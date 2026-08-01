@@ -79,15 +79,15 @@
   "moves": [
     {
       "source": "server/src/main/java/com/service/demo",
-      "target": "server/src/main/java/com/com/wust/dormitory/service"
+      "target": "server/src/main/java/com/wust/dormitory"
     },
     {
       "source": "starter/src/main/java/com/service/demo/StartApplication.java",
-      "target": "starter/src/main/java/com/wust/dormitory/service/WustDormitorySelectApplication.java"
+      "target": "starter/src/main/java/com/wust/dormitory/WustDormitorySelectApplication.java"
     },
     {
       "source": "server/src/main/resources/com/service/demo",
-      "target": "server/src/main/resources/com/wust/dormitory/service",
+      "target": "server/src/main/resources/com/wust/dormitory",
       "required": false
     }
   ],
