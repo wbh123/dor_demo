@@ -24,7 +24,7 @@ require_docker() {
 
 prepare() {
   require_docker
-  "${validate_script}"
+  bash "${validate_script}"
   mkdir -p "${repository_root}/data/mysql" "${repository_root}/data/redis"
   compose config >/dev/null
 }

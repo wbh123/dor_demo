@@ -95,6 +95,12 @@ class InfrastructureConfigurationTest(unittest.TestCase):
             self.assertNotEqual(failure.returncode, 0)
             self.assertIn("模板占位值", failure.stderr)
 
+    def test_start_script_invokes_validator_through_bash(self) -> None:
+        script = (REPO_ROOT / "scripts/dev/start-infra.sh").read_text(encoding="utf-8")
+        self.assertIn('bash "${validate_script}"', script)
+        direct_invocation = re.compile(r'^\s*"\$\{validate_script\}"\s*$', re.MULTILINE)
+        self.assertNotRegex(script, direct_invocation)
+
     def test_restart_recreates_services_to_apply_env_changes(self) -> None:
         script = (REPO_ROOT / "scripts/dev/start-infra.sh").read_text(encoding="utf-8")
         self.assertIn("compose up -d --force-recreate mysql redis", script)
