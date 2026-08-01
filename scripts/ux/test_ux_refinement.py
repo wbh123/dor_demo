@@ -131,24 +131,27 @@ class UxRefinementTest(unittest.TestCase):
         self.assertIn("position: sticky", content)
         self.assertIn("prefers-reduced-motion", content)
 
-    def test_scene_uses_two_by_two_layout_from_door_view(self) -> None:
+    def test_scene_uses_oblique_camera_and_longitudinal_bed_layout(self) -> None:
         scene = (FRONTEND / "components/student/RoomBedScene3D.vue").read_text(encoding="utf-8")
         for expected in (
-            "const FRONT_ROW_Z",
-            "const BACK_ROW_Z",
-            "const LEFT_COLUMN_X",
-            "const RIGHT_COLUMN_X",
-            "position === 3",
-            "RIGHT_COLUMN_X, BUNK_UPPER_Y, FRONT_ROW_Z",
-            "RIGHT_COLUMN_X, BUNK_LOWER_Y, FRONT_ROW_Z",
+            "const BED_LONGITUDINAL_ROTATION = Math.PI / 2",
+            "const LEFT_BED_COLUMN_X",
+            "const CENTER_BED_COLUMN_X",
+            "const BUNK_BED_COLUMN_X",
+            "const BACK_BED_Z",
+            "const FRONT_BED_Z",
+            "group.rotation.y = BED_LONGITUDINAL_ROTATION",
             "window.position.set(0,",
             "doorFrame.position.set(0,",
-            "camera.position.set(0,",
-            "camera.lookAt(0,",
+            "camera.position.set(mobile ? 9.7 : 9, mobile ? 8.8 : 7.7, mobile ? 16.8 : 13.3)",
+            "camera.lookAt(0, 1.05, 0)",
+            "斜视视角",
             "窗户正对入口",
-            "C床与上下铺同排",
+            "床位纵向排布",
         ):
             self.assertIn(expected, scene)
+        self.assertNotIn("camera.position.set(0, mobile ? 6.2", scene)
+        self.assertNotIn("整体为2×2布局", scene)
 
     def test_release_message_is_three_second_toast_and_layout_is_compact(self) -> None:
         detail = (FRONTEND / "views/student/RoomDetailView.vue").read_text(encoding="utf-8")

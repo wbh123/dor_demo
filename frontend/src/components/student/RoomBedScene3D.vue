@@ -19,14 +19,16 @@ const emit = defineEmits<{
 
 const ROOM_WIDTH = 11.5
 const ROOM_DEPTH = 8
-const LEFT_COLUMN_X = -2.65
-const RIGHT_COLUMN_X = 2.65
-const BACK_ROW_Z = -1.55
-const FRONT_ROW_Z = 1.45
-const BUNK_LOWER_Y = 0.58
-const BUNK_UPPER_Y = 2.02
+const LEFT_BED_COLUMN_X = -2.85
+const CENTER_BED_COLUMN_X = 0.15
+const BUNK_BED_COLUMN_X = 3.35
+const BACK_BED_Z = -1.45
+const FRONT_BED_Z = 1.5
+const BUNK_LOWER_Y = 0.66
+const BUNK_UPPER_Y = 2.08
 const BACK_WALL_Z = -3.92
 const FRONT_WALL_Z = 3.92
+const BED_LONGITUDINAL_ROTATION = Math.PI / 2
 
 const container = ref<HTMLDivElement | null>(null)
 const webglUnavailable = ref(false)
@@ -83,7 +85,7 @@ function initializeScene() {
     scene.background = new THREE.Color('#eaf2ff')
     scene.fog = new THREE.Fog('#eaf2ff', 18, 30)
 
-    camera = new THREE.PerspectiveCamera(40, 1, 0.1, 60)
+    camera = new THREE.PerspectiveCamera(39, 1, 0.1, 60)
     renderer = new THREE.WebGLRenderer({
       antialias: true,
       alpha: false,
@@ -93,7 +95,7 @@ function initializeScene() {
     renderer.shadowMap.enabled = true
     renderer.shadowMap.type = THREE.PCFSoftShadowMap
     renderer.domElement.className = 'three-bed-scene-canvas'
-    renderer.domElement.setAttribute('aria-label', '从门口观察的三维宿舍床位布局，可点击空床位进行选择')
+    renderer.domElement.setAttribute('aria-label', '斜视视角的三维宿舍床位布局，可点击空床位进行选择')
     renderer.domElement.setAttribute('role', 'img')
     renderer.domElement.style.touchAction = 'manipulation'
     renderer.domElement.addEventListener('pointerdown', handlePointerDown)
@@ -163,8 +165,8 @@ function addRoomShell() {
   leftWall.receiveShadow = true
   scene.add(leftWall)
 
-  const rightWall = new THREE.Mesh(new THREE.BoxGeometry(0.16, 4.8, ROOM_DEPTH), wallMaterial)
-  rightWall.position.set(5.66, 2.3, 0)
+  const rightWall = new THREE.Mesh(new THREE.BoxGeometry(0.16, 3.25, ROOM_DEPTH), wallMaterial)
+  rightWall.position.set(5.66, 1.53, 0)
   rightWall.receiveShadow = true
   scene.add(rightWall)
 
@@ -234,6 +236,7 @@ function renderBeds() {
     const group = type === 'BUNK_UPPER' || type === 'BUNK_LOWER'
       ? createBunkMattress(bed, placement)
       : createLoftBed(bed, placement)
+    group.rotation.y = BED_LONGITUDINAL_ROTATION
     bedLayer.add(group)
   }
 
@@ -255,14 +258,14 @@ function clearBedLayer() {
 
 function bedPlacement(bed: SceneBed) {
   const type = String(bed.bed_type)
-  if (type === 'BUNK_UPPER') return new THREE.Vector3(RIGHT_COLUMN_X, BUNK_UPPER_Y, FRONT_ROW_Z)
-  if (type === 'BUNK_LOWER') return new THREE.Vector3(RIGHT_COLUMN_X, BUNK_LOWER_Y, FRONT_ROW_Z)
+  if (type === 'BUNK_UPPER') return new THREE.Vector3(BUNK_BED_COLUMN_X, BUNK_UPPER_Y, FRONT_BED_Z)
+  if (type === 'BUNK_LOWER') return new THREE.Vector3(BUNK_BED_COLUMN_X, BUNK_LOWER_Y, FRONT_BED_Z)
 
   const position = Number(bed.position_index)
-  if (position === 1) return new THREE.Vector3(LEFT_COLUMN_X, 0, BACK_ROW_Z)
-  if (position === 2) return new THREE.Vector3(RIGHT_COLUMN_X, 0, BACK_ROW_Z)
-  if (position === 3) return new THREE.Vector3(LEFT_COLUMN_X, 0, FRONT_ROW_Z)
-  return new THREE.Vector3(RIGHT_COLUMN_X, 0, FRONT_ROW_Z)
+  if (position === 1) return new THREE.Vector3(LEFT_BED_COLUMN_X, 0, BACK_BED_Z)
+  if (position === 2) return new THREE.Vector3(LEFT_BED_COLUMN_X, 0, FRONT_BED_Z)
+  if (position === 3) return new THREE.Vector3(CENTER_BED_COLUMN_X, 0, FRONT_BED_Z)
+  return new THREE.Vector3(CENTER_BED_COLUMN_X, 0, BACK_BED_Z)
 }
 
 function createLoftBed(bed: SceneBed, placement: THREE.Vector3) {
@@ -295,7 +298,8 @@ function createLoftBed(bed: SceneBed, placement: THREE.Vector3) {
 
 function createSharedBunkFrame() {
   const group = new THREE.Group()
-  group.position.set(RIGHT_COLUMN_X, 0, FRONT_ROW_Z)
+  group.position.set(BUNK_BED_COLUMN_X, 0, FRONT_BED_Z)
+  group.rotation.y = BED_LONGITUDINAL_ROTATION
   const frame = new THREE.MeshStandardMaterial({ color: '#476386', roughness: 0.55, metalness: 0.1 })
 
   for (const x of [-1.12, 1.12]) {
@@ -490,9 +494,9 @@ function resizeScene() {
   renderer.setPixelRatio(ratio)
   renderer.setSize(width, height, false)
   camera.aspect = width / height
-  camera.fov = mobile ? 48 : compact ? 44 : 40
-  camera.position.set(0, mobile ? 6.2 : 5.35, mobile ? 14.8 : 12.2)
-  camera.lookAt(0, 1.15, -0.35)
+  camera.fov = mobile ? 48 : compact ? 43 : 39
+  camera.position.set(mobile ? 9.7 : 9, mobile ? 8.8 : 7.7, mobile ? 16.8 : 13.3)
+  camera.lookAt(0, 1.05, 0)
   camera.updateProjectionMatrix()
   requestRender()
 }
@@ -550,10 +554,9 @@ function disposeMaterial(material: THREE.Material) {
   <div class="three-bed-scene" :class="{ 'three-scene-selected': selectedBedIds.length > 0 }">
     <div ref="container" class="three-bed-scene-mount" />
     <div class="three-scene-orientation" aria-hidden="true">
-      <span>门口视角</span>
+      <span>斜视视角</span>
       <span>窗户正对入口</span>
-      <span>C床与上下铺同排</span>
-      <span>整体为2×2布局</span>
+      <span>床位纵向排布</span>
     </div>
     <div v-if="selectedBedLabel" class="three-scene-selection-badge">
       <strong>✓ 已选中</strong>
