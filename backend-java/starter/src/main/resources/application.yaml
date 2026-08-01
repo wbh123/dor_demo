@@ -1,0 +1,15 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: WustDormitorySelect
+  datasource:
+    username: root
+    password: change-me
+    url: jdbc:mysql://localhost:3306/wust_dormitory?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+mybatis:
+  mapper-locations: classpath*:com/wust/dormitory/mappers/**/*.xml
+

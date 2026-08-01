@@ -1,0 +1,24 @@
+openapi: 3.0.3
+info:
+  title: 基础响应
+  description: 通用基础模型
+  version: 1.0.0
+
+paths:
+
+components:
+  schemas:
+    BaseResponseBody:
+      type: object
+      properties:
+        code:
+          type: integer
+          format: int32
+          description: 状态码
+          default: 200
+        message:
+          type: string
+          default: 成功
+          description: 响应描述
+        data:
+          type: object

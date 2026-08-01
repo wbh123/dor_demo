@@ -1,0 +1,12 @@
+openapi: 3.0.3
+info:
+  title: Example Service 接口
+  description: 技术平台骨架接口
+  version: 1.0.0
+servers:
+  - url: 'http://localhost:8888'
+paths:
+  # ~1 和 ~0 分别用于转义路径片段中的 / 和 ~。
+  # 按接口域拆分契约文件，并在此处统一引用。
+  /api/v1/examples/echo:
+    $ref: 'example/example.yaml#/paths/~1examples~1echo'

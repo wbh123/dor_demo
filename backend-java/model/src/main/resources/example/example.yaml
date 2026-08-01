@@ -1,0 +1,74 @@
+openapi: 3.0.3
+info:
+  title: 示例接口
+  description: 技术平台骨架示例接口
+  version: 1.0.0
+tags:
+  - name: example
+
+paths:
+  /examples/echo:
+    post:
+      summary: 示例回显
+      operationId: echoExample
+      tags:
+        - example
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExampleRequest'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExampleResponse'
+        '400':
+          description: 参数校验失败
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi-base.yaml#/components/schemas/BaseResponseBody'
+
+components:
+  schemas:
+    ExampleRequest:
+      type: object
+      required:
+        - code
+        - name
+      properties:
+        code:
+          type: string
+          description: 示例编码
+        name:
+          type: string
+          description: 示例名称
+        description:
+          type: string
+          description: 示例说明
+
+    ExampleResponse:
+      type: object
+      properties:
+        requestId:
+          type: string
+          description: 请求标识
+        status:
+          type: string
+          description: 处理状态
+          enum:
+            - ACCEPTED
+            - REJECTED
+        code:
+          type: string
+          description: 示例编码
+        name:
+          type: string
+          description: 示例名称
+        description:
+          type: string
+          description: 示例说明

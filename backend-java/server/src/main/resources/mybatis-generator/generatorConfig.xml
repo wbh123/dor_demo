@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE generatorConfiguration
+        PUBLIC "-//mybatis.org//DTD MyBatis Generator Configuration 1.0//EN"
+        "http://mybatis.org/dtd/mybatis-generator-config_1_0.dtd">
+<generatorConfiguration>
+    <properties resource="mybatis-generator/generator.properties"/>
+
+    <context id="defaultContext" targetRuntime="MyBatis3">
+        <property name="autoDelimitKeywords" value="true"/>
+        <property name="beginningDelimiter" value="`"/>
+        <property name="endingDelimiter" value="`"/>
+        <property name="useJSR310Types" value="true"/>
+
+        <plugin type="org.mybatis.generator.plugins.MapperAnnotationPlugin"/>
+        <plugin type="org.mybatis.generator.plugins.UnmergeableXmlMappersPlugin"/>
+
+        <commentGenerator>
+            <property name="suppressAllComments" value="false"/>
+            <property name="suppressDate" value="true"/>
+            <property name="addRemarkComments" value="true"/>
+            <property name="javaFileEncoding" value="UTF-8"/>
+        </commentGenerator>
+
+        <jdbcConnection
+                driverClass="${driverClassName}"
+                connectionURL="${url}"
+                userId="${username}"
+                password="${password}">
+            <property name="nullCatalogMeansCurrent" value="true"/>
+        </jdbcConnection>
+
+        <javaTypeResolver>
+            <property name="forceBigDecimals" value="false"/>
+        </javaTypeResolver>
+
+        <!-- 生成前请将 com.wust.dormitory 替换为目标系统的根包名。 -->
+        <javaModelGenerator targetPackage="com.wust.dormitory.pojo.po" targetProject="MAVEN">
+            <property name="enableSubPackages" value="true"/>
+            <property name="trimStrings" value="true"/>
+        </javaModelGenerator>
+
+        <sqlMapGenerator targetPackage="com/wust/dormitory/mappers/" targetProject="MAVEN">
+            <property name="enableSubPackages" value="false"/>
+        </sqlMapGenerator>
+
+        <javaClientGenerator type="XMLMAPPER" targetPackage="com.wust.dormitory.mapper" targetProject="MAVEN">
+            <property name="enableSubPackages" value="false"/>
+        </javaClientGenerator>
+
+        <!-- 请将该示例表映射替换为目标系统的数据表。 -->
+        <table tableName="example_table" domainObjectName="ExampleEntity"/>
+    </context>
+</generatorConfiguration>
