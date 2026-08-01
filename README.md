@@ -1,8 +1,8 @@
 # 武汉科技大学学生宿舍智能选择系统
 
 > 仓库名称：`Wust-Dormitory-Select`  
-> 当前阶段：准备阶段——工程检查与项目文档基线  
-> 文档基线日期：2026-08-01
+> 当前阶段：准备阶段——本地基础设施与工程基线  
+> 最后更新：2026-08-01
 
 本项目面向高校学生宿舍分配与自主选寝场景，为学生提供自主选寝、随机选择、组队选寝和生活习惯匹配，为管理人员提供宿舍资源维护、批次规则配置、随机分配、过程监管、结果导出和异常调整能力。
 
@@ -71,6 +71,9 @@ backend-java/          Java 21 多模块后端
 └── starter/           Spring Boot 启动模块
 
 frontend/              Vue 3 + TypeScript + Vite 前端
+docker/                MySQL 与 Redis 本地开发基础设施
+scripts/dev/            配置校验、启动和基础设施测试脚本
+data/                  本地持久化数据，不提交版本库
 docs/                  项目需求、设计、开发阶段和开发规范
 records/               提示词、决策、变更、测试和每日开发记录
 ```
@@ -80,15 +83,15 @@ records/               提示词、决策、变更、测试和每日开发记录
 ## 5. 总体架构边界
 
 ```text
-Vue 3 前端
+Vue 3 前端（宿主机）
     ↓ REST + 服务器发送事件
-Spring Boot 单体业务系统
+Spring Boot 单体业务系统（宿主机）
     ├── 认证、权限和批次规则
     ├── 学生、组队、宿舍、房间和床位
     ├── 选寝、随机分配和匹配计算
     ├── 审计、统计和结果导出
-    ├── MySQL：最终业务事实
-    └── Redis：临时占用、热点状态和短期缓存
+    ├── MySQL 容器：最终业务事实
+    └── Redis 容器：临时占用、热点状态和短期缓存
 ```
 
 固定边界：
@@ -104,19 +107,51 @@ Spring Boot 单体业务系统
 
 | 阶段 | 目标 | 当前状态 |
 |---|---|---|
-| 准备阶段 | 工程修复、文档基线、环境和测试入口 | 进行中 |
+| 准备阶段 | 工程修复、文档基线、环境和测试入口 | 进行中，已建立 MySQL 与 Redis Compose |
 | 第一阶段 | 完成认证、资源、批次、问卷、个人/组队选寝、临时占用、实时推送和基础随机分配 | 待开发 |
 | 第二阶段 | 完善匹配推荐、异常调整、统计导出、交互体验和自动化验收 | 待开发 |
 | 第三阶段 | 实现可选增强能力，例如换寝申请、消息通知、运营分析和更细粒度策略 | 待评估 |
 
 阶段完成后必须形成验收记录并冻结稳定边界。后续阶段不得无理由重写已经冻结的核心链路。
 
-## 7. 构建入口
+## 7. 本地基础设施
 
-后端依赖父级物料清单工程，具体以 `backend-java/README.md` 为准。
+本地开发采用 A 方案：只在 Docker 中运行 MySQL 与 Redis，Java 后端和 Vue 前端在 WSL 或宿主机运行。
+
+首次准备：
+
+```bash
+cp .env.example .env
+```
+
+修改 `.env` 中的数据库业务密码、数据库根密码和 Redis 密码，然后执行：
+
+```bash
+bash scripts/dev/validate-env.sh
+bash scripts/dev/start-infra.sh up
+```
+
+查看状态：
+
+```bash
+bash scripts/dev/start-infra.sh status
+```
+
+停止容器但保留数据：
+
+```bash
+bash scripts/dev/start-infra.sh down
+```
+
+完整说明见 [`docker/README.md`](docker/README.md)。
+
+## 8. 构建入口
+
+后端依赖父级物料清单工程，具体以 `backend-java/README.md` 为准。请在仓库根目录启动，以便 Spring Boot 自动导入根目录 `.env`。
 
 ```bash
 mvn -f backend-java/pom.xml clean package -DskipTests
+java -jar backend-java/starter/target/Service.jar
 ```
 
 前端：
@@ -127,10 +162,15 @@ npm ci
 npm run build
 ```
 
-说明：当前提交重点建立文档和修正初始化目录，不代表完整构建、数据库和业务联调已经验收。
+基础设施配置测试：
 
-## 8. 文档入口
+```bash
+python -m unittest scripts/dev/test_infra_config.py -v
+```
 
+## 9. 文档入口
+
+- [`docker/README.md`](docker/README.md)：本地 MySQL 与 Redis 启停、验证和排障；
 - [`docs/README.md`](docs/README.md)：项目文档总索引；
 - [`docs/01_需求分析/01_软件开发需求设计.md`](docs/01_需求分析/01_软件开发需求设计.md)：面向开发人员的详细需求；
 - [`docs/01_需求分析/02_甲方需求说明书.md`](docs/01_需求分析/02_甲方需求说明书.md)：面向项目委托方的需求说明；

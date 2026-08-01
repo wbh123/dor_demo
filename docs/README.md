@@ -15,7 +15,10 @@ docs/
 ├── 01_需求分析/
 ├── 02_系统设计/
 ├── 03_开发阶段/
-└── 04_开发规范/
+├── 04_开发规范/
+└── superpowers/
+    ├── specs/
+    └── plans/
 ```
 
 ## 2. 当前权威文档
@@ -29,6 +32,9 @@ docs/
 | 5 | [`02_系统设计/01_业务架构与核心规则.md`](02_系统设计/01_业务架构与核心规则.md) | 核心流程、并发控制、实时推送和匹配算法设计 |
 | 6 | [`03_开发阶段/README.md`](03_开发阶段/README.md) | 准备阶段和三个正式开发阶段的范围与门禁 |
 | 7 | [`04_开发规范/01_开发与记录规范.md`](04_开发规范/01_开发与记录规范.md) | 开发流程、测试、提交、记录和验收要求 |
+| 8 | [`../docker/README.md`](../docker/README.md) | 本地 MySQL 与 Redis 部署、验证和排障 |
+| 9 | [`superpowers/specs/2026-08-01-local-infrastructure-compose-design.md`](superpowers/specs/2026-08-01-local-infrastructure-compose-design.md) | 本地基础设施设计基线 |
+| 10 | [`superpowers/plans/2026-08-01-local-infrastructure-compose.md`](superpowers/plans/2026-08-01-local-infrastructure-compose.md) | 本地基础设施实施计划与验证状态 |
 
 ## 3. 文档优先级
 
@@ -48,13 +54,15 @@ docs/
 
 ```text
 工程骨架：已初始化
-项目文档：本轮建立
-Java 包目录：本轮修复
+项目文档：已建立第一版
+Java 包目录：已修复
+本地 MySQL 与 Redis：已建立 Compose、统一配置和启动脚本
+Spring Boot Redis 配置：已接入
 正式数据库结构：待设计
 正式 OpenAPI：待设计
 核心后端业务：待开发
 正式前端页面：待开发
-自动化测试：待建立
+自动化测试：已建立基础设施配置测试，业务测试待建立
 ```
 
 当前示例接口、示例数据表和 Vue 默认页面只是工程占位内容，不应作为正式业务设计依据。

@@ -3,7 +3,7 @@
 > 项目：武汉科技大学学生宿舍智能选择系统  
 > 创建日期：2026-08-01
 
-本文件保存项目级关键节点。详细开发过程可在后续建立 `records/DAILY/`、`records/DECISIONS/` 和 `records/TESTS/` 子目录。
+本文件保存项目级关键节点。详细开发过程位于 `records/DAILY/`。
 
 ## 2026-08-01：仓库初始化检查与文档基线
 
@@ -56,20 +56,52 @@
 
 ### 验证说明
 
-本轮通过 GitHub 仓库内容和提交差异检查完成静态验证。由于当前执行环境未连接仓库本地工作区且缺少 GitHub 命令行工具，本轮不声称 Maven、前端构建或运行测试已经通过。后续应在本地或持续集成环境执行：
+本轮通过 GitHub 仓库内容和提交差异检查完成静态验证。由于当前执行环境未连接仓库本地工作区且缺少 GitHub 命令行工具，本轮不声称 Maven、前端构建或运行测试已经通过。
 
-```bash
-python -m unittest backend-java/scripts/test_rename_framework.py -v
-mvn -f backend-java/pom.xml clean package -DskipTests
-cd frontend && npm ci && npm run build
+## 2026-08-01：本地 MySQL 与 Redis Docker Compose
+
+### 用户要求
+
+- 继续开发本项目；
+- 参考“城安智序”的 Docker 目录和统一配置方式；
+- 先实施 A 方案，仅容器化基础设施。
+
+### 完成内容
+
+- 新增根目录 `.env.example`；
+- 新增只包含 MySQL 和 Redis 的 `docker/docker-compose.yml`；
+- MySQL 使用独立业务账号、`utf8mb4`、健康检查和 `data/mysql/` 持久化；
+- Redis 开启密码认证、追加文件持久化、健康检查和 `data/redis/` 持久化；
+- 新增环境配置校验脚本和基础设施管理脚本；
+- Spring Boot 改为从根目录 `.env` 读取 MySQL 与 Redis 配置；
+- 后端新增 Spring Data Redis Starter；
+- 新增本地部署说明、设计文档、实施计划和每日记录；
+- 根目录忽略 `.env` 与本地持久化数据；
+- 重启操作通过强制重建容器应用新的环境变量配置。
+
+### 测试结果
+
+采用测试先行方式，先验证测试在生产文件缺失时失败，再完成实现并重新执行；代码复核发现重启行为不能应用新环境变量后，再次按先失败、后修复的方式增加回归测试。
+
+```text
+Ran 7 tests
+OK
 ```
 
-父级物料清单工程和本地数据库依赖需要按实际环境准备。
+已通过：
+
+- Python 基础设施配置测试；
+- Bash 语法检查；
+- Compose 与 Spring YAML 静态解析；
+- Maven XML 静态解析。
+
+当前执行环境没有 Docker 和 Maven，因此真实容器健康、后端连接与 Maven 构建仍需在本地完成。详细记录见：
+
+[`records/DAILY/2026-08-01_15-25-00_本地基础设施DockerCompose.md`](DAILY/2026-08-01_15-25-00_本地基础设施DockerCompose.md)
 
 ### 下一步
 
-- 清理模板示例和前端默认页面；
-- 确认父级物料清单是否能够稳定获取；
-- 设计第一阶段数据库和 OpenAPI；
-- 建立根目录配置示例、Docker 开发基础设施和自动化测试；
-- 编写第一阶段详细开发计划。
+- 本地执行 Compose 并验证 MySQL、Redis 均为 `healthy`；
+- 设计第一阶段数据库迁移和 OpenAPI；
+- 为 Redis 临时占用建立正式业务实现和并发测试；
+- 清理示例接口、示例数据表和 Vue 默认页面。

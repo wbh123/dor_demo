@@ -1,0 +1,67 @@
+name: wust-dormitory-select-dev
+
+services:
+  mysql:
+    image: ${WUST_DORMITORY_MYSQL_IMAGE:?请在根目录.env配置WUST_DORMITORY_MYSQL_IMAGE}
+    container_name: wust-dormitory-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${WUST_DORMITORY_DB_NAME:?请在根目录.env配置WUST_DORMITORY_DB_NAME}
+      MYSQL_USER: ${WUST_DORMITORY_DB_USER:?请在根目录.env配置WUST_DORMITORY_DB_USER}
+      MYSQL_PASSWORD: ${WUST_DORMITORY_DB_PASSWORD:?请在根目录.env配置WUST_DORMITORY_DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${WUST_DORMITORY_DB_ROOT_PASSWORD:?请在根目录.env配置WUST_DORMITORY_DB_ROOT_PASSWORD}
+      TZ: ${WUST_DORMITORY_TIMEZONE:?请在根目录.env配置WUST_DORMITORY_TIMEZONE}
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
+      - --default-time-zone=+08:00
+    ports:
+      - "${WUST_DORMITORY_DB_PORT:?请在根目录.env配置WUST_DORMITORY_DB_PORT}:3306"
+    volumes:
+      - ../data/mysql:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p\"$${MYSQL_ROOT_PASSWORD}\" --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+    networks: [wust-dormitory-network]
+
+  redis:
+    image: ${WUST_DORMITORY_REDIS_IMAGE:?请在根目录.env配置WUST_DORMITORY_REDIS_IMAGE}
+    container_name: wust-dormitory-redis
+    restart: unless-stopped
+    environment:
+      REDIS_PASSWORD: ${WUST_DORMITORY_REDIS_PASSWORD:?请在根目录.env配置WUST_DORMITORY_REDIS_PASSWORD}
+      TZ: ${WUST_DORMITORY_TIMEZONE:?请在根目录.env配置WUST_DORMITORY_TIMEZONE}
+    command:
+      - sh
+      - -ec
+      - |
+        umask 077
+        cat > /tmp/redis.conf <<EOF
+        bind 0.0.0.0
+        protected-mode yes
+        port 6379
+        appendonly yes
+        appendfsync everysec
+        dir /data
+        requirepass $${REDIS_PASSWORD}
+        EOF
+        exec redis-server /tmp/redis.conf
+    ports:
+      - "${WUST_DORMITORY_REDIS_PORT:?请在根目录.env配置WUST_DORMITORY_REDIS_PORT}:6379"
+    volumes:
+      - ../data/redis:/data
+    healthcheck:
+      test: ["CMD-SHELL", "REDISCLI_AUTH=\"$${REDIS_PASSWORD}\" redis-cli -h 127.0.0.1 ping | grep -q PONG"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 5s
+    networks: [wust-dormitory-network]
+
+networks:
+  wust-dormitory-network:
+    name: wust-dormitory-network
+    driver: bridge
