@@ -2,15 +2,15 @@
 
 > 仓库：`Wust-Dormitory-Select`  
 > 第一阶段：已完成并最终冻结  
-> 第二阶段：开发中  
+> 第二阶段：开发中，逐房间床位布局配置已完成  
 > 最后更新：2026-08-01
 
-本项目面向高校新生宿舍选择与分配场景，为学生提供问卷、个人选寝、邀请式组队选寝、随机推荐和三维床位选择，为管理人员提供专业、学生、宿舍、批次、统一分配、结果导出、人工调整和审计能力。
+本项目面向高校新生宿舍选择与分配场景，为学生提供问卷、个人选寝、邀请式组队选寝、随机推荐和三维床位选择，为管理人员提供专业、学生、宿舍、批次、逐房间床位布局、统一分配、结果导出、人工调整和审计能力。
 
-## 1. 第一阶段最终闭环
+## 1. 核心业务闭环
 
 ```text
-管理人员维护专业、学生与宿舍资源
+管理人员维护专业、学生、宿舍和房间布局
 → 创建、准备并开放选寝活动
 → 学生激活账号并填写生活习惯问卷
 → 学生个人选择、邀请队友或使用随机推荐
@@ -20,8 +20,6 @@
 → 管理员统一分配未选学生
 → 查询、导出、人工调整和审计
 ```
-
-第一阶段：已完成并最终冻结。第二阶段：开发中。
 
 ## 2. 固定架构
 
@@ -45,7 +43,7 @@ Spring Boot 4单体后端
 - 生活习惯匹配使用确定性、可解释和可测试的算法；
 - 当前按单实例部署，不引入不必要的注册中心和消息队列。
 
-## 3. 第一阶段能力
+## 3. 已实现能力
 
 ### 学生端
 
@@ -54,15 +52,20 @@ Spring Boot 4单体后端
 - 问卷结果查看与修改；
 - 房间匹配排序、匿名室友偏好和随机推荐；
 - Three.js三维床位选择、下拉框联动和移动端适配；
+- 三维场景读取每个房间的自定义床位坐标与朝向；
 - 个人床位临时占用、直接换床和最终确认；
 - 邀请式组队：输入12位学号直接邀请，系统内部自动建立小组；
-- 队伍名称和内部编号不在学生端展示；
+- 小组名称和内部编号不在学生端展示；
 - 多床位整体占用与确认；
 - 最终住宿结果查询。
 
 ### 管理端
 
 - 专业、学生、楼栋、房间和床位资源管理；
+- 每个房间独立床位布局编辑；
+- 俯视拖拽、0.25单位吸附、90度旋转和数值输入；
+- 上下铺作为同一床架整体调整位置；
+- 布局乐观锁、修改原因和审计；
 - 学生批量导入；
 - 批次创建、准备、发布、开放、暂停、关闭和完成；
 - 批次资格与楼栋、房间、床位开放范围；
@@ -74,6 +77,7 @@ Spring Boot 4单体后端
 - Redis令牌化临时占用、原子释放和过期；
 - MySQL双唯一约束与事务确认；
 - 同一学生同一时刻只参加一个活动批次；
+- 房间布局使用`room.version`避免管理员互相覆盖；
 - 房间级服务器发送事件连接、心跳和重连。
 
 ## 4. 当前宿舍与数据边界
@@ -95,7 +99,7 @@ Spring Boot 4单体后端
 - 64个男生五人间、80个女生四人间；
 - 144个房间、640个床位。
 
-当前男生五人间为3个上床下桌和1组上下铺；女生四人间为4个上床下桌。房型可扩展，但每个房间必须固定为男寝或女寝。
+男生五人间当前为3个上床下桌和1组上下铺，女生四人间为4个上床下桌。房型可扩展，但每个房间必须固定为男寝或女寝。
 
 ## 5. 数据库基线
 
@@ -106,8 +110,11 @@ backend-java/server/src/main/resources/db/migration/
 ├── V1__create_phase1_schema.sql
 ├── V2__enforce_fixed_room_gender.sql
 ├── V3__normalize_major_and_minimize_student.sql
-└── V4__refine_questionnaire_and_active_batch_rules.sql
+├── V4__refine_questionnaire_and_active_batch_rules.sql
+└── V5__add_room_bed_layout.sql
 ```
+
+V5新增`room_bed_layout`，保存每个床位的平面坐标和朝向；没有记录的旧房间继续使用默认布局；同一上下铺床架的上下层必须共享平面位置和朝向。
 
 固化结构：
 
@@ -132,7 +139,7 @@ cp .env.example .env
 # 填写数据库业务密码、根密码和Redis密码
 ```
 
-`.env`中必须填写真实值，不能写成自引用表达式，例如：
+`.env`中必须填写真实值，不能写成自引用表达式：
 
 ```properties
 WUST_DORMITORY_DB_USER=wust_dormitory_dev
@@ -152,7 +159,7 @@ bash scripts/dev/reset-local-environment.sh
 bash scripts/dev/reset-local-environment.sh --yes
 ```
 
-该脚本会删除本地`data/mysql`和`data/redis`，执行Flyway V1至V4，再直接导入520名学生和640个床位的开发数据。
+脚本会删除本地`data/mysql`和`data/redis`，自动扫描并执行正式目录中的最新Flyway迁移，再导入520名学生和640个床位的开发数据。
 
 ### 6.3 启动后端
 
@@ -187,21 +194,20 @@ python -m unittest scripts/api/test_openapi_contract.py -v
 python -m unittest scripts/backend/test_phase1_source.py -v
 python -m unittest scripts/frontend/test_frontend_baseline.py -v
 python -m unittest scripts/ux/test_ux_refinement.py -v
+python -m unittest scripts/phase2/test_room_layout.py -v
 mvn -f backend-java/pom.xml clean verify
 cd frontend && npm run build
 ```
 
-GitHub Actions还会在全新MySQL和Redis中执行Flyway、Spring Boot健康检查和完整HTTP业务闭环。
+GitHub Actions还会在全新MySQL和Redis中执行Flyway V1至V5、Spring Boot健康检查、第一阶段回归和第二阶段房间布局HTTP验收。
 
-## 8. 第二阶段
+## 8. 第二阶段进度
 
-第二阶段：开发中。按照文档优先实施：
-
-1. 每个房间独立床位布局和上下铺位置配置；
-2. 匹配权重、冲突解释与运营界面；
-3. 批次复制、规则模板和复杂组队异常处理；
-4. 导入安全、数据质量、统计、性能与恢复能力；
-5. 分配优化和公平性评估。
+1. **已完成：** 每个房间独立床位布局和上下铺位置配置；
+2. **下一项：** 匹配权重、冲突解释与运营界面；
+3. 待开发：批次复制、规则模板和复杂组队异常处理；
+4. 待开发：导入安全、数据质量、统计、性能与恢复能力；
+5. 待开发：分配优化和公平性评估。
 
 第一阶段冻结边界不得被破坏：OpenAPI先行、Flyway只增不改、Redis不作为最终事实、关键分配事务化并可审计。
 
@@ -210,6 +216,6 @@ GitHub Actions还会在全新MySQL和Redis中执行Flyway、Spring Boot健康检
 - [`docs/README.md`](docs/README.md)：文档总索引；
 - [`docs/03_开发阶段/README.md`](docs/03_开发阶段/README.md)：阶段总览；
 - [`docs/03_开发阶段/01_第一阶段/README.md`](docs/03_开发阶段/01_第一阶段/README.md)：第一阶段最终状态；
-- [`docs/03_开发阶段/01_第一阶段/07_第一阶段冻结说明.md`](docs/03_开发阶段/01_第一阶段/07_第一阶段冻结说明.md)：冻结与验收证据；
+- [`docs/03_开发阶段/02_第二阶段/README.md`](docs/03_开发阶段/02_第二阶段/README.md)：第二阶段进度；
 - [`backend-java/docs/database-dictionary.md`](backend-java/docs/database-dictionary.md)：数据库字典；
 - [`AGENTS.md`](AGENTS.md)：项目开发约束。

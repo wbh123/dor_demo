@@ -116,6 +116,15 @@ class InfrastructureConfigurationTest(unittest.TestCase):
         self.assertIn("compose up -d --force-recreate mysql redis", script)
         self.assertNotIn("compose restart mysql redis", script)
 
+    def test_reset_script_discovers_latest_formal_migration_version(self) -> None:
+        script = (REPO_ROOT / "scripts/dev/reset-local-environment.sh").read_text(encoding="utf-8")
+        self.assertIn("latest_migration_version()", script)
+        self.assertIn('find "${FORMAL_SQL_DIR}"', script)
+        self.assertIn('LATEST_MIGRATION_VERSION="$(latest_migration_version)"', script)
+        self.assertIn('[[ "${version}" == "${LATEST_MIGRATION_VERSION}" ]]', script)
+        self.assertNotIn('[[ "${version}" == "4" ]]', script)
+        self.assertNotIn("Flyway：V1～V4", script)
+
     def test_shell_scripts_have_valid_bash_syntax(self) -> None:
         for relative in (
             "scripts/dev/validate-env.sh",

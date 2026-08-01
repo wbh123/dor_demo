@@ -6,7 +6,7 @@ set -Eeuo pipefail
 #
 # 重建策略：
 #   1. 删除本地 MySQL、Redis 持久化数据；
-#   2. 使用 Flyway 只执行正式版本迁移 V1～V4；
+#   2. 使用 Flyway 执行正式目录中的全部版本迁移；
 #   3. 使用 MySQL 客户端直接导入开发测试数据；
 #   4. 测试数据不写入 flyway_schema_history，避免后端只加载正式迁移时校验失败。
 #
@@ -32,6 +32,7 @@ MYSQL_CONTAINER="wust-dormitory-mysql"
 REDIS_CONTAINER="wust-dormitory-redis"
 DOCKER_NETWORK="wust-dormitory-network"
 FLYWAY_IMAGE="${WUST_DORMITORY_FLYWAY_IMAGE:-flyway/flyway:11.14.1-alpine}"
+LATEST_MIGRATION_VERSION=""
 
 ASSUME_YES=0
 case "${1:-}" in
@@ -59,6 +60,17 @@ fail() {
 
 require_command() {
   command -v "$1" >/dev/null 2>&1 || fail "未找到命令：$1"
+}
+
+latest_migration_version() {
+  find "${FORMAL_SQL_DIR}" \
+    -maxdepth 1 \
+    -type f \
+    -name 'V[0-9]*__*.sql' \
+    -printf '%f\n' \
+    | sed -nE 's/^V([0-9]+)__.*/\1/p' \
+    | sort -n \
+    | tail -n 1
 }
 
 compose() {
@@ -128,6 +140,10 @@ validate_environment() {
 
   [[ -f "${DEV_REFINEMENT_SQL}" ]] \
     || fail "未找到开发问卷修正脚本：${DEV_REFINEMENT_SQL}"
+
+  LATEST_MIGRATION_VERSION="$(latest_migration_version)"
+  [[ "${LATEST_MIGRATION_VERSION}" =~ ^[0-9]+$ ]] \
+    || fail "无法从正式迁移目录识别最新Flyway版本"
 
   if grep -q '请替换为' "${ENV_FILE}"; then
     fail ".env 中仍有“请替换为...”占位配置，请先填写 MySQL 和 Redis 密码。"
@@ -248,7 +264,7 @@ run_formal_migrations() {
   docker image inspect "${FLYWAY_IMAGE}" >/dev/null 2>&1 \
     || docker pull "${FLYWAY_IMAGE}"
 
-  log "使用 Flyway 容器执行正式版本迁移 V1～V4"
+  log "使用 Flyway 容器执行正式版本迁移 V1～V${LATEST_MIGRATION_VERSION}"
   docker run --rm \
     --network "${DOCKER_NETWORK}" \
     -e "FLYWAY_URL=jdbc:mysql://${MYSQL_CONTAINER}:3306/${database}?useUnicode=true&characterEncoding=utf8&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai" \
@@ -299,7 +315,7 @@ query() {
 verify() {
   log "校验正式迁移历史与开发测试数据"
 
-  local version unresolved_repeatable counts smoking lock_table admin_count
+  local version unresolved_repeatable counts smoking lock_table layout_table admin_count
 
   version="$(query <<'SQL'
 SELECT MAX(CAST(version AS UNSIGNED))
@@ -307,8 +323,8 @@ FROM flyway_schema_history
 WHERE success=1 AND version IS NOT NULL;
 SQL
 )"
-  [[ "${version}" == "4" ]] \
-    || fail "Flyway版本应为4，实际为：${version}"
+  [[ "${version}" == "${LATEST_MIGRATION_VERSION}" ]] \
+    || fail "Flyway版本应为${LATEST_MIGRATION_VERSION}，实际为：${version}"
 
   unresolved_repeatable="$(query <<'SQL'
 SELECT COUNT(*)
@@ -354,6 +370,18 @@ SQL
   [[ "${lock_table}" == "1" ]] \
     || fail "V4活动批次锁表未建立"
 
+  if (( LATEST_MIGRATION_VERSION >= 5 )); then
+    layout_table="$(query <<'SQL'
+SELECT COUNT(*)
+FROM information_schema.tables
+WHERE table_schema=DATABASE()
+  AND table_name='room_bed_layout';
+SQL
+)"
+    [[ "${layout_table}" == "1" ]] \
+      || fail "V5房间床位布局表未建立"
+  fi
+
   admin_count="$(query <<'SQL'
 SELECT COUNT(*)
 FROM app_user
@@ -368,7 +396,7 @@ SQL
 }
 
 print_summary() {
-  cat <<'EOF'
+  cat <<EOF
 
 ============================================================
 本地数据库与 Docker 基础设施已从零重建
@@ -379,7 +407,7 @@ print_summary() {
   Redis：healthy
 
 正式结构：
-  Flyway：V1～V4
+  Flyway：V1～V${LATEST_MIGRATION_VERSION}
   Flyway历史中不记录开发测试数据
 
 开发数据：

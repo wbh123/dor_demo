@@ -11,6 +11,8 @@ import com.wust.dormitory.model.dto.BatchRequest;
 import com.wust.dormitory.model.dto.ListSuccessResponse;
 import com.wust.dormitory.model.dto.MajorRequest;
 import com.wust.dormitory.model.dto.ObjectSuccessResponse;
+import com.wust.dormitory.model.dto.RoomBedLayoutItem;
+import com.wust.dormitory.model.dto.RoomBedLayoutRequest;
 import com.wust.dormitory.model.dto.RoomRequest;
 import com.wust.dormitory.model.dto.StudentRequest;
 import com.wust.dormitory.model.dto.VoidSuccessResponse;
@@ -31,6 +33,7 @@ import java.util.Map;
 @RestController
 public class AdminController implements AdminApi {
     private final AdminService adminService;
+    private final RoomLayoutService roomLayoutService;
     private final BatchLifecycleService batchLifecycleService;
     private final AdminAllocationService allocationService;
     private final AssignmentQueryService assignmentQueryService;
@@ -39,6 +42,7 @@ public class AdminController implements AdminApi {
     private final BatchRuleValidator batchRuleValidator;
 
     public AdminController(AdminService adminService,
+                           RoomLayoutService roomLayoutService,
                            BatchLifecycleService batchLifecycleService,
                            AdminAllocationService allocationService,
                            AssignmentQueryService assignmentQueryService,
@@ -46,6 +50,7 @@ public class AdminController implements AdminApi {
                            AssignmentExportService exportService,
                            BatchRuleValidator batchRuleValidator) {
         this.adminService = adminService;
+        this.roomLayoutService = roomLayoutService;
         this.batchLifecycleService = batchLifecycleService;
         this.allocationService = allocationService;
         this.assignmentQueryService = assignmentQueryService;
@@ -128,6 +133,27 @@ public class AdminController implements AdminApi {
                 request.getRemark(),
                 request.getReason()), SecurityUsers.requireAdmin());
         return ResponseEntity.ok(ResponseFactory.empty());
+    }
+
+    @Override
+    public ResponseEntity<ObjectSuccessResponse> getRoomBedLayout(Long roomId) {
+        SecurityUsers.requireAdmin();
+        return ResponseEntity.ok(ResponseFactory.object(roomLayoutService.getLayout(roomId)));
+    }
+
+    @Override
+    public ResponseEntity<ObjectSuccessResponse> updateRoomBedLayout(
+            Long roomId,
+            RoomBedLayoutRequest request) {
+        List<RoomLayoutService.LayoutItem> beds = request.getBeds().stream()
+                .map(this::layoutItem)
+                .toList();
+        RoomLayoutService.LayoutCommand command = new RoomLayoutService.LayoutCommand(
+                request.getExpectedRoomVersion(),
+                request.getReason(),
+                beds);
+        return ResponseEntity.ok(ResponseFactory.object(
+                roomLayoutService.updateLayout(roomId, command, SecurityUsers.requireAdmin())));
     }
 
     @Override
@@ -231,6 +257,14 @@ public class AdminController implements AdminApi {
                 )
                 .contentType(new MediaType("text", "csv", StandardCharsets.UTF_8))
                 .body(resource);
+    }
+
+    private RoomLayoutService.LayoutItem layoutItem(RoomBedLayoutItem item) {
+        return new RoomLayoutService.LayoutItem(
+                item.getBedId(),
+                item.getLayoutX(),
+                item.getLayoutZ(),
+                item.getRotationDegrees().getValue());
     }
 
     private AdminService.MajorCommand majorCommand(MajorRequest request) {

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref, watch } from 'vue'
+import RoomLayoutEditor from '../../components/admin/RoomLayoutEditor.vue'
 import { api } from '../../api/client'
 import type { DataObject, ListSuccessResponse, RoomRequest } from '../../api/types'
 
@@ -8,6 +9,7 @@ const rooms = ref<DataObject[]>([])
 const buildingId = ref<number | undefined>()
 const gender = ref('')
 const selectedRoom = ref<DataObject | null>(null)
+const layoutRoom = ref<DataObject | null>(null)
 const loadingRooms = ref(false)
 const error = ref('')
 const message = ref('')
@@ -64,6 +66,12 @@ function openRoomEditor(room: DataObject) {
   editForm.reason = ''
 }
 
+function openLayoutEditor(room: DataObject) {
+  layoutRoom.value = room
+  error.value = ''
+  message.value = ''
+}
+
 function closeRoomEditor() {
   selectedRoom.value = null
   editForm.reason = ''
@@ -83,6 +91,10 @@ async function saveRoom() {
   }
 }
 
+function roomLabel(room: DataObject) {
+  return `${String(room.building_name)} ${String(room.room_number)}`
+}
+
 function roomType(value: unknown) {
   return { FOUR_PERSON: '四人间', FIVE_PERSON: '五人间', SIX_PERSON: '六人间', OTHER: '其他' }[String(value)] ?? value
 }
@@ -97,7 +109,7 @@ function statusText(value: unknown) {
     <div class="page-title">
       <span class="eyebrow">DORMITORY RESOURCES</span>
       <h2>宿舍、房间与床位</h2>
-      <p>房型和性别属性分别维护。每间房固定为男寝或女寝，当前男五人间、女四人间只是现阶段配置。</p>
+      <p>房型和性别属性分别维护。每间房固定为男寝或女寝，并可按实际家具位置单独调整床位布局。</p>
     </div>
 
     <p v-if="error" class="alert error">{{ error }}</p>
@@ -139,7 +151,12 @@ function statusText(value: unknown) {
               <td>{{ room.gender_restriction === 'M' ? '男寝' : '女寝' }}</td>
               <td>{{ room.enabled_bed_count }}/{{ room.capacity }}</td>
               <td><span class="status-chip compact">{{ statusText(room.operational_status) }}</span></td>
-              <td><button class="button ghost small" type="button" @click="openRoomEditor(room)">编辑</button></td>
+              <td>
+                <div class="button-row compact-actions">
+                  <button class="button ghost small" type="button" @click="openRoomEditor(room)">编辑</button>
+                  <button class="button ghost small" type="button" @click="openLayoutEditor(room)">布局</button>
+                </div>
+              </td>
             </tr>
           </tbody>
         </table>
@@ -166,5 +183,13 @@ function statusText(value: unknown) {
         </form>
       </section>
     </div>
+
+    <RoomLayoutEditor
+      v-if="layoutRoom"
+      :room-id="Number(layoutRoom.id)"
+      :room-label="roomLabel(layoutRoom)"
+      @close="layoutRoom = null"
+      @saved="loadRooms"
+    />
   </div>
 </template>

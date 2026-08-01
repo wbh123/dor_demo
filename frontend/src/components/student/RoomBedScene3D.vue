@@ -221,10 +221,13 @@ function renderBeds() {
   if (!scene || !bedLayer || !renderer || !camera) return
 
   clearBedLayer()
-  const hasBunkBed = props.beds.some((bed) =>
+  const bunkBed = props.beds.find((bed) =>
     ['BUNK_UPPER', 'BUNK_LOWER'].includes(String(bed.bed_type)),
   )
-  if (hasBunkBed) bedLayer.add(createSharedBunkFrame())
+  if (bunkBed) {
+    const anchor = bunkAnchor(bunkBed)
+    bedLayer.add(createSharedBunkFrame(anchor, bedRotation(bunkBed)))
+  }
 
   for (const bed of props.beds) {
     const bedId = Number(bed.id)
@@ -232,11 +235,12 @@ function renderBeds() {
     bedById.set(bedId, bed)
 
     const type = String(bed.bed_type)
-    const placement = bedPlacement(bed)
+    const placement = customBedPlacement(bed) ?? defaultBedPlacement(bed)
     const group = type === 'BUNK_UPPER' || type === 'BUNK_LOWER'
       ? createBunkMattress(bed, placement)
       : createLoftBed(bed, placement)
     group.rotation.y = BED_LONGITUDINAL_ROTATION
+    group.rotation.y = bedRotation(bed)
     bedLayer.add(group)
   }
 
@@ -256,7 +260,17 @@ function clearBedLayer() {
   bedById.clear()
 }
 
-function bedPlacement(bed: SceneBed) {
+function customBedPlacement(bed: SceneBed) {
+  if (bed.layout_x == null || bed.layout_z == null) return null
+  const x = Number(bed.layout_x)
+  const z = Number(bed.layout_z)
+  if (!Number.isFinite(x) || !Number.isFinite(z)) return null
+  const type = String(bed.bed_type)
+  const y = type === 'BUNK_UPPER' ? BUNK_UPPER_Y : type === 'BUNK_LOWER' ? BUNK_LOWER_Y : 0
+  return new THREE.Vector3(x, y, z)
+}
+
+function defaultBedPlacement(bed: SceneBed) {
   const type = String(bed.bed_type)
   if (type === 'BUNK_UPPER') return new THREE.Vector3(BUNK_BED_COLUMN_X, BUNK_UPPER_Y, FRONT_BED_Z)
   if (type === 'BUNK_LOWER') return new THREE.Vector3(BUNK_BED_COLUMN_X, BUNK_LOWER_Y, FRONT_BED_Z)
@@ -266,6 +280,21 @@ function bedPlacement(bed: SceneBed) {
   if (position === 2) return new THREE.Vector3(LEFT_BED_COLUMN_X, 0, FRONT_BED_Z)
   if (position === 3) return new THREE.Vector3(CENTER_BED_COLUMN_X, 0, FRONT_BED_Z)
   return new THREE.Vector3(CENTER_BED_COLUMN_X, 0, BACK_BED_Z)
+}
+
+function defaultBedRotation() {
+  return BED_LONGITUDINAL_ROTATION
+}
+
+function bedRotation(bed: SceneBed) {
+  if (bed.rotation_degrees == null) return defaultBedRotation()
+  const degrees = Number(bed.rotation_degrees)
+  return Number.isFinite(degrees) ? THREE.MathUtils.degToRad(degrees) : defaultBedRotation()
+}
+
+function bunkAnchor(bed: SceneBed) {
+  const placement = customBedPlacement(bed) ?? defaultBedPlacement(bed)
+  return new THREE.Vector3(placement.x, 0, placement.z)
 }
 
 function createLoftBed(bed: SceneBed, placement: THREE.Vector3) {
@@ -296,10 +325,10 @@ function createLoftBed(bed: SceneBed, placement: THREE.Vector3) {
   return group
 }
 
-function createSharedBunkFrame() {
+function createSharedBunkFrame(placement: THREE.Vector3, rotation: number) {
   const group = new THREE.Group()
-  group.position.set(BUNK_BED_COLUMN_X, 0, FRONT_BED_Z)
-  group.rotation.y = BED_LONGITUDINAL_ROTATION
+  group.position.copy(placement)
+  group.rotation.y = rotation
   const frame = new THREE.MeshStandardMaterial({ color: '#476386', roughness: 0.55, metalness: 0.1 })
 
   for (const x of [-1.12, 1.12]) {
@@ -556,7 +585,7 @@ function disposeMaterial(material: THREE.Material) {
     <div class="three-scene-orientation" aria-hidden="true">
       <span>斜视视角</span>
       <span>窗户正对入口</span>
-      <span>床位纵向排布</span>
+      <span>按房间布局展示</span>
     </div>
     <div v-if="selectedBedLabel" class="three-scene-selection-badge">
       <strong>✓ 已选中</strong>

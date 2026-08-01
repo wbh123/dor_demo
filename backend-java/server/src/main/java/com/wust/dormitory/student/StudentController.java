@@ -24,15 +24,18 @@ import java.util.Map;
 @RestController
 public class StudentController implements StudentApi {
     private final StudentService studentService;
+    private final StudentRoomLayoutService roomLayoutService;
     private final TeamService teamService;
     private final TeamHoldReleaseService teamHoldReleaseService;
     private final BedScopeGuard bedScopeGuard;
 
     public StudentController(StudentService studentService,
+                             StudentRoomLayoutService roomLayoutService,
                              TeamService teamService,
                              TeamHoldReleaseService teamHoldReleaseService,
                              BedScopeGuard bedScopeGuard) {
         this.studentService = studentService;
+        this.roomLayoutService = roomLayoutService;
         this.teamService = teamService;
         this.teamHoldReleaseService = teamHoldReleaseService;
         this.bedScopeGuard = bedScopeGuard;
@@ -67,7 +70,8 @@ public class StudentController implements StudentApi {
 
     @Override
     public ResponseEntity<ObjectSuccessResponse> getCandidateRoom(Long batchId, Long roomId) {
-        Map<String, Object> snapshot = studentService.room(batchId, roomId, student());
+        Map<String, Object> snapshot = roomLayoutService.enrich(
+                studentService.room(batchId, roomId, student()));
         return ResponseEntity.ok(ResponseFactory.object(
                 bedScopeGuard.filterRoomSnapshot(batchId, snapshot)));
     }
