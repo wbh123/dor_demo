@@ -11,6 +11,13 @@ spring:
     password: ${WUST_DORMITORY_DB_PASSWORD}
     url: jdbc:mysql://${WUST_DORMITORY_DB_HOST:localhost}:${WUST_DORMITORY_DB_PORT:3306}/${WUST_DORMITORY_DB_NAME:wust_dormitory}?useUnicode=true&characterEncoding=utf8&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai
     driver-class-name: com.mysql.cj.jdbc.Driver
+  flyway:
+    enabled: true
+    locations: ${WUST_DORMITORY_FLYWAY_LOCATIONS:classpath:db/migration}
+    validate-on-migrate: true
+    baseline-on-migrate: false
+    clean-disabled: true
+    table: flyway_schema_history
   data:
     redis:
       host: ${WUST_DORMITORY_REDIS_HOST:localhost}
@@ -22,6 +29,8 @@ spring:
 
 mybatis:
   mapper-locations: classpath*:com/wust/dormitory/mappers/**/*.xml
+  configuration:
+    map-underscore-to-camel-case: true
 
 management:
   endpoints:

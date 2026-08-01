@@ -33,7 +33,6 @@
             <property name="forceBigDecimals" value="false"/>
         </javaTypeResolver>
 
-        <!-- 生成前请将 com.wust.dormitory 替换为目标系统的根包名。 -->
         <javaModelGenerator targetPackage="com.wust.dormitory.pojo.po" targetProject="MAVEN">
             <property name="enableSubPackages" value="true"/>
             <property name="trimStrings" value="true"/>
@@ -47,7 +46,30 @@
             <property name="enableSubPackages" value="false"/>
         </javaClientGenerator>
 
-        <!-- 请将该示例表映射替换为目标系统的数据表。 -->
-        <table tableName="example_table" domainObjectName="ExampleEntity"/>
+        <table tableName="organization" domainObjectName="OrganizationEntity"/>
+        <table tableName="app_user" domainObjectName="AppUserEntity"/>
+        <table tableName="campus" domainObjectName="CampusEntity"/>
+        <table tableName="student" domainObjectName="StudentEntity"/>
+        <table tableName="dormitory_building" domainObjectName="DormitoryBuildingEntity"/>
+        <table tableName="dormitory_floor" domainObjectName="DormitoryFloorEntity"/>
+        <table tableName="room" domainObjectName="RoomEntity"/>
+        <table tableName="bed_frame" domainObjectName="BedFrameEntity"/>
+        <table tableName="bed" domainObjectName="BedEntity"/>
+        <table tableName="selection_batch" domainObjectName="SelectionBatchEntity"/>
+        <table tableName="batch_student_eligibility" domainObjectName="BatchStudentEligibilityEntity"/>
+        <table tableName="questionnaire_version" domainObjectName="QuestionnaireVersionEntity"/>
+        <table tableName="questionnaire_question" domainObjectName="QuestionnaireQuestionEntity"/>
+        <table tableName="questionnaire_option" domainObjectName="QuestionnaireOptionEntity"/>
+        <table tableName="questionnaire_answer" domainObjectName="QuestionnaireAnswerEntity"/>
+        <table tableName="student_feature" domainObjectName="StudentFeatureEntity"/>
+        <table tableName="matching_weight_scheme" domainObjectName="MatchingWeightSchemeEntity"/>
+        <table tableName="selection_team" domainObjectName="SelectionTeamEntity"/>
+        <table tableName="selection_team_member" domainObjectName="SelectionTeamMemberEntity"/>
+        <table tableName="team_invitation" domainObjectName="TeamInvitationEntity"/>
+        <table tableName="bed_assignment" domainObjectName="BedAssignmentEntity"/>
+        <table tableName="assignment_history" domainObjectName="AssignmentHistoryEntity"/>
+        <table tableName="allocation_run" domainObjectName="AllocationRunEntity"/>
+        <table tableName="allocation_run_result" domainObjectName="AllocationRunResultEntity"/>
+        <table tableName="audit_log" domainObjectName="AuditLogEntity"/>
     </context>
 </generatorConfiguration>
