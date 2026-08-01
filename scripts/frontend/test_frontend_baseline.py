@@ -17,7 +17,7 @@ class FrontendBaselineTest(unittest.TestCase):
         self.assertIn("openapi-typescript", scripts["generate:api"])
         self.assertEqual(scripts["predev"], "npm run generate:api")
         self.assertIn("npm run generate:api", scripts["build"])
-        for dependency in ("axios", "pinia", "vue-router"):
+        for dependency in ("axios", "pinia", "three", "vue-router"):
             self.assertIn(dependency, package["dependencies"])
 
     def test_api_layer_consumes_generated_schema(self) -> None:
@@ -57,6 +57,7 @@ class FrontendBaselineTest(unittest.TestCase):
             "views/student/QuestionnaireView.vue",
             "views/student/RoomListView.vue",
             "views/student/RoomDetailView.vue",
+            "components/student/RoomBedScene3D.vue",
             "views/student/TeamView.vue",
             "views/student/AssignmentView.vue",
             "views/admin/AdminDashboardView.vue",
@@ -68,10 +69,12 @@ class FrontendBaselineTest(unittest.TestCase):
         for relative in required:
             self.assertTrue((SRC / relative).is_file(), relative)
 
-    def test_room_detail_supports_personal_team_and_realtime_modes(self) -> None:
+    def test_room_detail_supports_personal_team_realtime_and_switching_modes(self) -> None:
         content = (SRC / "views/student/RoomDetailView.vue").read_text(encoding="utf-8")
         self.assertIn("subscribeRoomEvents", content)
-        self.assertIn("/beds/${selectedBedIds.value[0]}/hold", content)
+        self.assertIn("/beds/${bedIds[0]}/hold", content)
+        self.assertIn("releaseIndividualHold", content)
+        self.assertIn("switchIndividualBed", content)
         self.assertIn("/teams/${teamId}/hold", content)
         self.assertIn("/teams/${teamId}/confirm", content)
         self.assertIn("/teams/${teamId}/release", content)

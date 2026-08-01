@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import json
 import unittest
 from pathlib import Path
 
@@ -90,21 +91,47 @@ class UxRefinementTest(unittest.TestCase):
         self.assertNotIn("student_name", content)
         self.assertNotIn("student_number", content)
 
-    def test_room_detail_uses_visual_scene_without_state_version(self) -> None:
+    def test_threejs_dependency_and_scene_component_exist(self) -> None:
+        package_json = json.loads((REPO_ROOT / "frontend/package.json").read_text(encoding="utf-8"))
+        self.assertIn("three", package_json["dependencies"])
+
+        scene_path = FRONTEND / "components/student/RoomBedScene3D.vue"
+        self.assertTrue(scene_path.exists())
+        scene = scene_path.read_text(encoding="utf-8")
+        self.assertIn("import * as THREE from 'three'", scene)
+        self.assertIn("new THREE.Raycaster()", scene)
+        self.assertIn("new ResizeObserver", scene)
+        self.assertIn("BUNK_UPPER", scene)
+        self.assertIn("BUNK_LOWER", scene)
+        self.assertIn("emit('select'", scene)
+        self.assertIn("prefers-reduced-motion", scene)
+
+    def test_room_detail_has_dropdown_and_direct_switching(self) -> None:
         content = (FRONTEND / "views/student/RoomDetailView.vue").read_text(encoding="utf-8")
-        self.assertIn("room-scene", content)
-        self.assertIn("room-window", content)
-        self.assertIn("bedPlacement", content)
-        self.assertIn("bunk-window-upper", content)
-        self.assertIn("bunk-window-lower", content)
+        self.assertIn("RoomBedScene3D", content)
+        self.assertIn("bed-select-control", content)
+        self.assertIn("selectFromDropdown", content)
+        self.assertIn("switchIndividualBed", content)
+        self.assertIn("releaseIndividualHold", content)
+        self.assertIn("切换床位", content)
+        self.assertIn(":selected-bed-ids=\"selectedBedIds\"", content)
+        self.assertNotIn("bedPlacement", content)
+        self.assertNotIn("Boolean(holdToken)", content)
         self.assertNotIn("room.state_version", content)
 
-    def test_responsive_scene_styles_exist(self) -> None:
+    def test_scene_selection_is_high_contrast_and_mobile_friendly(self) -> None:
         content = (FRONTEND / "ux-refinement.css").read_text(encoding="utf-8")
-        self.assertIn(".room-scene", content)
-        self.assertIn(".scene-bed.bunk-window-upper", content)
+        for selector in (
+            ".bed-select-control",
+            ".three-bed-scene",
+            ".selected-bed-summary",
+            ".bed-selection-action-bar",
+            ".three-scene-selected",
+        ):
+            self.assertIn(selector, content)
         self.assertIn("@media (max-width: 640px)", content)
-        self.assertIn(".modal-overlay", content)
+        self.assertIn("position: sticky", content)
+        self.assertIn("prefers-reduced-motion", content)
 
 
 if __name__ == "__main__":
