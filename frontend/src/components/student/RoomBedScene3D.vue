@@ -17,6 +17,17 @@ const emit = defineEmits<{
   select: [bed: SceneBed]
 }>()
 
+const ROOM_WIDTH = 11.5
+const ROOM_DEPTH = 8
+const LEFT_COLUMN_X = -2.65
+const RIGHT_COLUMN_X = 2.65
+const BACK_ROW_Z = -1.55
+const FRONT_ROW_Z = 1.45
+const BUNK_LOWER_Y = 0.58
+const BUNK_UPPER_Y = 2.02
+const BACK_WALL_Z = -3.92
+const FRONT_WALL_Z = 3.92
+
 const container = ref<HTMLDivElement | null>(null)
 const webglUnavailable = ref(false)
 const selectedBedLabel = computed(() =>
@@ -37,12 +48,9 @@ const raycaster = new THREE.Raycaster()
 const pointer = new THREE.Vector2()
 const clickableObjects: THREE.Object3D[] = []
 const bedById = new Map<number, SceneBed>()
-
 const reducedMotionQuery = '(prefers-reduced-motion: reduce)'
 
-onMounted(() => {
-  initializeScene()
-})
+onMounted(initializeScene)
 
 watch(
   () => [props.beds, props.selectedBedIds, props.disabled],
@@ -73,15 +81,19 @@ function initializeScene() {
   try {
     scene = new THREE.Scene()
     scene.background = new THREE.Color('#eaf2ff')
-    scene.fog = new THREE.Fog('#eaf2ff', 17, 28)
+    scene.fog = new THREE.Fog('#eaf2ff', 18, 30)
 
-    camera = new THREE.PerspectiveCamera(39, 1, 0.1, 60)
-    renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'high-performance' })
+    camera = new THREE.PerspectiveCamera(40, 1, 0.1, 60)
+    renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      alpha: false,
+      powerPreference: 'high-performance',
+    })
     renderer.outputColorSpace = THREE.SRGBColorSpace
     renderer.shadowMap.enabled = true
     renderer.shadowMap.type = THREE.PCFSoftShadowMap
     renderer.domElement.className = 'three-bed-scene-canvas'
-    renderer.domElement.setAttribute('aria-label', '三维宿舍床位布局，可点击空床位进行选择')
+    renderer.domElement.setAttribute('aria-label', '从门口观察的三维宿舍床位布局，可点击空床位进行选择')
     renderer.domElement.setAttribute('role', 'img')
     renderer.domElement.style.touchAction = 'manipulation'
     renderer.domElement.addEventListener('pointerdown', handlePointerDown)
@@ -97,7 +109,7 @@ function initializeScene() {
     scene.add(bedLayer)
     renderBeds()
 
-    resizeObserver = new ResizeObserver(() => resizeScene())
+    resizeObserver = new ResizeObserver(resizeScene)
     resizeObserver.observe(container.value)
     resizeScene()
   } catch (reason) {
@@ -108,20 +120,21 @@ function initializeScene() {
 
 function addLights() {
   if (!scene) return
-  scene.add(new THREE.HemisphereLight('#ffffff', '#7f93ad', 2.2))
 
-  const mainLight = new THREE.DirectionalLight('#ffffff', 3.1)
-  mainLight.position.set(-5, 11, 8)
+  scene.add(new THREE.HemisphereLight('#ffffff', '#73849c', 2.25))
+
+  const mainLight = new THREE.DirectionalLight('#ffffff', 3.15)
+  mainLight.position.set(-4.5, 10.5, 7.2)
   mainLight.castShadow = true
   mainLight.shadow.mapSize.set(1024, 1024)
-  mainLight.shadow.camera.left = -10
-  mainLight.shadow.camera.right = 10
-  mainLight.shadow.camera.top = 10
-  mainLight.shadow.camera.bottom = -10
+  mainLight.shadow.camera.left = -9
+  mainLight.shadow.camera.right = 9
+  mainLight.shadow.camera.top = 9
+  mainLight.shadow.camera.bottom = -9
   scene.add(mainLight)
 
-  const windowLight = new THREE.PointLight('#9ed9ff', 17, 18, 2)
-  windowLight.position.set(4.6, 4.2, -2.8)
+  const windowLight = new THREE.PointLight('#9ed9ff', 16, 17, 2)
+  windowLight.position.set(0, 4.1, BACK_WALL_Z + 0.7)
   scene.add(windowLight)
 }
 
@@ -129,7 +142,7 @@ function addRoomShell() {
   if (!scene) return
 
   const floorMaterial = new THREE.MeshStandardMaterial({ color: '#f7f9fc', roughness: 0.82 })
-  const floor = new THREE.Mesh(new THREE.BoxGeometry(11.5, 0.18, 8), floorMaterial)
+  const floor = new THREE.Mesh(new THREE.BoxGeometry(ROOM_WIDTH, 0.18, ROOM_DEPTH), floorMaterial)
   floor.position.y = -0.12
   floor.receiveShadow = true
   scene.add(floor)
@@ -140,58 +153,76 @@ function addRoomShell() {
   scene.add(grid)
 
   const wallMaterial = new THREE.MeshStandardMaterial({ color: '#dfeafb', roughness: 0.9 })
-  const backWall = new THREE.Mesh(new THREE.BoxGeometry(11.5, 4.8, 0.16), wallMaterial)
-  backWall.position.set(0, 2.3, -3.92)
+  const backWall = new THREE.Mesh(new THREE.BoxGeometry(ROOM_WIDTH, 4.8, 0.16), wallMaterial)
+  backWall.position.set(0, 2.3, BACK_WALL_Z)
   backWall.receiveShadow = true
   scene.add(backWall)
 
-  const sideWall = new THREE.Mesh(new THREE.BoxGeometry(0.16, 4.8, 8), wallMaterial)
-  sideWall.position.set(5.66, 2.3, 0)
-  sideWall.receiveShadow = true
-  scene.add(sideWall)
+  const leftWall = new THREE.Mesh(new THREE.BoxGeometry(0.16, 4.8, ROOM_DEPTH), wallMaterial)
+  leftWall.position.set(-5.66, 2.3, 0)
+  leftWall.receiveShadow = true
+  scene.add(leftWall)
 
-  const windowFrame = new THREE.MeshStandardMaterial({ color: '#8ba9ca', roughness: 0.52 })
-  const windowGlass = new THREE.MeshPhysicalMaterial({
+  const rightWall = new THREE.Mesh(new THREE.BoxGeometry(0.16, 4.8, ROOM_DEPTH), wallMaterial)
+  rightWall.position.set(5.66, 2.3, 0)
+  rightWall.receiveShadow = true
+  scene.add(rightWall)
+
+  addWindow()
+  addDoorFrame()
+}
+
+function addWindow() {
+  if (!scene) return
+
+  const frameMaterial = new THREE.MeshStandardMaterial({ color: '#8ba9ca', roughness: 0.52 })
+  const glassMaterial = new THREE.MeshPhysicalMaterial({
     color: '#a8d9ff',
     transmission: 0.38,
     transparent: true,
     opacity: 0.78,
     roughness: 0.14,
   })
-  const glass = new THREE.Mesh(new THREE.BoxGeometry(3.1, 1.45, 0.08), windowGlass)
-  glass.position.set(3.05, 2.9, -3.78)
-  scene.add(glass)
-  addBox(scene, [3.35, 0.13, 0.18], [3.05, 3.68, -3.69], windowFrame)
-  addBox(scene, [3.35, 0.13, 0.18], [3.05, 2.12, -3.69], windowFrame)
-  addBox(scene, [0.13, 1.68, 0.18], [1.38, 2.9, -3.69], windowFrame)
-  addBox(scene, [0.13, 1.68, 0.18], [4.72, 2.9, -3.69], windowFrame)
-  addBox(scene, [0.1, 1.55, 0.16], [3.05, 2.9, -3.66], windowFrame)
-  const windowLabel = createLabelSprite('窗户', '#405b80', '#e8f5ff')
-  windowLabel.position.set(3.05, 1.72, -3.58)
-  scene.add(windowLabel)
 
-  const doorMaterial = new THREE.MeshStandardMaterial({ color: '#c99d70', roughness: 0.72 })
-  const door = new THREE.Mesh(new THREE.BoxGeometry(0.16, 2.8, 1.7), doorMaterial)
-  door.position.set(-5.58, 1.38, 2.2)
-  door.castShadow = true
-  scene.add(door)
-  const doorLabel = createLabelSprite('入口', '#69482f', '#f4dfc5')
-  doorLabel.position.set(-5.35, 3.05, 2.2)
-  scene.add(doorLabel)
+  const window = new THREE.Mesh(new THREE.BoxGeometry(3.5, 1.5, 0.08), glassMaterial)
+  window.position.set(0, 2.92, BACK_WALL_Z + 0.14)
+  scene.add(window)
+
+  addBox(scene, [3.76, 0.13, 0.18], [0, 3.74, BACK_WALL_Z + 0.23], frameMaterial)
+  addBox(scene, [3.76, 0.13, 0.18], [0, 2.1, BACK_WALL_Z + 0.23], frameMaterial)
+  addBox(scene, [0.13, 1.76, 0.18], [-1.82, 2.92, BACK_WALL_Z + 0.23], frameMaterial)
+  addBox(scene, [0.13, 1.76, 0.18], [1.82, 2.92, BACK_WALL_Z + 0.23], frameMaterial)
+  addBox(scene, [0.1, 1.62, 0.16], [0, 2.92, BACK_WALL_Z + 0.26], frameMaterial)
+
+  const label = createLabelSprite('窗户', '#405b80', '#e8f5ff')
+  label.position.set(0, 1.68, BACK_WALL_Z + 0.36)
+  scene.add(label)
+}
+
+function addDoorFrame() {
+  if (!scene) return
+
+  const material = new THREE.MeshStandardMaterial({ color: '#c99d70', roughness: 0.72 })
+  const doorFrame = new THREE.Group()
+  doorFrame.position.set(0, 0, FRONT_WALL_Z - 0.08)
+  addBox(doorFrame, [0.18, 3.05, 0.2], [-1.05, 1.5, 0], material)
+  addBox(doorFrame, [0.18, 3.05, 0.2], [1.05, 1.5, 0], material)
+  addBox(doorFrame, [2.28, 0.18, 0.2], [0, 3.0, 0], material)
+  scene.add(doorFrame)
+
+  const label = createLabelSprite('入口', '#69482f', '#f4dfc5')
+  label.position.set(0, 3.42, FRONT_WALL_Z - 0.18)
+  scene.add(label)
 }
 
 function renderBeds() {
   if (!scene || !bedLayer || !renderer || !camera) return
 
-  while (bedLayer.children.length) {
-    const child = bedLayer.children.pop()
-    if (child) {
-      bedLayer.remove(child)
-      disposeObject(child)
-    }
-  }
-  clickableObjects.length = 0
-  bedById.clear()
+  clearBedLayer()
+  const hasBunkBed = props.beds.some((bed) =>
+    ['BUNK_UPPER', 'BUNK_LOWER'].includes(String(bed.bed_type)),
+  )
+  if (hasBunkBed) bedLayer.add(createSharedBunkFrame())
 
   for (const bed of props.beds) {
     const bedId = Number(bed.id)
@@ -201,7 +232,7 @@ function renderBeds() {
     const type = String(bed.bed_type)
     const placement = bedPlacement(bed)
     const group = type === 'BUNK_UPPER' || type === 'BUNK_LOWER'
-      ? createBunkBed(bed, placement)
+      ? createBunkMattress(bed, placement)
       : createLoftBed(bed, placement)
     bedLayer.add(group)
   }
@@ -209,16 +240,29 @@ function renderBeds() {
   requestRender()
 }
 
+function clearBedLayer() {
+  if (!bedLayer) return
+  while (bedLayer.children.length) {
+    const child = bedLayer.children.pop()
+    if (child) {
+      bedLayer.remove(child)
+      disposeObject(child)
+    }
+  }
+  clickableObjects.length = 0
+  bedById.clear()
+}
+
 function bedPlacement(bed: SceneBed) {
   const type = String(bed.bed_type)
-  if (type === 'BUNK_UPPER') return new THREE.Vector3(3.65, 2.15, 1.55)
-  if (type === 'BUNK_LOWER') return new THREE.Vector3(3.65, 0.78, 1.55)
+  if (type === 'BUNK_UPPER') return new THREE.Vector3(RIGHT_COLUMN_X, BUNK_UPPER_Y, FRONT_ROW_Z)
+  if (type === 'BUNK_LOWER') return new THREE.Vector3(RIGHT_COLUMN_X, BUNK_LOWER_Y, FRONT_ROW_Z)
 
   const position = Number(bed.position_index)
-  if (position === 1) return new THREE.Vector3(-2.75, 0, -1.35)
-  if (position === 2) return new THREE.Vector3(-2.75, 0, 1.55)
-  if (position === 3) return new THREE.Vector3(0.2, 0, 1.55)
-  return new THREE.Vector3(0.2, 0, -1.35)
+  if (position === 1) return new THREE.Vector3(LEFT_COLUMN_X, 0, BACK_ROW_Z)
+  if (position === 2) return new THREE.Vector3(RIGHT_COLUMN_X, 0, BACK_ROW_Z)
+  if (position === 3) return new THREE.Vector3(LEFT_COLUMN_X, 0, FRONT_ROW_Z)
+  return new THREE.Vector3(RIGHT_COLUMN_X, 0, FRONT_ROW_Z)
 }
 
 function createLoftBed(bed: SceneBed, placement: THREE.Vector3) {
@@ -227,60 +271,68 @@ function createLoftBed(bed: SceneBed, placement: THREE.Vector3) {
   const appearance = bedAppearance(bed)
   const frame = new THREE.MeshStandardMaterial({ color: '#476386', roughness: 0.56, metalness: 0.08 })
   const desk = new THREE.MeshStandardMaterial({ color: '#d7a773', roughness: 0.68 })
-  const mattress = new THREE.MeshStandardMaterial({
-    color: appearance.color,
-    emissive: appearance.emissive,
-    emissiveIntensity: appearance.selected ? 0.7 : 0.08,
-    roughness: 0.52,
-  })
+  const mattress = createMattressMaterial(appearance)
 
-  addBox(group, [2.45, 0.28, 1.05], [0, 2.15, 0], mattress, appearance)
-  addBox(group, [2.55, 0.12, 1.12], [0, 1.94, 0], frame)
-  addBox(group, [0.12, 2.02, 0.12], [-1.16, 1.02, -0.46], frame)
-  addBox(group, [0.12, 2.02, 0.12], [-1.16, 1.02, 0.46], frame)
-  addBox(group, [0.12, 2.02, 0.12], [1.16, 1.02, -0.46], frame)
-  addBox(group, [0.12, 2.02, 0.12], [1.16, 1.02, 0.46], frame)
-  addBox(group, [1.78, 0.16, 0.82], [0.18, 0.94, 0], desk)
-  addBox(group, [0.12, 0.86, 0.12], [-0.62, 0.46, -0.34], desk)
-  addBox(group, [0.12, 0.86, 0.12], [-0.62, 0.46, 0.34], desk)
-  addBox(group, [0.12, 0.86, 0.12], [0.98, 0.46, -0.34], desk)
-  addBox(group, [0.12, 0.86, 0.12], [0.98, 0.46, 0.34], desk)
+  addBox(group, [2.35, 0.28, 1.02], [0, 2.1, 0], mattress, appearance)
+  addBox(group, [2.45, 0.12, 1.1], [0, 1.9, 0], frame)
+  addBox(group, [0.12, 1.98, 0.12], [-1.1, 1, -0.45], frame)
+  addBox(group, [0.12, 1.98, 0.12], [-1.1, 1, 0.45], frame)
+  addBox(group, [0.12, 1.98, 0.12], [1.1, 1, -0.45], frame)
+  addBox(group, [0.12, 1.98, 0.12], [1.1, 1, 0.45], frame)
+  addBox(group, [1.68, 0.16, 0.78], [0.15, 0.91, 0], desk)
+  addBox(group, [0.12, 0.82, 0.12], [-0.6, 0.44, -0.32], desk)
+  addBox(group, [0.12, 0.82, 0.12], [-0.6, 0.44, 0.32], desk)
+  addBox(group, [0.12, 0.82, 0.12], [0.9, 0.44, -0.32], desk)
+  addBox(group, [0.12, 0.82, 0.12], [0.9, 0.44, 0.32], desk)
 
-  addSelectionMarker(group, appearance, 2.8, 1.35, 0.08)
-  addBedHitArea(group, bed, [2.75, 2.55, 1.35], [0, 1.25, 0], appearance.selectable)
+  addSelectionMarker(group, appearance, 2.68, 1.3, 0.07)
+  addBedHitArea(group, bed, [2.65, 2.48, 1.3], [0, 1.22, 0], appearance.selectable)
   const label = createLabelSprite(`${String(bed.bed_code)}床`, appearance.labelColor, appearance.labelBackground)
-  label.position.set(0, 2.85, 0)
+  label.position.set(0, 2.78, 0)
   group.add(label)
   return group
 }
 
-function createBunkBed(bed: SceneBed, placement: THREE.Vector3) {
+function createSharedBunkFrame() {
+  const group = new THREE.Group()
+  group.position.set(RIGHT_COLUMN_X, 0, FRONT_ROW_Z)
+  const frame = new THREE.MeshStandardMaterial({ color: '#476386', roughness: 0.55, metalness: 0.1 })
+
+  for (const x of [-1.12, 1.12]) {
+    for (const z of [-0.46, 0.46]) {
+      addBox(group, [0.12, 3.0, 0.12], [x, 1.48, z], frame)
+    }
+  }
+  addBox(group, [2.4, 0.12, 1.08], [0, BUNK_LOWER_Y - 0.22, 0], frame)
+  addBox(group, [2.4, 0.12, 1.08], [0, BUNK_UPPER_Y - 0.22, 0], frame)
+  addBox(group, [2.34, 0.12, 0.12], [0, BUNK_LOWER_Y + 0.3, -0.49], frame)
+  addBox(group, [2.34, 0.12, 0.12], [0, BUNK_UPPER_Y + 0.3, -0.49], frame)
+  return group
+}
+
+function createBunkMattress(bed: SceneBed, placement: THREE.Vector3) {
   const group = new THREE.Group()
   group.position.copy(placement)
   const appearance = bedAppearance(bed)
-  const frame = new THREE.MeshStandardMaterial({ color: '#476386', roughness: 0.55, metalness: 0.1 })
-  const mattress = new THREE.MeshStandardMaterial({
-    color: appearance.color,
-    emissive: appearance.emissive,
-    emissiveIntensity: appearance.selected ? 0.82 : 0.08,
-    roughness: 0.5,
-  })
+  const mattress = createMattressMaterial(appearance)
 
-  addBox(group, [2.45, 0.28, 1.05], [0, 0, 0], mattress, appearance)
-  addBox(group, [2.56, 0.1, 1.14], [0, -0.2, 0], frame)
-  addBox(group, [2.5, 0.12, 0.12], [0, 0.3, -0.5], frame)
-  addBox(group, [2.5, 0.12, 0.12], [0, 0.3, 0.5], frame)
-  addBox(group, [0.12, 2.85, 0.12], [-1.18, 0.15, -0.48], frame)
-  addBox(group, [0.12, 2.85, 0.12], [-1.18, 0.15, 0.48], frame)
-  addBox(group, [0.12, 2.85, 0.12], [1.18, 0.15, -0.48], frame)
-  addBox(group, [0.12, 2.85, 0.12], [1.18, 0.15, 0.48], frame)
+  addBox(group, [2.3, 0.28, 1.0], [0, 0, 0], mattress, appearance)
+  addSelectionMarker(group, appearance, 2.62, 1.28, -0.25)
+  addBedHitArea(group, bed, [2.62, 0.86, 1.3], [0, 0.04, 0], appearance.selectable)
 
-  addSelectionMarker(group, appearance, 2.82, 1.38, -0.36)
-  addBedHitArea(group, bed, [2.75, 0.92, 1.4], [0, 0.02, 0], appearance.selectable)
   const label = createLabelSprite(`${String(bed.bed_code)}床`, appearance.labelColor, appearance.labelBackground)
-  label.position.set(0, 0.78, 0)
+  label.position.set(0, 0.62, 0)
   group.add(label)
   return group
+}
+
+function createMattressMaterial(appearance: ReturnType<typeof bedAppearance>) {
+  return new THREE.MeshStandardMaterial({
+    color: appearance.color,
+    emissive: appearance.emissive,
+    emissiveIntensity: appearance.selected ? 0.78 : 0.08,
+    roughness: 0.5,
+  })
 }
 
 function addBox(
@@ -325,6 +377,7 @@ function addSelectionMarker(
   y: number,
 ) {
   if (!appearance.selected) return
+
   const marker = new THREE.Mesh(
     new THREE.BoxGeometry(width, 0.09, depth),
     new THREE.MeshBasicMaterial({ color: '#00c2ff', transparent: true, opacity: 0.72 }),
@@ -421,22 +474,25 @@ function createLabelSprite(text: string, color: string, background: string) {
   const texture = new THREE.CanvasTexture(canvas)
   texture.colorSpace = THREE.SRGBColorSpace
   const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, transparent: true }))
-  sprite.scale.set(1.75, 0.62, 1)
+  sprite.scale.set(1.7, 0.6, 1)
   return sprite
 }
 
 function resizeScene() {
   if (!container.value || !renderer || !camera) return
+
   const width = Math.max(container.value.clientWidth, 280)
-  const height = Math.max(container.value.clientHeight, 360)
+  const height = Math.max(container.value.clientHeight, 330)
   const mobile = width <= 640
-  const ratio = Math.min(window.devicePixelRatio || 1, mobile ? 1.25 : 1.75)
+  const compact = height <= 420
+  const ratio = Math.min(window.devicePixelRatio || 1, mobile ? 1.2 : 1.65)
 
   renderer.setPixelRatio(ratio)
   renderer.setSize(width, height, false)
   camera.aspect = width / height
-  camera.position.set(mobile ? 9.7 : 9, mobile ? 8.8 : 7.7, mobile ? 16.8 : 13.3)
-  camera.lookAt(0, 1.05, 0)
+  camera.fov = mobile ? 48 : compact ? 44 : 40
+  camera.position.set(0, mobile ? 6.2 : 5.35, mobile ? 14.8 : 12.2)
+  camera.lookAt(0, 1.15, -0.35)
   camera.updateProjectionMatrix()
   requestRender()
 }
@@ -474,7 +530,7 @@ function requestRender() {
 }
 
 function disposeObject(object: THREE.Object3D) {
-  object.traverse((child) => {
+  object.traverse((child: THREE.Object3D) => {
     const geometry = (child as THREE.Mesh).geometry
     if (geometry instanceof THREE.BufferGeometry) geometry.dispose()
 
@@ -494,9 +550,10 @@ function disposeMaterial(material: THREE.Material) {
   <div class="three-bed-scene" :class="{ 'three-scene-selected': selectedBedIds.length > 0 }">
     <div ref="container" class="three-bed-scene-mount" />
     <div class="three-scene-orientation" aria-hidden="true">
-      <span>入口在左侧</span>
-      <span>窗户在右侧</span>
-      <span>窗边上下铺与B、C床同排</span>
+      <span>门口视角</span>
+      <span>窗户正对入口</span>
+      <span>C床与上下铺同排</span>
+      <span>整体为2×2布局</span>
     </div>
     <div v-if="selectedBedLabel" class="three-scene-selection-badge">
       <strong>✓ 已选中</strong>

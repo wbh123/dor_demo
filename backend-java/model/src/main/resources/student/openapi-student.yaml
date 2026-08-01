@@ -149,23 +149,6 @@ paths:
         '200':
           $ref: '#/components/responses/ObjectSuccess'
 
-  /api/v1/student/batches/{batchId}/teams:
-    post:
-      tags: [Student]
-      operationId: createTeam
-      security: [{ bearerAuth: [] }]
-      parameters:
-        - $ref: '#/components/parameters/BatchIdPath'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/TeamCreateRequest'
-      responses:
-        '200':
-          $ref: '#/components/responses/ObjectSuccess'
-
   /api/v1/student/teams:
     get:
       tags: [Student]
@@ -183,14 +166,10 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/ListSuccess'
-
-  /api/v1/student/teams/{teamId}/invitations:
     post:
       tags: [Student]
-      operationId: inviteTeamMember
+      operationId: inviteTeammate
       security: [{ bearerAuth: [] }]
-      parameters:
-        - $ref: '#/components/parameters/TeamIdPath'
       requestBody:
         required: true
         content:
@@ -201,6 +180,8 @@ paths:
         '200':
           $ref: '#/components/responses/ObjectSuccess'
         '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '409':
           $ref: '#/components/responses/ErrorResponse'
 
   /api/v1/student/team-invitations/respond:
@@ -332,15 +313,6 @@ components:
       required: [token]
       properties:
         token:
-          type: string
-          minLength: 1
-          maxLength: 128
-
-    TeamCreateRequest:
-      type: object
-      required: [teamName]
-      properties:
-        teamName:
           type: string
           minLength: 1
           maxLength: 128

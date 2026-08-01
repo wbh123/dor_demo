@@ -72,14 +72,10 @@ paths:
     $ref: 'student/openapi-student.yaml#/paths/~1api~1v1~1student~1batches~1{batchId}~1random-recommendation'
   /api/v1/student/batches/{batchId}/assignment:
     $ref: 'student/openapi-student.yaml#/paths/~1api~1v1~1student~1batches~1{batchId}~1assignment'
-  /api/v1/student/batches/{batchId}/teams:
-    $ref: 'student/openapi-student.yaml#/paths/~1api~1v1~1student~1batches~1{batchId}~1teams'
   /api/v1/student/teams:
     $ref: 'student/openapi-student.yaml#/paths/~1api~1v1~1student~1teams'
   /api/v1/student/team-invitations:
     $ref: 'student/openapi-student.yaml#/paths/~1api~1v1~1student~1team-invitations'
-  /api/v1/student/teams/{teamId}/invitations:
-    $ref: 'student/openapi-student.yaml#/paths/~1api~1v1~1student~1teams~1{teamId}~1invitations'
   /api/v1/student/team-invitations/respond:
     $ref: 'student/openapi-student.yaml#/paths/~1api~1v1~1student~1team-invitations~1respond'
   /api/v1/student/teams/{teamId}/lock:

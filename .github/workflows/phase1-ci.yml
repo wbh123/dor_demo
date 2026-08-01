@@ -168,7 +168,9 @@ jobs:
           connection.close()
           PY
       - name: Run full Phase 1 HTTP smoke flow
-        run: python scripts/e2e/phase1_smoke.py
+        run: |
+          python scripts/e2e/phase1_smoke.py
+          python scripts/e2e/team_invite_smoke.py
       - name: Print service log
         if: always()
         run: cat /tmp/wust-dormitory.log || true

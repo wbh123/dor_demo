@@ -22,8 +22,10 @@ const loading = ref(true)
 const submitting = ref(false)
 const error = ref('')
 const message = ref('')
+const toastMessage = ref('')
 const abortController = new AbortController()
 let timer: number | undefined
+let toastTimer: number | undefined
 
 const remainingSeconds = computed(() =>
   expiresAt.value ? Math.max(0, Math.ceil((expiresAt.value - now.value) / 1000)) : 0,
@@ -64,6 +66,7 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   abortController.abort()
   if (timer) window.clearInterval(timer)
+  if (toastTimer) window.clearTimeout(toastTimer)
 })
 
 async function load(showLoading = true) {
@@ -80,6 +83,15 @@ async function load(showLoading = true) {
   } finally {
     loading.value = false
   }
+}
+
+function showToast(text: string) {
+  toastMessage.value = text
+  if (toastTimer) window.clearTimeout(toastTimer)
+  toastTimer = window.setTimeout(() => {
+    toastMessage.value = ''
+    toastTimer = undefined
+  }, 3000)
 }
 
 async function selectFromDropdown(event: Event) {
@@ -205,6 +217,7 @@ async function releaseHold() {
   if (!holdToken.value || !selectedBedIds.value.length) return
   submitting.value = true
   error.value = ''
+  message.value = ''
   try {
     if (isTeamMode.value) {
       await api.post(`/api/v1/student/batches/${batchId}/teams/${teamId}/release`, {
@@ -214,8 +227,8 @@ async function releaseHold() {
     } else {
       await releaseIndividualHold(selectedBedIds.value[0], holdToken.value)
     }
-    message.value = '已释放当前选择，可以重新选择床位。'
     resetHold(true)
+    showToast('已释放当前选择，可以重新选择床位。')
   } catch (reason) {
     error.value = reason instanceof Error ? reason.message : '床位释放失败'
   } finally {
@@ -282,28 +295,37 @@ function bedTypeText(value: unknown) {
 </script>
 
 <template>
-  <div class="content-column">
-    <div class="page-title split-title">
+  <div class="content-column room-detail-page">
+    <Transition name="toast">
+      <div v-if="toastMessage" class="selection-toast" role="status" aria-live="polite">
+        <span class="selection-toast-icon">✓</span>
+        <span>{{ toastMessage }}</span>
+      </div>
+    </Transition>
+
+    <div class="page-title split-title room-detail-heading">
       <div>
         <span class="eyebrow">ROOM LAYOUT</span>
         <h2>{{ room.building_name }} · {{ room.room_number }} 室</h2>
         <p v-if="isTeamMode">请选择 {{ memberCount }} 个床位，全部选好后再整体保留。</p>
-        <p v-else>{{ room.floor_number }} 层 · {{ room.capacity }}个床位 · 右侧为窗户</p>
+        <p v-else>{{ room.floor_number }} 层 · {{ room.capacity }}个床位 · 窗户正对入口</p>
       </div>
       <button class="button ghost" @click="router.back()">返回房间列表</button>
     </div>
 
     <p v-if="loading" class="panel empty-state">正在同步房间床位…</p>
     <p v-if="error" class="alert error">{{ error }}</p>
-    <p v-if="message" class="alert success">{{ message }}</p>
+    <p v-if="message" class="alert success compact-alert">{{ message }}</p>
 
-    <section v-if="!loading" class="panel room-layout-panel">
-      <div class="live-indicator"><i /> 床位变化会自动更新</div>
-      <div v-if="isTeamMode && !holdToken" class="selection-hint">
-        已选择 {{ selectedBedIds.length }}/{{ memberCount }} 个床位
+    <section v-if="!loading" class="panel room-layout-panel compact-room-layout-panel">
+      <div class="room-layout-meta-row">
+        <div class="live-indicator"><i /> 床位变化会自动更新</div>
+        <div v-if="isTeamMode && !holdToken" class="selection-hint">
+          已选择 {{ selectedBedIds.length }}/{{ memberCount }} 个床位
+        </div>
       </div>
 
-      <div class="bed-selection-toolbar">
+      <div class="bed-selection-toolbar compact-bed-selection-toolbar">
         <label class="bed-select-field">
           <span>{{ isTeamMode ? '添加或移除床位' : '床位下拉选择' }}</span>
           <select
@@ -323,14 +345,10 @@ function bedTypeText(value: unknown) {
               {{ selectedBedIds.includes(Number(bed.id)) ? '已选中' : statusText(bed.status) }}
             </option>
           </select>
-          <small>下拉框与三维图形完全同步；单人模式可直接选择其他空床位完成切换。</small>
+          <small>下拉框与三维图形同步，点击其他空床位可以直接切换床位。</small>
         </label>
 
-        <div
-          class="selected-bed-summary"
-          :class="{ active: selectedBeds.length > 0 }"
-          aria-live="polite"
-        >
+        <div class="selected-bed-summary" :class="{ active: selectedBeds.length > 0 }" aria-live="polite">
           <span>{{ selectedBeds.length ? '当前选择' : '尚未选择' }}</span>
           <strong v-if="selectedBeds.length">
             {{ selectedBeds.map((bed) => `${String(bed.bed_code)}床`).join('、') }}
@@ -349,12 +367,12 @@ function bedTypeText(value: unknown) {
         @select="selectBed"
       />
 
-      <div class="scene-legend" aria-label="床位状态说明">
+      <div class="scene-legend compact-scene-legend" aria-label="床位状态说明">
         <span class="legend-available">可选择</span>
         <span class="legend-selected">已选中</span>
         <span class="legend-held">暂时保留</span>
         <span class="legend-assigned">已有同学选择</span>
-        <span>右侧窗边上下铺与下方床位同排</span>
+        <span>C床与上下铺位于同一前排</span>
       </div>
 
       <div v-if="isTeamMode && !holdToken" class="button-row centered">
@@ -368,7 +386,7 @@ function bedTypeText(value: unknown) {
     <section v-if="holdToken" class="panel hold-panel bed-selection-action-bar">
       <div>
         <span class="eyebrow">TEMPORARY HOLD</span>
-        <h3>{{ isTeamMode ? '队伍床位已整体保留' : '床位已临时保留' }}</h3>
+        <h3>{{ isTeamMode ? '小组床位已整体保留' : '床位已临时保留' }}</h3>
         <p v-if="isTeamMode">请在倒计时结束前确认；超时后床位会重新开放选择。</p>
         <p v-else>可直接点击其他空床位切换，或在倒计时结束前确认当前床位。</p>
       </div>
@@ -376,7 +394,7 @@ function bedTypeText(value: unknown) {
       <div class="button-row">
         <button class="button ghost" :disabled="submitting" @click="releaseHold">主动释放</button>
         <button class="button primary" :disabled="submitting || remainingSeconds <= 0" @click="confirmSelection">
-          {{ submitting ? '正在处理…' : isTeamMode ? '确认队伍整体选寝' : '确认选择此床位' }}
+          {{ submitting ? '正在处理…' : isTeamMode ? '确认小组整体选寝' : '确认选择此床位' }}
         </button>
       </div>
     </section>

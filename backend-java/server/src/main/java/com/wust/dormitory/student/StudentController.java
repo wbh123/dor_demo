@@ -9,7 +9,6 @@ import com.wust.dormitory.model.dto.ListSuccessResponse;
 import com.wust.dormitory.model.dto.ObjectSuccessResponse;
 import com.wust.dormitory.model.dto.TeamBedsRequest;
 import com.wust.dormitory.model.dto.TeamConfirmRequest;
-import com.wust.dormitory.model.dto.TeamCreateRequest;
 import com.wust.dormitory.model.dto.VoidSuccessResponse;
 import com.wust.dormitory.security.CurrentUser;
 import com.wust.dormitory.security.SecurityUsers;
@@ -25,13 +24,16 @@ import java.util.Map;
 @RestController
 public class StudentController implements StudentApi {
     private final StudentService studentService;
+    private final TeamService teamService;
     private final TeamHoldReleaseService teamHoldReleaseService;
     private final BedScopeGuard bedScopeGuard;
 
     public StudentController(StudentService studentService,
+                             TeamService teamService,
                              TeamHoldReleaseService teamHoldReleaseService,
                              BedScopeGuard bedScopeGuard) {
         this.studentService = studentService;
+        this.teamService = teamService;
         this.teamHoldReleaseService = teamHoldReleaseService;
         this.bedScopeGuard = bedScopeGuard;
     }
@@ -107,25 +109,19 @@ public class StudentController implements StudentApi {
     }
 
     @Override
-    public ResponseEntity<ObjectSuccessResponse> createTeam(Long batchId, TeamCreateRequest request) {
-        return ResponseEntity.ok(ResponseFactory.object(
-                studentService.createTeam(batchId, request.getTeamName(), student())));
-    }
-
-    @Override
     public ResponseEntity<ListSuccessResponse> listMyTeams() {
-        return ResponseEntity.ok(ResponseFactory.list(studentService.teams(student())));
+        return ResponseEntity.ok(ResponseFactory.list(teamService.teams(student())));
     }
 
     @Override
     public ResponseEntity<ListSuccessResponse> listTeamInvitations() {
-        return ResponseEntity.ok(ResponseFactory.list(studentService.invitations(student())));
+        return ResponseEntity.ok(ResponseFactory.list(teamService.invitations(student())));
     }
 
     @Override
-    public ResponseEntity<ObjectSuccessResponse> inviteTeamMember(Long teamId, InviteRequest request) {
+    public ResponseEntity<ObjectSuccessResponse> inviteTeammate(InviteRequest request) {
         return ResponseEntity.ok(ResponseFactory.object(
-                studentService.invite(teamId, request.getStudentNumber(), student())));
+                teamService.inviteTeammate(request.getStudentNumber(), student())));
     }
 
     @Override

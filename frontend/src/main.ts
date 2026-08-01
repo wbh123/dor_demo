@@ -4,5 +4,6 @@ import router from './router'
 import { pinia } from './stores'
 import './style.css'
 import './ux-refinement.css'
+import './room-selection-refinement.css'
 
 createApp(App).use(pinia).use(router).mount('#app')
