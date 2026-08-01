@@ -117,7 +117,11 @@ class InfrastructureConfigurationTest(unittest.TestCase):
         self.assertNotIn("compose restart mysql redis", script)
 
     def test_shell_scripts_have_valid_bash_syntax(self) -> None:
-        for relative in ("scripts/dev/validate-env.sh", "scripts/dev/start-infra.sh"):
+        for relative in (
+            "scripts/dev/validate-env.sh",
+            "scripts/dev/start-infra.sh",
+            "scripts/dev/reset-local-environment.sh",
+        ):
             result = subprocess.run(
                 ["bash", "-n", str(REPO_ROOT / relative)],
                 capture_output=True,
@@ -125,6 +129,29 @@ class InfrastructureConfigurationTest(unittest.TestCase):
                 check=False,
             )
             self.assertEqual(result.returncode, 0, f"{relative}: {result.stderr}")
+
+    def test_phase_documents_mark_phase1_final_and_phase2_as_current(self) -> None:
+        agents = (REPO_ROOT / "AGENTS.md").read_text(encoding="utf-8")
+        root_readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+        docs_readme = (REPO_ROOT / "docs/README.md").read_text(encoding="utf-8")
+        phase_index = (REPO_ROOT / "docs/03_开发阶段/README.md").read_text(encoding="utf-8")
+        phase1 = (REPO_ROOT / "docs/03_开发阶段/01_第一阶段/README.md").read_text(encoding="utf-8")
+        freeze = (REPO_ROOT / "docs/03_开发阶段/01_第一阶段/07_第一阶段冻结说明.md").read_text(encoding="utf-8")
+
+        for content in (agents, root_readme, docs_readme, phase_index):
+            self.assertIn("第一阶段：已完成并最终冻结", content)
+            self.assertIn("第二阶段：开发中", content)
+
+        for content in (root_readme, phase_index, phase1, freeze):
+            self.assertIn("V4__refine_questionnaire_and_active_batch_rules.sql", content)
+            self.assertIn("邀请式组队", content)
+            self.assertIn("Three.js", content)
+
+        self.assertIn("bash scripts/dev/reset-local-environment.sh", root_readme)
+        self.assertNotIn(
+            "WUST_DORMITORY_FLYWAY_LOCATIONS=classpath:db/migration,filesystem:backend-java/server/src/test/resources/db/dev-migration",
+            root_readme,
+        )
 
 
 if __name__ == "__main__":
