@@ -46,7 +46,7 @@
             <property name="enableSubPackages" value="false"/>
         </javaClientGenerator>
 
-        <table tableName="organization" domainObjectName="OrganizationEntity"/>
+        <table tableName="major" domainObjectName="MajorEntity"/>
         <table tableName="app_user" domainObjectName="AppUserEntity"/>
         <table tableName="campus" domainObjectName="CampusEntity"/>
         <table tableName="student" domainObjectName="StudentEntity"/>

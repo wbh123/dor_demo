@@ -1,21 +1,28 @@
 {
-  "name": "front",
+  "name": "wust-dormitory-select-frontend",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
+    "generate:api": "openapi-typescript ../backend-java/model/src/main/resources/openapi-interface.yaml -o src/api/schema.d.ts",
+    "predev": "npm run generate:api",
     "dev": "vite",
-    "build": "vue-tsc -b && vite build",
+    "typecheck": "vue-tsc -b",
+    "build": "npm run generate:api && vue-tsc -b && vite build",
     "preview": "vite preview"
   },
   "dependencies": {
-    "vue": "^3.5.40"
+    "axios": "^1.11.0",
+    "pinia": "^3.0.3",
+    "vue": "^3.5.40",
+    "vue-router": "^4.5.1"
   },
   "devDependencies": {
     "@types/node": "^24.13.3",
     "@vitejs/plugin-vue": "^6.0.8",
     "@vue/tsconfig": "^0.9.1",
-    "typescript": "~6.0.2",
+    "openapi-typescript": "7.13.0",
+    "typescript": "~5.9.3",
     "vite": "^8.2.0",
     "vue-tsc": "^3.3.8"
   }

@@ -1,0 +1,44 @@
+openapi: 3.0.3
+info:
+  title: Wust Dormitory Select 队伍床位释放接口
+  version: 1.0.0
+paths:
+  /api/v1/student/batches/{batchId}/teams/{teamId}/release:
+    post:
+      tags: [Student]
+      operationId: releaseTeamBeds
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: batchId
+          in: path
+          required: true
+          schema: { type: integer, format: int64 }
+        - name: teamId
+          in: path
+          required: true
+          schema: { type: integer, format: int64 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: 'openapi-student.yaml#/components/schemas/TeamConfirmRequest'
+      responses:
+        '200':
+          description: 释放成功
+          content:
+            application/json:
+              schema:
+                $ref: '../common-response/openapi-common-response.yaml#/components/schemas/VoidSuccessResponse'
+        '400':
+          description: 参数错误
+          content:
+            application/json:
+              schema:
+                $ref: '../common-response/openapi-common-response.yaml#/components/schemas/ErrorResponse'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: Token

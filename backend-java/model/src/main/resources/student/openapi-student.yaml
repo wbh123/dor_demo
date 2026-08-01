@@ -1,0 +1,394 @@
+openapi: 3.0.3
+info:
+  title: Wust Dormitory Select 学生端接口
+  version: 1.0.0
+paths:
+  /api/v1/student/profile:
+    get:
+      tags: [Student]
+      operationId: getStudentProfile
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          $ref: '#/components/responses/ObjectSuccess'
+
+  /api/v1/student/batches:
+    get:
+      tags: [Student]
+      operationId: listStudentBatches
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          $ref: '#/components/responses/ListSuccess'
+
+  /api/v1/student/batches/{batchId}/questionnaire:
+    get:
+      tags: [Student]
+      operationId: getQuestionnaire
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/BatchIdPath'
+      responses:
+        '200':
+          $ref: '#/components/responses/ObjectSuccess'
+    post:
+      tags: [Student]
+      operationId: submitQuestionnaire
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/BatchIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          $ref: '#/components/responses/VoidSuccess'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /api/v1/student/batches/{batchId}/rooms:
+    get:
+      tags: [Student]
+      operationId: listCandidateRooms
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/BatchIdPath'
+      responses:
+        '200':
+          $ref: '#/components/responses/ListSuccess'
+
+  /api/v1/student/batches/{batchId}/rooms/{roomId}:
+    get:
+      tags: [Student]
+      operationId: getCandidateRoom
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/BatchIdPath'
+        - $ref: '#/components/parameters/RoomIdPath'
+      responses:
+        '200':
+          $ref: '#/components/responses/ObjectSuccess'
+        '403':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /api/v1/student/batches/{batchId}/beds/{bedId}/hold:
+    post:
+      tags: [Student]
+      operationId: holdBed
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/BatchIdPath'
+        - $ref: '#/components/parameters/BedIdPath'
+      responses:
+        '200':
+          $ref: '#/components/responses/ObjectSuccess'
+        '409':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /api/v1/student/batches/{batchId}/beds/{bedId}/release:
+    post:
+      tags: [Student]
+      operationId: releaseBed
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/BatchIdPath'
+        - $ref: '#/components/parameters/BedIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HoldTokenRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/VoidSuccess'
+
+  /api/v1/student/batches/{batchId}/beds/{bedId}/confirm:
+    post:
+      tags: [Student]
+      operationId: confirmBed
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/BatchIdPath'
+        - $ref: '#/components/parameters/BedIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HoldTokenRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/ObjectSuccess'
+        '409':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /api/v1/student/batches/{batchId}/random-recommendation:
+    get:
+      tags: [Student]
+      operationId: getRandomRecommendation
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/BatchIdPath'
+      responses:
+        '200':
+          $ref: '#/components/responses/ObjectSuccess'
+
+  /api/v1/student/batches/{batchId}/assignment:
+    get:
+      tags: [Student]
+      operationId: getMyAssignment
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/BatchIdPath'
+      responses:
+        '200':
+          $ref: '#/components/responses/ObjectSuccess'
+
+  /api/v1/student/batches/{batchId}/teams:
+    post:
+      tags: [Student]
+      operationId: createTeam
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/BatchIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TeamCreateRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/ObjectSuccess'
+
+  /api/v1/student/teams:
+    get:
+      tags: [Student]
+      operationId: listMyTeams
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          $ref: '#/components/responses/ListSuccess'
+
+  /api/v1/student/team-invitations:
+    get:
+      tags: [Student]
+      operationId: listTeamInvitations
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          $ref: '#/components/responses/ListSuccess'
+
+  /api/v1/student/teams/{teamId}/invitations:
+    post:
+      tags: [Student]
+      operationId: inviteTeamMember
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/TeamIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InviteRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/ObjectSuccess'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /api/v1/student/team-invitations/respond:
+    post:
+      tags: [Student]
+      operationId: respondTeamInvitation
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InvitationResponseRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/VoidSuccess'
+
+  /api/v1/student/teams/{teamId}/lock:
+    post:
+      tags: [Student]
+      operationId: lockTeam
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/TeamIdPath'
+      responses:
+        '200':
+          $ref: '#/components/responses/VoidSuccess'
+
+  /api/v1/student/batches/{batchId}/teams/{teamId}/hold:
+    post:
+      tags: [Student]
+      operationId: holdTeamBeds
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/BatchIdPath'
+        - $ref: '#/components/parameters/TeamIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TeamBedsRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/ObjectSuccess'
+        '409':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /api/v1/student/batches/{batchId}/teams/{teamId}/confirm:
+    post:
+      tags: [Student]
+      operationId: confirmTeamBeds
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/BatchIdPath'
+        - $ref: '#/components/parameters/TeamIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TeamConfirmRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/VoidSuccess'
+        '409':
+          $ref: '#/components/responses/ErrorResponse'
+
+components:
+  parameters:
+    BatchIdPath:
+      name: batchId
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+    RoomIdPath:
+      name: roomId
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+    BedIdPath:
+      name: bedId
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+    TeamIdPath:
+      name: teamId
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+
+  responses:
+    ObjectSuccess:
+      description: 操作成功
+      content:
+        application/json:
+          schema:
+            $ref: '../common-response/openapi-common-response.yaml#/components/schemas/ObjectSuccessResponse'
+    ListSuccess:
+      description: 查询成功
+      content:
+        application/json:
+          schema:
+            $ref: '../common-response/openapi-common-response.yaml#/components/schemas/ListSuccessResponse'
+    VoidSuccess:
+      description: 操作成功
+      content:
+        application/json:
+          schema:
+            $ref: '../common-response/openapi-common-response.yaml#/components/schemas/VoidSuccessResponse'
+    ErrorResponse:
+      description: 业务错误
+      content:
+        application/json:
+          schema:
+            $ref: '../common-response/openapi-common-response.yaml#/components/schemas/ErrorResponse'
+
+  schemas:
+    HoldTokenRequest:
+      type: object
+      required: [token]
+      properties:
+        token:
+          type: string
+          minLength: 1
+          maxLength: 128
+
+    TeamCreateRequest:
+      type: object
+      required: [teamName]
+      properties:
+        teamName:
+          type: string
+          minLength: 1
+          maxLength: 128
+
+    InviteRequest:
+      type: object
+      required: [studentNumber]
+      properties:
+        studentNumber:
+          type: string
+          pattern: '^\d{12}$'
+
+    InvitationResponseRequest:
+      type: object
+      required: [invitationToken, accepted]
+      properties:
+        invitationToken:
+          type: string
+          minLength: 1
+          maxLength: 128
+        accepted:
+          type: boolean
+
+    TeamBedsRequest:
+      type: object
+      required: [bedIds]
+      properties:
+        bedIds:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items:
+            type: integer
+            format: int64
+
+    TeamConfirmRequest:
+      allOf:
+        - $ref: '#/components/schemas/TeamBedsRequest'
+        - type: object
+          required: [token]
+          properties:
+            token:
+              type: string
+              minLength: 1
+              maxLength: 128
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: Token

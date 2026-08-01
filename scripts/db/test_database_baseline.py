@@ -44,7 +44,7 @@ class DatabaseBaselineTest(unittest.TestCase):
             / "R__development_test_data.sql"
         )
 
-    def test_student_numbers_and_gender_counts(self) -> None:
+    def test_student_numbers_gender_counts_and_major_references(self) -> None:
         students = self.generator.build_students()
         self.assertEqual(len(students), 520)
         self.assertEqual(sum(student.gender == "M" for student in students), 260)
@@ -52,6 +52,7 @@ class DatabaseBaselineTest(unittest.TestCase):
         numbers = [student.student_number for student in students]
         self.assertEqual(len(set(numbers)), 520)
         self.assertTrue(all(re.fullmatch(r"2026\d{8}", number) for number in numbers))
+        self.assertEqual({student.major_id for student in students}, {1, 2, 3, 4, 5})
 
     def test_current_room_mix_and_bed_capacity(self) -> None:
         buildings = self.generator.build_buildings()
@@ -138,10 +139,41 @@ class DatabaseBaselineTest(unittest.TestCase):
         self.assertIn("CREATE TABLE batch_room_scope", schema)
         self.assertIn("UNIQUE KEY uk_batch_room_scope (batch_id, room_id)", schema)
 
-    def test_committed_seed_is_reproducible(self) -> None:
+    def test_student_schema_is_minimal_and_major_is_normalized(self) -> None:
+        migration = (
+            self.migration_dir / "V3__normalize_major_and_minimize_student.sql"
+        ).read_text(encoding="utf-8")
+        self.assertIn("CREATE TABLE major", migration)
+        self.assertIn("major_code VARCHAR(32) NOT NULL", migration)
+        self.assertIn("major_name VARCHAR(128) NOT NULL", migration)
+        self.assertIn("ADD COLUMN major_id BIGINT NULL", migration)
+        self.assertIn("ADD CONSTRAINT fk_student_major", migration)
+        self.assertIn("ADD COLUMN student_id BIGINT NULL", migration)
+        self.assertIn("ADD CONSTRAINT fk_app_user_student", migration)
+        self.assertIn("DROP TABLE organization", migration)
+        for column in (
+            "user_id",
+            "organization_id",
+            "campus_id",
+            "grade_year",
+            "major_name",
+            "class_name",
+            "housing_eligibility",
+            "profile_status",
+            "data_source",
+            "version",
+        ):
+            self.assertRegex(migration, rf"DROP COLUMN {column}\b")
+
+    def test_committed_seed_is_reproducible_and_uses_major_table(self) -> None:
         generated = self.generator.generate_sql()
         committed = self.seed_path.read_text(encoding="utf-8")
         self.assertEqual(generated, committed)
+        self.assertIn("INSERT INTO major", committed)
+        self.assertNotIn("INSERT INTO organization", committed)
+        self.assertNotIn("class_name", committed)
+        self.assertNotIn("major_name_value", committed)
+        self.assertNotIn("data_source", committed)
 
     def test_schema_contains_phase1_core_constraints(self) -> None:
         schema = "\n".join(
@@ -149,7 +181,7 @@ class DatabaseBaselineTest(unittest.TestCase):
             for path in self.freezer.discover_migrations(self.migration_dir)
         )
         required_tables = {
-            "organization",
+            "major",
             "app_user",
             "student",
             "campus",
@@ -197,6 +229,7 @@ class DatabaseBaselineTest(unittest.TestCase):
         baseline = self.freezer.build_baseline(migrations)
         self.assertIn("V1__create_phase1_schema.sql", baseline)
         self.assertIn("V2__enforce_fixed_room_gender.sql", baseline)
+        self.assertIn("V3__normalize_major_and_minimize_student.sql", baseline)
         self.assertNotIn("INSERT INTO student", baseline)
         self.assertNotIn("R__development_test_data.sql", baseline)
 
@@ -225,7 +258,7 @@ class DatabaseBaselineTest(unittest.TestCase):
         pom_path = REPO_ROOT / "backend-java/server/pom.xml"
         ET.parse(pom_path)
         pom = pom_path.read_text(encoding="utf-8")
-        self.assertIn("<artifactId>flyway-core</artifactId>", pom)
+        self.assertIn("<artifactId>spring-boot-starter-flyway</artifactId>", pom)
         self.assertIn("<artifactId>flyway-mysql</artifactId>", pom)
 
     def test_mybatis_generator_targets_phase1_tables(self) -> None:
@@ -238,6 +271,7 @@ class DatabaseBaselineTest(unittest.TestCase):
         config = config_path.read_text(encoding="utf-8")
         self.assertNotIn('tableName="example_table"', config)
         for table_name in (
+            "major",
             "student",
             "dormitory_building",
             "room",

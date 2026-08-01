@@ -215,7 +215,7 @@ CREATE TABLE import_job (
 CREATE TABLE import_error (
     id BIGINT NOT NULL AUTO_INCREMENT COMMENT '导入错误主键',
     import_job_id BIGINT NOT NULL COMMENT '导入任务主键',
-    row_number INT NOT NULL COMMENT '原始行号',
+    `row_number` INT NOT NULL COMMENT '原始行号',
     field_name VARCHAR(128) NULL COMMENT '错误字段',
     error_code VARCHAR(64) NOT NULL COMMENT '错误代码',
     error_message VARCHAR(500) NOT NULL COMMENT '错误说明',
@@ -223,7 +223,7 @@ CREATE TABLE import_error (
     created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     PRIMARY KEY (id),
     CONSTRAINT fk_import_error_job FOREIGN KEY (import_job_id) REFERENCES import_job(id) ON DELETE CASCADE,
-    KEY idx_import_error_job_row (import_job_id, row_number)
+    KEY idx_import_error_job_row (import_job_id, `row_number`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='数据导入错误';
 
 CREATE TABLE questionnaire_version (

@@ -60,6 +60,16 @@ class InfrastructureConfigurationTest(unittest.TestCase):
         pom = (REPO_ROOT / "backend-java/server/pom.xml").read_text(encoding="utf-8")
         self.assertIn("spring-boot-starter-data-redis", pom)
 
+    def test_runtime_ci_executes_full_http_smoke_flow(self) -> None:
+        workflow = (REPO_ROOT / ".github/workflows/phase1-ci.yml").read_text(encoding="utf-8")
+        smoke = REPO_ROOT / "scripts/e2e/phase1_smoke.py"
+        self.assertTrue(smoke.is_file())
+        self.assertIn(
+            "classpath:db/migration,filesystem:backend-java/server/src/test/resources/db/dev-migration",
+            workflow,
+        )
+        self.assertIn("python scripts/e2e/phase1_smoke.py", workflow)
+
     def test_validate_env_accepts_valid_values_and_rejects_placeholder(self) -> None:
         script = REPO_ROOT / "scripts/dev/validate-env.sh"
         example = REPO_ROOT / ".env.example"

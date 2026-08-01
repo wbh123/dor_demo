@@ -1,0 +1,66 @@
+openapi: 3.0.3
+info:
+  title: Wust Dormitory Select 分配调整接口
+  version: 1.0.0
+paths:
+  /api/v1/admin/assignments/{assignmentId}/adjust:
+    post:
+      tags: [Admin]
+      operationId: adjustAssignment
+      summary: 管理员调整已分配床位
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: assignmentId
+          in: path
+          required: true
+          schema: { type: integer, format: int64 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssignmentAdjustmentRequest'
+      responses:
+        '200':
+          description: 调整成功
+          content:
+            application/json:
+              schema:
+                $ref: '../common-response/openapi-common-response.yaml#/components/schemas/ObjectSuccessResponse'
+        '400':
+          description: 参数或业务规则错误
+          content:
+            application/json:
+              schema:
+                $ref: '../common-response/openapi-common-response.yaml#/components/schemas/ErrorResponse'
+        '404':
+          description: 分配或床位不存在
+          content:
+            application/json:
+              schema:
+                $ref: '../common-response/openapi-common-response.yaml#/components/schemas/ErrorResponse'
+        '409':
+          description: 目标床位已分配
+          content:
+            application/json:
+              schema:
+                $ref: '../common-response/openapi-common-response.yaml#/components/schemas/ErrorResponse'
+components:
+  schemas:
+    AssignmentAdjustmentRequest:
+      type: object
+      required: [newBedId, reason]
+      properties:
+        newBedId:
+          type: integer
+          format: int64
+          minimum: 1
+        reason:
+          type: string
+          minLength: 2
+          maxLength: 500
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: Token

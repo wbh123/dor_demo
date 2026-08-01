@@ -2,18 +2,18 @@
 
 > 数据库：MySQL 8.4  
 > 结构来源：`server/src/main/resources/db/migration/`  
-> 当前版本：V2  
+> 当前版本：V3  
 > 状态：第一阶段开发中
 
 ## 1. 表清单
 
 | 数据域 | 表 | 说明 |
 |---|---|---|
-| 用户组织 | `organization` | 学校、学院、专业和班级层级 |
-| 用户组织 | `app_user` | 学生和管理员账户 |
-| 用户组织 | `student` | 学生业务档案 |
-| 用户组织 | `import_job` | 数据导入任务 |
-| 用户组织 | `import_error` | 数据导入错误 |
+| 用户学生 | `major` | 专业编号和专业名称 |
+| 用户学生 | `app_user` | 学生和管理员账户；学生账号通过 `student_id` 关联学生 |
+| 用户学生 | `student` | 最小化学生档案 |
+| 用户学生 | `import_job` | 数据导入任务 |
+| 用户学生 | `import_error` | 数据导入错误 |
 | 宿舍资源 | `campus` | 校区 |
 | 宿舍资源 | `dormitory_building` | 宿舍楼 |
 | 宿舍资源 | `dormitory_floor` | 楼层 |
@@ -27,7 +27,7 @@
 | 问卷匹配 | `student_feature` | 标准化特征 |
 | 问卷匹配 | `matching_weight_scheme` | 匹配权重方案 |
 | 批次资格 | `selection_batch` | 选寝批次 |
-| 批次资格 | `batch_student_eligibility` | 学生资格 |
+| 批次资格 | `batch_student_eligibility` | 学生在指定批次中的资格 |
 | 批次资格 | `batch_building_scope` | 可选楼栋范围 |
 | 批次资格 | `batch_room_scope` | 可选房间范围 |
 | 批次资格 | `batch_bed_scope` | 可选床位范围 |
@@ -40,21 +40,84 @@
 | 分配 | `allocation_run_result` | 随机分配结果 |
 | 审计 | `audit_log` | 关键操作审计 |
 
-## 2. 宿舍资源核心字段
+V3删除了通用 `organization` 组织树。当前需求不保存学院和班级信息，学生只关联专业，因此继续维护通用组织层级会增加无实际用途的表、外键和重复字段。
 
-### 2.1 `dormitory_building`
+## 2. 学生与专业
+
+### 2.1 `major`
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `id` | `BIGINT` | 专业主键 |
+| `major_code` | `VARCHAR(32)` | 学校专业编号，全局唯一 |
+| `major_name` | `VARCHAR(128)` | 专业名称，全局唯一 |
+| `enabled` | `TINYINT` | 是否启用 |
+| `created_at` | `DATETIME(3)` | 创建时间 |
+| `updated_at` | `DATETIME(3)` | 更新时间 |
+
+学生表不重复保存专业名称。查询学生信息时通过 `student.major_id` 关联专业表获得专业编号和名称。
+
+### 2.2 `student`
+
+V3后的业务字段只有：
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `id` | `BIGINT` | 技术主键 |
+| `student_number` | `CHAR(12)` | 12位数字学号，全局唯一 |
+| `student_name` | `VARCHAR(128)` | 姓名 |
+| `gender` | `CHAR(1)` | `M`或`F` |
+| `major_id` | `BIGINT` | 专业外键 |
+| `created_at` | `DATETIME(3)` | 创建时间 |
+| `updated_at` | `DATETIME(3)` | 更新时间 |
+
+学生表不再保存：
+
+```text
+用户外键
+组织或班级外键
+校区
+年级
+专业名称快照
+班级名称
+全局住宿资格
+资料状态
+数据来源
+乐观锁版本
+```
+
+原因如下：
+
+- 账号关系属于用户域，放在 `app_user.student_id`；
+- 班级、年级和学院不在当前需求范围内；
+- 专业名称属于专业表，学生只保存外键；
+- 住宿资格可能因批次而不同，应放在 `batch_student_eligibility`；
+- 校区和可选范围由宿舍资源及批次规则决定，不应重复写入学生档案。
+
+### 2.3 `app_user`
+
+`app_user.student_id`：
+
+- 学生账号关联一个学生；
+- 管理员账号为空；
+- 建立唯一索引，避免一个学生绑定多个账号；
+- 学生档案本身不保存账号信息。
+
+## 3. 宿舍资源核心字段
+
+### 3.1 `dormitory_building`
 
 | 字段 | 说明 |
 |---|---|
 | `campus_id` | 所属校区 |
 | `building_code` | 楼栋编码 |
 | `building_name` | 楼栋名称 |
-| `gender_restriction` | `M`、`F` 或 `ANY` |
+| `gender_restriction` | `M`、`F`或`ANY` |
 | `enabled` | 是否启用 |
 
-楼栋允许使用 `ANY`，表示未来可以在同一楼栋中按房间分别配置男寝和女寝。它不表示房间可以男女混住。
+楼栋允许使用 `ANY`，表示同一楼栋可以按房间分别配置男寝和女寝。房间本身仍不得男女混住。
 
-### 2.2 `room`
+### 3.2 `room`
 
 | 字段 | 说明 |
 |---|---|
@@ -62,12 +125,12 @@
 | `room_number` | 房间号 |
 | `room_type` | 房型 |
 | `capacity` | 规划容量 |
-| `gender_restriction` | 固定房间性别，只允许 `M` 或 `F` |
+| `gender_restriction` | 固定房间性别，只允许`M`或`F` |
 | `operational_status` | 启用、禁用或维护 |
 | `state_version` | 房间实时状态版本 |
 | `version` | 乐观锁版本 |
 
-当前支持的房型值：
+当前房型值：
 
 ```text
 FOUR_PERSON
@@ -76,29 +139,11 @@ SIX_PERSON
 OTHER
 ```
 
-房型不与性别绑定。后续可以存在：
+房型不与性别绑定。可以存在男生四人间、男生五人间、女生四人间和女生五人间，但每个具体房间必须固定为男寝或女寝。
 
-- 男生四人间；
-- 男生五人间；
-- 女生四人间；
-- 女生五人间。
+### 3.3 `bed_frame`与`bed`
 
-但每个具体房间必须固定为男寝或女寝。
-
-### 2.3 `bed_frame`
-
-用于表达共享床架，例如上下铺。当前五人间中，上铺和下铺通过同一个 `bed_frame_id` 关联。
-
-### 2.4 `bed`
-
-| 字段 | 说明 |
-|---|---|
-| `room_id` | 所属房间 |
-| `bed_frame_id` | 共享床架，可为空 |
-| `bed_code` | 房内床位编码 |
-| `bed_type` | 床位类型 |
-| `position_index` | 房内排序位置 |
-| `operational_status` | 启用、禁用或维护 |
+`bed_frame`表达共享床架，例如上下铺。`bed`保存每个可分配床位。
 
 床位类型：
 
@@ -111,33 +156,34 @@ OTHER
 
 同一房间中，床位编码和位置均唯一。
 
-## 3. 当前测试数据房型
+## 4. 当前测试数据
 
-当前第一阶段合成数据按学校现阶段要求生成：
+| 数据 | 数量 |
+|---|---:|
+| 专业 | 5 |
+| 学生 | 520 |
+| 男生 | 260 |
+| 女生 | 260 |
+| 男生五人间 | 64 |
+| 女生四人间 | 80 |
+| 房间合计 | 144 |
+| 男生床位 | 320 |
+| 女生床位 | 320 |
+| 床位合计 | 640 |
 
-| 性别 | 房型 | 房间数 | 每间床位 | 床位数 |
-|---|---|---:|---:|---:|
-| 男生 | 五人间 | 64 | 5 | 320 |
-| 女生 | 四人间 | 80 | 4 | 320 |
-| 合计 | — | 144 | — | 640 |
-
-男生五人间布局：
-
-```text
-A、B、C：LOFT_BED_DESK
-D-U：BUNK_UPPER
-D-L：BUNK_LOWER
-```
-
-女生四人间布局：
+测试专业编号为：
 
 ```text
-A、B、C、D：LOFT_BED_DESK
+M001
+M002
+M003
+M004
+M005
 ```
 
-该组合只是测试数据，不是数据库永久限制。
+学生通过 `major_id` 均匀分布到5个专业。全部学号为12位数字，范围为 `202600000001` 至 `202600000520`。
 
-## 4. 批次可选范围
+## 5. 批次可选范围
 
 管理员通过以下表控制宿舍开放范围：
 
@@ -147,65 +193,24 @@ A、B、C、D：LOFT_BED_DESK
 | `batch_room_scope` | 按具体房间开放 |
 | `batch_bed_scope` | 按具体床位开放或排除 |
 
-房型混合时，应优先使用 `batch_room_scope` 精确选择当前批次允许的四人间和五人间。
+候选查询必须同时校验批次资格、学生性别、房间性别、范围配置、房间状态、床位状态、最终分配和Redis临时占用。
 
-候选查询必须校验：
-
-- 学生具有批次资格；
-- 学生性别与房间性别一致；
-- 房间和床位属于批次范围；
-- 房间和床位处于启用状态；
-- 床位没有最终分配和有效临时占用。
-
-## 5. 核心唯一约束
+## 6. 核心唯一约束
 
 | 约束 | 说明 |
 |---|---|
+| `uk_major_code` | 专业编号唯一 |
+| `uk_major_name` | 专业名称唯一 |
 | `uk_student_number` | 学号全局唯一 |
+| `uk_app_user_student` | 一个学生最多关联一个账号 |
 | `uk_room_floor_number` | 同一楼层房间号唯一 |
 | `uk_bed_room_code` | 同一房间床位编码唯一 |
 | `uk_bed_room_position` | 同一房间床位位置唯一 |
 | `uk_batch_student_eligibility` | 同一批次每名学生只有一条资格 |
-| `uk_batch_room_scope` | 同一房间在同一批次只配置一次 |
 | `uk_active_team_member` | 同一学生在同一批次最多属于一个有效队伍 |
 | `uk_assignment_batch_student` | 同一学生在同一批次最多一个当前床位 |
 | `uk_assignment_batch_bed` | 同一床位在同一批次最多分配给一个学生 |
 | `uk_allocation_idempotency` | 同一批次随机分配请求幂等 |
-
-## 6. 关键状态
-
-### 6.1 批次状态
-
-```text
-DRAFT
-PUBLISHED
-OPEN
-PAUSED
-CLOSED
-ALLOCATING
-FINISHED
-CANCELLED
-```
-
-### 6.2 队伍状态
-
-```text
-FORMING
-LOCKED
-SELECTING
-COMPLETED
-DISSOLVED
-```
-
-### 6.3 分配方式
-
-```text
-SELF_SELECT
-TEAM_SELECT
-STUDENT_RANDOM
-ADMIN_RANDOM
-MANUAL_ADJUSTMENT
-```
 
 ## 7. Flyway迁移
 
@@ -214,26 +219,24 @@ MANUAL_ADJUSTMENT
 ```text
 V1__create_phase1_schema.sql
 V2__enforce_fixed_room_gender.sql
+V3__normalize_major_and_minimize_student.sql
 ```
 
-V2将房间性别约束从 `M/F/ANY` 收紧为：
+V3执行以下变化：
 
-```text
-M/F
-```
+1. 新建 `major`；
+2. 将原学生专业名称迁移到专业表；
+3. 为学生增加 `major_id`；
+4. 将账号关联迁移到 `app_user.student_id`；
+5. 删除学生冗余字段；
+6. 删除不再使用的 `organization`。
 
-开发期间：
+旧数据只有专业名称时，V3使用稳定哈希生成临时 `LEGACY-...` 专业编号。管理员导入学校正式专业目录后可以更新为真实编号。
 
-1. 新增Flyway版本迁移；
-2. 执行空库迁移测试；
-3. 执行已有数据库升级测试；
-4. 更新本文档；
-5. 不修改已经执行的版本迁移。
-
-第一阶段全部功能开发并验收完成后，运行：
+开发期间只能新增迁移，不能修改已经执行的V1、V2或V3。第一阶段全部功能验收后运行：
 
 ```bash
 python scripts/db/build_frozen_baseline.py
 ```
 
-将正式迁移整理为独立结构SQL。开发测试数据不进入固化脚本。
+将正式迁移整理为独立结构SQL，开发测试数据不进入固化脚本。

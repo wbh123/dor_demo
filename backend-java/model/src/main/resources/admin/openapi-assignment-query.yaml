@@ -1,0 +1,39 @@
+openapi: 3.0.3
+info:
+  title: Wust Dormitory Select 分配结果查询接口
+  version: 1.0.0
+paths:
+  /api/v1/admin/batches/{batchId}/assignments:
+    get:
+      tags: [Admin]
+      operationId: listAssignments
+      summary: 查询批次当前有效分配
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: batchId
+          in: path
+          required: true
+          schema: { type: integer, format: int64 }
+        - name: keyword
+          in: query
+          required: false
+          schema: { type: string, maxLength: 128 }
+      responses:
+        '200':
+          description: 当前有效分配列表
+          content:
+            application/json:
+              schema:
+                $ref: '../common-response/openapi-common-response.yaml#/components/schemas/ListSuccessResponse'
+        '404':
+          description: 批次不存在
+          content:
+            application/json:
+              schema:
+                $ref: '../common-response/openapi-common-response.yaml#/components/schemas/ErrorResponse'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: Token

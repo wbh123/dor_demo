@@ -1,0 +1,25 @@
+import type { components } from './schema'
+
+export type LoginRequest = components['schemas']['LoginRequest']
+export type ActivateRequest = components['schemas']['ActivateRequest']
+export type LoginSuccessResponse = components['schemas']['LoginSuccessResponse']
+export type CurrentUserData = components['schemas']['CurrentUserData']
+export type CurrentUserSuccessResponse = components['schemas']['CurrentUserSuccessResponse']
+export type ObjectSuccessResponse = components['schemas']['ObjectSuccessResponse']
+export type ListSuccessResponse = components['schemas']['ListSuccessResponse']
+export type VoidSuccessResponse = components['schemas']['VoidSuccessResponse']
+export type ErrorResponse = components['schemas']['ErrorResponse']
+export type MajorRequest = components['schemas']['MajorRequest']
+export type StudentRequest = components['schemas']['StudentRequest']
+export type RoomRequest = components['schemas']['RoomRequest']
+export type BatchRequest = components['schemas']['BatchRequest']
+export type AllocationCommitRequest = components['schemas']['AllocationCommitRequest']
+export type AssignmentAdjustmentRequest = components['schemas']['AssignmentAdjustmentRequest']
+export type HoldTokenRequest = components['schemas']['HoldTokenRequest']
+export type TeamCreateRequest = components['schemas']['TeamCreateRequest']
+export type InviteRequest = components['schemas']['InviteRequest']
+export type InvitationResponseRequest = components['schemas']['InvitationResponseRequest']
+export type TeamBedsRequest = components['schemas']['TeamBedsRequest']
+export type TeamConfirmRequest = components['schemas']['TeamConfirmRequest']
+
+export type DataObject = Record<string, unknown>

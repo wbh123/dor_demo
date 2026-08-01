@@ -13,6 +13,7 @@ DEFAULT_OUTPUT = (
 STUDENT_COUNT = 520
 MALE_STUDENT_COUNT = 260
 FEMALE_STUDENT_COUNT = 260
+MAJOR_COUNT = 5
 BUILDING_COUNT = 8
 BUILDINGS_PER_GENDER = 4
 FLOORS_PER_BUILDING = 4
@@ -30,7 +31,9 @@ BED_COUNT = MALE_BED_COUNT + FEMALE_BED_COUNT
 class StudentSeed:
     id: int
     student_number: str
+    student_name: str
     gender: str
+    major_id: int
 
 
 @dataclass(frozen=True)
@@ -65,14 +68,20 @@ class BedSeed:
 
 
 def build_students() -> list[StudentSeed]:
-    return [
-        StudentSeed(
-            id=index,
-            student_number=f"2026{index:08d}",
-            gender="M" if index <= MALE_STUDENT_COUNT else "F",
+    students: list[StudentSeed] = []
+    for index in range(1, STUDENT_COUNT + 1):
+        gender = "M" if index <= MALE_STUDENT_COUNT else "F"
+        gender_index = index if gender == "M" else index - MALE_STUDENT_COUNT
+        students.append(
+            StudentSeed(
+                id=index,
+                student_number=f"2026{index:08d}",
+                student_name=f"测试{'男' if gender == 'M' else '女'}生{gender_index:03d}",
+                gender=gender,
+                major_id=1 + ((index - 1) % MAJOR_COUNT),
+            )
         )
-        for index in range(1, STUDENT_COUNT + 1)
-    ]
+    return students
 
 
 def build_buildings() -> list[BuildingSeed]:
@@ -161,31 +170,34 @@ def validate_dataset() -> None:
     rooms = build_rooms(buildings, floors)
     beds = build_beds(rooms)
 
-    assert len(students) == 520
-    assert len({student.student_number for student in students}) == 520
+    assert len(students) == STUDENT_COUNT
+    assert len({student.student_number for student in students}) == STUDENT_COUNT
     assert all(
         len(student.student_number) == 12
         and student.student_number.isdigit()
         and student.student_number.startswith("2026")
         for student in students
     )
-    assert sum(student.gender == "M" for student in students) == 260
-    assert sum(student.gender == "F" for student in students) == 260
+    assert sum(student.gender == "M" for student in students) == MALE_STUDENT_COUNT
+    assert sum(student.gender == "F" for student in students) == FEMALE_STUDENT_COUNT
+    assert {student.major_id for student in students} == set(range(1, MAJOR_COUNT + 1))
 
-    assert len(buildings) == 8
-    assert len(floors) == 32
-    assert len(rooms) == 144
-    assert sum(room.room_type == "FIVE_PERSON" for room in rooms) == 64
-    assert sum(room.room_type == "FOUR_PERSON" for room in rooms) == 80
+    assert len(buildings) == BUILDING_COUNT
+    assert len(floors) == BUILDING_COUNT * FLOORS_PER_BUILDING
+    assert len(rooms) == ROOM_COUNT
+    assert sum(room.room_type == "FIVE_PERSON" for room in rooms) == MALE_ROOM_COUNT
+    assert sum(room.room_type == "FOUR_PERSON" for room in rooms) == FEMALE_ROOM_COUNT
+    assert all(room.gender in {"M", "F"} for room in rooms)
 
-    assert len(beds) == 640
-    assert sum(bed.gender == "M" for bed in beds) == 320
-    assert sum(bed.gender == "F" for bed in beds) == 320
+    assert len(beds) == BED_COUNT
+    assert sum(bed.gender == "M" for bed in beds) == MALE_BED_COUNT
+    assert sum(bed.gender == "F" for bed in beds) == FEMALE_BED_COUNT
 
 
 SQL_TEMPLATE = r"""-- ============================================================
 -- 第一阶段本地开发测试数据（仅用于开发与自动化测试）
 -- 学生：520（男260 / 女260）
+-- 专业：5
 -- 床位：640（男320 / 女320）
 -- 学号：12位数字，统一以2026开头
 -- 当前房型：男生64个五人间；女生80个四人间
@@ -196,7 +208,7 @@ SQL_TEMPLATE = r"""-- ==========================================================
 SET NAMES utf8mb4;
 
 -- 本迁移只允许在专用本地开发数据库中执行。
--- 固定测试主键会在重复执行时先清理，避免房型规则调整后留下旧数据。
+-- 固定测试主键会在重复执行时先清理，避免规则调整后留下旧数据。
 SET FOREIGN_KEY_CHECKS = 0;
 DELETE FROM allocation_run_result WHERE allocation_run_id = 1;
 DELETE FROM allocation_run WHERE id = 1;
@@ -212,56 +224,35 @@ DELETE FROM batch_room_scope WHERE batch_id = 1;
 DELETE FROM batch_building_scope WHERE batch_id = 1;
 DELETE FROM batch_student_eligibility WHERE batch_id = 1;
 DELETE FROM selection_batch WHERE id = 1;
+DELETE FROM app_user WHERE student_id BETWEEN 1 AND 520;
+DELETE FROM student WHERE id BETWEEN 1 AND 520;
+DELETE FROM major WHERE id BETWEEN 1 AND 5;
 DELETE FROM bed WHERE id BETWEEN 1 AND 1000;
 DELETE FROM bed_frame WHERE id BETWEEN 1 AND 1000;
 DELETE FROM room WHERE id BETWEEN 1 AND 1000;
 DELETE FROM dormitory_floor WHERE id BETWEEN 1 AND 1000;
 DELETE FROM dormitory_building WHERE id BETWEEN 1 AND 1000;
-DELETE FROM student WHERE data_source = 'SYNTHETIC_PHASE1';
-DELETE FROM app_user WHERE id BETWEEN 2 AND 521;
 SET FOREIGN_KEY_CHECKS = 1;
 
-INSERT INTO organization
-(id, parent_id, organization_code, organization_name, organization_type, sort_order, enabled)
+INSERT INTO major
+(id, major_code, major_name, enabled)
 VALUES
-(1, NULL, 'WUST-TEST', '武汉科技大学测试组织', 'UNIVERSITY', 1, 1),
-(2, 1, 'COL01', '测试学院1', 'COLLEGE', 1, 1),
-(3, 1, 'COL02', '测试学院2', 'COLLEGE', 2, 1),
-(4, 1, 'COL03', '测试学院3', 'COLLEGE', 3, 1),
-(5, 1, 'COL04', '测试学院4', 'COLLEGE', 4, 1),
-(6, 1, 'COL05', '测试学院5', 'COLLEGE', 5, 1),
-(7, 2, 'COL01-2026-01', '2026级测试1-1班', 'CLASS', 1, 1),
-(8, 2, 'COL01-2026-02', '2026级测试1-2班', 'CLASS', 2, 1),
-(9, 2, 'COL01-2026-03', '2026级测试1-3班', 'CLASS', 3, 1),
-(10, 2, 'COL01-2026-04', '2026级测试1-4班', 'CLASS', 4, 1),
-(11, 3, 'COL02-2026-01', '2026级测试2-1班', 'CLASS', 1, 1),
-(12, 3, 'COL02-2026-02', '2026级测试2-2班', 'CLASS', 2, 1),
-(13, 3, 'COL02-2026-03', '2026级测试2-3班', 'CLASS', 3, 1),
-(14, 3, 'COL02-2026-04', '2026级测试2-4班', 'CLASS', 4, 1),
-(15, 4, 'COL03-2026-01', '2026级测试3-1班', 'CLASS', 1, 1),
-(16, 4, 'COL03-2026-02', '2026级测试3-2班', 'CLASS', 2, 1),
-(17, 4, 'COL03-2026-03', '2026级测试3-3班', 'CLASS', 3, 1),
-(18, 4, 'COL03-2026-04', '2026级测试3-4班', 'CLASS', 4, 1),
-(19, 5, 'COL04-2026-01', '2026级测试4-1班', 'CLASS', 1, 1),
-(20, 5, 'COL04-2026-02', '2026级测试4-2班', 'CLASS', 2, 1),
-(21, 5, 'COL04-2026-03', '2026级测试4-3班', 'CLASS', 3, 1),
-(22, 5, 'COL04-2026-04', '2026级测试4-4班', 'CLASS', 4, 1),
-(23, 6, 'COL05-2026-01', '2026级测试5-1班', 'CLASS', 1, 1),
-(24, 6, 'COL05-2026-02', '2026级测试5-2班', 'CLASS', 2, 1),
-(25, 6, 'COL05-2026-03', '2026级测试5-3班', 'CLASS', 3, 1),
-(26, 6, 'COL05-2026-04', '2026级测试5-4班', 'CLASS', 4, 1)
+(1, 'M001', '测试专业1', 1),
+(2, 'M002', '测试专业2', 1),
+(3, 'M003', '测试专业3', 1),
+(4, 'M004', '测试专业4', 1),
+(5, 'M005', '测试专业5', 1)
 ON DUPLICATE KEY UPDATE
-parent_id=VALUES(parent_id),
-organization_name=VALUES(organization_name),
-organization_type=VALUES(organization_type),
-sort_order=VALUES(sort_order),
+major_code=VALUES(major_code),
+major_name=VALUES(major_name),
 enabled=VALUES(enabled);
 
 INSERT INTO app_user
-(id, username, password_hash, user_type, account_status, display_name)
+(id, student_id, username, password_hash, user_type, account_status, display_name)
 VALUES
-(1, 'admin', '{noop}Dormitory@2026', 'ADMIN', 'ACTIVE', '测试管理员')
+(1, NULL, 'admin', '{noop}Dormitory@2026', 'ADMIN', 'ACTIVE', '测试管理员')
 ON DUPLICATE KEY UPDATE
+student_id=VALUES(student_id),
 password_hash=VALUES(password_hash),
 user_type=VALUES(user_type),
 account_status=VALUES(account_status),
@@ -283,38 +274,29 @@ BEGIN
   DECLARE i INT DEFAULT 1;
   DECLARE gender_value CHAR(1);
   DECLARE gender_index INT;
-  DECLARE class_offset INT;
-  DECLARE college_index INT;
-  DECLARE class_index INT;
+  DECLARE major_id_value BIGINT;
   DECLARE student_number_value CHAR(12);
   DECLARE student_name_value VARCHAR(128);
-  DECLARE major_name_value VARCHAR(128);
-  DECLARE class_name_value VARCHAR(128);
 
   WHILE i <= 520 DO
     SET gender_value = IF(i <= 260, 'M', 'F');
     SET gender_index = IF(i <= 260, i, i - 260);
-    SET class_offset = MOD(i - 1, 20);
-    SET college_index = FLOOR(class_offset / 4) + 1;
-    SET class_index = MOD(class_offset, 4) + 1;
+    SET major_id_value = 1 + MOD(i - 1, 5);
     SET student_number_value = CONCAT('2026', LPAD(i, 8, '0'));
-    SET student_name_value = CONCAT(IF(gender_value='M', '测试男生', '测试女生'), LPAD(gender_index, 3, '0'));
-    SET major_name_value = CONCAT('测试专业', college_index);
-    SET class_name_value = CONCAT('2026级测试', college_index, '-', class_index, '班');
-
-    INSERT INTO app_user
-    (id, username, password_hash, user_type, account_status, display_name)
-    VALUES
-    (i + 1, student_number_value, NULL, 'STUDENT', 'PENDING', student_name_value);
+    SET student_name_value = CONCAT(
+      IF(gender_value='M', '测试男生', '测试女生'),
+      LPAD(gender_index, 3, '0')
+    );
 
     INSERT INTO student
-    (id, user_id, student_number, student_name, gender, organization_id,
-     campus_id, grade_year, major_name, class_name, housing_eligibility,
-     profile_status, data_source)
+    (id, student_number, student_name, gender, major_id)
     VALUES
-    (i, i + 1, student_number_value, student_name_value, gender_value,
-     7 + class_offset, 1, 2026, major_name_value, class_name_value,
-     'ELIGIBLE', 'COMPLETE', 'SYNTHETIC_PHASE1');
+    (i, student_number_value, student_name_value, gender_value, major_id_value);
+
+    INSERT INTO app_user
+    (id, student_id, username, password_hash, user_type, account_status, display_name)
+    VALUES
+    (i + 1, i, student_number_value, NULL, 'STUDENT', 'PENDING', student_name_value);
 
     SET i = i + 1;
   END WHILE;
@@ -576,6 +558,7 @@ DELIMITER $$
 CREATE PROCEDURE assert_phase1_development_data()
 BEGIN
   DECLARE student_count_value INT;
+  DECLARE major_count_value INT;
   DECLARE male_student_count_value INT;
   DECLARE female_student_count_value INT;
   DECLARE room_count_value INT;
@@ -589,11 +572,13 @@ BEGIN
   DECLARE invalid_female_layout_count INT;
 
   SELECT COUNT(*) INTO student_count_value
-  FROM student WHERE data_source='SYNTHETIC_PHASE1';
+  FROM student WHERE id BETWEEN 1 AND 520;
+  SELECT COUNT(*) INTO major_count_value
+  FROM major WHERE id BETWEEN 1 AND 5;
   SELECT COUNT(*) INTO male_student_count_value
-  FROM student WHERE data_source='SYNTHETIC_PHASE1' AND gender='M';
+  FROM student WHERE id BETWEEN 1 AND 520 AND gender='M';
   SELECT COUNT(*) INTO female_student_count_value
-  FROM student WHERE data_source='SYNTHETIC_PHASE1' AND gender='F';
+  FROM student WHERE id BETWEEN 1 AND 520 AND gender='F';
 
   SELECT COUNT(*) INTO room_count_value FROM room WHERE id BETWEEN 1 AND 144;
   SELECT COUNT(*) INTO male_room_count_value
@@ -637,10 +622,11 @@ BEGIN
   ) invalid_female;
 
   IF student_count_value <> 520
+     OR major_count_value <> 5
      OR male_student_count_value <> 260
      OR female_student_count_value <> 260 THEN
     SIGNAL SQLSTATE '45000'
-      SET MESSAGE_TEXT='第一阶段学生测试数据数量不正确';
+      SET MESSAGE_TEXT='第一阶段学生或专业测试数据数量不正确';
   END IF;
 
   IF room_count_value <> 144
@@ -686,8 +672,9 @@ def main() -> int:
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(sql, encoding="utf-8")
     print(
-        f"已生成 {args.output}：学生 {STUDENT_COUNT} 人，床位 {BED_COUNT} 个，"
-        f"男生五人间 {MALE_ROOM_COUNT} 个，女生四人间 {FEMALE_ROOM_COUNT} 个。"
+        f"已生成 {args.output}：学生 {STUDENT_COUNT} 人，专业 {MAJOR_COUNT} 个，"
+        f"床位 {BED_COUNT} 个，男生五人间 {MALE_ROOM_COUNT} 个，"
+        f"女生四人间 {FEMALE_ROOM_COUNT} 个。"
     )
     return 0
 

@@ -1,0 +1,133 @@
+@baseUrl = http://localhost:8080
+@adminToken = replace-after-login
+@studentToken = replace-after-login
+@batchId = 1
+@roomId = 1
+@bedId = 1
+@assignmentId = 1
+
+### 健康检查
+GET {{baseUrl}}/actuator/health
+
+### 管理员登录
+POST {{baseUrl}}/api/v1/auth/login
+Content-Type: application/json
+X-Request-Id: http-admin-login
+
+{
+  "username": "admin",
+  "password": "Dormitory@2026"
+}
+
+### 管理工作台
+GET {{baseUrl}}/api/v1/admin/dashboard
+Authorization: Bearer {{adminToken}}
+X-Request-Id: http-admin-dashboard
+
+### 专业列表
+GET {{baseUrl}}/api/v1/admin/majors
+Authorization: Bearer {{adminToken}}
+
+### 学生查询
+GET {{baseUrl}}/api/v1/admin/students?keyword=202600000001&page=1&size=20
+Authorization: Bearer {{adminToken}}
+
+### 准备测试批次
+POST {{baseUrl}}/api/v1/admin/batches/{{batchId}}/prepare
+Authorization: Bearer {{adminToken}}
+
+### 发布批次
+POST {{baseUrl}}/api/v1/admin/batches/{{batchId}}/status/PUBLISHED
+Authorization: Bearer {{adminToken}}
+
+### 开放批次
+POST {{baseUrl}}/api/v1/admin/batches/{{batchId}}/status/OPEN
+Authorization: Bearer {{adminToken}}
+
+### 激活学生账号
+POST {{baseUrl}}/api/v1/auth/activate
+Content-Type: application/json
+
+{
+  "studentNumber": "202600000001",
+  "studentName": "测试男生001",
+  "password": "StudentPassword2026"
+}
+
+### 学生登录
+POST {{baseUrl}}/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "username": "202600000001",
+  "password": "StudentPassword2026"
+}
+
+### 学生资料
+GET {{baseUrl}}/api/v1/student/profile
+Authorization: Bearer {{studentToken}}
+
+### 获取问卷
+GET {{baseUrl}}/api/v1/student/batches/{{batchId}}/questionnaire
+Authorization: Bearer {{studentToken}}
+
+### 提交问卷
+POST {{baseUrl}}/api/v1/student/batches/{{batchId}}/questionnaire
+Authorization: Bearer {{studentToken}}
+Content-Type: application/json
+
+{
+  "SLEEP_TIME": "23:00",
+  "WAKE_TIME": "07:00",
+  "NAP_HABIT": 1,
+  "SLEEP_SENSITIVITY": 3,
+  "NOISE_TOLERANCE": 3,
+  "CLEANING_FREQUENCY": 4,
+  "TIDINESS_REQUIREMENT": 4,
+  "AC_TEMPERATURE": 25,
+  "VENTILATION": 3,
+  "STUDY_FREQUENCY": 3,
+  "GAMING_VOICE": 2,
+  "SOCIAL_ACTIVITY": 3,
+  "SMOKING_ACCEPTANCE": false,
+  "BED_PREFERENCE": "LOFT_BED_DESK"
+}
+
+### 候选房间
+GET {{baseUrl}}/api/v1/student/batches/{{batchId}}/rooms
+Authorization: Bearer {{studentToken}}
+
+### 房间床位快照
+GET {{baseUrl}}/api/v1/student/batches/{{batchId}}/rooms/{{roomId}}
+Authorization: Bearer {{studentToken}}
+
+### 临时占用床位
+POST {{baseUrl}}/api/v1/student/batches/{{batchId}}/beds/{{bedId}}/hold
+Authorization: Bearer {{studentToken}}
+
+### 最终确认床位（替换token）
+POST {{baseUrl}}/api/v1/student/batches/{{batchId}}/beds/{{bedId}}/confirm
+Authorization: Bearer {{studentToken}}
+Content-Type: application/json
+
+{
+  "token": "replace-hold-token"
+}
+
+### 管理员查询当前分配
+GET {{baseUrl}}/api/v1/admin/batches/{{batchId}}/assignments
+Authorization: Bearer {{adminToken}}
+
+### 人工调整（替换assignmentId和newBedId）
+POST {{baseUrl}}/api/v1/admin/assignments/{{assignmentId}}/adjust
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "newBedId": 2,
+  "reason": "手工接口验收调整"
+}
+
+### 审计日志
+GET {{baseUrl}}/api/v1/admin/audit-logs?limit=100
+Authorization: Bearer {{adminToken}}

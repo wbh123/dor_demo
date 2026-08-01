@@ -1,0 +1,54 @@
+openapi: 3.0.3
+info:
+  title: Wust Dormitory Select 实时推送接口
+  version: 1.0.0
+paths:
+  /api/v1/realtime/batches/{batchId}/rooms/{roomId}:
+    get:
+      tags: [Realtime]
+      operationId: subscribeRoomEvents
+      summary: 订阅房间级床位状态变化
+      description: 建立服务器发送事件长连接，页面离开时客户端主动关闭。
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: batchId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: roomId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: Last-Event-ID
+          in: header
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 服务器发送事件流
+          content:
+            text/event-stream:
+              schema:
+                type: string
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+        '403':
+          $ref: '#/components/responses/ErrorResponse'
+components:
+  responses:
+    ErrorResponse:
+      description: 业务错误
+      content:
+        application/json:
+          schema:
+            $ref: '../common-response/openapi-common-response.yaml#/components/schemas/ErrorResponse'
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: Token
