@@ -42,7 +42,7 @@ onMounted(async () => {
     if (event.event !== 'HEARTBEAT' && event.event !== 'CONNECTED') void load(false)
   }).catch((reason) => {
     if (!abortController.signal.aborted) {
-      error.value = reason instanceof Error ? reason.message : '实时连接中断'
+      error.value = reason instanceof Error ? reason.message : '房间信息更新连接已中断，请刷新页面'
     }
   })
 })
@@ -105,7 +105,7 @@ async function createHold() {
       : '床位已临时保留，请在倒计时结束前确认。'
     await load(false)
   } catch (reason) {
-    error.value = reason instanceof Error ? reason.message : '占用失败'
+    error.value = reason instanceof Error ? reason.message : '床位保留失败'
   } finally {
     submitting.value = false
   }
@@ -146,7 +146,7 @@ async function confirmSelection() {
         `/api/v1/student/batches/${batchId}/beds/${selectedBedIds.value[0]}/confirm`,
         { token: holdToken.value },
       )
-      await router.replace(`/student/batches/${batchId}/assignment`)
+      await router.replace('/student')
     }
   } catch (reason) {
     error.value = reason instanceof Error ? reason.message : '最终确认失败'
@@ -165,11 +165,38 @@ function resetHold(refresh: boolean) {
 function statusText(status: unknown) {
   return {
     AVAILABLE: '可选择',
-    HELD: '临时占用',
+    HELD: '暂时被其他同学保留',
     HELD_BY_ME: '已为你保留',
-    ASSIGNED: '已分配',
-    DISABLED: '不可用',
+    ASSIGNED: '已有同学选择',
+    DISABLED: '暂不可用',
   }[String(status)] ?? String(status)
+}
+
+function bedTypeText(value: unknown) {
+  return {
+    LOFT_BED_DESK: '上床下桌',
+    BUNK_UPPER: '上下铺上铺',
+    BUNK_LOWER: '上下铺下铺',
+  }[String(value)] ?? String(value)
+}
+
+function bedPlacement(bed: DataObject) {
+  if (bed.bed_type === 'BUNK_UPPER') return 'bunk-window-upper'
+  if (bed.bed_type === 'BUNK_LOWER') return 'bunk-window-lower'
+  const position = Number(bed.position_index)
+  if (position === 1) return 'loft-left-1'
+  if (position === 2) return 'loft-left-2'
+  if (position === 3) return 'loft-center-3'
+  return 'loft-center-4'
+}
+
+function bedVisualClasses(bed: DataObject) {
+  return {
+    bunk: ['BUNK_UPPER', 'BUNK_LOWER'].includes(String(bed.bed_type)),
+    'bunk-upper': bed.bed_type === 'BUNK_UPPER',
+    'bunk-lower': bed.bed_type === 'BUNK_LOWER',
+    selected: selectedBedIds.value.includes(Number(bed.id)),
+  }
 }
 </script>
 
@@ -177,10 +204,10 @@ function statusText(status: unknown) {
   <div class="content-column">
     <div class="page-title split-title">
       <div>
-        <span class="eyebrow">LIVE ROOM STATUS</span>
+        <span class="eyebrow">ROOM LAYOUT</span>
         <h2>{{ room.building_name }} · {{ room.room_number }} 室</h2>
-        <p v-if="isTeamMode">队伍模式：请选择 {{ memberCount }} 个床位，系统将整体占用和提交。</p>
-        <p v-else>{{ room.floor_number }} 层 · {{ room.capacity }}个床位 · 状态版本 {{ room.state_version }}</p>
+        <p v-if="isTeamMode">请选择 {{ memberCount }} 个床位，全部选好后再整体保留。</p>
+        <p v-else>{{ room.floor_number }} 层 · {{ room.capacity }}个床位 · 右侧为窗户</p>
       </div>
       <button class="button ghost" @click="router.back()">返回房间列表</button>
     </div>
@@ -190,30 +217,47 @@ function statusText(status: unknown) {
     <p v-if="message" class="alert success">{{ message }}</p>
 
     <section v-if="!loading" class="panel room-layout-panel">
-      <div class="live-indicator"><i /> 房间状态实时更新</div>
+      <div class="live-indicator"><i /> 床位变化会自动更新</div>
       <div v-if="isTeamMode && !holdToken" class="selection-hint">
         已选择 {{ selectedBedIds.length }}/{{ memberCount }} 个床位
       </div>
-      <div class="bed-layout" :class="`capacity-${room.capacity}`">
+
+      <div class="room-scene" aria-label="房间床位空间布局">
+        <div class="room-window" aria-label="窗户"><span /><span /></div>
+        <div class="room-entry">入口</div>
         <button
           v-for="bed in beds"
           :key="String(bed.id)"
-          class="bed-card"
+          class="scene-bed"
           :class="[
+            bedPlacement(bed),
             `status-${String(bed.status).toLowerCase()}`,
-            { selected: selectedBedIds.includes(Number(bed.id)) },
+            bedVisualClasses(bed),
           ]"
           :disabled="bed.status !== 'AVAILABLE' || submitting || Boolean(holdToken)"
+          :aria-label="`${bed.bed_code}床，${bedTypeText(bed.bed_type)}，${statusText(bed.status)}`"
           @click="selectBed(bed)"
         >
-          <span class="bed-code">{{ bed.bed_code }}</span>
-          <strong>{{ bed.bed_type === 'LOFT_BED_DESK' ? '上床下桌' : bed.bed_type === 'BUNK_UPPER' ? '上下铺上铺' : '上下铺下铺' }}</strong>
+          <span class="bed-visual" aria-hidden="true">
+            <i class="mattress" />
+            <i class="desk-block" />
+          </span>
+          <span class="bed-code">{{ bed.bed_code }} 床</span>
+          <strong>{{ bedTypeText(bed.bed_type) }}</strong>
           <small>{{ selectedBedIds.includes(Number(bed.id)) ? '已选中' : statusText(bed.status) }}</small>
         </button>
       </div>
+
+      <div class="scene-legend" aria-label="床位状态说明">
+        <span>可选择</span>
+        <span>暂时保留</span>
+        <span>已有同学选择</span>
+        <span>右侧窗边为上下铺</span>
+      </div>
+
       <div v-if="isTeamMode && !holdToken" class="button-row centered">
         <button class="button primary" :disabled="!selectionReady || submitting" @click="createHold">
-          整体临时占用 {{ memberCount }} 个床位
+          整体保留 {{ memberCount }} 个床位
         </button>
       </div>
       <p v-if="room.remark" class="room-remark">{{ room.remark }}</p>
@@ -223,7 +267,7 @@ function statusText(status: unknown) {
       <div>
         <span class="eyebrow">TEMPORARY HOLD</span>
         <h3>{{ isTeamMode ? '队伍床位已整体保留' : '床位已临时保留' }}</h3>
-        <p>倒计时结束后自动释放，只有最终确认成功才形成正式分配。</p>
+        <p>请在倒计时结束前确认；超时后床位会重新开放选择。</p>
       </div>
       <div class="countdown">{{ remainingSeconds }}<small>秒</small></div>
       <div class="button-row">

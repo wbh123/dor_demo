@@ -46,7 +46,10 @@ public class MatchingService {
         compareTag(student, roommateFeatureJson, "sleepTimeMinutes", 60, "入睡时间接近", "入睡时间差异较大", positives, warnings);
         compareTag(student, roommateFeatureJson, "cleaningFrequency", 1, "卫生习惯接近", "卫生频率存在差异", positives, warnings);
         compareTag(student, roommateFeatureJson, "gamingVoiceFrequency", 1, "娱乐语音习惯接近", "游戏或语音频率存在差异", positives, warnings);
-        return new MatchResult(score, positives.stream().limit(3).toList(), warnings.stream().limit(3).toList());
+        if (hasSmokingConflict(student, roommateFeatureJson)) {
+            warnings.add("吸烟接受偏好存在冲突");
+        }
+        return new MatchResult(score, positives.stream().limit(3).toList(), warnings.stream().distinct().limit(3).toList());
     }
 
     public Map<String, Object> normalizeAnswers(Map<String, Object> answers) {
@@ -75,12 +78,25 @@ public class MatchingService {
             return 80.0;
         }
         double score = 100.0 * (1.0 - weightedDifference / maximum);
-        Object leftSmoking = left.get("smokingAcceptance");
-        Object rightSmoking = right.get("smokingAcceptance");
-        if (leftSmoking != null && rightSmoking != null && !leftSmoking.equals(rightSmoking)) {
+        if (smokingConflict(left.get("smokingAcceptance"), right.get("smokingAcceptance"))) {
             score -= 25.0;
         }
         return Math.max(0, Math.min(100, score));
+    }
+
+    private boolean hasSmokingConflict(Map<String, Object> student, List<String> roommates) {
+        Object own = student.get("smokingAcceptance");
+        return roommates.stream()
+                .map(this::parse)
+                .map(map -> map.get("smokingAcceptance"))
+                .anyMatch(value -> smokingConflict(own, value));
+    }
+
+    private boolean smokingConflict(Object left, Object right) {
+        String leftValue = left == null ? "ANY" : String.valueOf(left);
+        String rightValue = right == null ? "ANY" : String.valueOf(right);
+        return ("ACCEPT".equals(leftValue) && "REJECT".equals(rightValue))
+                || ("REJECT".equals(leftValue) && "ACCEPT".equals(rightValue));
     }
 
     private void compareTag(Map<String, Object> student, List<String> roommates, String key,

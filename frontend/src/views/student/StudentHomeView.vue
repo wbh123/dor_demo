@@ -1,12 +1,47 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { api } from '../../api/client'
 import type { DataObject, ListSuccessResponse, ObjectSuccessResponse } from '../../api/types'
 
 const profile = ref<DataObject>({})
-const batches = ref<DataObject[]>([])
+const currentActivity = ref<DataObject | null>(null)
+const questionnaire = ref<DataObject>({})
+const assignmentResult = ref<DataObject>({ assigned: false })
 const loading = ref(true)
 const error = ref('')
+
+const questions = computed(() => (questionnaire.value.questions ?? []) as DataObject[])
+const savedAnswers = computed(() => (questionnaire.value.answers ?? []) as DataObject[])
+const questionnaireStarted = computed(() => Boolean(currentActivity.value?.questionnaire_started))
+const canEditQuestionnaire = computed(() =>
+  ['PUBLISHED', 'OPEN', 'PAUSED'].includes(String(currentActivity.value?.batch_status)),
+)
+const canSelectRoom = computed(() => String(currentActivity.value?.batch_status) === 'OPEN')
+const assigned = computed(() => Boolean(assignmentResult.value.assigned))
+const assignment = computed(() => (assignmentResult.value.assignment ?? {}) as DataObject)
+const currentActivityId = computed(() => Number(currentActivity.value?.id ?? 0))
+
+const answerSummary = computed(() => {
+  const questionById = new Map(questions.value.map((question) => [Number(question.id), question]))
+  return savedAnswers.value
+    .map((answer) => {
+      const question = questionById.get(Number(answer.question_id))
+      if (!question) return null
+      let value: unknown = answer.answer_json
+      try {
+        value = typeof value === 'string' ? JSON.parse(value) : value
+      } catch {
+        // 保留原始值用于展示。
+      }
+      return {
+        code: String(question.question_code),
+        label: summaryLabel(question),
+        value: displayAnswer(question, value),
+      }
+    })
+    .filter((item): item is { code: string; label: string; value: string } => Boolean(item))
+    .slice(0, 8)
+})
 
 onMounted(load)
 
@@ -14,12 +49,22 @@ async function load() {
   loading.value = true
   error.value = ''
   try {
-    const [profileResponse, batchResponse] = await Promise.all([
+    const [profileResponse, activityResponse] = await Promise.all([
       api.get<ObjectSuccessResponse>('/api/v1/student/profile'),
       api.get<ListSuccessResponse>('/api/v1/student/batches'),
     ])
     profile.value = (profileResponse.data.data ?? {}) as DataObject
-    batches.value = (batchResponse.data.data ?? []) as DataObject[]
+    const activities = (activityResponse.data.data ?? []) as DataObject[]
+    currentActivity.value = chooseCurrentActivity(activities)
+
+    if (currentActivity.value) {
+      const id = activityId(currentActivity.value)
+      const requests: Promise<unknown>[] = [loadAssignment(id)]
+      if (['PUBLISHED', 'OPEN', 'PAUSED'].includes(String(currentActivity.value.batch_status))) {
+        requests.push(loadQuestionnaire(id))
+      }
+      await Promise.all(requests)
+    }
   } catch (reason) {
     error.value = reason instanceof Error ? reason.message : '数据加载失败'
   } finally {
@@ -27,27 +72,80 @@ async function load() {
   }
 }
 
-function batchId(batch: DataObject) {
-  return Number(batch.id)
+async function loadQuestionnaire(id: number) {
+  const response = await api.get<ObjectSuccessResponse>(`/api/v1/student/batches/${id}/questionnaire`)
+  questionnaire.value = (response.data.data ?? {}) as DataObject
 }
 
-function statusText(status: unknown) {
-  const texts: Record<string, string> = {
-    DRAFT: '草稿',
-    PUBLISHED: '已发布',
-    OPEN: '选寝进行中',
-    PAUSED: '暂时停止',
-    CLOSED: '已关闭',
-    ALLOCATING: '统一分配中',
-    FINISHED: '已完成',
-    CANCELLED: '已取消',
+async function loadAssignment(id: number) {
+  const response = await api.get<ObjectSuccessResponse>(`/api/v1/student/batches/${id}/assignment`)
+  assignmentResult.value = (response.data.data ?? { assigned: false }) as DataObject
+}
+
+function chooseCurrentActivity(activities: DataObject[]) {
+  return activities.find((item) => ['PUBLISHED', 'OPEN', 'PAUSED'].includes(String(item.batch_status)))
+    ?? activities.find((item) => item.assigned)
+    ?? activities.find((item) => ['CLOSED', 'ALLOCATING', 'FINISHED'].includes(String(item.batch_status)))
+    ?? null
+}
+
+function activityId(activity: DataObject) {
+  return Number(activity.id)
+}
+
+function summaryLabel(question: DataObject) {
+  const labels: Record<string, string> = {
+    SLEEP_TIME: '入睡时间',
+    WAKE_TIME: '起床时间',
+    NAP_HABIT: '午休习惯',
+    SLEEP_SENSITIVITY: '睡眠敏感度',
+    NOISE_TOLERANCE: '噪声接受度',
+    CLEANING_FREQUENCY: '清洁频率',
+    TIDINESS_REQUIREMENT: '整洁要求',
+    AC_TEMPERATURE: '空调温度',
+    VENTILATION: '通风偏好',
+    STUDY_FREQUENCY: '宿舍学习',
+    GAMING_VOICE: '游戏语音',
+    SOCIAL_ACTIVITY: '社交活跃度',
+    SMOKING_ACCEPTANCE: '室友吸烟',
+    BED_PREFERENCE: '床位偏好',
   }
-  return texts[String(status)] ?? String(status ?? '')
+  return labels[String(question.question_code)] ?? String(question.question_text)
+}
+
+function displayAnswer(question: DataObject, value: unknown) {
+  const code = String(question.question_code)
+  if (code === 'SMOKING_ACCEPTANCE') {
+    return { ACCEPT: '接受', REJECT: '不接受', ANY: '均可' }[String(value)] ?? '未填写'
+  }
+  if (code === 'BED_PREFERENCE') {
+    return {
+      ANY: '无特别偏好',
+      LOFT_BED_DESK: '上床下桌',
+      BUNK_UPPER: '上下铺上铺',
+      BUNK_LOWER: '上下铺下铺',
+    }[String(value)] ?? String(value)
+  }
+  if (code === 'NAP_HABIT') {
+    return ['基本不午休', '偶尔午休', '经常午休'][Number(value)] ?? String(value)
+  }
+  if (question.question_type === 'TIME') return String(value)
+  if (code === 'AC_TEMPERATURE') return `${value}℃`
+  if (typeof value === 'number') return ['非常低', '较低', '适中', '较高', '非常高'][value - 1] ?? String(value)
+  return String(value ?? '未填写')
+}
+
+function bedTypeText(value: unknown) {
+  return {
+    LOFT_BED_DESK: '上床下桌',
+    BUNK_UPPER: '上下铺上铺',
+    BUNK_LOWER: '上下铺下铺',
+  }[String(value)] ?? String(value ?? '')
 }
 </script>
 
 <template>
-  <div class="page-grid">
+  <div class="student-home-grid">
     <section class="welcome-card panel gradient-panel">
       <div>
         <span class="eyebrow light">欢迎回来</span>
@@ -57,58 +155,69 @@ function statusText(status: unknown) {
       <div class="welcome-mark">{{ profile.gender === 'M' ? '男寝' : '女寝' }}</div>
     </section>
 
-    <section class="panel span-2">
-      <div class="section-head">
-        <div>
-          <span class="eyebrow">SELECTION BATCHES</span>
-          <h2>可参与的选寝批次</h2>
+    <section class="panel assignment-summary">
+      <div>
+        <span class="eyebrow">MY DORMITORY</span>
+        <h2>我的住宿结果</h2>
+      </div>
+      <template v-if="assigned">
+        <div class="assignment-place">
+          <strong>{{ assignment.building_name }}</strong>
+          <span>{{ assignment.room_number }} 室 · {{ assignment.bed_code }} 床位</span>
         </div>
-        <button class="button ghost" @click="load">刷新</button>
+        <p>{{ assignment.floor_number }}层 · {{ bedTypeText(assignment.bed_type) }}</p>
+        <RouterLink v-if="currentActivityId" class="button secondary" :to="`/student/batches/${currentActivityId}/assignment`">查看完整结果</RouterLink>
+      </template>
+      <template v-else>
+        <p>尚未确定宿舍和床位。完成问卷后，可在开放选寝期间选择合适的房间。</p>
+        <RouterLink
+          v-if="canSelectRoom && currentActivityId"
+          class="button primary"
+          :to="`/student/batches/${currentActivityId}/rooms`"
+        >进入选寝</RouterLink>
+      </template>
+    </section>
+
+    <p v-if="loading" class="panel empty-state home-span-2">正在读取个人选寝信息…</p>
+    <p v-else-if="error" class="alert error home-span-2">{{ error }}</p>
+
+    <section v-else class="panel home-span-2">
+      <div class="section-head split-title">
+        <div>
+          <span class="eyebrow">LIFESTYLE PREFERENCES</span>
+          <h2>我的生活习惯偏好</h2>
+          <p>你可以随时查看已填写内容，并在允许修改时重新保存。</p>
+        </div>
+        <RouterLink
+          v-if="currentActivityId && canEditQuestionnaire"
+          class="button secondary"
+          :to="`/student/batches/${currentActivityId}/questionnaire`"
+        >{{ questionnaireStarted ? '修改问卷' : '填写问卷' }}</RouterLink>
       </div>
 
-      <p v-if="loading" class="empty-state">正在读取选寝批次…</p>
-      <p v-else-if="error" class="alert error">{{ error }}</p>
-      <p v-else-if="batches.length === 0" class="empty-state">当前没有可参与的选寝批次。</p>
-
-      <div v-else class="batch-list">
-        <article v-for="batch in batches" :key="String(batch.id)" class="batch-card">
-          <div class="batch-title">
-            <div>
-              <span class="status-chip compact">{{ statusText(batch.batch_status) }}</span>
-              <h3>{{ batch.batch_name }}</h3>
-              <p>{{ batch.batch_code }}</p>
-            </div>
-            <span class="big-number">{{ batch.assigned ? '✓' : batchId(batch) }}</span>
-          </div>
-          <dl class="meta-grid">
-            <div><dt>临时占用</dt><dd>{{ batch.hold_duration_seconds }} 秒</dd></div>
-            <div><dt>组队选寝</dt><dd>{{ batch.allow_team ? '支持' : '不支持' }}</dd></div>
-            <div><dt>学生随机</dt><dd>{{ batch.allow_student_random ? '支持' : '不支持' }}</dd></div>
-          </dl>
-          <div class="button-row">
-            <RouterLink
-              v-if="!batch.assigned"
-              class="button secondary"
-              :to="`/student/batches/${batchId(batch)}/questionnaire`"
-            >填写问卷</RouterLink>
-            <RouterLink
-              v-if="['PUBLISHED', 'OPEN', 'PAUSED'].includes(String(batch.batch_status)) && !batch.assigned"
-              class="button primary"
-              :to="`/student/batches/${batchId(batch)}/rooms`"
-            >进入选寝</RouterLink>
-            <RouterLink
-              class="button ghost"
-              :to="`/student/batches/${batchId(batch)}/assignment`"
-            >查看结果</RouterLink>
-          </div>
+      <p v-if="!currentActivity" class="empty-state">当前没有需要参与的选寝活动。</p>
+      <p v-else-if="answerSummary.length === 0" class="empty-state">尚未填写生活习惯问卷。</p>
+      <div v-else class="preference-summary-grid">
+        <article v-for="item in answerSummary" :key="item.code" class="preference-summary-item">
+          <span>{{ item.label }}</span>
+          <strong>{{ item.value }}</strong>
         </article>
+      </div>
+
+      <div v-if="currentActivity && !assigned" class="button-row">
+        <RouterLink
+          v-if="canSelectRoom"
+          class="button primary"
+          :to="`/student/batches/${currentActivityId}/rooms`"
+        >选择宿舍和床位</RouterLink>
+        <RouterLink v-if="canSelectRoom && currentActivity.allow_team" class="button ghost" to="/student/teams">组队选寝</RouterLink>
       </div>
     </section>
 
-    <section class="panel info-card">
+    <section class="panel info-card home-span-2">
       <span class="eyebrow">规则说明</span>
-      <h3>最终床位以服务端确认为准</h3>
-      <p>临时占用只在倒计时内保留床位。确认成功后，MySQL唯一约束会阻止任何重复分配。</p>
+      <h3>请在规定时间内完成选择</h3>
+      <p>床位在确认前只会短暂保留。确认成功后，首页会立即显示你的宿舍和床位；如需调整，请联系管理人员。</p>
     </section>
   </div>
 </template>

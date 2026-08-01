@@ -19,6 +19,15 @@ const form = reactive({
   allowStudentRandom: true,
 })
 
+const stateGuide = [
+  { status: 'DRAFT', label: '草稿', description: '配置资格与宿舍' },
+  { status: 'PUBLISHED', label: '已发布', description: '学生可填写问卷' },
+  { status: 'OPEN', label: '选寝中', description: '允许选择和确认床位' },
+  { status: 'PAUSED', label: '已暂停', description: '临时停止选寝' },
+  { status: 'CLOSED', label: '已关闭', description: '学生入口关闭' },
+  { status: 'FINISHED', label: '已完成', description: '结果已经确定' },
+]
+
 onMounted(load)
 
 async function load() {
@@ -51,14 +60,14 @@ async function createBatch() {
 async function prepare(batchId: unknown) {
   await run(async () => {
     await api.post(`/api/v1/admin/batches/${Number(batchId)}/prepare`)
-    message.value = '已加入全部启用专业学生和启用宿舍楼范围。'
+    message.value = '学生资格和可选宿舍范围已准备。'
   })
 }
 
 async function changeStatus(batchId: unknown, target: string) {
   await run(async () => {
     await api.post(`/api/v1/admin/batches/${Number(batchId)}/status/${target}`)
-    message.value = `批次状态已更新为 ${target}。`
+    message.value = `批次已切换为“${statusText(target)}”。`
   })
 }
 
@@ -84,7 +93,7 @@ async function commitAllocation() {
       randomSeed: 20260801,
       idempotencyKey: crypto.randomUUID(),
     })
-    message.value = '统一分配已提交，结果和执行明细已保存。'
+    message.value = '统一分配已正式执行，结果和明细已保存。'
     preview.value = null
     previewBatchId.value = null
   })
@@ -128,6 +137,33 @@ function nextActions(status: unknown) {
   }
   return actions[String(status)] ?? []
 }
+
+function statusText(status: unknown) {
+  const texts: Record<string, string> = {
+    DRAFT: '草稿',
+    PUBLISHED: '已发布',
+    OPEN: '选寝中',
+    PAUSED: '已暂停',
+    CLOSED: '已关闭',
+    ALLOCATING: '分配中',
+    FINISHED: '已完成',
+    CANCELLED: '已取消',
+  }
+  return texts[String(status)] ?? String(status)
+}
+
+function actionText(status: string) {
+  const texts: Record<string, string> = {
+    PUBLISHED: '发布活动',
+    OPEN: '开放选寝',
+    PAUSED: '暂停选寝',
+    CLOSED: '结束选寝',
+    ALLOCATING: '进入统一分配',
+    FINISHED: '标记完成',
+    CANCELLED: '取消批次',
+  }
+  return texts[status] ?? statusText(status)
+}
 </script>
 
 <template>
@@ -135,18 +171,28 @@ function nextActions(status: unknown) {
     <div class="page-title">
       <span class="eyebrow">SELECTION OPERATIONS</span>
       <h2>选寝批次与统一分配</h2>
-      <p>批次按状态机流转。预演不会写入正式分配，正式执行使用幂等键防止重复提交。</p>
+      <p>已发布表示学生可以查看活动并填写问卷；选寝中表示学生可以正式选择和确认床位。</p>
     </div>
 
     <p v-if="error" class="alert error">{{ error }}</p>
     <p v-if="message" class="alert success">{{ message }}</p>
 
     <section class="panel">
+      <div class="section-head"><div><span class="eyebrow">STATUS GUIDE</span><h3>批次状态流程</h3></div></div>
+      <div class="batch-state-guide">
+        <article v-for="state in stateGuide" :key="state.status" class="batch-state-step">
+          <strong>{{ state.label }}</strong>
+          <span>{{ state.description }}</span>
+        </article>
+      </div>
+    </section>
+
+    <section class="panel">
       <div class="section-head"><div><span class="eyebrow">NEW BATCH</span><h3>创建选寝批次</h3></div></div>
       <form class="form-grid three-column" @submit.prevent="createBatch">
         <label><span>批次编号</span><input v-model.trim="form.batchCode" class="input" required maxlength="32" /></label>
         <label><span>批次名称</span><input v-model.trim="form.batchName" class="input" required maxlength="128" /></label>
-        <label><span>占用秒数</span><input v-model.number="form.holdDurationSeconds" class="input" type="number" min="30" max="3600" /></label>
+        <label><span>床位保留时间（秒）</span><input v-model.number="form.holdDurationSeconds" class="input" type="number" min="30" max="3600" /></label>
         <label><span>开始时间</span><input v-model="form.startAt" class="input" type="datetime-local" required /></label>
         <label><span>结束时间</span><input v-model="form.endAt" class="input" type="datetime-local" required /></label>
         <label><span>队伍最大人数</span><input v-model.number="form.teamMaxSize" class="input" type="number" min="2" max="20" /></label>
@@ -161,13 +207,13 @@ function nextActions(status: unknown) {
       <div class="batch-list admin-batches">
         <article v-for="batch in batches" :key="String(batch.id)" class="batch-card">
           <div class="batch-title">
-            <div><span class="status-chip compact">{{ batch.batch_status }}</span><h3>{{ batch.batch_name }}</h3><p>{{ batch.batch_code }}</p></div>
+            <div><span class="status-chip compact">{{ statusText(batch.batch_status) }}</span><h3>{{ batch.batch_name }}</h3><p>{{ batch.batch_code }}</p></div>
             <strong>{{ batch.assigned_count }}/{{ batch.eligible_count }}</strong>
           </div>
           <div class="button-row wrap">
-            <button v-if="batch.batch_status === 'DRAFT'" class="button secondary small" @click="prepare(batch.id)">准备资格和宿舍范围</button>
-            <button v-for="target in nextActions(batch.batch_status)" :key="target" class="button ghost small" @click="changeStatus(batch.id, target)">{{ target }}</button>
-            <button v-if="['CLOSED', 'ALLOCATING'].includes(String(batch.batch_status))" class="button accent small" @click="previewAllocation(batch.id)">统一分配预演</button>
+            <button v-if="batch.batch_status === 'DRAFT'" class="button secondary small" @click="prepare(batch.id)">准备学生与宿舍范围</button>
+            <button v-for="target in nextActions(batch.batch_status)" :key="target" class="button ghost small" @click="changeStatus(batch.id, target)">{{ actionText(target) }}</button>
+            <button v-if="['CLOSED', 'ALLOCATING'].includes(String(batch.batch_status))" class="button accent small" @click="previewAllocation(batch.id)">预演统一分配</button>
             <button class="button ghost small" @click="download(batch.id)">导出结果</button>
           </div>
         </article>

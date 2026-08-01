@@ -73,6 +73,16 @@ function roomType(value: unknown) {
     OTHER: '其他房型',
   }[String(value)] ?? String(value)
 }
+
+function roommateCount(room: DataObject) {
+  return Number(room.assigned_count ?? 0)
+}
+
+function roommateTags(room: DataObject) {
+  const positives = ((room.matches ?? []) as string[]).slice(0, 3)
+  const warnings = ((room.warnings ?? []) as string[]).slice(0, 2)
+  return [...positives, ...warnings].slice(0, 3)
+}
 </script>
 
 <template>
@@ -81,15 +91,15 @@ function roomType(value: unknown) {
       <div>
         <span class="eyebrow">ROOM MATCHING</span>
         <h2>{{ isTeamMode ? `为${memberCount}人队伍选择房间` : '选择宿舍房间' }}</h2>
-        <p v-if="isTeamMode">只展示剩余床位不少于队伍人数的房间，全部床位必须位于同一房间。</p>
-        <p v-else>排序综合考虑生活习惯匹配度和当前可用床位，最终选择仍由你确认。</p>
+        <p v-if="isTeamMode">只展示能够容纳全部成员的房间，队伍需要在同一房间完成选择。</p>
+        <p v-else>房间按生活习惯接近程度排序。已有室友时，会显示匿名偏好提示。</p>
       </div>
-      <button v-if="!isTeamMode" class="button accent" @click="randomRecommend">帮我随机选一个</button>
+      <button v-if="!isTeamMode" class="button accent" @click="randomRecommend">帮我推荐一个</button>
     </div>
 
     <section v-if="randomResult" class="panel recommendation-card">
       <div>
-        <span class="eyebrow">RANDOM RECOMMENDATION</span>
+        <span class="eyebrow">RECOMMENDATION</span>
         <h3>已找到一个当前可选床位</h3>
         <p>{{ randomResult.explanation }}</p>
       </div>
@@ -98,8 +108,8 @@ function roomType(value: unknown) {
 
     <section class="panel filter-bar">
       <label class="search-field">
-        <span>搜索</span>
-        <input v-model="keyword" class="input" placeholder="楼栋或房间号" />
+        <span>搜索房间</span>
+        <input v-model="keyword" class="input" placeholder="输入楼栋或房间号" />
       </label>
       <div class="filter-summary">
         <strong>{{ filteredRooms.length }}</strong>
@@ -111,24 +121,32 @@ function roomType(value: unknown) {
     <p v-else-if="error" class="alert error">{{ error }}</p>
     <p v-else-if="filteredRooms.length === 0" class="panel empty-state">当前没有符合条件的房间。</p>
 
-    <div v-else class="room-grid">
+    <div v-else class="room-grid compact-room-grid">
       <article v-for="room in filteredRooms" :key="String(room.id)" class="panel room-card">
         <div class="room-card-head">
           <div>
             <span class="eyebrow">{{ room.building_name }}</span>
             <h3>{{ room.room_number }} 室</h3>
           </div>
-          <span class="score-ring">{{ Number(room.matchScore).toFixed(0) }}</span>
+          <span class="score-ring" :title="`匹配度 ${Number(room.matchScore).toFixed(0)}`">{{ Number(room.matchScore).toFixed(0) }}</span>
         </div>
         <div class="room-facts">
           <span>{{ roomType(room.room_type) }}</span>
           <span>剩余 {{ room.availableCount }} 床</span>
           <span>{{ room.floor_number }} 层</span>
         </div>
-        <div class="tag-row">
-          <span v-for="tag in (room.matches as string[] || [])" :key="tag" class="tag positive">{{ tag }}</span>
-          <span v-for="tag in (room.warnings as string[] || [])" :key="tag" class="tag warning">{{ tag }}</span>
+
+        <div class="roommate-summary">
+          <div class="roommate-summary-head">
+            <strong>室友偏好</strong>
+            <span>{{ roommateCount(room) > 0 ? `已有 ${roommateCount(room)} 人` : '当前空房' }}</span>
+          </div>
+          <div v-if="roommateCount(room) > 0" class="tag-row">
+            <span v-for="tag in roommateTags(room)" :key="tag" class="tag positive">{{ tag }}</span>
+          </div>
+          <p v-else class="roommate-empty">暂无室友偏好信息，可优先选择喜欢的床位。</p>
         </div>
+
         <button class="button primary full" @click="openRoom(room.id)">
           {{ isTeamMode ? '选择队伍床位' : '查看床位布局' }}
         </button>

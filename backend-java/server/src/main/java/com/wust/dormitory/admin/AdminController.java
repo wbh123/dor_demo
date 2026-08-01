@@ -31,6 +31,7 @@ import java.util.Map;
 @RestController
 public class AdminController implements AdminApi {
     private final AdminService adminService;
+    private final BatchLifecycleService batchLifecycleService;
     private final AdminAllocationService allocationService;
     private final AssignmentQueryService assignmentQueryService;
     private final AssignmentAdjustmentService adjustmentService;
@@ -38,12 +39,14 @@ public class AdminController implements AdminApi {
     private final BatchRuleValidator batchRuleValidator;
 
     public AdminController(AdminService adminService,
+                           BatchLifecycleService batchLifecycleService,
                            AdminAllocationService allocationService,
                            AssignmentQueryService assignmentQueryService,
                            AssignmentAdjustmentService adjustmentService,
                            AssignmentExportService exportService,
                            BatchRuleValidator batchRuleValidator) {
         this.adminService = adminService;
+        this.batchLifecycleService = batchLifecycleService;
         this.allocationService = allocationService;
         this.assignmentQueryService = assignmentQueryService;
         this.adjustmentService = adjustmentService;
@@ -157,7 +160,7 @@ public class AdminController implements AdminApi {
 
     @Override
     public ResponseEntity<VoidSuccessResponse> changeBatchStatus(Long batchId, String targetStatus) {
-        adminService.changeBatchStatus(
+        batchLifecycleService.changeStatus(
                 batchId,
                 targetStatus.toUpperCase(),
                 SecurityUsers.requireAdmin()

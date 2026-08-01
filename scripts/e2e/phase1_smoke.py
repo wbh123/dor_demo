@@ -106,6 +106,38 @@ def main() -> int:
     request("POST", "/api/v1/admin/batches/1/status/PUBLISHED", token=admin_token)
     request("POST", "/api/v1/admin/batches/1/status/OPEN", token=admin_token)
 
+    second_batch = response_data(
+        request(
+            "POST",
+            "/api/v1/admin/batches",
+            token=admin_token,
+            body={
+                "batchCode": "PHASE1-CONFLICT-CHECK",
+                "batchName": "活动批次唯一性验收",
+                "startAt": "2026-09-01T00:00:00Z",
+                "endAt": "2026-09-10T00:00:00Z",
+                "holdDurationSeconds": 300,
+                "allowTeam": True,
+                "teamMaxSize": 5,
+                "allowStudentRandom": True,
+            },
+        )
+    )
+    second_batch_id = int(second_batch["id"])
+    request(
+        "POST",
+        f"/api/v1/admin/batches/{second_batch_id}/prepare",
+        token=admin_token,
+    )
+    active_conflict = request(
+        "POST",
+        f"/api/v1/admin/batches/{second_batch_id}/status/PUBLISHED",
+        token=admin_token,
+        expected_status=409,
+    )
+    assert active_conflict["success"] is False, active_conflict
+    assert active_conflict["error"]["code"] == "BATCH_STUDENT_ACTIVE_CONFLICT", active_conflict
+
     request(
         "POST",
         "/api/v1/auth/activate",
@@ -133,6 +165,18 @@ def main() -> int:
         request("GET", "/api/v1/student/batches/1/questionnaire", token=student_token)
     )
     assert len(questionnaire["questions"]) == 14, questionnaire
+    smoking_question = next(
+        question
+        for question in questionnaire["questions"]
+        if question["question_code"] == "SMOKING_ACCEPTANCE"
+    )
+    assert smoking_question["question_type"] == "SINGLE_CHOICE", smoking_question
+    assert [option["option_code"] for option in smoking_question["options"]] == [
+        "ACCEPT",
+        "REJECT",
+        "ANY",
+    ], smoking_question
+
     request(
         "POST",
         "/api/v1/student/batches/1/questionnaire",
@@ -150,7 +194,7 @@ def main() -> int:
             "STUDY_FREQUENCY": 3,
             "GAMING_VOICE": 2,
             "SOCIAL_ACTIVITY": 3,
-            "SMOKING_ACCEPTANCE": False,
+            "SMOKING_ACCEPTANCE": "REJECT",
             "BED_PREFERENCE": "LOFT_BED_DESK",
         },
     )

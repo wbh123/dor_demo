@@ -63,7 +63,6 @@ async function logout() {
           <span class="eyebrow">WUST DORMITORY SELECT</span>
           <h1>{{ auth.isAdmin ? '管理控制台' : '学生选寝中心' }}</h1>
         </div>
-        <span class="status-chip"><i /> 系统服务正常</span>
       </header>
       <section class="page-container">
         <RouterView />
