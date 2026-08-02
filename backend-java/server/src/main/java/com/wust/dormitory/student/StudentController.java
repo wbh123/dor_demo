@@ -12,8 +12,10 @@ import com.wust.dormitory.model.dto.StudentPhoneUpdateRequest;
 import com.wust.dormitory.model.dto.TeamBedsRequest;
 import com.wust.dormitory.model.dto.TeamConfirmRequest;
 import com.wust.dormitory.model.dto.VoidSuccessResponse;
+import com.wust.dormitory.residency.BedResidencySynchronizationService;
 import com.wust.dormitory.residency.ResidencyService;
 import com.wust.dormitory.residency.RoomSelectionService;
+import com.wust.dormitory.residency.SelectionModeGuard;
 import com.wust.dormitory.security.CurrentUser;
 import com.wust.dormitory.security.SecurityUsers;
 import com.wust.dormitory.selection.BedHoldService;
@@ -37,6 +39,8 @@ public class StudentController implements StudentApi {
     private final BedScopeGuard bedScopeGuard;
     private final RoomSelectionService roomSelectionService;
     private final ResidencyService residencyService;
+    private final SelectionModeGuard selectionModeGuard;
+    private final BedResidencySynchronizationService bedResidencySynchronizationService;
 
     public StudentController(
             StudentService studentService,
@@ -47,7 +51,9 @@ public class StudentController implements StudentApi {
             TeamHoldReleaseService teamHoldReleaseService,
             BedScopeGuard bedScopeGuard,
             RoomSelectionService roomSelectionService,
-            ResidencyService residencyService) {
+            ResidencyService residencyService,
+            SelectionModeGuard selectionModeGuard,
+            BedResidencySynchronizationService bedResidencySynchronizationService) {
         this.studentService = studentService;
         this.profileService = profileService;
         this.roomLayoutService = roomLayoutService;
@@ -57,6 +63,8 @@ public class StudentController implements StudentApi {
         this.bedScopeGuard = bedScopeGuard;
         this.roomSelectionService = roomSelectionService;
         this.residencyService = residencyService;
+        this.selectionModeGuard = selectionModeGuard;
+        this.bedResidencySynchronizationService = bedResidencySynchronizationService;
     }
 
     @Override
@@ -107,14 +115,24 @@ public class StudentController implements StudentApi {
 
     @Override
     public ResponseEntity<ObjectSuccessResponse> getCandidateRoom(Long batchId, Long roomId) {
+        CurrentUser user = student();
+        if ("ROOM".equals(selectionModeGuard.mode(batchId))) {
+            return ResponseEntity.ok(ResponseFactory.object(
+                    Map.of(
+                            "selectionMode", "ROOM",
+                            "room", recommendationService.room(batchId, roomId, user),
+                            "bedsVisible", false,
+                            "message", "当前批次只选择寝室，具体床位由寝室成员入住后自行协商")));
+        }
         Map<String, Object> snapshot = roomLayoutService.enrich(
-                studentService.room(batchId, roomId, student()));
+                studentService.room(batchId, roomId, user));
         return ResponseEntity.ok(ResponseFactory.object(
                 bedScopeGuard.filterRoomSnapshot(batchId, snapshot)));
     }
 
     @Override
     public ResponseEntity<ObjectSuccessResponse> selectRoom(Long batchId, Long roomId) {
+        selectionModeGuard.requireRoomMode(batchId);
         return ResponseEntity.ok(ResponseFactory.object(
                 roomSelectionService.selectPersonal(batchId, roomId, student())));
     }
@@ -124,6 +142,7 @@ public class StudentController implements StudentApi {
             Long batchId,
             Long teamId,
             Long roomId) {
+        selectionModeGuard.requireRoomMode(batchId);
         return ResponseEntity.ok(ResponseFactory.object(
                 roomSelectionService.selectTeam(batchId, teamId, roomId, student())));
     }
@@ -156,6 +175,7 @@ public class StudentController implements StudentApi {
 
     @Override
     public ResponseEntity<ObjectSuccessResponse> holdBed(Long batchId, Long bedId) {
+        selectionModeGuard.requireBedMode(batchId);
         bedScopeGuard.requireAllowed(batchId, bedId);
         BedHoldService.HoldResult hold = studentService.hold(batchId, bedId, student());
         return ResponseEntity.ok(ResponseFactory.object(Map.of(
@@ -166,17 +186,24 @@ public class StudentController implements StudentApi {
     @Override
     public ResponseEntity<VoidSuccessResponse> releaseBed(
             Long batchId, Long bedId, HoldTokenRequest request) {
+        selectionModeGuard.requireBedMode(batchId);
         bedScopeGuard.requireAllowed(batchId, bedId);
         studentService.release(batchId, bedId, request.getToken(), student());
         return ResponseEntity.ok(ResponseFactory.empty());
     }
 
     @Override
+    @Transactional
     public ResponseEntity<ObjectSuccessResponse> confirmBed(
             Long batchId, Long bedId, HoldTokenRequest request) {
+        selectionModeGuard.requireBedMode(batchId);
         bedScopeGuard.requireAllowed(batchId, bedId);
-        return ResponseEntity.ok(ResponseFactory.object(
-                studentService.confirm(batchId, bedId, request.getToken(), student())));
+        CurrentUser user = student();
+        Map<String, Object> result = studentService.confirm(
+                batchId, bedId, request.getToken(), user);
+        bedResidencySynchronizationService.synchronizeStudent(
+                batchId, user.studentId(), user);
+        return ResponseEntity.ok(ResponseFactory.object(result));
     }
 
     @Override
@@ -187,7 +214,13 @@ public class StudentController implements StudentApi {
 
     @Override
     public ResponseEntity<ObjectSuccessResponse> getMyAssignment(Long batchId) {
-        return ResponseEntity.ok(ResponseFactory.object(studentService.assignment(batchId, student())));
+        CurrentUser user = student();
+        if ("ROOM".equals(selectionModeGuard.mode(batchId))) {
+            return ResponseEntity.ok(ResponseFactory.object(
+                    residencyService.current(user.studentId())));
+        }
+        return ResponseEntity.ok(ResponseFactory.object(
+                studentService.assignment(batchId, user)));
     }
 
     @Override
@@ -241,6 +274,7 @@ public class StudentController implements StudentApi {
     @Transactional
     public ResponseEntity<ObjectSuccessResponse> holdTeamBeds(
             Long batchId, Long teamId, TeamBedsRequest request) {
+        selectionModeGuard.requireBedMode(batchId);
         CurrentUser user = student();
         teamHoldReleaseService.lockTeamForHold(batchId, teamId, user.studentId());
         List<Long> bedIds = new ArrayList<>(request.getBedIds());
@@ -256,6 +290,7 @@ public class StudentController implements StudentApi {
     @Transactional
     public ResponseEntity<VoidSuccessResponse> releaseTeamBeds(
             Long batchId, Long teamId, TeamConfirmRequest request) {
+        selectionModeGuard.requireBedMode(batchId);
         CurrentUser user = student();
         List<Long> bedIds = new ArrayList<>(request.getBedIds());
         bedScopeGuard.requireAllowed(batchId, bedIds);
@@ -268,12 +303,14 @@ public class StudentController implements StudentApi {
     @Transactional
     public ResponseEntity<VoidSuccessResponse> confirmTeamBeds(
             Long batchId, Long teamId, TeamConfirmRequest request) {
+        selectionModeGuard.requireBedMode(batchId);
         CurrentUser user = student();
         teamHoldReleaseService.lockTeamForHold(batchId, teamId, user.studentId());
         List<Long> bedIds = new ArrayList<>(request.getBedIds());
         bedScopeGuard.requireAllowed(batchId, bedIds);
         studentService.confirmTeam(
                 batchId, teamId, bedIds, request.getToken(), user);
+        bedResidencySynchronizationService.synchronizeTeam(batchId, teamId, user);
         return ResponseEntity.ok(ResponseFactory.empty());
     }
 
