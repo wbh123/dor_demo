@@ -58,12 +58,12 @@ public class BatchCapacityService {
                             "code", "ROOM_BED_MAPPING_REQUIRED",
                             "message", unknown + "名在住学生尚未确认实际床位"));
                 }
-                slots = unknown == 0 ? policy.availableBedCount(roomId) : 0;
+                slots = unknown == 0 ? policy.availableBedCount(batchId, roomId) : 0;
             } else {
                 slots = policy.availableCapacity(roomId);
             }
             if (slots <= 0) {
-                reasons.add(Map.of("code", "ROOM_CAPACITY_FULL", "message", "寝室已无剩余名额"));
+                reasons.add(Map.of("code", "ROOM_CAPACITY_FULL", "message", "寝室已无剩余可选名额"));
             }
             Map<String, Object> view = new LinkedHashMap<>();
             view.putAll(room);
@@ -101,7 +101,7 @@ public class BatchCapacityService {
             blockers.add(Map.of("code", "BATCH_STUDENT_ACTIVE_CONFLICT", "message", "学生正在参加另一个活动批次"));
         }
         if (totalSlots <= 0) {
-            blockers.add(Map.of("code", "NO_ELIGIBLE_ROOM_CAPACITY", "message", "没有符合性别和学生类别的剩余宿舍名额"));
+            blockers.add(Map.of("code", "NO_ELIGIBLE_ROOM_CAPACITY", "message", "没有符合性别、学生类别与批次范围的剩余宿舍名额"));
         }
 
         Map<String, Object> result = new LinkedHashMap<>();
