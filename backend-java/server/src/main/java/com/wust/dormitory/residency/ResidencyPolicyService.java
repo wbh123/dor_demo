@@ -82,6 +82,39 @@ public class ResidencyPolicyService {
         }
     }
 
+    public void requireBedInBatch(long batchId, long bedId) {
+        Integer count = jdbc.queryForObject("""
+                SELECT COUNT(*)
+                FROM bed target_bed
+                JOIN room target_room ON target_room.id=target_bed.room_id
+                JOIN dormitory_floor target_floor ON target_floor.id=target_room.floor_id
+                WHERE target_bed.id=:bedId
+                  AND (
+                      EXISTS (
+                          SELECT 1 FROM batch_bed_scope scope
+                          WHERE scope.batch_id=:batchId AND scope.bed_id=target_bed.id
+                      )
+                      OR EXISTS (
+                          SELECT 1 FROM batch_room_scope scope
+                          WHERE scope.batch_id=:batchId AND scope.room_id=target_room.id
+                      )
+                      OR EXISTS (
+                          SELECT 1 FROM batch_building_scope scope
+                          WHERE scope.batch_id=:batchId
+                            AND scope.building_id=target_floor.building_id
+                      )
+                  )
+                """, new MapSqlParameterSource()
+                .addValue("batchId", batchId)
+                .addValue("bedId", bedId), Integer.class);
+        if (count == null || count != 1) {
+            throw new BusinessException(
+                    "BED_OUT_OF_BATCH_SCOPE",
+                    "该床位不属于当前批次开放范围",
+                    HttpStatus.FORBIDDEN);
+        }
+    }
+
     public void requireRoomLockedByBatch(long batchId, long roomId) {
         Integer count = jdbc.queryForObject("""
                 SELECT COUNT(*) FROM active_batch_room_lock
@@ -167,7 +200,47 @@ public class ResidencyPolicyService {
         return count == null ? 0 : count;
     }
 
+    public int availableBedCount(long batchId, long roomId) {
+        Integer count = jdbc.queryForObject("""
+                SELECT COUNT(*)
+                FROM bed target_bed
+                JOIN room target_room ON target_room.id=target_bed.room_id
+                JOIN dormitory_floor target_floor ON target_floor.id=target_room.floor_id
+                WHERE target_bed.room_id=:roomId
+                  AND target_bed.operational_status='ENABLED'
+                  AND (
+                      EXISTS (
+                          SELECT 1 FROM batch_bed_scope scope
+                          WHERE scope.batch_id=:batchId AND scope.bed_id=target_bed.id
+                      )
+                      OR EXISTS (
+                          SELECT 1 FROM batch_room_scope scope
+                          WHERE scope.batch_id=:batchId AND scope.room_id=target_room.id
+                      )
+                      OR EXISTS (
+                          SELECT 1 FROM batch_building_scope scope
+                          WHERE scope.batch_id=:batchId
+                            AND scope.building_id=target_floor.building_id
+                      )
+                  )
+                  AND NOT EXISTS (
+                      SELECT 1 FROM room_assignment ra
+                      WHERE ra.bed_id=target_bed.id AND ra.assignment_status='ACTIVE'
+                  )
+                """, new MapSqlParameterSource()
+                .addValue("batchId", batchId)
+                .addValue("roomId", roomId), Integer.class);
+        return count == null ? 0 : count;
+    }
+
     public Map<String, Object> requireAvailableBed(long roomId, long bedId) {
+        return requireAvailableBed(roomId, bedId, null);
+    }
+
+    public Map<String, Object> requireAvailableBed(
+            long roomId,
+            long bedId,
+            Long excludedResidencyId) {
         Map<String, Object> bed = one("""
                 SELECT b.id, b.room_id, b.bed_code, b.bed_type, b.operational_status
                 FROM bed b WHERE b.id=:bedId AND b.room_id=:roomId
@@ -182,7 +255,10 @@ public class ResidencyPolicyService {
         Integer occupied = jdbc.queryForObject("""
                 SELECT COUNT(*) FROM room_assignment
                 WHERE bed_id=:bedId AND assignment_status='ACTIVE'
-                """, Map.of("bedId", bedId), Integer.class);
+                  AND (:excludedId IS NULL OR id<>:excludedId)
+                """, new MapSqlParameterSource()
+                .addValue("bedId", bedId)
+                .addValue("excludedId", excludedResidencyId), Integer.class);
         if (occupied != null && occupied > 0) {
             throw new BusinessException(
                     "BED_ALREADY_OCCUPIED",
