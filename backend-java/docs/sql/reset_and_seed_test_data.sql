@@ -1,15 +1,16 @@
 -- ============================================================================
--- 武汉科技大学学生宿舍智能选择系统：测试数据全量重置脚本
+-- 武汉科技大学学生宿舍智能选择系统：V9全量测试数据重置脚本
 --
 -- 使用方式：
 --   mysql -u<user> -p <database> < backend-java/docs/sql/reset_and_seed_test_data.sql
 --
 -- 约束：
--- 1. 必须先完成 Flyway V1 至当前最新正式版本数据库迁移；
--- 2. 清空全部业务数据，但保留 flyway_schema_history；
+-- 1. 必须先完成Flyway V1-V9数据库迁移；
+-- 2. 清空全部业务数据，但保留flyway_schema_history；
 -- 3. 管理员 username='admin' 的账号主键、密码哈希和状态原样保留；
 -- 4. 学生学号均为12位数字；
--- 5. 学生账号恢复为待激活状态，便于重复测试激活流程。
+-- 5. 全部学生账号均为待激活，用于验证统一分配不依赖账号激活；
+-- 6. 包含个人偏好、组队邀请、系统通知和未分配失败原因样例。
 -- ============================================================================
 
 SET NAMES utf8mb4;
@@ -95,7 +96,7 @@ VALUES
 (5, 'M005', '国际经济与贸易', 1);
 
 -- ----------------------------------------------------------------------------
--- 学生：全部为12位数字学号，含中国及国际学生
+-- 学生：20人，全部为12位数字学号，全部账号待激活
 -- ----------------------------------------------------------------------------
 INSERT INTO student
 (id, student_number, student_name, gender, major_id, nationality_code, phone_number)
@@ -170,45 +171,37 @@ VALUES
 INSERT INTO bed
 (id, room_id, bed_frame_id, bed_code, bed_type, position_index, operational_status)
 VALUES
--- 男生101
 (1, 1, NULL, 'A', 'LOFT_BED_DESK', 1, 'ENABLED'),
 (2, 1, NULL, 'B', 'LOFT_BED_DESK', 2, 'ENABLED'),
 (3, 1, NULL, 'C', 'LOFT_BED_DESK', 3, 'ENABLED'),
 (4, 1, NULL, 'D', 'LOFT_BED_DESK', 4, 'ENABLED'),
--- 男生102
 (5, 2, NULL, 'A', 'LOFT_BED_DESK', 1, 'ENABLED'),
 (6, 2, NULL, 'B', 'LOFT_BED_DESK', 2, 'ENABLED'),
 (7, 2, NULL, 'C', 'LOFT_BED_DESK', 3, 'ENABLED'),
 (8, 2, 1, 'D-UP', 'BUNK_UPPER', 4, 'ENABLED'),
 (9, 2, 1, 'D-LOW', 'BUNK_LOWER', 5, 'ENABLED'),
--- 男生201
 (10, 3, NULL, 'A', 'LOFT_BED_DESK', 1, 'ENABLED'),
 (11, 3, NULL, 'B', 'LOFT_BED_DESK', 2, 'ENABLED'),
 (12, 3, NULL, 'C', 'LOFT_BED_DESK', 3, 'ENABLED'),
 (13, 3, NULL, 'D', 'LOFT_BED_DESK', 4, 'ENABLED'),
--- 男生202
 (14, 4, NULL, 'A', 'LOFT_BED_DESK', 1, 'ENABLED'),
 (15, 4, NULL, 'B', 'LOFT_BED_DESK', 2, 'ENABLED'),
 (16, 4, NULL, 'C', 'LOFT_BED_DESK', 3, 'ENABLED'),
 (17, 4, 2, 'D-UP', 'BUNK_UPPER', 4, 'ENABLED'),
 (18, 4, 2, 'D-LOW', 'BUNK_LOWER', 5, 'ENABLED'),
--- 女生101
 (19, 5, NULL, 'A', 'LOFT_BED_DESK', 1, 'ENABLED'),
 (20, 5, NULL, 'B', 'LOFT_BED_DESK', 2, 'ENABLED'),
 (21, 5, NULL, 'C', 'LOFT_BED_DESK', 3, 'ENABLED'),
 (22, 5, NULL, 'D', 'LOFT_BED_DESK', 4, 'ENABLED'),
--- 女生102
 (23, 6, NULL, 'A', 'LOFT_BED_DESK', 1, 'ENABLED'),
 (24, 6, NULL, 'B', 'LOFT_BED_DESK', 2, 'ENABLED'),
 (25, 6, NULL, 'C', 'LOFT_BED_DESK', 3, 'ENABLED'),
 (26, 6, 3, 'D-UP', 'BUNK_UPPER', 4, 'ENABLED'),
 (27, 6, 3, 'D-LOW', 'BUNK_LOWER', 5, 'ENABLED'),
--- 女生201
 (28, 7, NULL, 'A', 'LOFT_BED_DESK', 1, 'ENABLED'),
 (29, 7, NULL, 'B', 'LOFT_BED_DESK', 2, 'ENABLED'),
 (30, 7, NULL, 'C', 'LOFT_BED_DESK', 3, 'ENABLED'),
 (31, 7, NULL, 'D', 'LOFT_BED_DESK', 4, 'ENABLED'),
--- 女生202
 (32, 8, NULL, 'A', 'LOFT_BED_DESK', 1, 'ENABLED'),
 (33, 8, NULL, 'B', 'LOFT_BED_DESK', 2, 'ENABLED'),
 (34, 8, NULL, 'C', 'LOFT_BED_DESK', 3, 'ENABLED'),
@@ -249,7 +242,6 @@ VALUES
 (19, 1, 'SMOKING_ACCEPTANCE', '是否接受室友吸烟？', 'SINGLE_CHOICE', 'smokingAcceptance', 1, 19, 1),
 (20, 1, 'BED_PREFERENCE', '床位类型偏好？', 'SINGLE_CHOICE', 'bedPreference', 1, 20, 1);
 
--- 通用五级选项。
 INSERT INTO questionnaire_option
 (question_id, option_code, option_text, feature_value, sort_order, enabled)
 SELECT q.id, level.option_code, level.option_text, level.feature_value, level.sort_order, 1
@@ -337,7 +329,7 @@ VALUES
  DATE_SUB(CURRENT_TIMESTAMP(3), INTERVAL 1 DAY),
  DATE_ADD(CURRENT_TIMESTAMP(3), INTERVAL 30 DAY),
  300, 1, 1, 2, 5, 1,
- 'ADMIN_ALLOCATION', 'test-rule-v1', @admin_id,
+ 'ADMIN_ALLOCATION', 'test-rule-v2', @admin_id,
  CURRENT_TIMESTAMP(3), 0);
 
 INSERT INTO batch_student_eligibility
@@ -371,6 +363,94 @@ VALUES
  0, @admin_id);
 
 -- ----------------------------------------------------------------------------
+-- 学生完全重置测试样例：个人偏好、画像、组队邀请和系统通知
+-- ----------------------------------------------------------------------------
+INSERT INTO questionnaire_answer
+(id, batch_id, questionnaire_version_id, student_id, question_id,
+ answer_json, submitted_at, version)
+VALUES
+(1, 1, 1, 1, 1, JSON_QUOTE('23:00'), CURRENT_TIMESTAMP(3), 0);
+
+INSERT INTO student_feature
+(id, batch_id, student_id, algorithm_version,
+ feature_vector_json, explanation_tags_json,
+ calculated_at, source_answer_version)
+VALUES
+(1, 1, 1, 'feature-v2',
+ JSON_OBJECT('sleepTimeMinutes',1380,'wakeTimeMinutes',420),
+ JSON_ARRAY('作息规律','偏好安静'), CURRENT_TIMESTAMP(3), 1);
+
+INSERT INTO selection_team
+(id, batch_id, team_code, team_name, leader_student_id,
+ team_status, locked_at, version)
+VALUES
+(1, 1, 'TEAM-RESET-001', '学生重置测试队伍', 1,
+ 'FORMING', NULL, 0);
+
+INSERT INTO selection_team_member
+(id, team_id, batch_id, student_id, member_role, member_status,
+ joined_at, left_at)
+VALUES
+(1, 1, 1, 1, 'LEADER', 'JOINED', CURRENT_TIMESTAMP(3), NULL),
+(2, 1, 1, 2, 'MEMBER', 'INVITED', NULL, NULL);
+
+INSERT INTO team_invitation
+(id, team_id, inviter_student_id, invitee_student_id,
+ invitation_status, invitation_token, expires_at, responded_at)
+VALUES
+(1, 1, 1, 2, 'PENDING',
+ '00000000-0000-0000-0000-000000000001',
+ DATE_ADD(CURRENT_TIMESTAMP(3), INTERVAL 1 DAY), NULL);
+
+INSERT INTO student_notification
+(id, student_id, notification_type, title_key, message_key,
+ parameters_json, read_at)
+VALUES
+(1, 2, 'TEAM_INVITATION_CANCELLED',
+ 'notification.teamInvitationCancelled.title',
+ 'notification.teamInvitationCancelled.message',
+ JSON_OBJECT('leaderName','张明宇'), NULL);
+
+-- ----------------------------------------------------------------------------
+-- 统一分配失败清单测试样例
+-- 仅用于验证页面能够展示姓名、学号、失败代码和中文原因。
+-- ----------------------------------------------------------------------------
+INSERT INTO allocation_run
+(id, batch_id, execution_code, idempotency_key, run_mode, run_status,
+ algorithm_version, rule_version, random_seed,
+ student_snapshot_json, bed_snapshot_json, summary_json,
+ operator_user_id, started_at, finished_at)
+VALUES
+(1, 1, 'ALLOC-FIXTURE-001', 'fixture-unassigned-001',
+ 'PREVIEW', 'PARTIAL_SUCCESS', 'team-first-all-students-v2', 'test-rule-v2', 20260801,
+ JSON_ARRAY(JSON_OBJECT(
+   'studentId',20,
+   'studentNumber','202600000020',
+   'studentName','Ananya Sharma',
+   'accountStatus','PENDING'
+ )),
+ JSON_ARRAY(),
+ JSON_OBJECT(
+   'studentCount',1,
+   'availableBedCount',0,
+   'assignedCount',0,
+   'unassignedCount',1,
+   'allStudentsIncluded',true
+ ),
+ @admin_id, CURRENT_TIMESTAMP(3), CURRENT_TIMESTAMP(3));
+
+INSERT INTO allocation_run_result
+(id, allocation_run_id, student_id, bed_id,
+ result_status, score, failure_code, explanation_json)
+VALUES
+(1, 1, 20, NULL, 'UNASSIGNED', NULL, 'NO_AVAILABLE_BED',
+ JSON_OBJECT(
+   'studentName','Ananya Sharma',
+   'studentNumber','202600000020',
+   'failureReason','没有符合性别和批次范围的剩余床位'
+ ));
+
+-- ----------------------------------------------------------------------------
 -- 结果校验
 -- ----------------------------------------------------------------------------
 DROP PROCEDURE IF EXISTS assert_reset_test_data;
@@ -379,30 +459,51 @@ CREATE PROCEDURE assert_reset_test_data()
 BEGIN
     DECLARE admin_total INT;
     DECLARE student_total INT;
+    DECLARE pending_student_accounts INT;
     DECLARE invalid_student_numbers INT;
     DECLARE international_total INT;
     DECLARE bed_total INT;
+    DECLARE eligibility_total INT;
+    DECLARE reset_fixture_total INT;
+    DECLARE allocation_failure_total INT;
 
     SELECT COUNT(*) INTO admin_total
     FROM app_user WHERE username='admin' AND user_type='ADMIN';
     SELECT COUNT(*) INTO student_total FROM student;
+    SELECT COUNT(*) INTO pending_student_accounts
+    FROM app_user WHERE user_type='STUDENT' AND account_status='PENDING';
     SELECT COUNT(*) INTO invalid_student_numbers
     FROM student WHERE student_number NOT REGEXP '^[0-9]{12}$';
     SELECT COUNT(*) INTO international_total
     FROM student WHERE nationality_code <> 'CN';
     SELECT COUNT(*) INTO bed_total FROM bed;
+    SELECT COUNT(*) INTO eligibility_total
+    FROM batch_student_eligibility
+    WHERE batch_id=1 AND eligibility_status='ELIGIBLE';
+    SELECT
+      (SELECT COUNT(*) FROM questionnaire_answer) +
+      (SELECT COUNT(*) FROM student_feature) +
+      (SELECT COUNT(*) FROM selection_team) +
+      (SELECT COUNT(*) FROM team_invitation) +
+      (SELECT COUNT(*) FROM student_notification)
+    INTO reset_fixture_total;
+    SELECT COUNT(*) INTO allocation_failure_total
+    FROM allocation_run_result WHERE result_status='UNASSIGNED';
 
     IF admin_total <> 1 THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='管理员账号恢复校验失败';
     END IF;
-    IF student_total <> 20 OR invalid_student_numbers <> 0 THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='学生测试数据或12位学号校验失败';
+    IF student_total <> 20 OR pending_student_accounts <> 20 OR invalid_student_numbers <> 0 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='学生测试数据、待激活状态或12位学号校验失败';
     END IF;
-    IF international_total < 8 THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='国际学生测试数据不足';
+    IF international_total <> 10 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='国际学生测试数据数量异常';
     END IF;
-    IF bed_total <> 36 THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='宿舍床位测试数据校验失败';
+    IF bed_total <> 36 OR eligibility_total <> 20 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='宿舍床位或全部学生资格校验失败';
+    END IF;
+    IF reset_fixture_total <> 5 OR allocation_failure_total <> 1 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='学生重置或分配失败测试样例校验失败';
     END IF;
 END$$
 DELIMITER ;
@@ -411,7 +512,9 @@ DROP PROCEDURE assert_reset_test_data;
 
 SELECT
     (SELECT COUNT(*) FROM student) AS student_count,
+    (SELECT COUNT(*) FROM app_user WHERE user_type='STUDENT' AND account_status='PENDING') AS pending_student_account_count,
     (SELECT COUNT(*) FROM student WHERE nationality_code<>'CN') AS international_student_count,
     (SELECT COUNT(*) FROM room) AS room_count,
     (SELECT COUNT(*) FROM bed) AS bed_count,
-    (SELECT COUNT(*) FROM selection_batch WHERE batch_status='OPEN') AS open_batch_count;
+    (SELECT COUNT(*) FROM batch_student_eligibility WHERE eligibility_status='ELIGIBLE') AS eligible_student_count,
+    (SELECT COUNT(*) FROM allocation_run_result WHERE result_status='UNASSIGNED') AS unassigned_fixture_count;

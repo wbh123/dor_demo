@@ -203,6 +203,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/students/{studentId}/reset-password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 重置学生密码并恢复为待激活账号 */
+        post: operations["resetStudentPassword"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/students/{studentId}/reset-state": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 完全重置学生账号与全部选寝状态 */
+        post: operations["resetStudentState"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/buildings": {
         parameters: {
             query?: never;
@@ -296,41 +330,6 @@ export interface paths {
         put?: never;
         /** 基于已有方案创建不可变新修订 */
         post: operations["createMatchingWeightSchemeRevision"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/admin/batch-rule-templates": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** 查询批次规则模板及修订 */
-        get: operations["listBatchRuleTemplates"];
-        put?: never;
-        /** 创建批次规则模板首个修订 */
-        post: operations["createBatchRuleTemplate"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/admin/batch-rule-templates/{templateId}/revisions": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** 基于已有模板创建不可变新修订 */
-        post: operations["createBatchRuleTemplateRevision"];
         delete?: never;
         options?: never;
         head?: never;
@@ -974,6 +973,13 @@ export interface components {
             nationalityCode: string;
             phoneNumber?: string;
         };
+        StudentPasswordResetRequest: {
+            reason: string;
+        };
+        StudentStateResetRequest: {
+            confirmStudentNumber: string;
+            reason: string;
+        };
         RoomRequest: {
             capacity: number;
             gender: string;
@@ -1029,47 +1035,6 @@ export interface components {
             expectedVersion: number;
             reason: string;
         };
-        BatchRuleTemplateCreateRequest: {
-            ruleCode: string;
-            ruleName: string;
-            /** Format: int32 */
-            holdDurationSeconds: number;
-            /** Format: int32 */
-            holdRenewalLimit: number;
-            allowTeam: boolean;
-            /** Format: int32 */
-            teamMinSize: number;
-            /** Format: int32 */
-            teamMaxSize: number;
-            allowStudentRandom: boolean;
-            /** @enum {string} */
-            unselectedStrategy: "NONE" | "ADMIN_ALLOCATION";
-            ruleVersion: string;
-            enabled: boolean;
-            makeDefault: boolean;
-            changeReason: string;
-        };
-        BatchRuleTemplateRevisionRequest: {
-            ruleName: string;
-            /** Format: int32 */
-            holdDurationSeconds: number;
-            /** Format: int32 */
-            holdRenewalLimit: number;
-            allowTeam: boolean;
-            /** Format: int32 */
-            teamMinSize: number;
-            /** Format: int32 */
-            teamMaxSize: number;
-            allowStudentRandom: boolean;
-            /** @enum {string} */
-            unselectedStrategy: "NONE" | "ADMIN_ALLOCATION";
-            ruleVersion: string;
-            enabled: boolean;
-            makeDefault: boolean;
-            /** Format: int32 */
-            expectedVersion: number;
-            changeReason: string;
-        };
         BatchRequest: {
             batchCode: string;
             batchName: string;
@@ -1077,31 +1042,10 @@ export interface components {
             startAt: string;
             /** Format: date-time */
             endAt: string;
-            /**
-             * Format: int64
-             * @description 精确批次规则模板修订；为空时使用当前默认模板
-             */
-            ruleTemplateId?: number;
-            /**
-             * @deprecated
-             * @description 旧客户端兼容字段，服务端以规则模板快照为准
-             */
-            holdDurationSeconds?: number;
-            /**
-             * @deprecated
-             * @description 旧客户端兼容字段，服务端以规则模板快照为准
-             */
-            allowTeam?: boolean;
-            /**
-             * @deprecated
-             * @description 旧客户端兼容字段，服务端以规则模板快照为准
-             */
-            teamMaxSize?: number;
-            /**
-             * @deprecated
-             * @description 旧客户端兼容字段，服务端以规则模板快照为准
-             */
-            allowStudentRandom?: boolean;
+            holdDurationSeconds: number;
+            allowTeam: boolean;
+            teamMaxSize: number;
+            allowStudentRandom: boolean;
         };
         BatchCopyRequest: {
             batchCode: string;
@@ -1182,12 +1126,13 @@ export interface components {
     };
     parameters: {
         IdPath: number;
+        StudentIdPath: number;
         RoomIdPath: number;
         BatchIdPath: number;
         NotificationIdPath: number;
         BedIdPath: number;
         TeamIdPath: number;
-        StudentIdPath: number;
+        "parameters-StudentIdPath": number;
     };
     requestBodies: never;
     headers: never;
@@ -1499,6 +1444,47 @@ export interface operations {
             400: components["responses"]["ErrorResponse"];
         };
     };
+    resetStudentPassword: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                studentId: components["parameters"]["StudentIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StudentPasswordResetRequest"];
+            };
+        };
+        responses: {
+            200: components["responses"]["ObjectSuccess"];
+            400: components["responses"]["ErrorResponse"];
+            404: components["responses"]["ErrorResponse"];
+        };
+    };
+    resetStudentState: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                studentId: components["parameters"]["StudentIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StudentStateResetRequest"];
+            };
+        };
+        responses: {
+            200: components["responses"]["ObjectSuccess"];
+            400: components["responses"]["ErrorResponse"];
+            404: components["responses"]["ErrorResponse"];
+            409: components["responses"]["ErrorResponse"];
+        };
+    };
     listBuildings: {
         parameters: {
             query?: never;
@@ -1697,121 +1683,6 @@ export interface operations {
             };
         };
     };
-    listBatchRuleTemplates: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description 查询成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ListSuccessResponse"];
-                };
-            };
-        };
-    };
-    createBatchRuleTemplate: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["BatchRuleTemplateCreateRequest"];
-            };
-        };
-        responses: {
-            /** @description 创建成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ObjectSuccessResponse"];
-                };
-            };
-            /** @description 参数校验失败 */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description 模板编码冲突 */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-        };
-    };
-    createBatchRuleTemplateRevision: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                templateId: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["BatchRuleTemplateRevisionRequest"];
-            };
-        };
-        responses: {
-            /** @description 新修订创建成功 */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ObjectSuccessResponse"];
-                };
-            };
-            /** @description 参数校验失败 */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description 原模板不存在 */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description 模板版本冲突 */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-        };
-    };
     listBatches: {
         parameters: {
             query?: never;
@@ -1839,7 +1710,6 @@ export interface operations {
         responses: {
             200: components["responses"]["ObjectSuccess"];
             400: components["responses"]["ErrorResponse"];
-            409: components["responses"]["ErrorResponse"];
         };
     };
     copyBatch: {
@@ -2378,7 +2248,7 @@ export interface operations {
             header?: never;
             path: {
                 teamId: components["parameters"]["TeamIdPath"];
-                studentId: components["parameters"]["StudentIdPath"];
+                studentId: components["parameters"]["parameters-StudentIdPath"];
             };
             cookie?: never;
         };
