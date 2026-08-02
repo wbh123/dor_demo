@@ -12,7 +12,7 @@ ROOM_LAYOUT = ROOT / "backend-java/server/src/main/java/com/wust/dormitory/admin
 ROOM_MANAGEMENT = ROOT / "backend-java/server/src/main/java/com/wust/dormitory/admin/RoomManagementService.java"
 ADMIN_VIEW = ROOT / "frontend/src/views/admin/AdminDormitoryView.vue"
 EDITOR = ROOT / "frontend/src/components/admin/RoomLayoutEditor.vue"
-LAYOUT_STYLES = ROOT / "frontend/src/phase2-room-layout.css"
+LAYOUT_STYLES = ROOT / "frontend/src/admin-layout-canvas-refinement.css"
 QUESTIONNAIRE = ROOT / "frontend/src/views/student/QuestionnaireView.vue"
 STUDENT_STYLES = ROOT / "frontend/src/student-experience.css"
 ROOM_DETAIL = ROOT / "frontend/src/views/student/RoomDetailView.vue"
@@ -66,14 +66,16 @@ class RoomBedTypeAndPreferenceUiTest(unittest.TestCase):
         self.assertIn("房型由床位布局编辑器自动同步", admin)
         self.assertIn("当前房型", admin)
 
-    def test_visual_editor_uses_bed_units_and_large_rectangles(self) -> None:
+    def test_visual_editor_uses_inline_mutually_exclusive_type_buttons(self) -> None:
         editor = EDITOR.read_text(encoding="utf-8")
         for expected in (
-            "layout-bed-type-grid",
             "layoutUnits",
-            "setUnitType",
+            "layout-bed-type-actions",
+            "layout-bed-rotate-button",
+            "setUnitType(unit, 'LOFT_BED_DESK')",
+            "setUnitType(unit, 'BUNK')",
+            "cycleRotation(unit)",
             "unit.occupied",
-            ':disabled="saving || unit.occupied"',
             "非空床位不可修改类型",
             "bedType: unit.unitType",
             "新增一个独立下铺床位",
@@ -81,16 +83,30 @@ class RoomBedTypeAndPreferenceUiTest(unittest.TestCase):
             "最多8人",
         ):
             self.assertIn(expected, editor)
-        self.assertNotIn("上下铺上铺", editor)
-        self.assertNotIn("上下铺下铺", editor)
+        for forbidden in (
+            "layout-bed-type-grid",
+            "layout-number-grid",
+            "横向位置X",
+            "纵向位置Z",
+            "<select",
+            "上下铺上铺",
+            "上下铺下铺",
+        ):
+            self.assertNotIn(forbidden, editor)
 
         styles = LAYOUT_STYLES.read_text(encoding="utf-8")
-        self.assertIn("width: min(1040px, calc(100vw - 40px))", styles)
-        self.assertIn("min-height: 360px", styles)
-        self.assertIn("width: 304px", styles)
-        self.assertIn("height: 144px", styles)
-        self.assertIn("background: #ffffff", styles)
-        self.assertIn("background: rgba(8, 22, 48, 0.72)", styles)
+        for expected in (
+            "padding: 30px",
+            "border-radius: 26px",
+            "min-height: 430px",
+            "width: 310px",
+            "min-height: 176px",
+            "background: #ffffff",
+            "background: rgba(9, 23, 48, 0.78)",
+            ".layout-bed-type-actions",
+            ".layout-bed-rotate-button",
+        ):
+            self.assertIn(expected, styles)
 
     def test_preference_card_columns_stretch_and_buttons_are_fixed(self) -> None:
         styles = STUDENT_STYLES.read_text(encoding="utf-8")

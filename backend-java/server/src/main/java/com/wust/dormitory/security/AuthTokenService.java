@@ -8,7 +8,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -56,6 +59,32 @@ public class AuthTokenService {
         if (token != null && !token.isBlank()) {
             redisTemplate.delete(PREFIX + token);
         }
+    }
+
+    public int revokeUser(long userId) {
+        Set<String> keys = redisTemplate.keys(PREFIX + "*");
+        if (keys == null || keys.isEmpty()) {
+            return 0;
+        }
+        List<String> matched = new ArrayList<>();
+        for (String key : keys) {
+            String value = redisTemplate.opsForValue().get(key);
+            if (value == null) {
+                continue;
+            }
+            try {
+                CurrentUser currentUser = objectMapper.readValue(value, CurrentUser.class);
+                if (currentUser.userId() == userId) {
+                    matched.add(key);
+                }
+            } catch (JsonProcessingException exception) {
+                matched.add(key);
+            }
+        }
+        if (!matched.isEmpty()) {
+            redisTemplate.delete(matched);
+        }
+        return matched.size();
     }
 
     public record Token(String accessToken, long expiresInSeconds) {

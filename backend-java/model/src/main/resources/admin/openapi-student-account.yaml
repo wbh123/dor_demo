@@ -1,0 +1,84 @@
+openapi: 3.0.3
+info:
+  title: Wust Dormitory Select 学生账号重置接口
+  version: 1.0.0
+paths:
+  /api/v1/admin/students/{studentId}/reset-password:
+    post:
+      tags: [StudentAccountAdmin]
+      operationId: resetStudentPassword
+      summary: 重置学生密码并恢复为待激活账号
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/StudentIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/StudentPasswordResetRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/ObjectSuccess' }
+        '400': { $ref: '#/components/responses/ErrorResponse' }
+        '404': { $ref: '#/components/responses/ErrorResponse' }
+
+  /api/v1/admin/students/{studentId}/reset-state:
+    post:
+      tags: [StudentAccountAdmin]
+      operationId: resetStudentState
+      summary: 完全重置学生账号与全部选寝状态
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/StudentIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/StudentStateResetRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/ObjectSuccess' }
+        '400': { $ref: '#/components/responses/ErrorResponse' }
+        '404': { $ref: '#/components/responses/ErrorResponse' }
+        '409': { $ref: '#/components/responses/ErrorResponse' }
+components:
+  parameters:
+    StudentIdPath:
+      name: studentId
+      in: path
+      required: true
+      schema: { type: integer, format: int64, minimum: 1 }
+  responses:
+    ObjectSuccess:
+      description: 操作成功
+      content:
+        application/json:
+          schema: { $ref: '../common-response/openapi-common-response.yaml#/components/schemas/ObjectSuccessResponse' }
+    ErrorResponse:
+      description: 业务错误
+      content:
+        application/json:
+          schema: { $ref: '../common-response/openapi-common-response.yaml#/components/schemas/ErrorResponse' }
+  schemas:
+    StudentPasswordResetRequest:
+      type: object
+      required: [reason]
+      properties:
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 500
+    StudentStateResetRequest:
+      type: object
+      required: [confirmStudentNumber, reason]
+      properties:
+        confirmStudentNumber:
+          type: string
+          pattern: '^\d{12}$'
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 500
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: Token

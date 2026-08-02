@@ -56,13 +56,17 @@ class Phase1BackendSourceTest(unittest.TestCase):
         self.assertIn("afterCommit", student_service)
         self.assertIn("INSERT INTO allocation_run", allocation_service)
 
-    def test_admin_allocation_preserves_locked_teams(self) -> None:
+    def test_admin_allocation_preserves_locked_teams_and_includes_all_students(self) -> None:
         content = (JAVA_ROOT / "allocation/AdminAllocationService.java").read_text(encoding="utf-8")
-        self.assertIn("team-first-greedy-v1", content)
+        self.assertIn("team-first-all-students-v2", content)
         self.assertIn("lockedTeams", content)
+        self.assertIn("allRemainingStudents", content)
+        self.assertIn("allStudentsIncluded", content)
         self.assertIn("没有同一房间可容纳完整锁定队伍", content)
-        self.assertIn("ACTIVE_TEAM_NOT_LOCKED", content)
         self.assertIn("team_status='COMPLETED'", content)
+        self.assertIn("failureReason", content)
+        self.assertNotIn("ACTIVE_TEAM_NOT_LOCKED", content)
+        self.assertNotIn("account_status='ACTIVE'", content)
 
     def test_assignment_query_and_adjustment_are_audited(self) -> None:
         query = (JAVA_ROOT / "allocation/AssignmentQueryService.java").read_text(encoding="utf-8")

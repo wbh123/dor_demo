@@ -17,6 +17,10 @@ const keyword = ref('')
 const error = ref('')
 const message = ref('')
 const editingStudentId = ref<number | null>(null)
+const resetting = ref(false)
+const resetTarget = ref<DataObject | null>(null)
+const resetMode = ref<'password' | 'state'>('password')
+const resetForm = reactive({ reason: '', confirmStudentNumber: '' })
 const majorForm = reactive<MajorRequest>({ majorCode: '', majorName: '', enabled: true })
 const studentForm = reactive<StudentRequest>({
   studentNumber: '',
@@ -118,6 +122,48 @@ function resetStudentForm() {
   studentForm.phoneNumber = ''
   if (majors.value.length) studentForm.majorId = Number(majors.value[0].id)
 }
+
+function openReset(student: DataObject, mode: 'password' | 'state') {
+  resetTarget.value = student
+  resetMode.value = mode
+  resetForm.reason = ''
+  resetForm.confirmStudentNumber = ''
+  error.value = ''
+  message.value = ''
+}
+
+function closeReset() {
+  if (resetting.value) return
+  resetTarget.value = null
+}
+
+async function submitReset() {
+  if (!resetTarget.value) return
+  error.value = ''
+  message.value = ''
+  resetting.value = true
+  try {
+    const id = Number(resetTarget.value.id)
+    if (resetMode.value === 'password') {
+      await api.post(`/api/v1/admin/students/${id}/reset-password`, {
+        reason: resetForm.reason.trim(),
+      })
+      message.value = `${resetTarget.value.student_name}的密码已重置，账号恢复为待激活。`
+    } else {
+      await api.post(`/api/v1/admin/students/${id}/reset-state`, {
+        confirmStudentNumber: resetForm.confirmStudentNumber.trim(),
+        reason: resetForm.reason.trim(),
+      })
+      message.value = `${resetTarget.value.student_name}的账号及全部选寝状态已完全重置。`
+    }
+    resetTarget.value = null
+    await load()
+  } catch (reason) {
+    error.value = translateError(reason)
+  } finally {
+    resetting.value = false
+  }
+}
 </script>
 
 <template>
@@ -130,6 +176,49 @@ function resetStudentForm() {
 
     <p v-if="error" class="alert error">{{ error }}</p>
     <p v-if="message" class="alert success">{{ message }}</p>
+
+    <div v-if="resetTarget" class="modal-overlay student-reset-overlay" @click.self="closeReset">
+      <section class="modal-card student-reset-dialog" role="dialog" aria-modal="true" aria-labelledby="student-reset-title">
+        <header class="section-head split-title">
+          <div>
+            <span class="eyebrow">STUDENT ACCOUNT RESET</span>
+            <h3 id="student-reset-title">{{ resetMode === 'password' ? '重置学生密码' : '完全重置学生状态' }}</h3>
+            <p>{{ resetTarget.student_name }} · {{ resetTarget.student_number }}</p>
+          </div>
+          <button class="button ghost small" type="button" :disabled="resetting" @click="closeReset">关闭</button>
+        </header>
+
+        <div class="student-reset-warning" :class="{ danger: resetMode === 'state' }">
+          <strong>{{ resetMode === 'password' ? '仅重置登录信息' : '不可恢复的完整重置' }}</strong>
+          <p v-if="resetMode === 'password'">清除密码和登录令牌，不影响床位分配、个人偏好、组队及批次资格。学生需要重新激活账号。</p>
+          <p v-else>清除密码、分配结果、个人偏好、组队关系、通知和批次资格，使学生恢复到刚导入的待激活状态。</p>
+        </div>
+
+        <form class="form-stack" @submit.prevent="submitReset">
+          <label v-if="resetMode === 'state'">
+            <span>输入学号确认</span>
+            <input
+              v-model.trim="resetForm.confirmStudentNumber"
+              class="input"
+              required
+              pattern="\d{12}"
+              maxlength="12"
+              :placeholder="String(resetTarget.student_number)"
+            />
+          </label>
+          <label>
+            <span>操作原因</span>
+            <textarea v-model.trim="resetForm.reason" class="input" required maxlength="500" rows="3" placeholder="请说明重置原因"></textarea>
+          </label>
+          <div class="button-row student-reset-actions">
+            <button class="button ghost" type="button" :disabled="resetting" @click="closeReset">取消</button>
+            <button class="button" :class="resetMode === 'state' ? 'danger' : 'primary'" type="submit" :disabled="resetting">
+              {{ resetting ? '正在处理…' : resetMode === 'state' ? '确认完全重置' : '确认重置密码' }}
+            </button>
+          </div>
+        </form>
+      </section>
+    </div>
 
     <div class="admin-grid equal">
       <section class="panel">
@@ -196,7 +285,13 @@ function resetStudentForm() {
               <td>{{ student.phone_number || '-' }}</td>
               <td>{{ student.major_code }} · {{ student.major_name }}</td>
               <td><span class="status-chip compact">{{ student.account_status }}</span></td>
-              <td><button class="button ghost small" @click="editStudent(student)">编辑</button></td>
+              <td>
+                <div class="button-row wrap student-row-actions">
+                  <button class="button ghost small" @click="editStudent(student)">编辑</button>
+                  <button class="button secondary small" @click="openReset(student, 'password')">重置密码</button>
+                  <button class="button danger small" @click="openReset(student, 'state')">完全重置</button>
+                </div>
+              </td>
             </tr>
           </tbody>
         </table>
