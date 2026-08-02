@@ -4,11 +4,6 @@ import RoomLayoutEditor from '../../components/admin/RoomLayoutEditor.vue'
 import { api } from '../../api/client'
 import type { DataObject, ListSuccessResponse, RoomRequest } from '../../api/types'
 
-interface RoomTypeOption {
-  value: RoomRequest['roomType']
-  label: string
-}
-
 const ROOM_TYPE_LABELS: Record<string, string> = {
   FOUR_PERSON: '四人间',
   FIVE_PERSON: '五人间',
@@ -26,7 +21,6 @@ const loadingRooms = ref(false)
 const error = ref('')
 const message = ref('')
 const editForm = reactive<RoomRequest>({
-  roomType: 'FOUR_PERSON',
   capacity: 4,
   gender: 'F',
   operationalStatus: 'ENABLED',
@@ -70,11 +64,6 @@ async function loadRooms() {
 
 function openRoomEditor(room: DataObject) {
   selectedRoom.value = room
-  const options = roomTypeOptions(room)
-  const currentType = String(room.room_type) as RoomRequest['roomType']
-  editForm.roomType = options.some((option) => option.value === currentType)
-    ? currentType
-    : 'OTHER'
   editForm.capacity = physicalBedCount(room)
   editForm.gender = String(room.gender_restriction) as RoomRequest['gender']
   editForm.operationalStatus = String(room.operational_status) as RoomRequest['operationalStatus']
@@ -108,7 +97,7 @@ async function saveRoom() {
   try {
     await api.put(`/api/v1/admin/rooms/${selectedRoom.value.id}`, {
       ...editForm,
-      capacity: physicalBedCount(selectedRoom.value),
+      capacity,
       remark: String(editForm.remark ?? '').trim(),
       reason: String(editForm.reason ?? '').trim(),
     })
@@ -139,26 +128,6 @@ function unavailableBedCount(room: DataObject | null) {
   return Math.max(0, physicalBedCount(room) - enabledBedCount(room))
 }
 
-function roomTypeOptions(room: DataObject): RoomTypeOption[] {
-  const capacity = physicalBedCount(room)
-  const standardType = capacity === 4
-    ? 'FOUR_PERSON'
-    : capacity === 5
-      ? 'FIVE_PERSON'
-      : capacity === 6
-        ? 'SIX_PERSON'
-        : null
-  const options: RoomTypeOption[] = []
-  if (standardType) {
-    options.push({
-      value: standardType as RoomRequest['roomType'],
-      label: ROOM_TYPE_LABELS[standardType],
-    })
-  }
-  options.push({ value: 'OTHER', label: '其他（非标准床位布局）' })
-  return options
-}
-
 function roomLabel(room: DataObject) {
   return `${String(room.building_name)} ${String(room.room_number)}`
 }
@@ -177,7 +146,7 @@ function statusText(value: unknown) {
     <div class="page-title">
       <span class="eyebrow">DORMITORY RESOURCES</span>
       <h2>宿舍、房间与床位</h2>
-      <p>房型和性别属性分别维护。每间房固定为男寝或女寝，并可按实际家具位置单独调整床位布局。</p>
+      <p>房间性别和运行状态在属性编辑器中维护；床位类型、房型和家具位置统一在布局编辑器中维护。</p>
     </div>
 
     <p v-if="error" class="alert error">{{ error }}</p>
@@ -240,7 +209,7 @@ function statusText(value: unknown) {
           <div>
             <span class="eyebrow">EDIT ROOM</span>
             <h3 id="room-editor-title">{{ selectedRoom.building_name }} {{ selectedRoom.room_number }}</h3>
-            <p>修改房间属性不会增删床位；物理床位和家具位置请通过布局功能维护。</p>
+            <p>修改房间属性不会增删床位；床位类型、房型和家具位置请通过布局功能维护。</p>
           </div>
           <button class="modal-close" type="button" aria-label="关闭编辑窗口" @click="closeRoomEditor">×</button>
         </div>
@@ -266,15 +235,12 @@ function statusText(value: unknown) {
         <form class="form-grid two-column room-editor-form" @submit.prevent="saveRoom">
           <div class="room-editor-section span-2">
             <strong>房间基本属性</strong>
-            <span>标准房型必须和物理床位总数一致。</span>
+            <span>房型由床位布局编辑器自动同步。</span>
           </div>
-          <label>
-            <span>房型</span>
-            <select v-model="editForm.roomType" class="input">
-              <option v-for="option in roomTypeOptions(selectedRoom)" :key="String(option.value)" :value="option.value">
-                {{ option.label }}
-              </option>
-            </select>
+          <label class="room-readonly-field">
+            <span>当前房型</span>
+            <div class="input room-readonly-value">{{ roomType(selectedRoom.room_type) }}</div>
+            <small>房型由床位布局编辑器自动同步，不能在此直接修改。</small>
           </label>
           <label class="room-capacity-field">
             <span>规划容量</span>
