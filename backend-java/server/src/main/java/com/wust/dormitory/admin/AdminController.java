@@ -6,20 +6,29 @@ import com.wust.dormitory.allocation.AssignmentQueryService;
 import com.wust.dormitory.common.response.ResponseFactory;
 import com.wust.dormitory.matching.MatchingSchemeService;
 import com.wust.dormitory.model.api.AdminApi;
+import com.wust.dormitory.model.dto.AdminBedConfirmationRequest;
 import com.wust.dormitory.model.dto.AllocationCommitRequest;
 import com.wust.dormitory.model.dto.AssignmentAdjustmentRequest;
 import com.wust.dormitory.model.dto.BatchCopyRequest;
+import com.wust.dormitory.model.dto.BatchEnrollmentRequest;
 import com.wust.dormitory.model.dto.BatchRequest;
+import com.wust.dormitory.model.dto.DirectResidencyAssignmentRequest;
 import com.wust.dormitory.model.dto.ListSuccessResponse;
 import com.wust.dormitory.model.dto.MajorRequest;
 import com.wust.dormitory.model.dto.MatchingWeightSchemeCreateRequest;
 import com.wust.dormitory.model.dto.MatchingWeightSchemeRevisionRequest;
 import com.wust.dormitory.model.dto.ObjectSuccessResponse;
+import com.wust.dormitory.model.dto.ResidencyEndRequest;
 import com.wust.dormitory.model.dto.RoomBedLayoutItem;
 import com.wust.dormitory.model.dto.RoomBedLayoutRequest;
 import com.wust.dormitory.model.dto.RoomRequest;
 import com.wust.dormitory.model.dto.StudentRequest;
+import com.wust.dormitory.model.dto.TransferStudentOnboardingRequest;
 import com.wust.dormitory.model.dto.VoidSuccessResponse;
+import com.wust.dormitory.residency.BatchCapacityService;
+import com.wust.dormitory.residency.BatchRoomLockService;
+import com.wust.dormitory.residency.ResidencyService;
+import com.wust.dormitory.security.CurrentUser;
 import com.wust.dormitory.security.SecurityUsers;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
@@ -39,6 +48,10 @@ import java.util.Map;
 public class AdminController implements AdminApi {
     private final AdminService adminService;
     private final StudentAdminService studentAdminService;
+    private final TransferStudentService transferStudentService;
+    private final ResidencyService residencyService;
+    private final BatchCapacityService batchCapacityService;
+    private final BatchRoomLockService batchRoomLockService;
     private final RoomManagementService roomManagementService;
     private final RoomLayoutService roomLayoutService;
     private final MatchingSchemeService matchingSchemeService;
@@ -53,6 +66,10 @@ public class AdminController implements AdminApi {
     public AdminController(
             AdminService adminService,
             StudentAdminService studentAdminService,
+            TransferStudentService transferStudentService,
+            ResidencyService residencyService,
+            BatchCapacityService batchCapacityService,
+            BatchRoomLockService batchRoomLockService,
             RoomManagementService roomManagementService,
             RoomLayoutService roomLayoutService,
             MatchingSchemeService matchingSchemeService,
@@ -65,6 +82,10 @@ public class AdminController implements AdminApi {
             AssignmentExportService exportService) {
         this.adminService = adminService;
         this.studentAdminService = studentAdminService;
+        this.transferStudentService = transferStudentService;
+        this.residencyService = residencyService;
+        this.batchCapacityService = batchCapacityService;
+        this.batchRoomLockService = batchRoomLockService;
         this.roomManagementService = roomManagementService;
         this.roomLayoutService = roomLayoutService;
         this.matchingSchemeService = matchingSchemeService;
@@ -101,11 +122,19 @@ public class AdminController implements AdminApi {
 
     @Override
     public ResponseEntity<ObjectSuccessResponse> listStudents(
-            String keyword, String gender, Long majorId, Integer page, Integer size) {
+            String keyword,
+            String gender,
+            Long majorId,
+            String studentCategory,
+            String enrollmentSource,
+            Integer page,
+            Integer size) {
         return ResponseEntity.ok(ResponseFactory.object(studentAdminService.students(
                 keyword,
                 gender,
                 majorId,
+                studentCategory,
+                enrollmentSource,
                 page == null ? 1 : page,
                 size == null ? 20 : size)));
     }
@@ -138,6 +167,104 @@ public class AdminController implements AdminApi {
     }
 
     @Override
+    public ResponseEntity<ObjectSuccessResponse> onboardTransferStudent(
+            TransferStudentOnboardingRequest request) {
+        TransferStudentService.DirectAssignment direct = request.getDirectAssignment() == null
+                ? null
+                : new TransferStudentService.DirectAssignment(
+                        request.getDirectAssignment().getRoomId(),
+                        request.getDirectAssignment().getBedId(),
+                        request.getDirectAssignment().getReason());
+        Long batchId = request.getBatchEnrollment() == null
+                ? null
+                : request.getBatchEnrollment().getBatchId();
+        TransferStudentService.OnboardCommand command = new TransferStudentService.OnboardCommand(
+                request.getStudentNumber(),
+                request.getStudentName(),
+                request.getGender().getValue(),
+                request.getMajorId(),
+                request.getNationalityCode(),
+                request.getStudentCategory().getValue(),
+                request.getPhoneNumber(),
+                request.getAction().getValue(),
+                direct,
+                batchId,
+                request.getReason());
+        return ResponseEntity.ok(ResponseFactory.object(
+                transferStudentService.onboard(command, SecurityUsers.requireAdmin())));
+    }
+
+    @Override
+    public ResponseEntity<ObjectSuccessResponse> directlyAssignStudent(
+            Long studentId,
+            DirectResidencyAssignmentRequest request) {
+        CurrentUser operator = SecurityUsers.requireAdmin();
+        return ResponseEntity.ok(ResponseFactory.object(residencyService.assign(
+                studentId,
+                request.getRoomId(),
+                request.getBedId(),
+                null,
+                null,
+                "DIRECT",
+                request.getBedId() == null ? "DIRECT_ROOM" : "DIRECT_BED",
+                request.getReason(),
+                operator)));
+    }
+
+    @Override
+    public ResponseEntity<ObjectSuccessResponse> previewStudentBatchCapacity(
+            Long batchId,
+            Long studentId) {
+        SecurityUsers.requireAdmin();
+        return ResponseEntity.ok(ResponseFactory.object(
+                batchCapacityService.preview(batchId, studentId)));
+    }
+
+    @Override
+    public ResponseEntity<ObjectSuccessResponse> enrollStudentIntoBatch(
+            Long batchId,
+            Long studentId,
+            BatchEnrollmentRequest request) {
+        return ResponseEntity.ok(ResponseFactory.object(batchCapacityService.enroll(
+                batchId,
+                studentId,
+                "ADMIN_MANUAL",
+                request.getReason(),
+                SecurityUsers.requireAdmin())));
+    }
+
+    @Override
+    public ResponseEntity<ObjectSuccessResponse> listResidencies(
+            Long roomId,
+            String keyword,
+            String bedMappingStatus) {
+        SecurityUsers.requireAdmin();
+        return ResponseEntity.ok(ResponseFactory.object(
+                residencyService.list(roomId, keyword, bedMappingStatus)));
+    }
+
+    @Override
+    public ResponseEntity<ObjectSuccessResponse> confirmResidencyBedByAdmin(
+            Long residencyId,
+            AdminBedConfirmationRequest request) {
+        return ResponseEntity.ok(ResponseFactory.object(residencyService.confirmBed(
+                residencyId,
+                request.getBedId(),
+                request.getReason(),
+                SecurityUsers.requireAdmin())));
+    }
+
+    @Override
+    public ResponseEntity<ObjectSuccessResponse> endResidency(
+            Long residencyId,
+            ResidencyEndRequest request) {
+        return ResponseEntity.ok(ResponseFactory.object(residencyService.end(
+                residencyId,
+                request.getReason(),
+                SecurityUsers.requireAdmin())));
+    }
+
+    @Override
     public ResponseEntity<ListSuccessResponse> listBuildings() {
         return ResponseEntity.ok(ResponseFactory.list(adminService.buildings()));
     }
@@ -153,6 +280,7 @@ public class AdminController implements AdminApi {
         roomManagementService.updateRoom(roomId, new RoomManagementService.RoomCommand(
                 request.getCapacity(),
                 request.getGender(),
+                request.getResidentScope().getValue(),
                 request.getOperationalStatus(),
                 request.getRemark(),
                 request.getReason()), SecurityUsers.requireAdmin());
@@ -232,9 +360,17 @@ public class AdminController implements AdminApi {
                 request.getBatchName(),
                 toLocalDateTime(request.getStartAt()),
                 toLocalDateTime(request.getEndAt()),
-                request.getRuleTemplateId());
+                request.getRuleTemplateId(),
+                request.getSelectionMode().getValue(),
+                Boolean.TRUE.equals(request.getSeparateStudentCategories()));
         return ResponseEntity.ok(ResponseFactory.object(
                 batchCreationService.create(command, SecurityUsers.requireAdmin())));
+    }
+
+    @Override
+    public ResponseEntity<ObjectSuccessResponse> previewBatchRoomAvailability(Long batchId) {
+        SecurityUsers.requireAdmin();
+        return ResponseEntity.ok(ResponseFactory.object(batchRoomLockService.preview(batchId)));
     }
 
     @Override
@@ -351,12 +487,17 @@ public class AdminController implements AdminApi {
                 phoneNumber = null;
             }
         }
+        String enrollmentSource = request.getEnrollmentSource() == null
+                ? "ADMIN_MANUAL"
+                : request.getEnrollmentSource().getValue();
         return new StudentAdminService.StudentCommand(
                 request.getStudentNumber(),
                 request.getStudentName().trim(),
                 request.getGender(),
                 request.getMajorId(),
                 nationalityCode.trim().toUpperCase(Locale.ROOT),
+                request.getStudentCategory().getValue(),
+                enrollmentSource,
                 phoneNumber);
     }
 
