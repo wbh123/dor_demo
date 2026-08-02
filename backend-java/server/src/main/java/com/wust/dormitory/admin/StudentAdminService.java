@@ -30,6 +30,8 @@ public class StudentAdminService {
             String keyword,
             String gender,
             Long majorId,
+            String studentCategory,
+            String enrollmentSource,
             int page,
             int size) {
         int safePage = Math.max(1, page);
@@ -49,6 +51,14 @@ public class StudentAdminService {
             where.append(" AND s.major_id=:majorId ");
             parameters.addValue("majorId", majorId);
         }
+        if (studentCategory != null && !studentCategory.isBlank()) {
+            where.append(" AND s.student_category=:studentCategory ");
+            parameters.addValue("studentCategory", studentCategory);
+        }
+        if (enrollmentSource != null && !enrollmentSource.isBlank()) {
+            where.append(" AND s.enrollment_source=:enrollmentSource ");
+            parameters.addValue("enrollmentSource", enrollmentSource);
+        }
         Integer totalValue = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM student s" + where,
                 parameters,
@@ -57,8 +67,13 @@ public class StudentAdminService {
                 .addValue("offset", (safePage - 1) * safeSize);
         List<Map<String, Object>> items = jdbc.queryForList("""
                 SELECT s.id, s.student_number, s.student_name, s.gender,
-                       s.nationality_code, s.phone_number, s.major_id,
-                       m.major_code, m.major_name, u.account_status
+                       s.nationality_code, s.student_category,
+                       s.enrollment_source, s.phone_number, s.major_id,
+                       m.major_code, m.major_name, u.account_status,
+                       EXISTS(
+                           SELECT 1 FROM room_assignment ra
+                           WHERE ra.student_id=s.id AND ra.assignment_status='ACTIVE'
+                       ) AS currently_resident
                 FROM student s
                 JOIN major m ON m.id=s.major_id
                 LEFT JOIN app_user u ON u.student_id=s.id
@@ -79,9 +94,11 @@ public class StudentAdminService {
             jdbc.update("""
                     INSERT INTO student
                     (student_number, student_name, gender, major_id,
-                     nationality_code, phone_number)
+                     nationality_code, student_category, enrollment_source,
+                     phone_number)
                     VALUES (:number, :name, :gender, :majorId,
-                            :nationalityCode, :phoneNumber)
+                            :nationalityCode, :studentCategory,
+                            :enrollmentSource, :phoneNumber)
                     """, parameters(command), studentKey, new String[]{"id"});
             long studentId = studentKey.getKey().longValue();
             jdbc.update("""
@@ -99,7 +116,7 @@ public class StudentAdminService {
                     "STUDENT_CREATE",
                     "STUDENT",
                     studentId,
-                    null,
+                    "学生资料录入",
                     null,
                     command);
             return studentId;
@@ -114,6 +131,8 @@ public class StudentAdminService {
                     gender=:gender,
                     major_id=:majorId,
                     nationality_code=:nationalityCode,
+                    student_category=:studentCategory,
+                    enrollment_source=:enrollmentSource,
                     phone_number=:phoneNumber
                 WHERE id=:id
                 """, update);
@@ -127,7 +146,7 @@ public class StudentAdminService {
                 "STUDENT_UPDATE",
                 "STUDENT",
                 id,
-                null,
+                "学生资料修改",
                 before,
                 command);
         return id;
@@ -146,7 +165,8 @@ public class StudentAdminService {
                         "SELECT id FROM student WHERE student_number=:number",
                         Map.of("number", command.studentNumber()),
                         (rs, rowNum) -> rs.getLong(1));
-                saveStudent(existing.isEmpty() ? null : existing.getFirst(), command, operator);
+                StudentCommand importCommand = command.withEnrollmentSource("BATCH_IMPORT");
+                saveStudent(existing.isEmpty() ? null : existing.getFirst(), importCommand, operator);
                 success++;
             } catch (RuntimeException exception) {
                 errors.add(Map.of(
@@ -182,15 +202,30 @@ public class StudentAdminService {
                 .addValue("gender", command.gender())
                 .addValue("majorId", command.majorId())
                 .addValue("nationalityCode", command.nationalityCode())
+                .addValue("studentCategory", command.studentCategory())
+                .addValue("enrollmentSource", command.enrollmentSource())
                 .addValue("phoneNumber", command.phoneNumber());
     }
 
     private void validate(StudentCommand command) {
-        if (!command.studentNumber().matches("^\\d{12}$")) {
+        if (command.studentNumber() == null || !command.studentNumber().matches("^\\d{12}$")) {
             throw new BusinessException("STUDENT_NUMBER_INVALID", "学号必须为12位数字");
         }
-        if (!command.nationalityCode().matches("^[A-Z]{2}$")) {
+        if (command.studentName() == null || command.studentName().isBlank()) {
+            throw new BusinessException("STUDENT_NAME_REQUIRED", "学生姓名不能为空");
+        }
+        if (!List.of("M", "F").contains(command.gender())) {
+            throw new BusinessException("STUDENT_GENDER_INVALID", "学生性别必须为男或女");
+        }
+        if (command.nationalityCode() == null || !command.nationalityCode().matches("^[A-Z]{2}$")) {
             throw new BusinessException("NATIONALITY_CODE_INVALID", "国籍代码必须为两位大写字母");
+        }
+        if (!List.of("DOMESTIC", "INTERNATIONAL").contains(command.studentCategory())) {
+            throw new BusinessException("STUDENT_CATEGORY_INVALID", "学生类别必须为国内生或国际生");
+        }
+        if (!List.of("INITIAL_IMPORT", "TRANSFER_MANUAL", "ADMIN_MANUAL", "BATCH_IMPORT")
+                .contains(command.enrollmentSource())) {
+            throw new BusinessException("ENROLLMENT_SOURCE_INVALID", "学生录入来源不合法");
         }
         if (command.phoneNumber() != null
                 && !command.phoneNumber().matches("^\\+?[0-9][0-9 -]{5,30}$")) {
@@ -227,6 +262,20 @@ public class StudentAdminService {
             String gender,
             long majorId,
             String nationalityCode,
+            String studentCategory,
+            String enrollmentSource,
             String phoneNumber) {
+
+        public StudentCommand withEnrollmentSource(String value) {
+            return new StudentCommand(
+                    studentNumber,
+                    studentName,
+                    gender,
+                    majorId,
+                    nationalityCode,
+                    studentCategory,
+                    value,
+                    phoneNumber);
+        }
     }
 }
