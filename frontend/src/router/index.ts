@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { pinia } from '../stores'
+import { platformRoutes, installPlatformRouteGuard } from '../platform/routes'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -11,6 +12,7 @@ const router = createRouter({
       component: () => import('../views/LoginView.vue'),
       meta: { public: true },
     },
+    ...platformRoutes,
     {
       path: '/',
       component: () => import('../layouts/AppShell.vue'),
@@ -100,8 +102,12 @@ const router = createRouter({
   ],
 })
 
+installPlatformRouteGuard(router)
+
 let restored = false
 router.beforeEach(async (to) => {
+  if (to.path.startsWith('/platform')) return true
+
   const auth = useAuthStore(pinia)
   if (!restored) {
     restored = true
