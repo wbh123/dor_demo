@@ -167,7 +167,7 @@ class TeamI18nLayoutRefinementTest(unittest.TestCase):
         content = I18N.read_text(encoding="utf-8")
         self.assertIn("function pauseObserver", content)
         self.assertIn("function resumeObserver", content)
-        self.assertIn("observer.disconnect()", content)
+        self.assertIn("observer?.disconnect()", content)
         self.assertIn("if (translated === current) return", content)
         self.assertIn("originalText.set(mutation.target, mutation.target.textContent ?? '')", content)
         self.assertIn("pauseObserver()", content)

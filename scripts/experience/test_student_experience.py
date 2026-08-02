@@ -115,7 +115,7 @@ class StudentExperienceTest(unittest.TestCase):
         i18n = (FRONTEND / "i18n/index.ts").read_text(encoding="utf-8")
         styles = (FRONTEND / "student-experience.css").read_text(encoding="utf-8")
         self.assertIn("新同学，欢迎你", i18n)
-        self.assertIn("welcome.messages", shell)
+        self.assertIn("welcome?.messages", shell)
         self.assertIn("acknowledgeWelcome", auth)
         self.assertIn("welcome-overlay", styles)
         self.assertIn("prefers-reduced-motion", styles)

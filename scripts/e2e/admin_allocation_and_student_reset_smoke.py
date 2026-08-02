@@ -75,7 +75,7 @@ def main() -> int:
     ))
     summary = preview["summary"]
     assert summary["allStudentsIncluded"] is True, summary
-    assert int(summary["studentCount"]) >= 500, summary
+    assert int(summary["studentCount"]) == 20, summary
     assert int(summary["unassignedCount"]) == 0, preview.get("unassigned")
     assert all("studentName" in item for item in preview["assignments"]), preview["assignments"][:3]
 

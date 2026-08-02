@@ -202,7 +202,7 @@ def choose_empty_loft_and_occupied_bed() -> tuple[int, int, int, int]:
                 oe_room_id, oe_bed_id, temp_student_id = int(temp_row[0]), int(temp_row[1]), int(temp_row[2])
                 cursor.execute(
                     "INSERT INTO bed_assignment (batch_id, student_id, bed_id, assignment_method, assigned_by, assigned_at) "
-                    "VALUES (1, %s, %s, 'DIRECT_SELECTION', 1, NOW())",
+                    "VALUES (1, %s, %s, 'MANUAL_ADJUSTMENT', 1, NOW())",
                     (temp_student_id, oe_bed_id),
                 )
                 occupied_row = (oe_room_id, oe_bed_id)
@@ -321,14 +321,14 @@ def main() -> int:
     request(
         "POST", "/api/v1/auth/activate",
         body={
-            "studentNumber": "202600000010",
-            "studentName": "测试男生010",
+            "studentNumber": "202600000017",
+            "studentName": "刘宇航",
             "password": "StudentLayoutPassword2026",
         },
     )
     student_token = data(request(
         "POST", "/api/v1/auth/login",
-        body={"username": "202600000010", "password": "StudentLayoutPassword2026"},
+        body={"username": "202600000017", "password": "StudentLayoutPassword2026"},
     ))["accessToken"]
 
     snapshot = data(request(

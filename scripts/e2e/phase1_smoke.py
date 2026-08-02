@@ -80,9 +80,9 @@ def main() -> int:
     assert admin_token
 
     dashboard = response_data(request("GET", "/api/v1/admin/dashboard", token=admin_token))
-    assert int(dashboard["studentCount"]) == 520, dashboard
-    assert int(dashboard["roomCount"]) == 144, dashboard
-    assert int(dashboard["bedCount"]) == 640, dashboard
+    assert int(dashboard["studentCount"]) == 20, dashboard
+    assert int(dashboard["roomCount"]) == 8, dashboard
+    assert int(dashboard["bedCount"]) == 36, dashboard
 
     majors = response_data(request("GET", "/api/v1/admin/majors", token=admin_token))
     assert len(majors) == 5, majors
@@ -98,13 +98,16 @@ def main() -> int:
     assert students["items"][0]["student_number"] == "202600000001", students
 
     buildings = response_data(request("GET", "/api/v1/admin/buildings", token=admin_token))
-    assert len(buildings) == 8, buildings
+    assert len(buildings) == 2, buildings
     rooms = response_data(request("GET", "/api/v1/admin/rooms?gender=M", token=admin_token))
-    assert len(rooms) == 64, len(rooms)
+    assert len(rooms) == 4, len(rooms)
 
-    request("POST", "/api/v1/admin/batches/1/prepare", token=admin_token)
-    request("POST", "/api/v1/admin/batches/1/status/PUBLISHED", token=admin_token)
-    request("POST", "/api/v1/admin/batches/1/status/OPEN", token=admin_token)
+    batches = response_data(request("GET", "/api/v1/admin/batches", token=admin_token))
+    batch1 = next(item for item in batches if int(item["id"]) == 1)
+    if str(batch1["batch_status"]) != "OPEN":
+        request("POST", "/api/v1/admin/batches/1/prepare", token=admin_token)
+        request("POST", "/api/v1/admin/batches/1/status/PUBLISHED", token=admin_token)
+        request("POST", "/api/v1/admin/batches/1/status/OPEN", token=admin_token)
 
     second_batch = response_data(
         request(
@@ -143,7 +146,7 @@ def main() -> int:
         "/api/v1/auth/activate",
         body={
             "studentNumber": "202600000001",
-            "studentName": "测试男生001",
+            "studentName": "张明宇",
             "password": "StudentPassword2026",
         },
     )
@@ -164,7 +167,7 @@ def main() -> int:
     questionnaire = response_data(
         request("GET", "/api/v1/student/batches/1/questionnaire", token=student_token)
     )
-    assert len(questionnaire["questions"]) == 14, questionnaire
+    assert len(questionnaire["questions"]) == 20, questionnaire
     question_codes = {question["question_code"] for question in questionnaire["questions"]}
     for expected_code in (
         "NAP_HABIT",
@@ -200,7 +203,13 @@ def main() -> int:
             "NOISE_TOLERANCE": 3,
             "CLEANING_FREQUENCY": 4,
             "TIDINESS_REQUIREMENT": 4,
-            "AC_TEMPERATURE": 25,
+            "SUMMER_AC_OVERNIGHT": "TIMER",
+            "SUMMER_AC_TEMPERATURE": 25,
+            "WINTER_HEATING_ACCEPTANCE": "ACCEPT",
+            "WINTER_HEATING_TEMPERATURE": 20,
+            "AFTER_LIGHTS_ACTIVITY": "DESK_LAMP_HEADPHONES",
+            "ALARM_SNOOZE": "ONCE",
+            "STRONG_FOOD_ODOR_ACCEPTANCE": "OCCASIONAL",
             "VENTILATION": 3,
             "STUDY_FREQUENCY": 3,
             "GAMING_VOICE": 2,
