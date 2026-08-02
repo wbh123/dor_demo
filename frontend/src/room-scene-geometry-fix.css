@@ -1,11 +1,11 @@
 .three-bed-scene-mount {
-  height: clamp(560px, calc(100vh - 260px), 820px);
-  min-height: 560px;
+  height: clamp(680px, calc(100vh - 220px), 940px);
+  min-height: 680px;
 }
 
 @media (max-width: 640px) {
   .three-bed-scene-mount {
-    height: min(118vw, 560px);
-    min-height: 420px;
+    height: min(132vw, 680px);
+    min-height: 500px;
   }
 }

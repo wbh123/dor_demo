@@ -33,6 +33,7 @@ import java.util.Map;
 @RestController
 public class AdminController implements AdminApi {
     private final AdminService adminService;
+    private final RoomManagementService roomManagementService;
     private final RoomLayoutService roomLayoutService;
     private final BatchLifecycleService batchLifecycleService;
     private final AdminAllocationService allocationService;
@@ -42,6 +43,7 @@ public class AdminController implements AdminApi {
     private final BatchRuleValidator batchRuleValidator;
 
     public AdminController(AdminService adminService,
+                           RoomManagementService roomManagementService,
                            RoomLayoutService roomLayoutService,
                            BatchLifecycleService batchLifecycleService,
                            AdminAllocationService allocationService,
@@ -50,6 +52,7 @@ public class AdminController implements AdminApi {
                            AssignmentExportService exportService,
                            BatchRuleValidator batchRuleValidator) {
         this.adminService = adminService;
+        this.roomManagementService = roomManagementService;
         this.roomLayoutService = roomLayoutService;
         this.batchLifecycleService = batchLifecycleService;
         this.allocationService = allocationService;
@@ -120,12 +123,13 @@ public class AdminController implements AdminApi {
 
     @Override
     public ResponseEntity<ListSuccessResponse> listRooms(Long buildingId, String gender) {
-        return ResponseEntity.ok(ResponseFactory.list(adminService.rooms(buildingId, gender)));
+        return ResponseEntity.ok(ResponseFactory.list(
+                roomManagementService.rooms(buildingId, gender)));
     }
 
     @Override
     public ResponseEntity<VoidSuccessResponse> updateRoom(Long roomId, RoomRequest request) {
-        adminService.updateRoom(roomId, new AdminService.RoomCommand(
+        roomManagementService.updateRoom(roomId, new RoomManagementService.RoomCommand(
                 request.getRoomType(),
                 request.getCapacity(),
                 request.getGender(),

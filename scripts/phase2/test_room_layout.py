@@ -9,6 +9,7 @@ MIGRATION = ROOT / "backend-java/server/src/main/resources/db/migration/V5__add_
 SCHEMA = ROOT / "backend-java/docs/sql/schema.sql"
 OPENAPI = ROOT / "backend-java/model/src/main/resources/admin/openapi-admin.yaml"
 CONTROLLER = ROOT / "backend-java/server/src/main/java/com/wust/dormitory/admin/AdminController.java"
+ROOM_MANAGEMENT = ROOT / "backend-java/server/src/main/java/com/wust/dormitory/admin/RoomManagementService.java"
 SERVICE = ROOT / "backend-java/server/src/main/java/com/wust/dormitory/admin/RoomLayoutService.java"
 STUDENT_LAYOUT = ROOT / "backend-java/server/src/main/java/com/wust/dormitory/student/StudentRoomLayoutService.java"
 STUDENT_CONTROLLER = ROOT / "backend-java/server/src/main/java/com/wust/dormitory/student/StudentController.java"
@@ -120,6 +121,45 @@ class RoomLayoutPhaseTwoTest(unittest.TestCase):
         self.assertIn("./phase2-room-layout.css", main)
         self.assertIn("./room-scene-geometry-fix.css", main)
 
+    def test_admin_room_editor_uses_physical_bed_count_and_readonly_capacity(self) -> None:
+        self.assertTrue(ROOM_MANAGEMENT.is_file())
+        service = ROOM_MANAGEMENT.read_text(encoding="utf-8")
+        self.assertIn("class RoomManagementService", service)
+        self.assertIn("SELECT COUNT(*) FROM bed WHERE room_id=:id", service)
+        self.assertNotIn("room_id=:id AND operational_status='ENABLED'", service)
+        self.assertIn("房间容量必须等于当前床位总数", service)
+        self.assertIn("COALESCE(SUM(bed.operational_status='ENABLED'), 0) AS enabled_bed_count", service)
+        self.assertIn("ROOM_TYPE_CAPACITY_MISMATCH", service)
+
+        controller = CONTROLLER.read_text(encoding="utf-8")
+        self.assertIn("roomManagementService.rooms", controller)
+        self.assertIn("roomManagementService.updateRoom", controller)
+
+        admin = ADMIN_VIEW.read_text(encoding="utf-8")
+        for expected in (
+            "physicalBedCount",
+            "roomTypeOptions",
+            "room-editor-dialog",
+            "room-editor-summary",
+            "room-capacity-field",
+            "readonly",
+            "容量由物理床位总数决定",
+        ):
+            self.assertIn(expected, admin)
+        self.assertIn("capacity: physicalBedCount(selectedRoom.value)", admin)
+
+    def test_layout_editor_uses_larger_bed_cards_and_wider_dialog(self) -> None:
+        styles = STYLES.read_text(encoding="utf-8")
+        for expected in (
+            "width: min(1240px, calc(100vw - 32px))",
+            "min-height: 500px",
+            "width: 154px",
+            "height: 84px",
+            ".room-editor-dialog",
+            ".room-editor-summary",
+        ):
+            self.assertIn(expected, styles)
+
     def test_drag_coordinate_snapping_never_escapes_backend_bounds(self) -> None:
         editor = EDITOR.read_text(encoding="utf-8")
         self.assertIn("const snapped = Math.round(value / SNAP) * SNAP", editor)
@@ -174,11 +214,26 @@ class RoomLayoutPhaseTwoTest(unittest.TestCase):
 
     def test_three_scene_expands_to_fill_desktop_control_area(self) -> None:
         styles = SCENE_SIZE_STYLES.read_text(encoding="utf-8")
-        self.assertIn("height: clamp(560px, calc(100vh - 260px), 820px)", styles)
-        self.assertIn("min-height: 560px", styles)
+        self.assertIn("height: clamp(680px, calc(100vh - 220px), 940px)", styles)
+        self.assertIn("min-height: 680px", styles)
         scene = SCENE.read_text(encoding="utf-8")
-        self.assertIn("camera.fov = mobile ? 48 : compact ? 39 : 35", scene)
-        self.assertIn("camera.position.set(mobile ? -13.2 : -11.2", scene)
+        self.assertIn("camera.fov = mobile ? 45 : compact ? 36 : 31", scene)
+        self.assertIn("mobile ? -11.6 : -9.4", scene)
+        self.assertIn("camera.lookAt(0, 1.0, 0)", scene)
+
+    def test_three_scene_keeps_long_sides_open(self) -> None:
+        scene = SCENE.read_text(encoding="utf-8")
+        for forbidden in (
+            "BACK_LONG_WALL_Z",
+            "FRONT_LONG_WALL_Z",
+            "backLongWall",
+            "frontLongWall",
+        ):
+            self.assertNotIn(forbidden, scene)
+        self.assertIn("const floor = new THREE.Mesh", scene)
+        self.assertIn("addWindow()", scene)
+        self.assertIn("addDoorFrame()", scene)
+        self.assertIn("开放视角", scene)
 
     def test_three_scene_prefers_database_layout_and_keeps_default_fallback(self) -> None:
         scene = SCENE.read_text(encoding="utf-8")

@@ -8,6 +8,8 @@ import urllib.error
 import urllib.request
 from typing import Any
 
+import pymysql
+
 BASE_URL = os.environ.get("WUST_DORMITORY_BASE_URL", "http://127.0.0.1:8080").rstrip("/")
 
 
@@ -45,6 +47,76 @@ def data(response: dict[str, Any]) -> Any:
     return response["data"]
 
 
+def database_connection() -> pymysql.Connection:
+    return pymysql.connect(
+        host=os.environ.get("WUST_DORMITORY_DB_HOST", "127.0.0.1"),
+        port=int(os.environ.get("WUST_DORMITORY_DB_PORT", "3306")),
+        user=os.environ.get("WUST_DORMITORY_DB_USER", "wust_dormitory"),
+        password=os.environ.get("WUST_DORMITORY_DB_PASSWORD", "RuntimeTestPassword2026"),
+        database=os.environ.get("WUST_DORMITORY_DB_NAME", "wust_dormitory"),
+        charset="utf8mb4",
+        autocommit=True,
+    )
+
+
+def exercise_room_capacity_update(
+    admin_token: str,
+    room: dict[str, Any],
+) -> None:
+    room_id = int(room["id"])
+    physical_bed_count = int(room["bed_count"])
+    assert physical_bed_count > 1, room
+
+    connection = database_connection()
+    original_status: str | None = None
+    bed_id: int | None = None
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT id, operational_status FROM bed WHERE room_id=%s ORDER BY position_index LIMIT 1",
+                (room_id,),
+            )
+            row = cursor.fetchone()
+            assert row is not None, room
+            bed_id = int(row[0])
+            original_status = str(row[1])
+            cursor.execute(
+                "UPDATE bed SET operational_status='MAINTENANCE' WHERE id=%s",
+                (bed_id,),
+            )
+
+        refreshed_rooms = data(request(
+            "GET",
+            f"/api/v1/admin/rooms?gender={room['gender_restriction']}",
+            token=admin_token,
+        ))
+        refreshed = next(item for item in refreshed_rooms if int(item["id"]) == room_id)
+        assert int(refreshed["bed_count"]) == physical_bed_count, refreshed
+        assert int(refreshed["enabled_bed_count"]) == physical_bed_count - 1, refreshed
+
+        request(
+            "PUT",
+            f"/api/v1/admin/rooms/{room_id}",
+            token=admin_token,
+            body={
+                "roomType": room["room_type"],
+                "capacity": physical_bed_count,
+                "gender": room["gender_restriction"],
+                "operationalStatus": room["operational_status"],
+                "remark": "自动化验证：维护床位不改变物理容量",
+                "reason": "验证房间容量按物理床位总数计算",
+            },
+        )
+    finally:
+        if bed_id is not None and original_status is not None:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "UPDATE bed SET operational_status=%s WHERE id=%s",
+                    (original_status, bed_id),
+                )
+        connection.close()
+
+
 def main() -> int:
     admin_token = data(request(
         "POST",
@@ -54,7 +126,10 @@ def main() -> int:
 
     rooms = data(request("GET", "/api/v1/admin/rooms?gender=M", token=admin_token))
     assert rooms, rooms
-    room_id = int(rooms[0]["id"])
+    room = rooms[0]
+    room_id = int(room["id"])
+
+    exercise_room_capacity_update(admin_token, room)
 
     initial = data(request(
         "GET",
@@ -140,7 +215,9 @@ def main() -> int:
     assert int(student_bed["rotation_degrees"]) in {0, 90, 180, 270}, student_bed
 
     audits = data(request("GET", "/api/v1/admin/audit-logs?limit=100", token=admin_token))
-    assert "ROOM_LAYOUT_UPDATE" in {row["action_type"] for row in audits}, audits
+    actions = {row["action_type"] for row in audits}
+    assert "ROOM_UPDATE" in actions, audits
+    assert "ROOM_LAYOUT_UPDATE" in actions, audits
 
     request("POST", "/api/v1/auth/logout", token=student_token)
     request("POST", "/api/v1/auth/logout", token=admin_token)

@@ -131,7 +131,7 @@ class UxRefinementTest(unittest.TestCase):
         self.assertIn("position: sticky", content)
         self.assertIn("prefers-reduced-motion", content)
 
-    def test_scene_uses_oblique_camera_and_longitudinal_two_by_two_layout(self) -> None:
+    def test_scene_uses_open_oblique_camera_and_longitudinal_two_by_two_layout(self) -> None:
         scene = (FRONTEND / "components/student/RoomBedScene3D.vue").read_text(encoding="utf-8")
         for expected in (
             "const ROOM_WIDTH = 11.5",
@@ -146,13 +146,20 @@ class UxRefinementTest(unittest.TestCase):
             "customBedPlacement",
             "window.position.set(RIGHT_SHORT_WALL_X",
             "doorFrame.position.set(LEFT_SHORT_WALL_X",
-            "camera.position.set(mobile ? -13.2 : -11.2",
-            "camera.lookAt(0, 1.05, 0)",
-            "斜视视角",
+            "mobile ? -11.6 : -9.4",
+            "camera.lookAt(0, 1.0, 0)",
+            "开放视角",
             "门窗位于房间短边",
             "纵向2×2布局",
         ):
             self.assertIn(expected, scene)
+        for forbidden in (
+            "BACK_LONG_WALL_Z",
+            "FRONT_LONG_WALL_Z",
+            "backLongWall",
+            "frontLongWall",
+        ):
+            self.assertNotIn(forbidden, scene)
         self.assertNotIn("const BED_LONGITUDINAL_ROTATION = Math.PI / 2", scene)
         self.assertNotIn("整体为2×2布局", scene)
 
