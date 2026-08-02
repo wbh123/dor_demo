@@ -16,6 +16,7 @@ ADMIN_VIEW = ROOT / "frontend/src/views/admin/AdminDormitoryView.vue"
 EDITOR = ROOT / "frontend/src/components/admin/RoomLayoutEditor.vue"
 SCENE = ROOT / "frontend/src/components/student/RoomBedScene3D.vue"
 STYLES = ROOT / "frontend/src/phase2-room-layout.css"
+SCENE_SIZE_STYLES = ROOT / "frontend/src/room-scene-geometry-fix.css"
 MAIN = ROOT / "frontend/src/main.ts"
 SMOKE = ROOT / "scripts/e2e/phase2_room_layout_smoke.py"
 WORKFLOW = ROOT / ".github/workflows/phase1-ci.yml"
@@ -115,7 +116,69 @@ class RoomLayoutPhaseTwoTest(unittest.TestCase):
         styles = STYLES.read_text(encoding="utf-8")
         self.assertIn(".room-layout-stage", styles)
         self.assertIn("@media (max-width: 640px)", styles)
-        self.assertIn("./phase2-room-layout.css", MAIN.read_text(encoding="utf-8"))
+        main = MAIN.read_text(encoding="utf-8")
+        self.assertIn("./phase2-room-layout.css", main)
+        self.assertIn("./room-scene-geometry-fix.css", main)
+
+    def test_drag_coordinate_snapping_never_escapes_backend_bounds(self) -> None:
+        editor = EDITOR.read_text(encoding="utf-8")
+        self.assertIn("const snapped = Math.round(value / SNAP) * SNAP", editor)
+        self.assertIn("return Math.min(maximum, Math.max(minimum, snapped))", editor)
+        self.assertNotIn("const clamped = Math.min(maximum, Math.max(minimum, value))", editor)
+
+    def test_save_button_reports_missing_reason_instead_of_silently_disabling(self) -> None:
+        editor = EDITOR.read_text(encoding="utf-8")
+        self.assertIn("请填写布局修改原因后再保存", editor)
+        self.assertIn("reasonInput.value?.focus()", editor)
+        self.assertIn(':disabled="saving"', editor)
+        self.assertNotIn(':disabled="saving || !reason.trim()"', editor)
+
+    def test_default_layout_is_long_rectangle_with_short_edge_openings_and_two_by_two_units(self) -> None:
+        scene = SCENE.read_text(encoding="utf-8")
+        editor = EDITOR.read_text(encoding="utf-8")
+        service = SERVICE.read_text(encoding="utf-8")
+        styles = STYLES.read_text(encoding="utf-8")
+        for expected in (
+            "const ROOM_WIDTH = 11.5",
+            "const ROOM_DEPTH = 8",
+            "const DOOR_SIDE_X = -2.35",
+            "const WINDOW_SIDE_X = 2.35",
+            "const UPPER_ROW_Z = -1.65",
+            "const LOWER_ROW_Z = 1.65",
+            "const LEFT_SHORT_WALL_X",
+            "const RIGHT_SHORT_WALL_X",
+            "门窗位于房间短边",
+            "纵向2×2布局",
+        ):
+            self.assertIn(expected, scene)
+        self.assertIn("return new THREE.Vector3(DOOR_SIDE_X, 0, UPPER_ROW_Z)", scene)
+        self.assertIn("return new THREE.Vector3(WINDOW_SIDE_X, 0, UPPER_ROW_Z)", scene)
+        self.assertIn("return new THREE.Vector3(DOOR_SIDE_X, 0, LOWER_ROW_Z)", scene)
+        self.assertIn("WINDOW_SIDE_X, BUNK_UPPER_Y, LOWER_ROW_Z", scene)
+        self.assertIn("WINDOW_SIDE_X, BUNK_LOWER_Y, LOWER_ROW_Z", scene)
+        self.assertIn("return 0", scene)
+
+        for expected in (
+            "return { x: -2.35, z: -1.65, rotation: 0 }",
+            "return { x: 2.35, z: -1.65, rotation: 0 }",
+            "return { x: -2.35, z: 1.65, rotation: 0 }",
+            "return { x: 2.35, z: 1.65, rotation: 0 }",
+        ):
+            self.assertIn(expected, editor)
+        self.assertIn("new DefaultPlacement(-2.35, -1.65, 0)", service)
+        self.assertIn("new DefaultPlacement(2.35, -1.65, 0)", service)
+        self.assertIn("new DefaultPlacement(-2.35, 1.65, 0)", service)
+        self.assertIn("new DefaultPlacement(2.35, 1.65, 0)", service)
+        self.assertIn("left: 8px", styles)
+        self.assertIn("right: 8px", styles)
+
+    def test_three_scene_expands_to_fill_desktop_control_area(self) -> None:
+        styles = SCENE_SIZE_STYLES.read_text(encoding="utf-8")
+        self.assertIn("height: clamp(560px, calc(100vh - 260px), 820px)", styles)
+        self.assertIn("min-height: 560px", styles)
+        scene = SCENE.read_text(encoding="utf-8")
+        self.assertIn("camera.fov = mobile ? 48 : compact ? 39 : 35", scene)
+        self.assertIn("camera.position.set(mobile ? -13.2 : -11.2", scene)
 
     def test_three_scene_prefers_database_layout_and_keeps_default_fallback(self) -> None:
         scene = SCENE.read_text(encoding="utf-8")

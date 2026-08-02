@@ -43,6 +43,7 @@ const MAX_Z = 3.5
 const SNAP = 0.25
 
 const stage = ref<HTMLDivElement | null>(null)
+const reasonInput = ref<HTMLTextAreaElement | null>(null)
 const beds = ref<LayoutBed[]>([])
 const roomVersion = ref(0)
 const reason = ref('')
@@ -113,6 +114,8 @@ function parseBed(value: DataObject): LayoutBed {
 
 function startDrag(unit: LayoutUnit, event: PointerEvent) {
   if (saving.value) return
+  error.value = ''
+  message.value = ''
   dragKey.value = unit.key
   updateFromPointer(unit.key, event)
   window.addEventListener('pointermove', onPointerMove)
@@ -138,8 +141,8 @@ function updateFromPointer(key: string, event: PointerEvent) {
 }
 
 function snapCoordinate(value: number, minimum: number, maximum: number) {
-  const clamped = Math.min(maximum, Math.max(minimum, value))
-  return Math.round(clamped / SNAP) * SNAP
+  const snapped = Math.round(value / SNAP) * SNAP
+  return Math.min(maximum, Math.max(minimum, snapped))
 }
 
 function updateUnit(key: string, x: number, z: number, rotation?: number) {
@@ -184,17 +187,18 @@ function restoreDefaultLayout() {
       rotation_degrees: placement.rotation,
     }
   })
+  error.value = ''
   message.value = '已恢复默认布局预览，点击保存后生效。'
 }
 
 function defaultPlacement(bed: LayoutBed) {
   if (bed.bed_type === 'BUNK_UPPER' || bed.bed_type === 'BUNK_LOWER') {
-    return { x: 3.35, z: 1.5, rotation: 90 }
+    return { x: 2.35, z: 1.65, rotation: 0 }
   }
-  if (bed.position_index === 1) return { x: -2.85, z: -1.45, rotation: 90 }
-  if (bed.position_index === 2) return { x: -2.85, z: 1.5, rotation: 90 }
-  if (bed.position_index === 3) return { x: 0.15, z: 1.5, rotation: 90 }
-  return { x: 0.15, z: -1.45, rotation: 90 }
+  if (bed.position_index === 1) return { x: -2.35, z: -1.65, rotation: 0 }
+  if (bed.position_index === 2) return { x: 2.35, z: -1.65, rotation: 0 }
+  if (bed.position_index === 3) return { x: -2.35, z: 1.65, rotation: 0 }
+  return { x: 2.35, z: 1.65, rotation: 0 }
 }
 
 function unitStyle(unit: LayoutUnit) {
@@ -206,7 +210,14 @@ function unitStyle(unit: LayoutUnit) {
 }
 
 async function save() {
-  if (!reason.value.trim() || saving.value) return
+  if (saving.value) return
+  if (!reason.value.trim()) {
+    error.value = '请填写布局修改原因后再保存。'
+    message.value = ''
+    reasonInput.value?.focus()
+    return
+  }
+
   saving.value = true
   error.value = ''
   message.value = ''
@@ -222,6 +233,7 @@ async function save() {
       })),
     })
     message.value = '床位布局已保存。'
+    reason.value = ''
     await load()
     emit('saved')
   } catch (reasonValue) {
@@ -309,6 +321,7 @@ async function save() {
         <label class="layout-reason-field">
           <span>修改原因</span>
           <textarea
+            ref="reasonInput"
             v-model.trim="reason"
             class="input"
             rows="2"
@@ -316,12 +329,13 @@ async function save() {
             required
             placeholder="例如：按该房间实际家具摆放调整"
           />
+          <small>保存布局必须填写原因，用于操作审计。</small>
         </label>
 
         <div class="button-row room-layout-actions">
           <button class="button ghost" type="button" @click="restoreDefaultLayout">恢复默认布局</button>
           <button class="button ghost" type="button" @click="emit('close')">取消</button>
-          <button class="button primary" type="button" :disabled="saving || !reason.trim()" @click="save">
+          <button class="button primary" type="button" :disabled="saving" @click="save">
             {{ saving ? '正在保存…' : '保存布局' }}
           </button>
         </div>

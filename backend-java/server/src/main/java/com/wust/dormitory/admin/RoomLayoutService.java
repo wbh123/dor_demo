@@ -236,13 +236,13 @@ public class RoomLayoutService {
 
     private DefaultPlacement defaultPlacement(String bedType, int positionIndex) {
         if ("BUNK_UPPER".equals(bedType) || "BUNK_LOWER".equals(bedType)) {
-            return new DefaultPlacement(3.35, 1.5, 90);
+            return new DefaultPlacement(2.35, 1.65, 0);
         }
         return switch (positionIndex) {
-            case 1 -> new DefaultPlacement(-2.85, -1.45, 90);
-            case 2 -> new DefaultPlacement(-2.85, 1.5, 90);
-            case 3 -> new DefaultPlacement(0.15, 1.5, 90);
-            default -> new DefaultPlacement(0.15, -1.45, 90);
+            case 1 -> new DefaultPlacement(-2.35, -1.65, 0);
+            case 2 -> new DefaultPlacement(2.35, -1.65, 0);
+            case 3 -> new DefaultPlacement(-2.35, 1.65, 0);
+            default -> new DefaultPlacement(2.35, 1.65, 0);
         };
     }
 

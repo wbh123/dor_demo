@@ -16,6 +16,7 @@
 .room-layout-stage {
   position: relative;
   min-height: 430px;
+  aspect-ratio: 11.5 / 8;
   overflow: hidden;
   border: 2px solid #aabbd3;
   border-radius: 20px;
@@ -32,23 +33,24 @@
 .layout-window,
 .layout-door {
   position: absolute;
-  left: 50%;
+  top: 50%;
   z-index: 1;
-  transform: translateX(-50%);
+  transform: translateY(-50%);
   border-radius: 999px;
-  padding: 5px 18px;
+  padding: 18px 5px;
   font-size: 12px;
   font-weight: 700;
+  writing-mode: vertical-rl;
 }
 
 .layout-window {
-  top: 8px;
+  right: 8px;
   background: #d8efff;
   color: #315c83;
 }
 
 .layout-door {
-  bottom: 8px;
+  left: 8px;
   background: #f4dfc5;
   color: #69482f;
 }
@@ -119,6 +121,10 @@
   margin-top: 14px;
 }
 
+.layout-reason-field small {
+  color: #6c7b90;
+}
+
 .layout-reason-field textarea {
   resize: vertical;
 }
@@ -150,7 +156,8 @@
   }
 
   .room-layout-stage {
-    min-height: 310px;
+    min-height: 280px;
+    aspect-ratio: 11.5 / 8;
     background-size: 18px 18px;
   }
 
@@ -159,6 +166,12 @@
     height: 52px;
     border-width: 2px;
     font-size: 12px;
+  }
+
+  .layout-window,
+  .layout-door {
+    padding: 12px 4px;
+    font-size: 10px;
   }
 
   .layout-number-grid {
