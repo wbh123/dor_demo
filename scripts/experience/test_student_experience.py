@@ -88,6 +88,22 @@ class StudentExperienceTest(unittest.TestCase):
         self.assertIn("SUMMER_AC_TEMPERATURE", home)
         self.assertNotIn("生活习惯问卷", questionnaire + home)
 
+    def test_personal_preference_card_uses_desktop_table_and_profile_columns(self) -> None:
+        home = (FRONTEND / "views/student/StudentHomeView.vue").read_text(encoding="utf-8")
+        styles = (FRONTEND / "student-experience.css").read_text(encoding="utf-8")
+        for expected in (
+            "personal-preference-content",
+            "personal-preference-table-column",
+            "personal-preference-side-column",
+            "personal-preference-profile-panel",
+            "personal-preference-action-panel",
+        ):
+            self.assertIn(expected, home + styles)
+        self.assertIn("grid-template-columns: minmax(0, 1.45fr) minmax(300px, 0.75fr)", styles)
+        self.assertIn("grid-template-columns: minmax(82px, auto) minmax(0, 1fr)", styles)
+        self.assertIn("gap: 8px", styles)
+        self.assertIn("@media (max-width: 900px)", styles)
+
     def test_frontend_welcome_modal_and_admin_editor_exist(self) -> None:
         shell = (FRONTEND / "layouts/AppShell.vue").read_text(encoding="utf-8")
         auth = (FRONTEND / "stores/auth.ts").read_text(encoding="utf-8")
