@@ -48,7 +48,7 @@ public class BatchCapacityService {
             try {
                 policy.requireStudentEligibleForRoom(student, batch, room);
             } catch (BusinessException exception) {
-                reasons.add(Map.of("code", exception.code(), "message", exception.getMessage()));
+                reasons.add(Map.of("code", exception.getCode(), "message", exception.getMessage()));
             }
             int slots;
             if ("BED".equals(String.valueOf(batch.get("selection_mode")))) {
