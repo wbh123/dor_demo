@@ -47,10 +47,6 @@ const MIN_Z = -3.5
 const MAX_Z = 3.5
 const SNAP = 0.25
 const MAX_CAPACITY = 8
-const BED_TYPE_OPTIONS = [
-  { value: 'LOFT_BED_DESK', label: '上床下桌' },
-  { value: 'BUNK', label: '上下铺' },
-] as const
 
 const { t, subtitle, translateError } = useI18n()
 const stage = ref<HTMLDivElement | null>(null)
@@ -145,6 +141,8 @@ function parseBed(value: DataObject): LayoutBed {
 
 function startDrag(unit: LayoutUnit, event: PointerEvent) {
   if (saving.value) return
+  const target = event.target as HTMLElement
+  if (target.closest('button')) return
   error.value = ''
   message.value = ''
   dragKey.value = unit.key
@@ -192,23 +190,10 @@ function updateUnit(key: string, x: number, z: number, rotation?: number) {
 
 function cycleRotation(unit: LayoutUnit) {
   updateUnit(unit.key, unit.x, unit.z, (unit.rotation + 90) % 360)
+  message.value = `${unit.label} 已顺时针旋转90°，保存后生效。`
 }
 
-function setUnitCoordinate(key: string, axis: 'x' | 'z', value: number) {
-  const unit = layoutUnits.value.find((item) => item.key === key)
-  if (!unit || !Number.isFinite(value)) return
-  const x = axis === 'x' ? snapCoordinate(value, MIN_X, MAX_X) : unit.x
-  const z = axis === 'z' ? snapCoordinate(value, MIN_Z, MAX_Z) : unit.z
-  updateUnit(key, x, z)
-}
-
-function setUnitRotation(unit: LayoutUnit, value: number) {
-  if (![0, 90, 180, 270].includes(value)) return
-  updateUnit(unit.key, unit.x, unit.z, value)
-}
-
-function setUnitType(unit: LayoutUnit, value: string) {
-  if (!['LOFT_BED_DESK', 'BUNK'].includes(value)) return
+function setUnitType(unit: LayoutUnit, value: 'LOFT_BED_DESK' | 'BUNK') {
   if (unit.occupied && value !== unit.originalType) {
     error.value = '非空床位不可修改类型。'
     return
@@ -217,22 +202,21 @@ function setUnitType(unit: LayoutUnit, value: string) {
     error.value = '已有上下铺不能直接合并为上床下桌。'
     return
   }
-  const nextType = value as 'LOFT_BED_DESK' | 'BUNK'
   const currentAdditional = layoutUnits.value.filter((item) =>
     item.key !== unit.key
     && item.originalType === 'LOFT_BED_DESK'
     && item.unitType === 'BUNK').length
   if (unit.originalType === 'LOFT_BED_DESK'
-    && nextType === 'BUNK'
+    && value === 'BUNK'
     && beds.value.length + currentAdditional >= MAX_CAPACITY) {
     error.value = '房间最多只能配置8个床位。'
     return
   }
-  unitTypes.value = { ...unitTypes.value, [unit.key]: nextType }
+  unitTypes.value = { ...unitTypes.value, [unit.key]: value }
   error.value = ''
-  message.value = nextType === 'BUNK' && unit.originalType === 'LOFT_BED_DESK'
+  message.value = value === 'BUNK' && unit.originalType === 'LOFT_BED_DESK'
     ? '保存后将新增一个独立下铺床位，并同步增加1人居住容量。'
-    : '床具类型已更新预览，保存后会同步房型。'
+    : '床具类型已更新预览，点击保存后统一校验并生效。'
 }
 
 function restoreDefaultLayout() {
@@ -333,7 +317,7 @@ async function save() {
         <div>
           <span class="eyebrow">{{ subtitle('床具布局', 'ROOM LAYOUT') }}</span>
           <h3 id="layout-title">{{ roomLabel }}床位布局</h3>
-          <p>拖动床具调整位置；空的上床下桌可以拆分为上下铺，已有学生的床位不可修改类型。</p>
+          <p>拖动床具调整位置，在床具卡片内切换类型或顺时针旋转。所有更改在点击保存后统一校验。</p>
         </div>
         <button class="button ghost" type="button" @click="emit('close')">关闭</button>
       </div>
@@ -360,79 +344,53 @@ async function save() {
           <small>{{ t('layout.maximum') }}。保存时按独立可选床位数量自动同步房型和容量。</small>
         </div>
 
-        <div class="layout-bed-type-grid" aria-label="床具类型设置">
-          <article
-            v-for="unit in layoutUnits"
-            :key="`type-${unit.key}`"
-            class="layout-bed-type-card"
-            :class="{ occupied: unit.occupied }"
-          >
-            <div>
-              <strong>{{ unit.label }}</strong>
-              <small v-if="unit.occupied">非空床位不可修改类型</small>
-              <small v-else-if="unit.originalType === 'LOFT_BED_DESK' && unit.unitType === 'BUNK'">新增一个独立下铺床位</small>
-              <small v-else>{{ unit.unitType === 'BUNK' ? '上下铺，包含两个可选床位' : '上床下桌' }}</small>
-            </div>
-            <select
-              class="input"
-              :value="unit.unitType"
-              :disabled="saving || unit.occupied"
-              @change="setUnitType(unit, String(($event.target as HTMLSelectElement).value))"
-            >
-              <option
-                v-for="option in BED_TYPE_OPTIONS"
-                :key="option.value"
-                :value="option.value"
-                :disabled="unit.originalType === 'BUNK' && option.value === 'LOFT_BED_DESK'"
-              >
-                {{ option.label }}
-              </option>
-            </select>
-          </article>
-        </div>
-
         <p class="layout-bunk-explanation">
-          {{ t('layout.bunkHint') }} {{ capacityLimitReached ? '当前预览已达到最多8人。' : '' }}
+          空的上床下桌可切换为上下铺并新增一个独立床位；已有学生的床具不可改型。
+          {{ capacityLimitReached ? '当前预览已达到最多8人。' : '' }}
         </p>
 
         <div ref="stage" class="room-layout-stage" aria-label="房间床具俯视布局编辑区">
           <span class="layout-window">窗户</span>
           <span class="layout-door">入口</span>
-          <button
+          <article
             v-for="unit in layoutUnits"
             :key="unit.key"
             class="layout-bed-unit"
-            :class="{ bunk: unit.unitType === 'BUNK', dragging: dragKey === unit.key }"
+            :class="{
+              bunk: unit.unitType === 'BUNK',
+              dragging: dragKey === unit.key,
+              occupied: unit.occupied,
+            }"
             :style="unitStyle(unit)"
-            type="button"
             @pointerdown.prevent="startDrag(unit, $event)"
           >
-            <strong>{{ unit.label }}</strong>
-            <small>{{ unit.unitType === 'BUNK' ? '上下铺' : '上床下桌' }}</small>
-          </button>
-        </div>
-
-        <div class="layout-number-grid">
-          <article v-for="unit in layoutUnits" :key="`form-${unit.key}`" class="layout-number-card">
-            <strong>{{ unit.label }}</strong>
-            <label>
-              <span>横向位置X</span>
-              <input class="input" type="number" min="-5.2" max="5.2" step="0.25" :value="unit.x" @change="setUnitCoordinate(unit.key, 'x', Number(($event.target as HTMLInputElement).value))" />
-            </label>
-            <label>
-              <span>纵向位置Z</span>
-              <input class="input" type="number" min="-3.5" max="3.5" step="0.25" :value="unit.z" @change="setUnitCoordinate(unit.key, 'z', Number(($event.target as HTMLInputElement).value))" />
-            </label>
-            <label>
-              <span>朝向</span>
-              <select class="input" :value="unit.rotation" @change="setUnitRotation(unit, Number(($event.target as HTMLSelectElement).value))">
-                <option :value="0">0°</option>
-                <option :value="90">90°</option>
-                <option :value="180">180°</option>
-                <option :value="270">270°</option>
-              </select>
-            </label>
-            <button class="button ghost" type="button" @click="cycleRotation(unit)">旋转90°</button>
+            <div class="layout-bed-drag-handle">
+              <strong>{{ unit.label }}</strong>
+              <small>{{ unit.occupied ? '非空床位·类型锁定' : '拖动调整位置' }}</small>
+            </div>
+            <div class="layout-bed-type-actions" role="group" :aria-label="`${unit.label}床具类型`">
+              <button
+                type="button"
+                :class="{ active: unit.unitType === 'LOFT_BED_DESK' }"
+                :disabled="saving || unit.occupied || unit.originalType === 'BUNK'"
+                @pointerdown.stop
+                @click.stop="setUnitType(unit, 'LOFT_BED_DESK')"
+              >上床下桌</button>
+              <button
+                type="button"
+                :class="{ active: unit.unitType === 'BUNK' }"
+                :disabled="saving || unit.occupied"
+                @pointerdown.stop
+                @click.stop="setUnitType(unit, 'BUNK')"
+              >上下铺</button>
+            </div>
+            <button
+              class="layout-bed-rotate-button"
+              type="button"
+              :disabled="saving"
+              @pointerdown.stop
+              @click.stop="cycleRotation(unit)"
+            >顺时针旋转90°</button>
           </article>
         </div>
 

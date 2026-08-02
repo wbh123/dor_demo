@@ -18,6 +18,7 @@ ADMIN_VIEW = ROOT / "frontend/src/views/admin/AdminDormitoryView.vue"
 EDITOR = ROOT / "frontend/src/components/admin/RoomLayoutEditor.vue"
 SCENE = ROOT / "frontend/src/components/student/RoomBedScene3D.vue"
 STYLES = ROOT / "frontend/src/phase2-room-layout.css"
+CANVAS_STYLES = ROOT / "frontend/src/admin-layout-canvas-refinement.css"
 SCENE_SIZE_STYLES = ROOT / "frontend/src/room-scene-geometry-fix.css"
 MAIN = ROOT / "frontend/src/main.ts"
 SMOKE = ROOT / "scripts/e2e/phase2_room_layout_smoke.py"
@@ -96,7 +97,7 @@ class RoomLayoutPhaseTwoTest(unittest.TestCase):
         self.assertIn("layout.rotation_degrees", content)
         self.assertIn("roomLayoutService.enrich", STUDENT_CONTROLLER.read_text(encoding="utf-8"))
 
-    def test_admin_visual_editor_uses_bed_units_and_mobile_inputs(self) -> None:
+    def test_admin_visual_editor_keeps_all_controls_inside_canvas(self) -> None:
         editor = EDITOR.read_text(encoding="utf-8")
         for expected in (
             "room-layout-stage",
@@ -106,31 +107,43 @@ class RoomLayoutPhaseTwoTest(unittest.TestCase):
             "pointermove",
             "snapCoordinate",
             "cycleRotation",
+            "layout-bed-type-actions",
+            "layout-bed-rotate-button",
+            "setUnitType(unit, 'LOFT_BED_DESK')",
+            "setUnitType(unit, 'BUNK')",
             "restoreDefaultLayout",
             "expectedRoomVersion",
             "修改原因",
-            "layout-number-grid",
-            "layout-bed-type-grid",
-            "setUnitType",
             "bedType: unit.unitType",
             "新增一个独立下铺床位",
             "最多8人",
         ):
             self.assertIn(expected, editor)
-        self.assertNotIn("上下铺上铺", editor)
-        self.assertNotIn("上下铺下铺", editor)
+        for forbidden in (
+            "layout-number-grid",
+            "layout-bed-type-grid",
+            "横向位置X",
+            "纵向位置Z",
+            "<select",
+            "上下铺上铺",
+            "上下铺下铺",
+        ):
+            self.assertNotIn(forbidden, editor)
 
         admin = ADMIN_VIEW.read_text(encoding="utf-8")
         self.assertIn("RoomLayoutEditor", admin)
         self.assertIn("openLayoutEditor", admin)
         self.assertIn(">布局</button>", admin)
 
-        styles = STYLES.read_text(encoding="utf-8")
+        styles = CANVAS_STYLES.read_text(encoding="utf-8")
         self.assertIn(".room-layout-stage", styles)
+        self.assertIn(".layout-bed-type-actions", styles)
+        self.assertIn(".layout-bed-rotate-button", styles)
         self.assertIn("@media (max-width: 640px)", styles)
         main = MAIN.read_text(encoding="utf-8")
         self.assertIn("./phase2-room-layout.css", main)
         self.assertIn("./room-scene-geometry-fix.css", main)
+        self.assertIn("./admin-layout-canvas-refinement.css", main)
 
     def test_admin_room_editor_uses_physical_bed_count_and_readonly_room_type(self) -> None:
         service = ROOM_MANAGEMENT.read_text(encoding="utf-8")
@@ -160,19 +173,23 @@ class RoomLayoutPhaseTwoTest(unittest.TestCase):
             self.assertIn(expected, admin)
         self.assertNotIn("roomTypeOptions", admin)
 
-    def test_layout_editor_uses_one_point_six_scaled_cards_and_opaque_dialog(self) -> None:
-        styles = STYLES.read_text(encoding="utf-8")
+    def test_layout_editor_uses_opaque_rounded_dialog_and_inline_cards(self) -> None:
+        styles = CANVAS_STYLES.read_text(encoding="utf-8")
         for expected in (
-            "width: min(1040px, calc(100vw - 40px))",
-            "min-height: 360px",
-            "width: 304px",
-            "height: 144px",
+            "padding: 30px",
+            "border-radius: 26px",
+            "min-height: 430px",
+            "width: 310px",
+            "min-height: 176px",
             "background: #ffffff",
-            "background: rgba(8, 22, 48, 0.72)",
-            ".room-editor-dialog",
-            ".room-editor-summary",
+            "background: rgba(9, 23, 48, 0.78)",
+            ".layout-bed-type-actions",
+            ".layout-bed-rotate-button",
         ):
             self.assertIn(expected, styles)
+        base_styles = STYLES.read_text(encoding="utf-8")
+        self.assertIn(".room-editor-dialog", base_styles)
+        self.assertIn(".room-editor-summary", base_styles)
 
     def test_drag_coordinate_snapping_never_escapes_backend_bounds(self) -> None:
         editor = EDITOR.read_text(encoding="utf-8")
@@ -213,6 +230,7 @@ class RoomLayoutPhaseTwoTest(unittest.TestCase):
         workflow = WORKFLOW.read_text(encoding="utf-8")
         self.assertIn("python -m unittest scripts/phase2/test_room_layout.py -v", workflow)
         self.assertIn("python -m unittest scripts/phase2/test_room_bed_type_and_preference_ui.py -v", workflow)
+        self.assertIn("python -m unittest scripts/phase2/test_admin_layout_allocation_student_reset.py -v", workflow)
         self.assertIn("python scripts/e2e/phase2_room_layout_smoke.py", workflow)
         self.assertIn("room_bed_layout", workflow)
 

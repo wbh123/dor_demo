@@ -57,7 +57,7 @@ def main() -> int:
         "/api/v1/auth/activate",
         body={
             "studentNumber": "202600000020",
-            "studentName": "测试男生020",
+            "studentName": "Ananya Sharma",
             "password": "StudentMatchingPassword2026",
         },
     )

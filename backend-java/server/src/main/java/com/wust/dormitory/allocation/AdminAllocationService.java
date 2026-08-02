@@ -23,13 +23,16 @@ import java.util.UUID;
 
 @Service
 public class AdminAllocationService {
+    private static final String ALGORITHM_VERSION = "team-first-all-students-v2";
+
     private final NamedParameterJdbcTemplate jdbc;
     private final ObjectMapper objectMapper;
     private final AuditService auditService;
 
-    public AdminAllocationService(NamedParameterJdbcTemplate jdbc,
-                                  ObjectMapper objectMapper,
-                                  AuditService auditService) {
+    public AdminAllocationService(
+            NamedParameterJdbcTemplate jdbc,
+            ObjectMapper objectMapper,
+            AuditService auditService) {
         this.jdbc = jdbc;
         this.objectMapper = objectMapper;
         this.auditService = auditService;
@@ -41,22 +44,21 @@ public class AdminAllocationService {
     }
 
     @Transactional
-    public Map<String, Object> commit(long batchId,
-                                      long randomSeed,
-                                      String idempotencyKey,
-                                      CurrentUser operator) {
+    public Map<String, Object> commit(
+            long batchId,
+            long randomSeed,
+            String idempotencyKey,
+            CurrentUser operator) {
         Map<String, Object> batch = one(
                 "SELECT batch_status FROM selection_batch WHERE id=:id",
                 Map.of("id", batchId),
                 "BATCH_NOT_FOUND",
-                "选寝批次不存在"
-        );
+                "选寝批次不存在");
         String status = String.valueOf(batch.get("batch_status"));
         if (!Set.of("CLOSED", "ALLOCATING").contains(status)) {
             throw new BusinessException(
                     "BATCH_NOT_CLOSED",
-                    "仅已关闭或分配中的批次可以执行统一分配"
-            );
+                    "仅已关闭或分配中的批次可以执行统一分配");
         }
 
         List<Map<String, Object>> existing = jdbc.queryForList("""
@@ -68,11 +70,13 @@ public class AdminAllocationService {
                 .addValue("idempotencyKey", idempotencyKey));
         if (!existing.isEmpty()) {
             Map<String, Object> row = existing.getFirst();
+            long runId = ((Number) row.get("id")).longValue();
             Map<String, Object> reused = new LinkedHashMap<>();
-            reused.put("allocationRunId", row.get("id"));
+            reused.put("allocationRunId", runId);
             reused.put("executionCode", row.get("execution_code"));
             reused.put("reused", true);
             reused.put("summary", row.get("summary_json"));
+            reused.put("unassigned", failureList(runId));
             return reused;
         }
 
@@ -88,7 +92,7 @@ public class AdminAllocationService {
                  operator_user_id, started_at, finished_at)
                 VALUES
                 (:batchId, :executionCode, :idempotencyKey, 'COMMIT', :runStatus,
-                 'team-first-greedy-v1', 'phase1-rule-v1', :randomSeed,
+                 :algorithmVersion, 'phase1-rule-v1', :randomSeed,
                  CAST(:studentSnapshot AS JSON), CAST(:bedSnapshot AS JSON),
                  CAST(:summary AS JSON), :operatorId,
                  CURRENT_TIMESTAMP(3), CURRENT_TIMESTAMP(3))
@@ -98,6 +102,7 @@ public class AdminAllocationService {
                 .addValue("idempotencyKey", idempotencyKey)
                 .addValue("runStatus", plan.unassigned().isEmpty()
                         ? "SUCCEEDED" : "PARTIAL_SUCCESS")
+                .addValue("algorithmVersion", ALGORITHM_VERSION)
                 .addValue("randomSeed", randomSeed)
                 .addValue("studentSnapshot", json(plan.studentSnapshot()))
                 .addValue("bedSnapshot", json(plan.bedSnapshot()))
@@ -146,8 +151,8 @@ public class AdminAllocationService {
                     .addValue("bedId", item.bedId())
                     .addValue("operatorId", operator.userId())
                     .addValue("reason", item.teamId() == null
-                            ? "统一随机分配未组队学生"
-                            : "统一随机分配锁定队伍")
+                            ? "统一分配学生"
+                            : "统一分配锁定队伍")
                     .addValue("currentData", json(item.toMap())));
 
             jdbc.update("""
@@ -163,10 +168,9 @@ public class AdminAllocationService {
                     .addValue("bedId", item.bedId())
                     .addValue("score", item.score())
                     .addValue("explanation", json(Map.of(
-                            "algorithm", "team-first-greedy-v1",
+                            "algorithm", ALGORITHM_VERSION,
                             "teamPreserved", item.teamId() != null,
-                            "genderMatched", true
-                    ))));
+                            "genderMatched", true))));
             if (item.teamId() != null) {
                 completedTeams.add(item.teamId());
             }
@@ -193,8 +197,9 @@ public class AdminAllocationService {
                     .addValue("studentId", item.studentId())
                     .addValue("failureCode", item.failureCode())
                     .addValue("explanation", json(Map.of(
-                            "message", item.message()
-                    ))));
+                            "studentName", item.studentName(),
+                            "studentNumber", item.studentNumber(),
+                            "failureReason", item.failureReason()))));
         }
 
         jdbc.update("""
@@ -207,25 +212,23 @@ public class AdminAllocationService {
                 "ALLOCATION_COMMIT",
                 "ALLOCATION_RUN",
                 runId,
-                "锁定队伍优先，未组队学生随后分配",
+                "锁定队伍优先，其余全部学生按个人参与统一分配",
                 null,
-                plan.summary()
-        );
+                plan.toMap());
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("allocationRunId", runId);
         result.put("executionCode", executionCode);
         result.put("reused", false);
         result.put("summary", plan.summary());
+        result.put("unassigned", plan.unassigned().stream().map(UnassignedItem::toMap).toList());
         return result;
     }
 
     private AllocationPlan plan(long batchId, long randomSeed) {
         List<BedCandidate> beds = availableBeds(batchId, randomSeed);
         List<Map<String, Object>> studentSnapshot = eligibleStudentSnapshot(batchId);
-        List<Map<String, Object>> bedSnapshot = beds.stream()
-                .map(BedCandidate::toMap)
-                .toList();
+        List<Map<String, Object>> bedSnapshot = beds.stream().map(BedCandidate::toMap).toList();
         Set<Long> usedBeds = new HashSet<>();
         Set<Long> plannedStudents = new HashSet<>();
         List<AssignmentItem> assignments = new ArrayList<>();
@@ -233,20 +236,20 @@ public class AdminAllocationService {
 
         Map<Long, List<BedCandidate>> bedsByRoom = new LinkedHashMap<>();
         for (BedCandidate bed : beds) {
-            bedsByRoom.computeIfAbsent(bed.roomId(), ignored -> new ArrayList<>())
-                    .add(bed);
+            bedsByRoom.computeIfAbsent(bed.roomId(), ignored -> new ArrayList<>()).add(bed);
         }
 
         List<TeamCandidate> teams = lockedTeams(batchId, randomSeed);
         for (TeamCandidate team : teams) {
             List<StudentCandidate> members = teamMembers(team.teamId());
             if (members.size() != team.memberCount()) {
-                members.forEach(member -> unassigned.add(new UnassignedItem(
-                        member.studentId(),
-                        member.studentNumber(),
-                        "TEAM_MEMBER_STATE_INVALID",
-                        "队伍成员状态不完整，未执行整体分配"
-                )));
+                for (StudentCandidate member : members) {
+                    plannedStudents.add(member.studentId());
+                    unassigned.add(UnassignedItem.of(
+                            member,
+                            "TEAM_MEMBER_STATE_INVALID",
+                            "锁定队伍成员状态不完整"));
+                }
                 continue;
             }
             List<BedCandidate> selectedRoomBeds = bedsByRoom.values().stream()
@@ -259,12 +262,13 @@ public class AdminAllocationService {
                     .findFirst()
                     .orElse(List.of());
             if (selectedRoomBeds.isEmpty()) {
-                members.forEach(member -> unassigned.add(new UnassignedItem(
-                        member.studentId(),
-                        member.studentNumber(),
-                        "TEAM_ROOM_CAPACITY_INSUFFICIENT",
-                        "没有同一房间可容纳完整锁定队伍"
-                )));
+                for (StudentCandidate member : members) {
+                    plannedStudents.add(member.studentId());
+                    unassigned.add(UnassignedItem.of(
+                            member,
+                            "TEAM_ROOM_CAPACITY_INSUFFICIENT",
+                            "没有同一房间可容纳完整锁定队伍"));
+                }
                 continue;
             }
             for (int index = 0; index < members.size(); index++) {
@@ -272,19 +276,10 @@ public class AdminAllocationService {
                 BedCandidate bed = selectedRoomBeds.get(index);
                 usedBeds.add(bed.bedId());
                 plannedStudents.add(member.studentId());
-                assignments.add(new AssignmentItem(
-                        member.studentId(),
-                        member.studentNumber(),
-                        bed.bedId(),
-                        bed.roomId(),
-                        bed.displayName(),
-                        team.teamId(),
-                        100.0
-                ));
+                assignments.add(AssignmentItem.of(member, bed, team.teamId(), 100.0));
             }
         }
 
-        List<StudentCandidate> individualStudents = individualStudents(batchId, randomSeed);
         Map<String, List<BedCandidate>> remainingBedsByGender = new HashMap<>();
         for (BedCandidate bed : beds) {
             if (!usedBeds.contains(bed.bedId())) {
@@ -294,7 +289,7 @@ public class AdminAllocationService {
             }
         }
         Map<String, Integer> genderIndex = new HashMap<>();
-        for (StudentCandidate student : individualStudents) {
+        for (StudentCandidate student : allRemainingStudents(batchId, randomSeed)) {
             if (plannedStudents.contains(student.studentId())) {
                 continue;
             }
@@ -302,39 +297,18 @@ public class AdminAllocationService {
                     .getOrDefault(student.gender(), List.of());
             int index = genderIndex.getOrDefault(student.gender(), 0);
             if (index >= genderBeds.size()) {
-                unassigned.add(new UnassignedItem(
-                        student.studentId(),
-                        student.studentNumber(),
+                unassigned.add(UnassignedItem.of(
+                        student,
                         "NO_AVAILABLE_BED",
-                        "没有符合性别和批次范围的剩余床位"
-                ));
+                        "没有符合性别和批次范围的剩余床位"));
+                plannedStudents.add(student.studentId());
                 continue;
             }
             BedCandidate bed = genderBeds.get(index);
             genderIndex.put(student.gender(), index + 1);
             usedBeds.add(bed.bedId());
             plannedStudents.add(student.studentId());
-            assignments.add(new AssignmentItem(
-                    student.studentId(),
-                    student.studentNumber(),
-                    bed.bedId(),
-                    bed.roomId(),
-                    bed.displayName(),
-                    null,
-                    90.0
-            ));
-        }
-
-        List<StudentCandidate> activeUnreadyTeamMembers = activeUnreadyTeamMembers(batchId);
-        for (StudentCandidate student : activeUnreadyTeamMembers) {
-            if (!plannedStudents.contains(student.studentId())) {
-                unassigned.add(new UnassignedItem(
-                        student.studentId(),
-                        student.studentNumber(),
-                        "ACTIVE_TEAM_NOT_LOCKED",
-                        "学生仍在未锁定队伍中，为避免拆散队伍未进行个人分配"
-                ));
-            }
+            assignments.add(AssignmentItem.of(student, bed, null, 90.0));
         }
 
         Map<String, Object> summary = new LinkedHashMap<>();
@@ -343,16 +317,11 @@ public class AdminAllocationService {
         summary.put("lockedTeamCount", teams.size());
         summary.put("assignedCount", assignments.size());
         summary.put("unassignedCount", unassigned.size());
+        summary.put("allStudentsIncluded", true);
         summary.put("randomSeed", randomSeed);
-        summary.put("algorithmVersion", "team-first-greedy-v1");
+        summary.put("algorithmVersion", ALGORITHM_VERSION);
 
-        return new AllocationPlan(
-                studentSnapshot,
-                bedSnapshot,
-                assignments,
-                unassigned,
-                summary
-        );
+        return new AllocationPlan(studentSnapshot, bedSnapshot, assignments, unassigned, summary);
     }
 
     private List<BedCandidate> availableBeds(long batchId, long randomSeed) {
@@ -405,18 +374,20 @@ public class AdminAllocationService {
                         rs.getString("gender"),
                         rs.getString("building_name"),
                         rs.getString("room_number"),
-                        rs.getString("bed_code")
-                ));
+                        rs.getString("bed_code")));
     }
 
     private List<Map<String, Object>> eligibleStudentSnapshot(long batchId) {
         return jdbc.queryForList("""
                 SELECT s.id AS student_id,
                        s.student_number,
+                       s.student_name,
                        s.gender,
-                       s.major_id
+                       s.major_id,
+                       u.account_status
                 FROM batch_student_eligibility e
                 JOIN student s ON s.id=e.student_id
+                LEFT JOIN app_user u ON u.student_id=s.id
                 LEFT JOIN bed_assignment a
                   ON a.batch_id=e.batch_id AND a.student_id=s.id
                 WHERE e.batch_id=:batchId
@@ -430,8 +401,7 @@ public class AdminAllocationService {
         return jdbc.query("""
                 SELECT t.id AS team_id,
                        MIN(s.gender) AS gender,
-                       COUNT(*) AS member_count,
-                       COUNT(DISTINCT s.gender) AS gender_count
+                       COUNT(*) AS member_count
                 FROM selection_team t
                 JOIN selection_team_member tm ON tm.team_id=t.id
                 JOIN student s ON s.id=tm.student_id
@@ -450,14 +420,14 @@ public class AdminAllocationService {
                 (rs, rowNum) -> new TeamCandidate(
                         rs.getLong("team_id"),
                         rs.getString("gender"),
-                        rs.getInt("member_count")
-                ));
+                        rs.getInt("member_count")));
     }
 
     private List<StudentCandidate> teamMembers(long teamId) {
         return jdbc.query("""
                 SELECT s.id AS student_id,
                        s.student_number,
+                       s.student_name,
                        s.gender
                 FROM selection_team_member tm
                 JOIN student s ON s.id=tm.student_id
@@ -465,17 +435,14 @@ public class AdminAllocationService {
                   AND tm.member_status='LOCKED'
                 ORDER BY tm.member_role='LEADER' DESC, tm.id
                 """, Map.of("teamId", teamId),
-                (rs, rowNum) -> new StudentCandidate(
-                        rs.getLong("student_id"),
-                        rs.getString("student_number"),
-                        rs.getString("gender")
-                ));
+                (rs, rowNum) -> studentCandidate(rs));
     }
 
-    private List<StudentCandidate> individualStudents(long batchId, long randomSeed) {
+    private List<StudentCandidate> allRemainingStudents(long batchId, long randomSeed) {
         return jdbc.query("""
                 SELECT s.id AS student_id,
                        s.student_number,
+                       s.student_name,
                        s.gender
                 FROM batch_student_eligibility e
                 JOIN student s ON s.id=e.student_id
@@ -484,46 +451,39 @@ public class AdminAllocationService {
                 WHERE e.batch_id=:batchId
                   AND e.eligibility_status='ELIGIBLE'
                   AND a.id IS NULL
-                  AND NOT EXISTS (
-                    SELECT 1 FROM selection_team_member tm
-                    WHERE tm.batch_id=:batchId
-                      AND tm.student_id=s.id
-                      AND tm.active_marker=1
-                  )
                 ORDER BY s.gender,
                          MOD(s.id + :randomSeed, 100000),
                          s.id
                 """, new MapSqlParameterSource()
                 .addValue("batchId", batchId)
                 .addValue("randomSeed", randomSeed),
-                (rs, rowNum) -> new StudentCandidate(
-                        rs.getLong("student_id"),
-                        rs.getString("student_number"),
-                        rs.getString("gender")
-                ));
+                (rs, rowNum) -> studentCandidate(rs));
     }
 
-    private List<StudentCandidate> activeUnreadyTeamMembers(long batchId) {
-        return jdbc.query("""
-                SELECT DISTINCT s.id AS student_id,
+    private StudentCandidate studentCandidate(java.sql.ResultSet rs)
+            throws java.sql.SQLException {
+        return new StudentCandidate(
+                rs.getLong("student_id"),
+                rs.getString("student_number"),
+                rs.getString("student_name"),
+                rs.getString("gender"));
+    }
+
+    private List<Map<String, Object>> failureList(long runId) {
+        return jdbc.queryForList("""
+                SELECT r.student_id,
                        s.student_number,
-                       s.gender
-                FROM selection_team_member tm
-                JOIN selection_team t ON t.id=tm.team_id
-                JOIN student s ON s.id=tm.student_id
-                LEFT JOIN bed_assignment a
-                  ON a.batch_id=tm.batch_id AND a.student_id=s.id
-                WHERE tm.batch_id=:batchId
-                  AND tm.active_marker=1
-                  AND t.team_status<>'LOCKED'
-                  AND a.id IS NULL
+                       s.student_name,
+                       r.failure_code,
+                       JSON_UNQUOTE(JSON_EXTRACT(
+                           r.explanation_json,
+                           '$.failureReason')) AS failure_reason
+                FROM allocation_run_result r
+                JOIN student s ON s.id=r.student_id
+                WHERE r.allocation_run_id=:runId
+                  AND r.result_status='UNASSIGNED'
                 ORDER BY s.student_number
-                """, Map.of("batchId", batchId),
-                (rs, rowNum) -> new StudentCandidate(
-                        rs.getLong("student_id"),
-                        rs.getString("student_number"),
-                        rs.getString("gender")
-                ));
+                """, Map.of("runId", runId));
     }
 
     private void ensureBatchExists(long batchId) {
@@ -531,14 +491,14 @@ public class AdminAllocationService {
                 "SELECT id FROM selection_batch WHERE id=:id",
                 Map.of("id", batchId),
                 "BATCH_NOT_FOUND",
-                "选寝批次不存在"
-        );
+                "选寝批次不存在");
     }
 
-    private Map<String, Object> one(String sql,
-                                    Map<String, ?> parameters,
-                                    String code,
-                                    String message) {
+    private Map<String, Object> one(
+            String sql,
+            Map<String, ?> parameters,
+            String code,
+            String message) {
         List<Map<String, Object>> rows = jdbc.queryForList(sql, parameters);
         if (rows.isEmpty()) {
             throw new BusinessException(code, message, HttpStatus.NOT_FOUND);
@@ -553,54 +513,72 @@ public class AdminAllocationService {
             throw new BusinessException(
                     "JSON_ERROR",
                     "分配快照序列化失败",
-                    HttpStatus.INTERNAL_SERVER_ERROR
-            );
+                    HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 
-    private record StudentCandidate(long studentId,
-                                    String studentNumber,
-                                    String gender) {
+    private record StudentCandidate(
+            long studentId,
+            String studentNumber,
+            String studentName,
+            String gender) {
     }
 
-    private record TeamCandidate(long teamId,
-                                 String gender,
-                                 int memberCount) {
+    private record TeamCandidate(long teamId, String gender, int memberCount) {
     }
 
-    private record BedCandidate(long bedId,
-                                long roomId,
-                                String gender,
-                                String buildingName,
-                                String roomNumber,
-                                String bedCode) {
+    private record BedCandidate(
+            long bedId,
+            long roomId,
+            String gender,
+            String buildingName,
+            String roomNumber,
+            String bedCode) {
         String displayName() {
             return buildingName + " " + roomNumber + "-" + bedCode;
         }
 
         Map<String, Object> toMap() {
-            Map<String, Object> map = new LinkedHashMap<>();
-            map.put("bedId", bedId);
-            map.put("roomId", roomId);
-            map.put("gender", gender);
-            map.put("buildingName", buildingName);
-            map.put("roomNumber", roomNumber);
-            map.put("bedCode", bedCode);
-            return map;
+            return Map.of(
+                    "bedId", bedId,
+                    "roomId", roomId,
+                    "gender", gender,
+                    "buildingName", buildingName,
+                    "roomNumber", roomNumber,
+                    "bedCode", bedCode);
         }
     }
 
-    private record AssignmentItem(long studentId,
-                                  String studentNumber,
-                                  long bedId,
-                                  long roomId,
-                                  String room,
-                                  Long teamId,
-                                  double score) {
+    private record AssignmentItem(
+            long studentId,
+            String studentNumber,
+            String studentName,
+            long bedId,
+            long roomId,
+            String room,
+            Long teamId,
+            double score) {
+        static AssignmentItem of(
+                StudentCandidate student,
+                BedCandidate bed,
+                Long teamId,
+                double score) {
+            return new AssignmentItem(
+                    student.studentId(),
+                    student.studentNumber(),
+                    student.studentName(),
+                    bed.bedId(),
+                    bed.roomId(),
+                    bed.displayName(),
+                    teamId,
+                    score);
+        }
+
         Map<String, Object> toMap() {
             Map<String, Object> map = new LinkedHashMap<>();
             map.put("studentId", studentId);
             map.put("studentNumber", studentNumber);
+            map.put("studentName", studentName);
             map.put("bedId", bedId);
             map.put("roomId", roomId);
             map.put("room", room);
@@ -610,25 +588,40 @@ public class AdminAllocationService {
         }
     }
 
-    private record UnassignedItem(long studentId,
-                                  String studentNumber,
-                                  String failureCode,
-                                  String message) {
+    private record UnassignedItem(
+            long studentId,
+            String studentNumber,
+            String studentName,
+            String failureCode,
+            String failureReason) {
+        static UnassignedItem of(
+                StudentCandidate student,
+                String failureCode,
+                String failureReason) {
+            return new UnassignedItem(
+                    student.studentId(),
+                    student.studentNumber(),
+                    student.studentName(),
+                    failureCode,
+                    failureReason);
+        }
+
         Map<String, Object> toMap() {
             return Map.of(
                     "studentId", studentId,
                     "studentNumber", studentNumber,
+                    "studentName", studentName,
                     "failureCode", failureCode,
-                    "message", message
-            );
+                    "failureReason", failureReason);
         }
     }
 
-    private record AllocationPlan(List<Map<String, Object>> studentSnapshot,
-                                  List<Map<String, Object>> bedSnapshot,
-                                  List<AssignmentItem> assignments,
-                                  List<UnassignedItem> unassigned,
-                                  Map<String, Object> summary) {
+    private record AllocationPlan(
+            List<Map<String, Object>> studentSnapshot,
+            List<Map<String, Object>> bedSnapshot,
+            List<AssignmentItem> assignments,
+            List<UnassignedItem> unassigned,
+            Map<String, Object> summary) {
         Map<String, Object> toMap() {
             return Map.of(
                     "students", studentSnapshot,
@@ -639,8 +632,7 @@ public class AdminAllocationService {
                     "unassigned", unassigned.stream()
                             .map(UnassignedItem::toMap)
                             .toList(),
-                    "summary", summary
-            );
+                    "summary", summary);
         }
     }
 }

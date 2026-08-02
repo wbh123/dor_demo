@@ -163,6 +163,16 @@ class TeamI18nLayoutRefinementTest(unittest.TestCase):
         self.assertIn("subtitle(", shell)
         self.assertNotIn('class="avatar"', shell)
 
+    def test_dom_i18n_observer_cannot_rewrite_itself_or_restore_stale_vue_text(self) -> None:
+        content = I18N.read_text(encoding="utf-8")
+        self.assertIn("function pauseObserver", content)
+        self.assertIn("function resumeObserver", content)
+        self.assertIn("observer?.disconnect()", content)
+        self.assertIn("if (translated === current) return", content)
+        self.assertIn("originalText.set(mutation.target, mutation.target.textContent ?? '')", content)
+        self.assertIn("pauseObserver()", content)
+        self.assertIn("resumeObserver()", content)
+
     def test_foreign_nationality_and_phone_are_visible_and_admin_editable(self) -> None:
         home = STUDENT_HOME.read_text(encoding="utf-8")
         self.assertIn("isForeignStudent", home)
