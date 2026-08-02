@@ -21,6 +21,13 @@ public class MatchingService {
             Map.entry("cleaningFrequency", 1.0),
             Map.entry("tidinessRequirement", 1.0),
             Map.entry("airConditionerTemperature", 0.8),
+            Map.entry("summerAirConditionerTemperature", 0.8),
+            Map.entry("winterHeatingTemperature", 0.6),
+            Map.entry("summerOvernightAirConditioner", 1.1),
+            Map.entry("winterHeatingAcceptance", 0.8),
+            Map.entry("afterLightsActivity", 1.2),
+            Map.entry("alarmSnooze", 0.9),
+            Map.entry("strongFoodOdorAcceptance", 0.7),
             Map.entry("studyFrequency", 0.8),
             Map.entry("gamingVoiceFrequency", 1.1),
             Map.entry("socialActivity", 0.6)
@@ -40,10 +47,6 @@ public class MatchingService {
         this.schemeService = schemeService;
     }
 
-    /**
-     * Resolves the immutable policy referenced by
-     * selection_batch.matching_weight_scheme_id before calculating scores.
-     */
     public MatchResult roomScore(
             long batchId,
             String studentFeatureJson,
@@ -56,10 +59,6 @@ public class MatchingService {
                 policy.conflictRules());
     }
 
-    /**
-     * Compatibility path used by frozen first-stage callers. New recommendation
-     * flows always call the batch-aware overload above.
-     */
     public MatchResult roomScore(String studentFeatureJson, List<String> roommateFeatureJson) {
         return calculate(
                 studentFeatureJson,
@@ -80,7 +79,7 @@ public class MatchingService {
             Map<String, Double> weights,
             Map<String, Double> rules) {
         if (studentFeatureJson == null || studentFeatureJson.isBlank()) {
-            return result(80.0, List.of("完成生活习惯问卷后可获得更准确的推荐"), List.of(), 0);
+            return result(80.0, List.of("完成个人偏好设置后可获得更准确的推荐"), List.of(), 0);
         }
         if (roommateFeatureJson.isEmpty()) {
             return result(100.0, List.of("当前为空房间，可优先选择床位"), List.of(), 0);
@@ -133,6 +132,60 @@ public class MatchingService {
                 "游戏或语音频率存在差异",
                 recommendationReasons,
                 conflictReasons);
+        compareTag(
+                student,
+                roommates,
+                "summerAirConditionerTemperature",
+                2,
+                "夏季空调温度偏好接近",
+                "空调使用偏好存在差异",
+                recommendationReasons,
+                conflictReasons);
+        compareTag(
+                student,
+                roommates,
+                "summerOvernightAirConditioner",
+                1,
+                "夏季夜间空调习惯接近",
+                "空调使用偏好存在差异",
+                recommendationReasons,
+                conflictReasons);
+        compareTag(
+                student,
+                roommates,
+                "winterHeatingAcceptance",
+                1,
+                "冬季制热接受度接近",
+                "空调使用偏好存在差异",
+                recommendationReasons,
+                conflictReasons);
+        compareTag(
+                student,
+                roommates,
+                "afterLightsActivity",
+                1,
+                "熄灯后活动习惯接近",
+                "熄灯后活动习惯存在差异",
+                recommendationReasons,
+                conflictReasons);
+        compareTag(
+                student,
+                roommates,
+                "alarmSnooze",
+                1,
+                "闹钟习惯接近",
+                "闹钟响铃习惯存在差异",
+                recommendationReasons,
+                conflictReasons);
+        compareTag(
+                student,
+                roommates,
+                "strongFoodOdorAcceptance",
+                1,
+                "宿舍饮食气味接受度接近",
+                "宿舍饮食气味接受度存在差异",
+                recommendationReasons,
+                conflictReasons);
         if (hasSmokingConflict(student, roommates)) {
             conflictReasons.add("吸烟接受偏好存在冲突");
         } else if (student.containsKey("smokingAcceptance")) {
@@ -178,7 +231,7 @@ public class MatchingService {
             if (a == null || b == null) {
                 continue;
             }
-            double range = key.contains("Minutes") ? 720.0 : 5.0;
+            double range = dimensionRange(key);
             double difference = key.contains("Minutes")
                     ? circularMinuteDifference(a, b)
                     : Math.abs(a - b);
@@ -194,6 +247,16 @@ public class MatchingService {
             score -= rule(rules, "smokingConflictPenalty", 25);
         }
         return new PairResult(Math.max(0, Math.min(100, score)), dimensionCount);
+    }
+
+    private double dimensionRange(String key) {
+        if (key.contains("Minutes")) {
+            return 720.0;
+        }
+        if (key.contains("Temperature")) {
+            return 10.0;
+        }
+        return 5.0;
     }
 
     private boolean hasSmokingConflict(

@@ -32,6 +32,13 @@ public class MatchingSchemeService {
             "cleaningFrequency",
             "tidinessRequirement",
             "airConditionerTemperature",
+            "summerAirConditionerTemperature",
+            "winterHeatingTemperature",
+            "summerOvernightAirConditioner",
+            "winterHeatingAcceptance",
+            "afterLightsActivity",
+            "alarmSnooze",
+            "strongFoodOdorAcceptance",
             "studyFrequency",
             "gamingVoiceFrequency",
             "socialActivity"

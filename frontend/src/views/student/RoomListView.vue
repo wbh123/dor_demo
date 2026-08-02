@@ -15,16 +15,27 @@ const loading = ref(true)
 const error = ref('')
 const randomResult = ref<DataObject | null>(null)
 const keyword = ref('')
+const floorFilter = ref('')
+const minimumAvailableBeds = ref(0)
+
+const floorOptions = computed(() =>
+  [...new Set(rooms.value.map((room) => Number(room.floor_number)))]
+    .filter((floor) => Number.isFinite(floor))
+    .sort((left, right) => left - right),
+)
 
 const filteredRooms = computed(() => {
   const term = keyword.value.trim().toLowerCase()
-  const enoughBeds = rooms.value.filter((room) =>
-    !isTeamMode.value || Number(room.availableCount) >= memberCount,
-  )
-  if (!term) return enoughBeds
-  return enoughBeds.filter((room) =>
-    `${room.building_name} ${room.room_number}`.toLowerCase().includes(term),
-  )
+  return rooms.value.filter((room) => {
+    if (isTeamMode.value && Number(room.availableCount) < memberCount) return false
+    if (floorFilter.value
+      && Number(room.floor_number) !== Number(floorFilter.value)) return false
+    if (Number(room.availableCount) < minimumAvailableBeds.value) return false
+    if (term && !`${room.building_name} ${room.room_number}`.toLowerCase().includes(term)) {
+      return false
+    }
+    return true
+  })
 })
 
 onMounted(load)
@@ -94,7 +105,7 @@ function conflictReasons(room: DataObject) {
         <span class="eyebrow">ROOM MATCHING</span>
         <h2>{{ isTeamMode ? `为${memberCount}人队伍选择房间` : '选择宿舍房间' }}</h2>
         <p v-if="isTeamMode">只展示能够容纳全部成员的房间，队伍需要在同一房间完成选择。</p>
-        <p v-else>房间按生活习惯接近程度排序。已有室友时，会显示匿名推荐理由和注意事项。</p>
+        <p v-else>房间按个人偏好接近程度排序，可结合楼层和剩余铺位快速筛选。</p>
       </div>
       <button v-if="!isTeamMode" class="button accent" @click="randomRecommend">帮我推荐一个</button>
     </div>
@@ -108,10 +119,30 @@ function conflictReasons(room: DataObject) {
       <button class="button primary" @click="openRoom((randomResult.room as DataObject)?.id)">查看推荐房间</button>
     </section>
 
-    <section class="panel filter-bar">
-      <label class="search-field">
+    <section class="panel filter-bar room-filter-bar">
+      <label class="search-field room-filter-search">
         <span>搜索房间</span>
         <input v-model="keyword" class="input" placeholder="输入楼栋或房间号" />
+      </label>
+      <label class="room-filter-field">
+        <span>筛选楼层</span>
+        <select v-model="floorFilter" class="input">
+          <option value="">全部楼层</option>
+          <option v-for="floor in floorOptions" :key="floor" :value="String(floor)">
+            {{ floor }} 层
+          </option>
+        </select>
+      </label>
+      <label class="room-filter-field">
+        <span>最少剩余铺位</span>
+        <select v-model.number="minimumAvailableBeds" class="input">
+          <option :value="0">不限</option>
+          <option :value="1">至少 1 个</option>
+          <option :value="2">至少 2 个</option>
+          <option :value="3">至少 3 个</option>
+          <option :value="4">至少 4 个</option>
+          <option :value="5">至少 5 个</option>
+        </select>
       </label>
       <div class="filter-summary">
         <strong>{{ filteredRooms.length }}</strong>
@@ -121,7 +152,7 @@ function conflictReasons(room: DataObject) {
 
     <p v-if="loading" class="panel empty-state">正在计算候选宿舍…</p>
     <p v-else-if="error" class="alert error">{{ error }}</p>
-    <p v-else-if="filteredRooms.length === 0" class="panel empty-state">当前没有符合条件的房间。</p>
+    <p v-else-if="filteredRooms.length === 0" class="panel empty-state">当前没有符合筛选条件的房间。</p>
 
     <div v-else class="room-grid compact-room-grid">
       <article v-for="room in filteredRooms" :key="String(room.id)" class="panel room-card">

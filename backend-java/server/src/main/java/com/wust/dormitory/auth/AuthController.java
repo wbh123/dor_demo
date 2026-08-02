@@ -24,10 +24,15 @@ import java.util.Date;
 public class AuthController implements AuthApi {
     private final AuthService authService;
     private final AuthTokenService tokenService;
+    private final StudentWelcomeService welcomeService;
 
-    public AuthController(AuthService authService, AuthTokenService tokenService) {
+    public AuthController(
+            AuthService authService,
+            AuthTokenService tokenService,
+            StudentWelcomeService welcomeService) {
         this.authService = authService;
         this.tokenService = tokenService;
+        this.welcomeService = welcomeService;
     }
 
     @Override
@@ -81,6 +86,7 @@ public class AuthController implements AuthApi {
         data.setUsername(user.username());
         data.setDisplayName(user.displayName());
         data.setUserType(user.userType());
+        data.setWelcome(welcomeService.welcomeFor(user));
         return data;
     }
 

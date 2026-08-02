@@ -65,15 +65,36 @@ class UxRefinementTest(unittest.TestCase):
             self.assertNotIn(forbidden, home)
         self.assertIn("answerSummary", home)
         self.assertIn("我的住宿结果", home)
-        self.assertIn("修改问卷", home)
+        self.assertIn("修改个人偏好", home)
+        self.assertNotIn("slice(0, 8)", home)
 
-    def test_questionnaire_uses_three_radio_choices(self) -> None:
+    def test_personal_preferences_are_complete_and_share_one_profile_card(self) -> None:
+        home = (FRONTEND / "views/student/StudentHomeView.vue").read_text(encoding="utf-8")
+        styles = (FRONTEND / "student-experience.css").read_text(encoding="utf-8")
+        for expected in (
+            "preferenceProfileSummary",
+            "preferenceProfileTags",
+            "personal-preference-card",
+            "personal-preference-list",
+            "student-primary-actions",
+            "选择宿舍和床位",
+            "组队选寝",
+        ):
+            self.assertIn(expected, home + styles)
+        self.assertNotIn("preference-summary-item", home)
+        self.assertIn("min-height: 56px", styles)
+
+    def test_questionnaire_page_uses_personal_preference_wording(self) -> None:
         content = (FRONTEND / "views/student/QuestionnaireView.vue").read_text(encoding="utf-8")
         for value in ("ACCEPT", "REJECT", "ANY"):
             self.assertIn(value, content)
         self.assertIn("question.options", content)
         self.assertIn('type="radio"', content)
         self.assertNotIn("feature_key }}</p>", content)
+        self.assertIn("个人偏好", content)
+        self.assertNotIn("生活习惯问卷", content)
+        self.assertIn("isQuestionVisible", content)
+        self.assertIn("isRequired", content)
 
     def test_room_cards_show_anonymous_roommate_preferences(self) -> None:
         content = (FRONTEND / "views/student/RoomListView.vue").read_text(encoding="utf-8")
@@ -83,6 +104,19 @@ class UxRefinementTest(unittest.TestCase):
         self.assertIn("assigned_count", content)
         self.assertNotIn("student_name", content)
         self.assertNotIn("student_number", content)
+
+    def test_room_list_filters_floor_and_minimum_available_beds(self) -> None:
+        content = (FRONTEND / "views/student/RoomListView.vue").read_text(encoding="utf-8")
+        for expected in (
+            "floorFilter",
+            "minimumAvailableBeds",
+            "floorOptions",
+            "Number(room.floor_number) !== Number(floorFilter.value)",
+            "Number(room.availableCount) < minimumAvailableBeds.value",
+            "筛选楼层",
+            "最少剩余铺位",
+        ):
+            self.assertIn(expected, content)
 
     def test_threejs_dependency_and_scene_component_exist(self) -> None:
         package_json = json.loads((REPO_ROOT / "frontend/package.json").read_text(encoding="utf-8"))
@@ -131,8 +165,9 @@ class UxRefinementTest(unittest.TestCase):
         self.assertIn("position: sticky", content)
         self.assertIn("prefers-reduced-motion", content)
 
-    def test_scene_uses_open_oblique_camera_and_longitudinal_two_by_two_layout(self) -> None:
+    def test_scene_uses_open_oblique_camera_and_hides_orientation_prompts(self) -> None:
         scene = (FRONTEND / "components/student/RoomBedScene3D.vue").read_text(encoding="utf-8")
+        styles = (FRONTEND / "student-experience.css").read_text(encoding="utf-8")
         for expected in (
             "const ROOM_WIDTH = 11.5",
             "const ROOM_DEPTH = 8",
@@ -148,9 +183,6 @@ class UxRefinementTest(unittest.TestCase):
             "doorFrame.position.set(LEFT_SHORT_WALL_X",
             "mobile ? -11.6 : -9.4",
             "camera.lookAt(0, 1.0, 0)",
-            "开放视角",
-            "门窗位于房间短边",
-            "纵向2×2布局",
         ):
             self.assertIn(expected, scene)
         for forbidden in (
@@ -160,8 +192,25 @@ class UxRefinementTest(unittest.TestCase):
             "frontLongWall",
         ):
             self.assertNotIn(forbidden, scene)
+        self.assertIn(".three-scene-orientation", styles)
+        self.assertIn("display: none !important", styles)
         self.assertNotIn("const BED_LONGITUDINAL_ROTATION = Math.PI / 2", scene)
-        self.assertNotIn("整体为2×2布局", scene)
+
+    def test_room_detail_keeps_only_four_bed_status_bubbles(self) -> None:
+        detail = (FRONTEND / "views/student/RoomDetailView.vue").read_text(encoding="utf-8")
+        for expected in ("可选择", "已选中", "暂时保留", "已有同学选择"):
+            self.assertIn(expected, detail)
+        for forbidden in (
+            "窗户正对入口",
+            "床位变化会自动更新",
+            "C床与上下铺位于同一前排",
+            "下拉框与三维图形同步",
+            "可点击三维床位，或使用左侧下拉框",
+            "room.remark",
+        ):
+            self.assertNotIn(forbidden, detail)
+        legend = detail.split('class="scene-legend compact-scene-legend"', 1)[1].split("</div>", 1)[0]
+        self.assertEqual(legend.count("<span"), 4)
 
     def test_scene_canvas_zoom_makes_beds_fill_more_of_the_viewport(self) -> None:
         styles = (FRONTEND / "room-scene-geometry-fix.css").read_text(encoding="utf-8")
@@ -169,6 +218,33 @@ class UxRefinementTest(unittest.TestCase):
         self.assertIn("transform: scale(1.22)", styles)
         self.assertIn("transform-origin: 50% 48%", styles)
         self.assertIn("transform: scale(1.12)", styles)
+
+    def test_student_welcome_modal_is_persistent_and_animated(self) -> None:
+        shell = (FRONTEND / "layouts/AppShell.vue").read_text(encoding="utf-8")
+        store = (FRONTEND / "stores/auth.ts").read_text(encoding="utf-8")
+        styles = (FRONTEND / "student-experience.css").read_text(encoding="utf-8")
+        for expected in (
+            "新同学，欢迎你",
+            "welcome-overlay",
+            "welcome-dialog",
+            "acknowledgeWelcome",
+            "/api/v1/auth/welcome/acknowledge",
+            "prefers-reduced-motion",
+        ):
+            self.assertIn(expected, shell + store + styles)
+        self.assertIn('v-if="auth.isAdmin" class="topbar"', shell)
+        self.assertNotIn("学生选寝中心", shell)
+
+    def test_admin_dashboard_can_edit_student_welcome_message(self) -> None:
+        dashboard = (FRONTEND / "views/admin/AdminDashboardView.vue").read_text(encoding="utf-8")
+        for expected in (
+            "/api/v1/admin/settings/student-welcome",
+            "welcomeMessage",
+            "welcomeVersion",
+            "新生欢迎语",
+            "保存欢迎语",
+        ):
+            self.assertIn(expected, dashboard)
 
     def test_release_message_is_three_second_toast_and_layout_is_compact(self) -> None:
         detail = (FRONTEND / "views/student/RoomDetailView.vue").read_text(encoding="utf-8")

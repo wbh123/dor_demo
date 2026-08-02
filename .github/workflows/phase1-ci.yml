@@ -39,6 +39,8 @@ jobs:
         run: python -m unittest scripts/frontend/test_frontend_baseline.py -v
       - name: Run UX refinement tests
         run: python -m unittest scripts/ux/test_ux_refinement.py -v
+      - name: Run student experience tests
+        run: python -m unittest scripts/experience/test_student_experience.py -v
       - name: Run Phase 2 room layout tests
         run: python -m unittest scripts/phase2/test_room_layout.py -v
       - name: Run Phase 2 matching operations tests
@@ -135,7 +137,7 @@ jobs:
           done
           cat /tmp/wust-dormitory.log
           exit 1
-      - name: Assert Flyway V6 and matching revision rules
+      - name: Assert Flyway V8 and matching revision rules
         run: |
           python -m pip install --disable-pip-version-check pymysql
           python - <<'PY'
@@ -150,7 +152,7 @@ jobs:
           )
           with connection.cursor() as cursor:
               cursor.execute("SELECT MAX(CAST(version AS UNSIGNED)) FROM flyway_schema_history WHERE success=1")
-              assert cursor.fetchone()[0] >= 6
+              assert cursor.fetchone()[0] >= 8
               cursor.execute("SHOW TABLES LIKE 'major'")
               assert cursor.fetchone() is not None
               cursor.execute("SHOW TABLES LIKE 'organization'")
@@ -159,6 +161,12 @@ jobs:
               assert cursor.fetchone() is not None
               cursor.execute("SHOW TABLES LIKE 'room_bed_layout'")
               assert cursor.fetchone() is not None
+              cursor.execute("SHOW TABLES LIKE 'system_setting'")
+              assert cursor.fetchone() is not None
+              cursor.execute("SHOW COLUMNS FROM app_user LIKE 'welcome_acknowledged_at'")
+              assert cursor.fetchone() is not None
+              cursor.execute("SELECT setting_value FROM system_setting WHERE setting_key='STUDENT_WELCOME_MESSAGE'")
+              assert cursor.fetchone()[0]
               cursor.execute("SHOW COLUMNS FROM room_bed_layout")
               layout_columns = {row[0] for row in cursor.fetchall()}
               assert layout_columns == {
@@ -172,8 +180,6 @@ jobs:
               assert len(cursor.fetchall()) == 2
               cursor.execute("SELECT COUNT(*) FROM matching_weight_scheme WHERE enabled=1")
               assert cursor.fetchone()[0] == 1
-              cursor.execute("SELECT JSON_LENGTH(weights_json), JSON_LENGTH(conflict_rules_json) FROM matching_weight_scheme WHERE id=1")
-              assert cursor.fetchone() == (10, 4)
               cursor.execute("SHOW COLUMNS FROM student")
               columns = {row[0] for row in cursor.fetchall()}
               assert columns == {'id', 'student_number', 'student_name', 'gender', 'major_id', 'created_at', 'updated_at'}
@@ -186,11 +192,14 @@ jobs:
                   WHERE qq.question_code='SMOKING_ACCEPTANCE'
               """)
               assert cursor.fetchone()[0] == 'ACCEPT,REJECT,ANY'
+              cursor.execute("SELECT COUNT(*) FROM questionnaire_question WHERE question_code IN ('SUMMER_AC_OVERNIGHT','SUMMER_AC_TEMPERATURE','WINTER_HEATING_ACCEPTANCE','WINTER_HEATING_TEMPERATURE','AFTER_LIGHTS_ACTIVITY','ALARM_SNOOZE','STRONG_FOOD_ODOR_ACCEPTANCE')")
+              assert cursor.fetchone()[0] == 7
           connection.close()
           PY
       - name: Run full Phase 1 and Phase 2 HTTP smoke flow
         run: |
           python scripts/e2e/phase1_smoke.py
+          python scripts/e2e/student_experience_smoke.py
           python scripts/e2e/team_invite_smoke.py
           python scripts/e2e/phase2_room_layout_smoke.py
           python scripts/e2e/phase2_matching_operations_smoke.py

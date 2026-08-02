@@ -27,20 +27,64 @@ const answerSummary = computed(() => {
     .map((answer) => {
       const question = questionById.get(Number(answer.question_id))
       if (!question) return null
-      let value: unknown = answer.answer_json
-      try {
-        value = typeof value === 'string' ? JSON.parse(value) : value
-      } catch {
-        // 保留原始值用于展示。
-      }
+      const value = parseAnswer(answer.answer_json)
       return {
         code: String(question.question_code),
         label: summaryLabel(question),
         value: displayAnswer(question, value),
+        rawValue: value,
       }
     })
-    .filter((item): item is { code: string; label: string; value: string } => Boolean(item))
-    .slice(0, 8)
+    .filter((item): item is {
+      code: string
+      label: string
+      value: string
+      rawValue: unknown
+    } => Boolean(item))
+})
+
+const rawAnswerByCode = computed(() =>
+  new Map(answerSummary.value.map((item) => [item.code, item.rawValue])),
+)
+
+const preferenceProfileSummary = computed(() => {
+  if (!answerSummary.value.length) return '完成个人偏好后，这里会形成你的宿舍生活画像。'
+  const descriptions: string[] = []
+  const sleepMinutes = timeMinutes(rawAnswerByCode.value.get('SLEEP_TIME'))
+  if (sleepMinutes !== null) {
+    if (sleepMinutes >= 0 && sleepMinutes < 60) descriptions.push('作息偏晚')
+    else if (sleepMinutes >= 1380) descriptions.push('作息偏晚')
+    else if (sleepMinutes <= 1350) descriptions.push('作息偏早')
+    else descriptions.push('作息时间适中')
+  }
+  if (numericAnswer('SLEEP_SENSITIVITY') >= 4) descriptions.push('睡眠较敏感')
+  if (numericAnswer('TIDINESS_REQUIREMENT') >= 4) descriptions.push('重视宿舍整洁')
+  if (numericAnswer('AFTER_LIGHTS_ACTIVITY') <= 1) descriptions.push('熄灯后偏好安静')
+  if (numericAnswer('GAMING_VOICE') <= 2) descriptions.push('娱乐语音较少')
+  if (numericAnswer('SUMMER_AC_OVERNIGHT') >= 3) descriptions.push('接受夏季整夜空调')
+  if (numericAnswer('SUMMER_AC_OVERNIGHT') === 1) descriptions.push('不偏好夏季整夜空调')
+  const selected = descriptions.slice(0, 5)
+  return selected.length
+    ? `你${selected.join('，')}，系统会优先推荐相处节奏更接近的室友。`
+    : '你的偏好较为均衡，系统会综合多个维度推荐合适的室友。'
+})
+
+const preferenceProfileTags = computed(() => {
+  const tags: string[] = []
+  const push = (condition: boolean, label: string) => {
+    if (condition && !tags.includes(label)) tags.push(label)
+  }
+  push(numericAnswer('SLEEP_SENSITIVITY') >= 4, '睡眠敏感')
+  push(numericAnswer('NOISE_TOLERANCE') <= 2, '偏好安静')
+  push(numericAnswer('CLEANING_FREQUENCY') >= 4, '勤于清洁')
+  push(numericAnswer('TIDINESS_REQUIREMENT') >= 4, '重视整洁')
+  push(numericAnswer('STUDY_FREQUENCY') >= 4, '常在宿舍学习')
+  push(numericAnswer('GAMING_VOICE') <= 2, '少语音娱乐')
+  push(numericAnswer('AFTER_LIGHTS_ACTIVITY') <= 1, '熄灯后安静')
+  push(numericAnswer('ALARM_SNOOZE') <= 1, '单次闹钟')
+  push(numericAnswer('STRONG_FOOD_ODOR_ACCEPTANCE') <= 1, '不接受重气味食物')
+  push(String(rawAnswerByCode.value.get('SMOKING_ACCEPTANCE')) === 'REJECT', '不接受吸烟')
+  return tags.slice(0, 6)
 })
 
 onMounted(load)
@@ -93,6 +137,25 @@ function activityId(activity: DataObject) {
   return Number(activity.id)
 }
 
+function parseAnswer(value: unknown) {
+  try {
+    return typeof value === 'string' ? JSON.parse(value) : value
+  } catch {
+    return value
+  }
+}
+
+function numericAnswer(code: string) {
+  const value = Number(rawAnswerByCode.value.get(code))
+  return Number.isFinite(value) ? value : 0
+}
+
+function timeMinutes(value: unknown) {
+  const match = /^(\d{2}):(\d{2})$/.exec(String(value ?? ''))
+  if (!match) return null
+  return Number(match[1]) * 60 + Number(match[2])
+}
+
 function summaryLabel(question: DataObject) {
   const labels: Record<string, string> = {
     SLEEP_TIME: '入睡时间',
@@ -102,7 +165,14 @@ function summaryLabel(question: DataObject) {
     NOISE_TOLERANCE: '噪声接受度',
     CLEANING_FREQUENCY: '清洁频率',
     TIDINESS_REQUIREMENT: '整洁要求',
-    AC_TEMPERATURE: '空调温度',
+    SUMMER_AC_OVERNIGHT: '夏季整夜空调',
+    SUMMER_AC_TEMPERATURE: '夏季制冷温度',
+    AC_TEMPERATURE: '夏季制冷温度',
+    WINTER_HEATING_ACCEPTANCE: '冬季空调制热',
+    WINTER_HEATING_TEMPERATURE: '冬季制热温度',
+    AFTER_LIGHTS_ACTIVITY: '熄灯后活动',
+    ALARM_SNOOZE: '闹钟习惯',
+    STRONG_FOOD_ODOR_ACCEPTANCE: '重气味食物',
     VENTILATION: '通风偏好',
     STUDY_FREQUENCY: '宿舍学习',
     GAMING_VOICE: '游戏语音',
@@ -114,6 +184,15 @@ function summaryLabel(question: DataObject) {
 }
 
 function displayAnswer(question: DataObject, value: unknown) {
+  const configured = (question.options ?? []) as DataObject[]
+  const option = configured.find((item) =>
+    String(item.option_code) === String(value)
+    || (item.feature_value !== null
+      && item.feature_value !== undefined
+      && Number(item.feature_value) === Number(value)),
+  )
+  if (option) return String(option.option_text)
+
   const code = String(question.question_code)
   if (code === 'SMOKING_ACCEPTANCE') {
     return { ACCEPT: '接受', REJECT: '不接受', ANY: '均可' }[String(value)] ?? '未填写'
@@ -130,7 +209,7 @@ function displayAnswer(question: DataObject, value: unknown) {
     return ['基本不午休', '偶尔午休', '经常午休'][Number(value)] ?? String(value)
   }
   if (question.question_type === 'TIME') return String(value)
-  if (code === 'AC_TEMPERATURE') return `${value}℃`
+  if (code.includes('TEMPERATURE')) return `${value}℃`
   if (typeof value === 'number') return ['非常低', '较低', '适中', '较高', '非常高'][value - 1] ?? String(value)
   return String(value ?? '未填写')
 }
@@ -169,55 +248,66 @@ function bedTypeText(value: unknown) {
         <RouterLink v-if="currentActivityId" class="button secondary" :to="`/student/batches/${currentActivityId}/assignment`">查看完整结果</RouterLink>
       </template>
       <template v-else>
-        <p>尚未确定宿舍和床位。完成问卷后，可在开放选寝期间选择合适的房间。</p>
-        <RouterLink
-          v-if="canSelectRoom && currentActivityId"
-          class="button primary"
-          :to="`/student/batches/${currentActivityId}/rooms`"
-        >进入选寝</RouterLink>
+        <p>尚未确定宿舍和床位。完善个人偏好后，可在开放选寝期间选择合适的房间。</p>
       </template>
     </section>
 
     <p v-if="loading" class="panel empty-state home-span-2">正在读取个人选寝信息…</p>
     <p v-else-if="error" class="alert error home-span-2">{{ error }}</p>
 
-    <section v-else class="panel home-span-2">
+    <section v-else class="panel home-span-2 personal-preference-card">
       <div class="section-head split-title">
         <div>
-          <span class="eyebrow">LIFESTYLE PREFERENCES</span>
-          <h2>我的生活习惯偏好</h2>
-          <p>你可以随时查看已填写内容，并在允许修改时重新保存。</p>
+          <span class="eyebrow">PERSONAL PREFERENCES</span>
+          <h2>我的个人偏好</h2>
+          <p>完整展示你的已保存偏好，并形成便于理解的宿舍生活画像。</p>
         </div>
         <RouterLink
           v-if="currentActivityId && canEditQuestionnaire"
           class="button secondary"
           :to="`/student/batches/${currentActivityId}/questionnaire`"
-        >{{ questionnaireStarted ? '修改问卷' : '填写问卷' }}</RouterLink>
+        >{{ questionnaireStarted ? '修改个人偏好' : '填写个人偏好' }}</RouterLink>
       </div>
 
       <p v-if="!currentActivity" class="empty-state">当前没有需要参与的选寝活动。</p>
-      <p v-else-if="answerSummary.length === 0" class="empty-state">尚未填写生活习惯问卷。</p>
-      <div v-else class="preference-summary-grid">
-        <article v-for="item in answerSummary" :key="item.code" class="preference-summary-item">
-          <span>{{ item.label }}</span>
-          <strong>{{ item.value }}</strong>
-        </article>
-      </div>
+      <p v-else-if="answerSummary.length === 0" class="empty-state">尚未填写个人偏好。</p>
+      <template v-else>
+        <div class="preference-profile-overview">
+          <div>
+            <span class="profile-caption">用户画像概述</span>
+            <h3>{{ preferenceProfileSummary }}</h3>
+          </div>
+          <div v-if="preferenceProfileTags.length" class="profile-tag-row">
+            <span v-for="tag in preferenceProfileTags" :key="tag" class="profile-tag">{{ tag }}</span>
+          </div>
+        </div>
 
-      <div v-if="currentActivity && !assigned" class="button-row">
+        <dl class="personal-preference-list">
+          <div v-for="item in answerSummary" :key="item.code" class="personal-preference-row">
+            <dt>{{ item.label }}</dt>
+            <dd>{{ item.value }}</dd>
+          </div>
+        </dl>
+      </template>
+
+      <div v-if="currentActivity && !assigned" class="student-primary-actions">
         <RouterLink
           v-if="canSelectRoom"
-          class="button primary"
+          class="button primary student-action-button"
           :to="`/student/batches/${currentActivityId}/rooms`"
         >选择宿舍和床位</RouterLink>
-        <RouterLink v-if="canSelectRoom && currentActivity.allow_team" class="button ghost" to="/student/teams">组队选寝</RouterLink>
+        <RouterLink
+          v-if="canSelectRoom && currentActivity.allow_team"
+          class="button accent student-action-button"
+          to="/student/teams"
+        >组队选寝</RouterLink>
       </div>
     </section>
 
-    <section class="panel info-card home-span-2">
+    <section class="panel info-card home-span-2 compact-rule-card">
       <span class="eyebrow">规则说明</span>
       <h3>请在规定时间内完成选择</h3>
-      <p>床位在确认前只会短暂保留。确认成功后，首页会立即显示你的宿舍和床位；如需调整，请联系管理人员。</p>
+      <p>床位在确认前只会短暂保留，最终确认后会立即显示住宿结果。</p>
     </section>
   </div>
 </template>

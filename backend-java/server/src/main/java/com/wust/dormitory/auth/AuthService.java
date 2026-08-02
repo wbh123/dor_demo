@@ -68,7 +68,10 @@ public class AuthService {
             throw new BusinessException("ACCOUNT_ALREADY_ACTIVE", "该学生账号已经激活");
         }
         jdbc.update("""
-                UPDATE app_user SET password_hash=:passwordHash, account_status='ACTIVE'
+                UPDATE app_user
+                SET password_hash=:passwordHash,
+                    account_status='ACTIVE',
+                    welcome_acknowledged_at=NULL
                 WHERE id=:userId
                 """, new MapSqlParameterSource()
                 .addValue("passwordHash", passwordEncoder.encode(password))

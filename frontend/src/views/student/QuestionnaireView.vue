@@ -15,11 +15,18 @@ const saving = ref(false)
 const error = ref('')
 const message = ref('')
 
+const visibleQuestions = computed(() => questions.value.filter(isQuestionVisible))
 const completed = computed(() =>
-  questions.value.filter((question) => question.required_flag).every((question) => {
+  visibleQuestions.value.filter(isRequired).every((question) => {
     const value = answers[String(question.question_code)]
     return value !== undefined && value !== null && value !== ''
   }),
+)
+const answeredCount = computed(() =>
+  visibleQuestions.value.filter((question) => {
+    const value = answers[String(question.question_code)]
+    return value !== undefined && value !== null && value !== ''
+  }).length,
 )
 const canSave = computed(() => ['PUBLISHED', 'OPEN'].includes(String(batch.value.batch_status)))
 
@@ -50,7 +57,7 @@ async function load() {
       }
     }
   } catch (reason) {
-    error.value = reason instanceof Error ? reason.message : '问卷加载失败'
+    error.value = reason instanceof Error ? reason.message : '个人偏好加载失败'
   } finally {
     loading.value = false
   }
@@ -58,19 +65,25 @@ async function load() {
 
 async function submit() {
   if (!canSave.value) {
-    error.value = '当前活动暂不允许修改问卷。'
+    error.value = '当前活动暂不允许修改个人偏好。'
     return
   }
   if (!completed.value) {
-    error.value = '请完成所有必填问题。'
+    error.value = '请完成所有必填的个人偏好。'
     return
   }
   saving.value = true
   error.value = ''
   message.value = ''
   try {
-    await api.post(`/api/v1/student/batches/${batchId}/questionnaire`, { ...answers })
-    message.value = '问卷已保存，生活习惯匹配结果已更新。'
+    const payload: Record<string, unknown> = {}
+    for (const question of visibleQuestions.value) {
+      const code = String(question.question_code)
+      const value = answers[code]
+      if (value !== undefined && value !== null && value !== '') payload[code] = value
+    }
+    await api.post(`/api/v1/student/batches/${batchId}/questionnaire`, payload)
+    message.value = '个人偏好已保存，室友匹配结果已更新。'
     window.setTimeout(() => {
       void router.push(String(batch.value.batch_status) === 'OPEN'
         ? `/student/batches/${batchId}/rooms`
@@ -83,11 +96,29 @@ async function submit() {
   }
 }
 
+function isQuestionVisible(question: DataObject) {
+  const code = String(question.question_code)
+  if (code === 'WINTER_HEATING_TEMPERATURE') {
+    const acceptance = Number(answers.WINTER_HEATING_ACCEPTANCE)
+    return Number.isFinite(acceptance) && acceptance > 1
+  }
+  return true
+}
+
+function isRequired(question: DataObject) {
+  return Boolean(question.required_flag)
+    || String(question.question_code) === 'WINTER_HEATING_TEMPERATURE'
+}
+
 function choices(question: DataObject) {
   const configured = (question.options ?? []) as DataObject[]
   if (configured.length > 0) {
+    const keepCode = ['SMOKING_ACCEPTANCE', 'BED_PREFERENCE']
+      .includes(String(question.question_code))
     return configured.map((option) => ({
-      value: String(option.option_code),
+      value: keepCode || option.feature_value === null || option.feature_value === undefined
+        ? String(option.option_code)
+        : Number(option.feature_value),
       label: String(option.option_text),
     }))
   }
@@ -120,29 +151,41 @@ function choices(question: DataObject) {
     label: ['非常低', '较低', '适中', '较高', '非常高'][value - 1],
   }))
 }
+
+function questionMin(question: DataObject) {
+  return String(question.question_code) === 'WINTER_HEATING_TEMPERATURE' ? 16 : 20
+}
+
+function questionMax(question: DataObject) {
+  return String(question.question_code) === 'WINTER_HEATING_TEMPERATURE' ? 28 : 32
+}
 </script>
 
 <template>
   <div class="content-column narrow">
     <div class="page-title">
       <div>
-        <span class="eyebrow">LIFESTYLE QUESTIONNAIRE</span>
-        <h2>生活习惯问卷</h2>
-        <p>答案只用于寻找生活习惯更接近的室友，不用于评价个人品质。</p>
+        <span class="eyebrow">PERSONAL PREFERENCES</span>
+        <h2>个人偏好</h2>
+        <p>这些信息只用于寻找相处习惯更接近的室友，不用于评价个人品质。</p>
       </div>
-      <span class="progress-pill">{{ Object.keys(answers).length }}/{{ questions.length }}</span>
+      <span class="progress-pill">{{ answeredCount }}/{{ visibleQuestions.length }}</span>
     </div>
 
-    <p v-if="loading" class="panel empty-state">正在加载问卷…</p>
+    <p v-if="loading" class="panel empty-state">正在加载个人偏好…</p>
     <p v-else-if="error && questions.length === 0" class="alert error">{{ error }}</p>
-    <p v-else-if="!canSave" class="alert">当前活动暂时不能修改问卷，你仍可查看已经填写的内容。</p>
+    <p v-else-if="!canSave" class="alert">当前活动暂时不能修改个人偏好，你仍可查看已经填写的内容。</p>
 
     <form v-if="!loading" class="question-list" @submit.prevent="submit">
-      <article v-for="(question, index) in questions" :key="String(question.id)" class="panel question-card">
+      <article
+        v-for="(question, index) in visibleQuestions"
+        :key="String(question.id)"
+        class="panel question-card"
+      >
         <div class="question-number">{{ String(index + 1).padStart(2, '0') }}</div>
         <div class="question-body">
           <h3>{{ question.question_text }}</h3>
-          <p>{{ question.required_flag ? '必填' : '选填' }}</p>
+          <p>{{ isRequired(question) ? '必填' : '选填' }}</p>
 
           <input
             v-if="question.question_type === 'TIME'"
@@ -150,18 +193,20 @@ function choices(question: DataObject) {
             class="input"
             type="time"
             :disabled="!canSave"
-            :required="Boolean(question.required_flag)"
+            :required="isRequired(question)"
           />
-          <input
-            v-else-if="question.question_type === 'INTEGER'"
-            v-model.number="answers[String(question.question_code)]"
-            class="input"
-            type="number"
-            min="16"
-            max="32"
-            :disabled="!canSave"
-            :required="Boolean(question.required_flag)"
-          />
+          <label v-else-if="question.question_type === 'INTEGER'" class="temperature-input">
+            <input
+              v-model.number="answers[String(question.question_code)]"
+              class="input"
+              type="number"
+              :min="questionMin(question)"
+              :max="questionMax(question)"
+              :disabled="!canSave"
+              :required="isRequired(question)"
+            />
+            <span>℃</span>
+          </label>
           <div v-else class="choice-grid">
             <label v-for="choice in choices(question)" :key="String(choice.value)" class="choice-item">
               <input
@@ -170,7 +215,7 @@ function choices(question: DataObject) {
                 :name="String(question.question_code)"
                 :value="choice.value"
                 :disabled="!canSave"
-                :required="Boolean(question.required_flag)"
+                :required="isRequired(question)"
               />
               <span>{{ choice.label }}</span>
             </label>
@@ -183,7 +228,7 @@ function choices(question: DataObject) {
       <div class="sticky-actions">
         <button type="button" class="button ghost" @click="router.push('/student')">返回首页</button>
         <button class="button primary" :disabled="saving || !completed || !canSave">
-          {{ saving ? '正在保存…' : '保存问卷' }}
+          {{ saving ? '正在保存…' : '保存个人偏好' }}
         </button>
       </div>
     </form>

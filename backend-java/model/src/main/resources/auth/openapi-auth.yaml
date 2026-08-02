@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: Wust Dormitory Select 认证接口
-  version: 1.0.0
+  version: 1.1.0
 paths:
   /api/v1/auth/login:
     post:
@@ -124,6 +124,17 @@ components:
           minLength: 8
           maxLength: 72
 
+    WelcomeData:
+      type: object
+      required: [required, title, message]
+      properties:
+        required:
+          type: boolean
+        title:
+          type: string
+        message:
+          type: string
+
     CurrentUserData:
       type: object
       required: [userId, username, displayName, userType]
@@ -141,6 +152,10 @@ components:
           type: string
         userType:
           type: string
+        welcome:
+          allOf:
+            - $ref: '#/components/schemas/WelcomeData'
+          nullable: true
 
     LoginData:
       type: object

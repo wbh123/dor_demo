@@ -308,7 +308,7 @@ function bedTypeText(value: unknown) {
         <span class="eyebrow">ROOM LAYOUT</span>
         <h2>{{ room.building_name }} · {{ room.room_number }} 室</h2>
         <p v-if="isTeamMode">请选择 {{ memberCount }} 个床位，全部选好后再整体保留。</p>
-        <p v-else>{{ room.floor_number }} 层 · {{ room.capacity }}个床位 · 窗户正对入口</p>
+        <p v-else>{{ room.floor_number }} 层 · {{ room.capacity }}个床位</p>
       </div>
       <button class="button ghost" @click="router.back()">返回房间列表</button>
     </div>
@@ -318,11 +318,8 @@ function bedTypeText(value: unknown) {
     <p v-if="message" class="alert success compact-alert">{{ message }}</p>
 
     <section v-if="!loading" class="panel room-layout-panel compact-room-layout-panel">
-      <div class="room-layout-meta-row">
-        <div class="live-indicator"><i /> 床位变化会自动更新</div>
-        <div v-if="isTeamMode && !holdToken" class="selection-hint">
-          已选择 {{ selectedBedIds.length }}/{{ memberCount }} 个床位
-        </div>
+      <div v-if="isTeamMode && !holdToken" class="selection-hint team-selection-count">
+        已选择 {{ selectedBedIds.length }}/{{ memberCount }} 个床位
       </div>
 
       <div class="bed-selection-toolbar compact-bed-selection-toolbar">
@@ -345,7 +342,6 @@ function bedTypeText(value: unknown) {
               {{ selectedBedIds.includes(Number(bed.id)) ? '已选中' : statusText(bed.status) }}
             </option>
           </select>
-          <small>下拉框与三维图形同步，点击其他空床位可以直接切换床位。</small>
         </label>
 
         <div class="selected-bed-summary" :class="{ active: selectedBeds.length > 0 }" aria-live="polite">
@@ -356,7 +352,6 @@ function bedTypeText(value: unknown) {
           <small v-if="selectedBeds.length">
             {{ selectedBeds.map((bed) => bedTypeText(bed.bed_type)).join('、') }}
           </small>
-          <small v-else>可点击三维床位，或使用左侧下拉框。</small>
         </div>
       </div>
 
@@ -372,7 +367,6 @@ function bedTypeText(value: unknown) {
         <span class="legend-selected">已选中</span>
         <span class="legend-held">暂时保留</span>
         <span class="legend-assigned">已有同学选择</span>
-        <span>C床与上下铺位于同一前排</span>
       </div>
 
       <div v-if="isTeamMode && !holdToken" class="button-row centered">
@@ -380,7 +374,6 @@ function bedTypeText(value: unknown) {
           整体保留 {{ memberCount }} 个床位
         </button>
       </div>
-      <p v-if="room.remark" class="room-remark">{{ room.remark }}</p>
     </section>
 
     <section v-if="holdToken" class="panel hold-panel bed-selection-action-bar">

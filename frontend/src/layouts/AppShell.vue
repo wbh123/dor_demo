@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 
 const auth = useAuthStore()
 const router = useRouter()
+const welcomeError = ref('')
 
 const links = computed(() =>
   auth.isAdmin
@@ -21,6 +22,15 @@ const links = computed(() =>
         { to: '/student/teams', label: '我的队伍', icon: '队' },
       ],
 )
+
+async function acknowledgeWelcome() {
+  welcomeError.value = ''
+  try {
+    await auth.acknowledgeWelcome()
+  } catch (reason) {
+    welcomeError.value = reason instanceof Error ? reason.message : '欢迎信息确认失败，请重试'
+  }
+}
 
 async function logout() {
   await auth.logout()
@@ -58,16 +68,42 @@ async function logout() {
       </div>
     </aside>
 
-    <main class="main-content">
-      <header class="topbar">
+    <main class="main-content" :class="{ 'student-main-content': auth.isStudent }">
+      <header v-if="auth.isAdmin" class="topbar">
         <div>
           <span class="eyebrow">WUST DORMITORY SELECT</span>
-          <h1>{{ auth.isAdmin ? '管理控制台' : '学生选寝中心' }}</h1>
+          <h1>管理控制台</h1>
         </div>
       </header>
-      <section class="page-container">
+      <section class="page-container" :class="{ 'student-page-container': auth.isStudent }">
         <RouterView />
       </section>
     </main>
+
+    <Transition name="welcome-pop">
+      <div v-if="auth.welcomeRequired" class="welcome-overlay" role="presentation">
+        <section
+          class="welcome-dialog"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="student-welcome-title"
+        >
+          <div class="welcome-glow welcome-glow-one" />
+          <div class="welcome-glow welcome-glow-two" />
+          <div class="welcome-symbol" aria-hidden="true">W</div>
+          <span class="eyebrow">WELCOME TO CAMPUS</span>
+          <h2 id="student-welcome-title">新同学，欢迎你</h2>
+          <p>{{ auth.user?.welcome?.message }}</p>
+          <p v-if="welcomeError" class="alert error">{{ welcomeError }}</p>
+          <button
+            class="button primary welcome-start-button"
+            :disabled="auth.welcomeAcknowledging"
+            @click="acknowledgeWelcome"
+          >
+            {{ auth.welcomeAcknowledging ? '正在进入…' : '开始使用' }}
+          </button>
+        </section>
+      </div>
+    </Transition>
   </div>
 </template>

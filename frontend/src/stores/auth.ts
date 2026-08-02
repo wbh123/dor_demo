@@ -13,10 +13,14 @@ export const useAuthStore = defineStore('auth', () => {
   const token = ref<string | null>(localStorage.getItem(TOKEN_KEY))
   const user = ref<CurrentUserData | null>(null)
   const loading = ref(false)
+  const welcomeAcknowledging = ref(false)
 
   const authenticated = computed(() => Boolean(token.value && user.value))
   const isAdmin = computed(() => user.value?.userType === 'ADMIN')
   const isStudent = computed(() => user.value?.userType === 'STUDENT')
+  const welcomeRequired = computed(() =>
+    Boolean(isStudent.value && user.value?.welcome?.required),
+  )
 
   async function login(payload: LoginRequest) {
     loading.value = true
@@ -51,6 +55,19 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  async function acknowledgeWelcome() {
+    if (!welcomeRequired.value || welcomeAcknowledging.value) return
+    welcomeAcknowledging.value = true
+    try {
+      await api.post('/api/v1/auth/welcome/acknowledge')
+      if (user.value?.welcome) {
+        user.value.welcome.required = false
+      }
+    } finally {
+      welcomeAcknowledging.value = false
+    }
+  }
+
   async function logout() {
     try {
       if (token.value) await api.post('/api/v1/auth/logout')
@@ -69,12 +86,15 @@ export const useAuthStore = defineStore('auth', () => {
     token,
     user,
     loading,
+    welcomeAcknowledging,
     authenticated,
     isAdmin,
     isStudent,
+    welcomeRequired,
     login,
     activate,
     restore,
+    acknowledgeWelcome,
     logout,
     clear,
   }

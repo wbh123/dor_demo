@@ -48,11 +48,11 @@ async function submitActivate() {
       <div class="hero-copy">
         <span class="eyebrow light">WUHAN UNIVERSITY OF SCIENCE AND TECHNOLOGY</span>
         <h1>让宿舍选择<br />更公平，也更合拍</h1>
-        <p>基于明确规则和生活习惯的宿舍智能选择系统。每一次占用、分配和调整都有记录。</p>
+        <p>基于明确规则和个人偏好的宿舍智能选择系统。每一次占用、分配和调整都有记录。</p>
       </div>
       <div class="hero-stats">
         <div><strong>实时</strong><span>房间床位状态</span></div>
-        <div><strong>可解释</strong><span>生活习惯匹配</span></div>
+        <div><strong>可解释</strong><span>个人偏好匹配</span></div>
         <div><strong>可追溯</strong><span>分配与审计记录</span></div>
       </div>
     </section>

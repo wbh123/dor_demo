@@ -8,6 +8,13 @@ const batches = ref<DataObject[]>([])
 const auditLogs = ref<DataObject[]>([])
 const loading = ref(true)
 const error = ref('')
+const welcomeMessage = ref('')
+const welcomeVersion = ref(0)
+const welcomeUpdatedAt = ref('')
+const welcomeUpdatedBy = ref('')
+const welcomeSaving = ref(false)
+const welcomeError = ref('')
+const welcomeSuccess = ref('')
 
 onMounted(load)
 
@@ -27,6 +34,48 @@ async function load() {
     error.value = reason instanceof Error ? reason.message : '管理数据加载失败'
   } finally {
     loading.value = false
+  }
+  await loadWelcomeSetting()
+}
+
+async function loadWelcomeSetting() {
+  welcomeError.value = ''
+  try {
+    const response = await api.get<ObjectSuccessResponse>('/api/v1/admin/settings/student-welcome')
+    const data = (response.data.data ?? {}) as DataObject
+    welcomeMessage.value = String(data.message ?? '')
+    welcomeVersion.value = Number(data.version ?? 0)
+    welcomeUpdatedAt.value = String(data.updated_at ?? '')
+    welcomeUpdatedBy.value = String(data.updated_by_name ?? '')
+  } catch (reason) {
+    welcomeError.value = reason instanceof Error ? reason.message : '欢迎语配置加载失败'
+  }
+}
+
+async function saveWelcomeSetting() {
+  const normalized = welcomeMessage.value.trim()
+  welcomeError.value = ''
+  welcomeSuccess.value = ''
+  if (!normalized || normalized.length > 1000) {
+    welcomeError.value = '欢迎语长度必须为1至1000个字符。'
+    return
+  }
+  welcomeSaving.value = true
+  try {
+    const response = await api.put<ObjectSuccessResponse>(
+      '/api/v1/admin/settings/student-welcome',
+      { message: normalized, expectedVersion: welcomeVersion.value },
+    )
+    const data = (response.data.data ?? {}) as DataObject
+    welcomeMessage.value = String(data.message ?? normalized)
+    welcomeVersion.value = Number(data.version ?? welcomeVersion.value + 1)
+    welcomeUpdatedAt.value = String(data.updated_at ?? '')
+    welcomeUpdatedBy.value = String(data.updated_by_name ?? '')
+    welcomeSuccess.value = '新生欢迎语已保存。'
+  } catch (reason) {
+    welcomeError.value = reason instanceof Error ? reason.message : '欢迎语保存失败'
+  } finally {
+    welcomeSaving.value = false
   }
 }
 
@@ -60,6 +109,36 @@ const stats = [
           <small>{{ stat[2] }}</small>
         </article>
       </div>
+
+      <section class="panel welcome-setting-card">
+        <div class="section-head split-title">
+          <div>
+            <span class="eyebrow">FIRST LOGIN WELCOME</span>
+            <h3>新生欢迎语</h3>
+            <p>学生激活账号后首次登录时显示。已经确认过欢迎信息的学生不会重复弹出。</p>
+          </div>
+          <span class="welcome-character-count">{{ welcomeMessage.length }}/1000</span>
+        </div>
+        <textarea
+          v-model="welcomeMessage"
+          class="input welcome-message-input"
+          rows="4"
+          maxlength="1000"
+          placeholder="请输入首次登录欢迎文本"
+        />
+        <div class="welcome-setting-meta">
+          <span v-if="welcomeUpdatedAt">最后修改：{{ welcomeUpdatedAt }}</span>
+          <span v-if="welcomeUpdatedBy">修改人：{{ welcomeUpdatedBy }}</span>
+        </div>
+        <p v-if="welcomeError" class="alert error">{{ welcomeError }}</p>
+        <p v-if="welcomeSuccess" class="alert success">{{ welcomeSuccess }}</p>
+        <div class="button-row welcome-setting-actions">
+          <button class="button ghost" :disabled="welcomeSaving" @click="loadWelcomeSetting">重新加载</button>
+          <button class="button primary" :disabled="welcomeSaving" @click="saveWelcomeSetting">
+            {{ welcomeSaving ? '正在保存…' : '保存欢迎语' }}
+          </button>
+        </div>
+      </section>
 
       <div class="admin-grid">
         <section class="panel span-2">

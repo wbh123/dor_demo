@@ -25,10 +25,16 @@ const weightDefinitions: WeightDefinition[] = [
   { key: 'noiseTolerance', label: '噪声容忍度', description: '对室友活动声音的接受程度' },
   { key: 'cleaningFrequency', label: '打扫频率', description: '日常清洁习惯' },
   { key: 'tidinessRequirement', label: '整洁要求', description: '对公共区域整洁程度的要求' },
-  { key: 'airConditionerTemperature', label: '空调温度偏好', description: '常用空调温度习惯' },
+  { key: 'summerAirConditionerTemperature', label: '夏季制冷温度', description: '夏季空调制冷温度偏好' },
+  { key: 'summerOvernightAirConditioner', label: '夏季整夜空调', description: '对整夜开启空调制冷的接受度' },
+  { key: 'winterHeatingAcceptance', label: '冬季制热接受度', description: '对冬季空调制热的接受程度' },
+  { key: 'winterHeatingTemperature', label: '冬季制热温度', description: '冬季空调制热温度偏好' },
+  { key: 'afterLightsActivity', label: '熄灯后活动', description: '熄灯后保持安静或继续活动的习惯' },
+  { key: 'alarmSnooze', label: '闹钟重复响铃', description: '早晨闹钟重复响铃频率' },
+  { key: 'strongFoodOdorAcceptance', label: '重气味食物接受度', description: '对宿舍内重气味食物的接受程度' },
   { key: 'studyFrequency', label: '宿舍学习频率', description: '在宿舍学习的频率' },
   { key: 'gamingVoiceFrequency', label: '游戏或语音频率', description: '游戏、语音聊天等活动频率' },
-  { key: 'socialActivity', label: '社交活动频率', description: '邀请同学或参与宿舍社交的频率' },
+  { key: 'socialActivity', label: '社交活动频率', description: '参与宿舍社交的频率' },
 ]
 
 const ruleDefinitions: RuleDefinition[] = [
@@ -49,23 +55,31 @@ const creating = ref(false)
 const form = reactive({
   schemeCode: '',
   schemeName: '',
-  algorithmVersion: 'weighted-v2',
+  algorithmVersion: 'weighted-distance-v2',
   activate: true,
   reason: '',
 })
 
-const weights = reactive<Record<string, number>>({
+const defaultWeights: Record<string, number> = {
   sleepTimeMinutes: 1.2,
   wakeTimeMinutes: 1.0,
   sleepSensitivity: 1.2,
   noiseTolerance: 1.2,
   cleaningFrequency: 1.0,
   tidinessRequirement: 1.0,
-  airConditionerTemperature: 0.8,
+  summerAirConditionerTemperature: 0.8,
+  summerOvernightAirConditioner: 1.1,
+  winterHeatingAcceptance: 0.8,
+  winterHeatingTemperature: 0.6,
+  afterLightsActivity: 1.2,
+  alarmSnooze: 0.9,
+  strongFoodOdorAcceptance: 0.7,
   studyFrequency: 0.8,
   gamingVoiceFrequency: 1.1,
   socialActivity: 0.6,
-})
+}
+
+const weights = reactive<Record<string, number>>({ ...defaultWeights })
 
 const conflictRules = reactive<Record<string, number>>({
   smokingConflictPenalty: 25,
@@ -104,11 +118,21 @@ function selectScheme(scheme: DataObject) {
   creating.value = false
   form.schemeCode = String(scheme.scheme_code ?? '')
   form.schemeName = String(scheme.scheme_name ?? '')
-  form.algorithmVersion = String(scheme.algorithm_version ?? 'weighted-v2')
+  form.algorithmVersion = String(scheme.algorithm_version ?? 'weighted-distance-v2')
   form.activate = Boolean(scheme.enabled)
   form.reason = ''
-  assignNumbers(weights, (scheme.weights ?? {}) as DataObject)
-  assignNumbers(conflictRules, (scheme.conflictRules ?? {}) as DataObject)
+  const sourceWeights = { ...((scheme.weights ?? {}) as DataObject) }
+  if (sourceWeights.summerAirConditionerTemperature == null
+    && sourceWeights.airConditionerTemperature != null) {
+    sourceWeights.summerAirConditionerTemperature = sourceWeights.airConditionerTemperature
+  }
+  assignNumbers(weights, sourceWeights, defaultWeights)
+  assignNumbers(conflictRules, (scheme.conflictRules ?? {}) as DataObject, {
+    smokingConflictPenalty: 25,
+    sleepTimeWarningMinutes: 60,
+    cleaningWarningDifference: 1,
+    gamingVoiceWarningDifference: 1,
+  })
   error.value = ''
   message.value = ''
 }
@@ -118,32 +142,25 @@ function startCreate() {
   creating.value = true
   form.schemeCode = ''
   form.schemeName = ''
-  form.algorithmVersion = 'weighted-v2'
+  form.algorithmVersion = 'weighted-distance-v2'
   form.activate = false
   form.reason = ''
-  assignNumbers(weights, {
-    sleepTimeMinutes: 1.2,
-    wakeTimeMinutes: 1,
-    sleepSensitivity: 1.2,
-    noiseTolerance: 1.2,
-    cleaningFrequency: 1,
-    tidinessRequirement: 1,
-    airConditionerTemperature: 0.8,
-    studyFrequency: 0.8,
-    gamingVoiceFrequency: 1.1,
-    socialActivity: 0.6,
-  })
+  assignNumbers(weights, defaultWeights, defaultWeights)
   assignNumbers(conflictRules, {
     smokingConflictPenalty: 25,
     sleepTimeWarningMinutes: 60,
     cleaningWarningDifference: 1,
     gamingVoiceWarningDifference: 1,
-  })
+  }, {})
 }
 
-function assignNumbers(target: Record<string, number>, source: DataObject) {
+function assignNumbers(
+  target: Record<string, number>,
+  source: DataObject,
+  fallback: Record<string, number>,
+) {
   for (const key of Object.keys(target)) {
-    if (source[key] != null) target[key] = Number(source[key])
+    target[key] = Number(source[key] ?? fallback[key] ?? 0)
   }
 }
 
@@ -202,7 +219,7 @@ function revisionLabel(scheme: DataObject) {
     <div class="page-title">
       <span class="eyebrow">MATCHING OPERATIONS</span>
       <h2>匹配规则</h2>
-      <p>管理生活习惯匹配权重和冲突提示。每次修改都会创建不可变修订，已有批次不会受影响。</p>
+      <p>管理个人偏好匹配权重和冲突提示。每次修改都会创建不可变修订，已有批次不会受影响。</p>
     </div>
 
     <p v-if="error" class="alert error">{{ error }}</p>
@@ -265,7 +282,7 @@ function revisionLabel(scheme: DataObject) {
           </div>
 
           <div class="matching-section-title">
-            <div><h4>生活习惯权重</h4><p>范围0～5，数值越大表示该维度对排序影响越明显。</p></div>
+            <div><h4>个人偏好权重</h4><p>范围0～5，数值越大表示该维度对排序影响越明显。</p></div>
           </div>
           <div class="weight-grid">
             <label v-for="definition in weightDefinitions" :key="definition.key" class="weight-field">
