@@ -3,9 +3,19 @@
   min-height: 680px;
 }
 
+.three-bed-scene-canvas {
+  transform: scale(1.22);
+  transform-origin: 50% 48%;
+  will-change: transform;
+}
+
 @media (max-width: 640px) {
   .three-bed-scene-mount {
     height: min(132vw, 680px);
     min-height: 500px;
+  }
+
+  .three-bed-scene-canvas {
+    transform: scale(1.12);
   }
 }

@@ -163,6 +163,13 @@ class UxRefinementTest(unittest.TestCase):
         self.assertNotIn("const BED_LONGITUDINAL_ROTATION = Math.PI / 2", scene)
         self.assertNotIn("整体为2×2布局", scene)
 
+    def test_scene_canvas_zoom_makes_beds_fill_more_of_the_viewport(self) -> None:
+        styles = (FRONTEND / "room-scene-geometry-fix.css").read_text(encoding="utf-8")
+        self.assertIn(".three-bed-scene-canvas", styles)
+        self.assertIn("transform: scale(1.22)", styles)
+        self.assertIn("transform-origin: 50% 48%", styles)
+        self.assertIn("transform: scale(1.12)", styles)
+
     def test_release_message_is_three_second_toast_and_layout_is_compact(self) -> None:
         detail = (FRONTEND / "views/student/RoomDetailView.vue").read_text(encoding="utf-8")
         styles = (FRONTEND / "room-selection-refinement.css").read_text(encoding="utf-8")
