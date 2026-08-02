@@ -203,6 +203,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/students/{studentId}/reset-password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 重置学生密码并恢复为待激活账号 */
+        post: operations["resetStudentPassword"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/students/{studentId}/reset-state": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 完全重置学生账号与全部选寝状态 */
+        post: operations["resetStudentState"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/buildings": {
         parameters: {
             query?: never;
@@ -939,6 +973,13 @@ export interface components {
             nationalityCode: string;
             phoneNumber?: string;
         };
+        StudentPasswordResetRequest: {
+            reason: string;
+        };
+        StudentStateResetRequest: {
+            confirmStudentNumber: string;
+            reason: string;
+        };
         RoomRequest: {
             capacity: number;
             gender: string;
@@ -1085,12 +1126,13 @@ export interface components {
     };
     parameters: {
         IdPath: number;
+        StudentIdPath: number;
         RoomIdPath: number;
         BatchIdPath: number;
         NotificationIdPath: number;
         BedIdPath: number;
         TeamIdPath: number;
-        StudentIdPath: number;
+        "parameters-StudentIdPath": number;
     };
     requestBodies: never;
     headers: never;
@@ -1400,6 +1442,47 @@ export interface operations {
         responses: {
             200: components["responses"]["ObjectSuccess"];
             400: components["responses"]["ErrorResponse"];
+        };
+    };
+    resetStudentPassword: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                studentId: components["parameters"]["StudentIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StudentPasswordResetRequest"];
+            };
+        };
+        responses: {
+            200: components["responses"]["ObjectSuccess"];
+            400: components["responses"]["ErrorResponse"];
+            404: components["responses"]["ErrorResponse"];
+        };
+    };
+    resetStudentState: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                studentId: components["parameters"]["StudentIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StudentStateResetRequest"];
+            };
+        };
+        responses: {
+            200: components["responses"]["ObjectSuccess"];
+            400: components["responses"]["ErrorResponse"];
+            404: components["responses"]["ErrorResponse"];
+            409: components["responses"]["ErrorResponse"];
         };
     };
     listBuildings: {
@@ -2165,7 +2248,7 @@ export interface operations {
             header?: never;
             path: {
                 teamId: components["parameters"]["TeamIdPath"];
-                studentId: components["parameters"]["StudentIdPath"];
+                studentId: components["parameters"]["parameters-StudentIdPath"];
             };
             cookie?: never;
         };

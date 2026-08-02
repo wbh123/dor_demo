@@ -179,7 +179,7 @@ const textTranslations: Record<string, string> = {
   恢复默认布局: 'Restore default layout',
   上床下桌: 'Loft bed with desk',
   上下铺: 'Bunk bed',
-  顺时针旋转90°: 'Rotate 90° clockwise',
+  '顺时针旋转90°': 'Rotate 90° clockwise',
   拖动调整位置: 'Drag to reposition',
   '非空床位·类型锁定': 'Occupied · type locked',
   当前房型: 'Current room type',
