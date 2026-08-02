@@ -16,12 +16,6 @@ import java.util.Map;
 
 @Service
 public class RoomManagementService {
-    private static final Map<String, Integer> STANDARD_ROOM_CAPACITIES = Map.of(
-            "FOUR_PERSON", 4,
-            "FIVE_PERSON", 5,
-            "SIX_PERSON", 6
-    );
-
     private final NamedParameterJdbcTemplate jdbc;
     private final AuditService auditService;
 
@@ -75,22 +69,21 @@ public class RoomManagementService {
                     "ROOM_CAPACITY_MISMATCH",
                     "房间容量必须等于当前床位总数");
         }
-        validateRoomType(command.roomType(), physicalBedCount);
 
         jdbc.update("""
-                UPDATE room SET room_type=:roomType, capacity=:capacity,
+                UPDATE room SET capacity=:capacity,
                     gender_restriction=:gender, operational_status=:status,
                     remark=:remark, state_version=state_version+1, version=version+1
                 WHERE id=:id
                 """, new MapSqlParameterSource()
                 .addValue("id", roomId)
-                .addValue("roomType", command.roomType())
                 .addValue("capacity", physicalBedCount)
                 .addValue("gender", command.gender())
                 .addValue("status", command.operationalStatus())
                 .addValue("remark", normalizeNullable(command.remark()), Types.VARCHAR));
 
         Map<String, Object> after = new LinkedHashMap<>(command.asAuditMap());
+        after.put("roomType", before.get("room_type"));
         after.put("capacity", physicalBedCount);
         auditService.success(
                 operator,
@@ -100,15 +93,6 @@ public class RoomManagementService {
                 command.reason().trim(),
                 before,
                 after);
-    }
-
-    private void validateRoomType(String roomType, int physicalBedCount) {
-        Integer expectedCapacity = STANDARD_ROOM_CAPACITIES.get(roomType);
-        if (expectedCapacity != null && expectedCapacity != physicalBedCount) {
-            throw new BusinessException(
-                    "ROOM_TYPE_CAPACITY_MISMATCH",
-                    "标准房型人数必须与当前床位总数一致；非标准布局请选择其他房型");
-        }
     }
 
     private Map<String, Object> roomForUpdate(long roomId) {
@@ -137,7 +121,6 @@ public class RoomManagementService {
     }
 
     public record RoomCommand(
-            String roomType,
             int capacity,
             String gender,
             String operationalStatus,
@@ -146,7 +129,6 @@ public class RoomManagementService {
 
         public Map<String, Object> asAuditMap() {
             Map<String, Object> result = new LinkedHashMap<>();
-            result.put("roomType", roomType);
             result.put("capacity", capacity);
             result.put("gender", gender);
             result.put("operationalStatus", operationalStatus);
