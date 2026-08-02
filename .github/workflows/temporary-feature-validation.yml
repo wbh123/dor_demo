@@ -1,8 +1,8 @@
 name: Temporary feature validation
 
 on:
-  schedule:
-    - cron: '*/5 * * * *'
+  issues:
+    types: [opened]
   workflow_dispatch:
 
 permissions:
@@ -10,10 +10,11 @@ permissions:
 
 concurrency:
   group: temporary-team-i18n-validation
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   validate:
+    if: github.event_name != 'issues' || github.event.issue.title == '[CI] Validate team i18n layout refinement'
     runs-on: ubuntu-latest
     services:
       mysql:
@@ -72,17 +73,6 @@ jobs:
           set +e
           LOG=/tmp/feature-validation.log
           : > "$LOG"
-          run_step() {
-            echo "===== $1 =====" | tee -a "$LOG"
-            shift
-            "$@" 2>&1 | tee -a "$LOG"
-            local step_status=${PIPESTATUS[0]}
-            if [ $step_status -ne 0 ]; then
-              echo "FAILED_STEP=$1" >> /tmp/validation-status.env
-              return $step_status
-            fi
-          }
-
           python -m pip install --disable-pip-version-check pyyaml pymysql 2>&1 | tee -a "$LOG"
           STATUS=${PIPESTATUS[0]}
 
@@ -175,7 +165,12 @@ jobs:
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add backend-java/docs/sql/schema.sql docs/ci/team-i18n-validation.txt docs/ci/team-i18n-validation-failure.log 2>/dev/null || true
+          git add backend-java/docs/sql/schema.sql docs/ci/team-i18n-validation.txt
+          if [ -f docs/ci/team-i18n-validation-failure.log ]; then
+            git add docs/ci/team-i18n-validation-failure.log
+          else
+            git rm --cached --ignore-unmatch docs/ci/team-i18n-validation-failure.log || true
+          fi
           if ! git diff --cached --quiet; then
             git commit -m "ci: 记录组队国际化验证结果"
             git push origin HEAD:feature/team-i18n-layout-refinement
