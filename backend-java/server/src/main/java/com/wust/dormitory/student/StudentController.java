@@ -7,10 +7,13 @@ import com.wust.dormitory.model.dto.InvitationResponseRequest;
 import com.wust.dormitory.model.dto.InviteRequest;
 import com.wust.dormitory.model.dto.ListSuccessResponse;
 import com.wust.dormitory.model.dto.ObjectSuccessResponse;
+import com.wust.dormitory.model.dto.StudentBedConfirmationRequest;
 import com.wust.dormitory.model.dto.StudentPhoneUpdateRequest;
 import com.wust.dormitory.model.dto.TeamBedsRequest;
 import com.wust.dormitory.model.dto.TeamConfirmRequest;
 import com.wust.dormitory.model.dto.VoidSuccessResponse;
+import com.wust.dormitory.residency.ResidencyService;
+import com.wust.dormitory.residency.RoomSelectionService;
 import com.wust.dormitory.security.CurrentUser;
 import com.wust.dormitory.security.SecurityUsers;
 import com.wust.dormitory.selection.BedHoldService;
@@ -32,6 +35,8 @@ public class StudentController implements StudentApi {
     private final TeamService teamService;
     private final TeamHoldReleaseService teamHoldReleaseService;
     private final BedScopeGuard bedScopeGuard;
+    private final RoomSelectionService roomSelectionService;
+    private final ResidencyService residencyService;
 
     public StudentController(
             StudentService studentService,
@@ -40,7 +45,9 @@ public class StudentController implements StudentApi {
             StudentRoomRecommendationService recommendationService,
             TeamService teamService,
             TeamHoldReleaseService teamHoldReleaseService,
-            BedScopeGuard bedScopeGuard) {
+            BedScopeGuard bedScopeGuard,
+            RoomSelectionService roomSelectionService,
+            ResidencyService residencyService) {
         this.studentService = studentService;
         this.profileService = profileService;
         this.roomLayoutService = roomLayoutService;
@@ -48,6 +55,8 @@ public class StudentController implements StudentApi {
         this.teamService = teamService;
         this.teamHoldReleaseService = teamHoldReleaseService;
         this.bedScopeGuard = bedScopeGuard;
+        this.roomSelectionService = roomSelectionService;
+        this.residencyService = residencyService;
     }
 
     @Override
@@ -102,6 +111,36 @@ public class StudentController implements StudentApi {
                 studentService.room(batchId, roomId, student()));
         return ResponseEntity.ok(ResponseFactory.object(
                 bedScopeGuard.filterRoomSnapshot(batchId, snapshot)));
+    }
+
+    @Override
+    public ResponseEntity<ObjectSuccessResponse> selectRoom(Long batchId, Long roomId) {
+        return ResponseEntity.ok(ResponseFactory.object(
+                roomSelectionService.selectPersonal(batchId, roomId, student())));
+    }
+
+    @Override
+    public ResponseEntity<ObjectSuccessResponse> selectTeamRoom(
+            Long batchId,
+            Long teamId,
+            Long roomId) {
+        return ResponseEntity.ok(ResponseFactory.object(
+                roomSelectionService.selectTeam(batchId, teamId, roomId, student())));
+    }
+
+    @Override
+    public ResponseEntity<ObjectSuccessResponse> getMyResidency() {
+        CurrentUser user = student();
+        return ResponseEntity.ok(ResponseFactory.object(
+                residencyService.current(user.studentId())));
+    }
+
+    @Override
+    public ResponseEntity<ObjectSuccessResponse> confirmMyActualBed(
+            StudentBedConfirmationRequest request) {
+        CurrentUser user = student();
+        return ResponseEntity.ok(ResponseFactory.object(
+                residencyService.confirmOwnBed(user.studentId(), request.getBedId(), user)));
     }
 
     @Override
