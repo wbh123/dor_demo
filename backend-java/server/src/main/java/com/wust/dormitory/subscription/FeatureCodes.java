@@ -21,6 +21,7 @@ public final class FeatureCodes {
     public static final String P2_BED_TYPE_UPDATE = "P2_BED_TYPE_UPDATE";
     public static final String P2_BED_OPERATIONAL_STATUS_UPDATE = "P2_BED_OPERATIONAL_STATUS_UPDATE";
     public static final String P2_THREE_DIMENSIONAL_SELECTION = "P2_THREE_DIMENSIONAL_SELECTION";
+    public static final String P2_BED_SELECTION_MODE = "P2_BED_SELECTION_MODE";
     public static final String P2_MATCHING_SCHEME_VIEW = "P2_MATCHING_SCHEME_VIEW";
     public static final String P2_MATCHING_SCHEME_CREATE = "P2_MATCHING_SCHEME_CREATE";
     public static final String P2_MATCHING_SCHEME_REVISE = "P2_MATCHING_SCHEME_REVISE";
