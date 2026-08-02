@@ -5,7 +5,8 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-OPENAPI = ROOT / "backend-java/model/src/main/resources/admin/openapi-admin.yaml"
+OPENAPI = ROOT / "backend-java/model/src/main/resources/admin/openapi-room-management.yaml"
+MASTER_OPENAPI = ROOT / "backend-java/model/src/main/resources/openapi-interface.yaml"
 CONTROLLER = ROOT / "backend-java/server/src/main/java/com/wust/dormitory/admin/AdminController.java"
 ROOM_LAYOUT = ROOT / "backend-java/server/src/main/java/com/wust/dormitory/admin/RoomLayoutService.java"
 ROOM_MANAGEMENT = ROOT / "backend-java/server/src/main/java/com/wust/dormitory/admin/RoomManagementService.java"
@@ -19,16 +20,20 @@ ROOM_SELECTION_STYLES = ROOT / "frontend/src/room-selection-refinement.css"
 
 
 class RoomBedTypeAndPreferenceUiTest(unittest.TestCase):
-    def test_layout_contract_accepts_bed_type(self) -> None:
+    def test_layout_contract_accepts_bed_type_and_room_edit_omits_room_type(self) -> None:
         openapi = OPENAPI.read_text(encoding="utf-8")
+        master = MASTER_OPENAPI.read_text(encoding="utf-8")
+        self.assertIn("openapi-room-management.yaml", master)
         self.assertIn("required: [bedId, bedType, layoutX, layoutZ, rotationDegrees]", openapi)
+        self.assertIn("required: [capacity, gender, operationalStatus, reason]", openapi)
+        self.assertNotIn("required: [roomType, capacity", openapi)
         self.assertIn("bedType:", openapi)
-        self.assertIn("LOFT_BED_DESK", openapi)
-        self.assertIn("BUNK_UPPER", openapi)
-        self.assertIn("BUNK_LOWER", openapi)
+        for bed_type in ("LOFT_BED_DESK", "BUNK_UPPER", "BUNK_LOWER"):
+            self.assertIn(bed_type, openapi)
 
         controller = CONTROLLER.read_text(encoding="utf-8")
-        self.assertIn("item.getBedType()", controller)
+        self.assertIn("item.getBedType().getValue()", controller)
+        self.assertNotIn("request.getRoomType()", controller)
 
     def test_backend_rejects_occupied_bed_type_changes_and_syncs_room_type(self) -> None:
         service = ROOM_LAYOUT.read_text(encoding="utf-8")
@@ -40,17 +45,19 @@ class RoomBedTypeAndPreferenceUiTest(unittest.TestCase):
             "roomTypeForBedCount",
             "room_type=:roomType",
             "capacity=:capacity",
-            "Set.of(\"LOFT_BED_DESK\", \"BUNK_UPPER\", \"BUNK_LOWER\")",
+            "BED_TYPES",
         ):
             self.assertIn(expected, service)
 
         management = ROOM_MANAGEMENT.read_text(encoding="utf-8")
         self.assertNotIn("SET room_type=:roomType", management)
-        self.assertNotIn("validateRoomType(command.roomType()", management)
+        self.assertNotIn("validateRoomType", management)
+        self.assertNotIn("roomType,", management)
 
     def test_room_editor_no_longer_changes_room_type(self) -> None:
         admin = ADMIN_VIEW.read_text(encoding="utf-8")
         self.assertNotIn('v-model="editForm.roomType"', admin)
+        self.assertNotIn("roomTypeOptions", admin)
         self.assertIn("房型由床位布局编辑器自动同步", admin)
         self.assertIn("当前房型", admin)
 
@@ -75,7 +82,7 @@ class RoomBedTypeAndPreferenceUiTest(unittest.TestCase):
         self.assertIn("width: 114px", styles)
         self.assertIn("height: 54px", styles)
 
-    def test_preference_card_columns_stretch_and_header_gap_is_compact(self) -> None:
+    def test_preference_card_columns_stretch_and_buttons_are_fixed(self) -> None:
         styles = STUDENT_STYLES.read_text(encoding="utf-8")
         for expected in (
             ".personal-preference-card > .section-head",
@@ -84,6 +91,9 @@ class RoomBedTypeAndPreferenceUiTest(unittest.TestCase):
             "height: 100%",
             "grid-auto-rows: 1fr",
             "grid-template-rows: minmax(0, 1fr) auto",
+            "grid-template-rows: repeat(2, minmax(56px, 56px))",
+            "padding: 16px",
+            "width: 100%",
         ):
             self.assertIn(expected, styles)
 
