@@ -2,13 +2,16 @@ package com.wust.dormitory.student;
 
 import com.wust.dormitory.common.error.BusinessException;
 import com.wust.dormitory.matching.MatchingService;
+import com.wust.dormitory.residency.ResidencyPolicyService;
 import com.wust.dormitory.security.CurrentUser;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -16,127 +19,140 @@ import java.util.Map;
 public class StudentRoomRecommendationService {
     private final NamedParameterJdbcTemplate jdbc;
     private final MatchingService matchingService;
-    private final StudentService studentService;
+    private final ResidencyPolicyService policy;
 
     public StudentRoomRecommendationService(
             NamedParameterJdbcTemplate jdbc,
             MatchingService matchingService,
-            StudentService studentService) {
+            ResidencyPolicyService policy) {
         this.jdbc = jdbc;
         this.matchingService = matchingService;
-        this.studentService = studentService;
+        this.policy = policy;
     }
 
     public List<Map<String, Object>> rooms(long batchId, CurrentUser user) {
-        String gender = studentGender(user.studentId());
         requireAccessibleBatch(batchId, user.studentId());
+        Map<String, Object> batch = policy.batch(batchId);
+        Map<String, Object> student = policy.student(user.studentId());
         String feature = featureJson(batchId, user.studentId());
+        String mode = String.valueOf(batch.get("selection_mode"));
+        List<Map<String, Object>> result = new ArrayList<>();
 
-        List<Map<String, Object>> rooms = jdbc.queryForList("""
-                SELECT room.id, building.building_name, floor.floor_number,
-                       room.room_number, room.room_type, room.capacity,
-                       room.gender_restriction, room.state_version,
-                       COUNT(bed.id) AS bed_count,
-                       SUM(bed.operational_status='ENABLED') AS enabled_bed_count,
-                       COUNT(assignment.id) AS assigned_count
-                FROM room
-                JOIN dormitory_floor floor ON floor.id=room.floor_id
-                JOIN dormitory_building building ON building.id=floor.building_id
-                JOIN bed ON bed.room_id=room.id
-                LEFT JOIN bed_assignment assignment
-                  ON assignment.batch_id=:batchId AND assignment.bed_id=bed.id
-                WHERE room.operational_status='ENABLED'
-                  AND bed.operational_status='ENABLED'
-                  AND room.gender_restriction=:gender
-                  AND (
-                    EXISTS (
-                      SELECT 1 FROM batch_room_scope room_scope
-                      WHERE room_scope.batch_id=:batchId
-                        AND room_scope.room_id=room.id
-                    )
-                    OR EXISTS (
-                      SELECT 1 FROM batch_building_scope building_scope
-                      WHERE building_scope.batch_id=:batchId
-                        AND building_scope.building_id=building.id
-                    )
-                  )
-                GROUP BY room.id, building.building_name, floor.floor_number,
-                         room.room_number, room.room_type, room.capacity,
-                         room.gender_restriction, room.state_version
-                HAVING COUNT(assignment.id) < COUNT(bed.id)
-                ORDER BY building.building_name, floor.floor_number, room.room_number
-                """, new MapSqlParameterSource()
-                .addValue("batchId", batchId)
-                .addValue("gender", gender));
+        for (Long roomId : policy.roomIdsForBatch(batchId)) {
+            Map<String, Object> room = policy.room(roomId, false);
+            try {
+                policy.requireStudentEligibleForRoom(student, batch, room);
+                policy.requireRoomLockedByBatch(batchId, roomId);
+            } catch (BusinessException ignored) {
+                continue;
+            }
+            int activeResidents = policy.activeResidentCount(roomId);
+            int unknownBedResidents = policy.unknownBedResidentCount(roomId);
+            int available = "BED".equals(mode)
+                    ? (unknownBedResidents == 0 ? policy.availableBedCount(roomId) : 0)
+                    : policy.availableCapacity(roomId);
+            if (available <= 0) {
+                continue;
+            }
 
-        for (Map<String, Object> room : rooms) {
-            long roomId = ((Number) room.get("id")).longValue();
             List<String> roommateFeatures = jdbc.query("""
-                    SELECT feature.feature_vector_json
-                    FROM bed_assignment assignment
-                    JOIN bed ON bed.id=assignment.bed_id
-                    JOIN student_feature feature
-                      ON feature.batch_id=assignment.batch_id
-                     AND feature.student_id=assignment.student_id
-                    WHERE assignment.batch_id=:batchId
-                      AND bed.room_id=:roomId
+                    SELECT sf.feature_vector_json
+                    FROM room_assignment ra
+                    JOIN student_feature sf
+                      ON sf.student_id=ra.student_id
+                     AND sf.batch_id=:batchId
+                    WHERE ra.room_id=:roomId
+                      AND ra.assignment_status='ACTIVE'
+                    ORDER BY ra.assigned_at
                     """, new MapSqlParameterSource()
                     .addValue("batchId", batchId)
                     .addValue("roomId", roomId),
-                    (resultSet, rowNumber) -> resultSet.getString(1));
+                    (rs, rowNum) -> rs.getString(1));
             MatchingService.MatchResult match = matchingService.roomScore(
                     batchId,
                     feature,
                     roommateFeatures);
-            int availableCount = ((Number) room.get("enabled_bed_count")).intValue()
-                    - ((Number) room.get("assigned_count")).intValue();
-            room.put("availableCount", availableCount);
-            room.put("matchScore", match.score());
-            room.put("matches", match.matches());
-            room.put("warnings", match.warnings());
-            room.put("recommendationReasons", match.recommendationReasons());
-            room.put("conflictReasons", match.conflictReasons());
-            room.put("dimensionCount", match.dimensionCount());
+            Map<String, Object> view = new LinkedHashMap<>(room);
+            view.put("selectionMode", mode);
+            view.put("activeResidentCount", activeResidents);
+            view.put("confirmedBedCount", activeResidents - unknownBedResidents);
+            view.put("unconfirmedBedCount", unknownBedResidents);
+            view.put("bedMappingComplete", unknownBedResidents == 0);
+            view.put("availableCount", available);
+            view.put("matchScore", match.score());
+            view.put("matches", match.matches());
+            view.put("warnings", match.warnings());
+            view.put("recommendationReasons", match.recommendationReasons());
+            view.put("conflictReasons", match.conflictReasons());
+            view.put("dimensionCount", match.dimensionCount());
+            if ("ROOM".equals(mode)) {
+                view.put("selectionHint", "选择后仅确定寝室，具体床位由寝室成员自行协商");
+            } else {
+                view.put("selectionHint", "进入寝室后选择当前真实可用床位");
+            }
+            result.add(view);
         }
-        rooms.sort(Comparator.comparingDouble(
+        result.sort(Comparator.comparingDouble(
                 room -> -((Number) room.get("matchScore")).doubleValue()));
-        return rooms;
+        return result;
+    }
+
+    public Map<String, Object> room(long batchId, long roomId, CurrentUser user) {
+        return rooms(batchId, user).stream()
+                .filter(room -> ((Number) room.get("id")).longValue() == roomId)
+                .findFirst()
+                .orElseThrow(() -> new BusinessException(
+                        "ROOM_NOT_CANDIDATE",
+                        "该寝室当前不符合你的选择条件或已经没有剩余名额",
+                        HttpStatus.FORBIDDEN));
     }
 
     public Map<String, Object> randomRecommendation(long batchId, CurrentUser user) {
-        for (Map<String, Object> candidate : rooms(batchId, user)) {
-            long roomId = ((Number) candidate.get("id")).longValue();
-            @SuppressWarnings("unchecked")
-            List<Map<String, Object>> beds = (List<Map<String, Object>>) studentService
-                    .room(batchId, roomId, user)
-                    .get("beds");
-            for (Map<String, Object> bed : beds) {
-                if ("AVAILABLE".equals(bed.get("status"))) {
-                    return Map.of(
-                            "room", candidate,
-                            "bed", bed,
-                            "explanation", "从高匹配房间中选择当前可用床位，确认前不会形成最终分配");
-                }
-            }
-        }
-        throw new BusinessException(
-                "NO_AVAILABLE_BED",
-                "当前没有符合条件的可用床位",
-                HttpStatus.CONFLICT);
-    }
-
-    private String studentGender(long studentId) {
-        List<String> rows = jdbc.query(
-                "SELECT gender FROM student WHERE id=:studentId",
-                Map.of("studentId", studentId),
-                (resultSet, rowNumber) -> resultSet.getString(1));
-        if (rows.isEmpty()) {
+        Map<String, Object> batch = policy.batch(batchId);
+        List<Map<String, Object>> candidates = rooms(batchId, user);
+        if (candidates.isEmpty()) {
             throw new BusinessException(
-                    "STUDENT_NOT_FOUND",
-                    "学生档案不存在",
-                    HttpStatus.NOT_FOUND);
+                    "NO_AVAILABLE_ROOM",
+                    "当前没有符合条件的可用寝室",
+                    HttpStatus.CONFLICT);
         }
-        return rows.getFirst();
+        Map<String, Object> room = candidates.getFirst();
+        if ("ROOM".equals(String.valueOf(batch.get("selection_mode")))) {
+            return Map.of(
+                    "selectionMode", "ROOM",
+                    "room", room,
+                    "explanation", "从符合性别、学生类别和容量条件的寝室中推荐匹配度较高的寝室；不会分配具体床位");
+        }
+        long roomId = ((Number) room.get("id")).longValue();
+        List<Map<String, Object>> beds = jdbc.queryForList("""
+                SELECT b.id, b.bed_code, b.bed_type, b.position_index
+                FROM bed b
+                WHERE b.room_id=:roomId
+                  AND b.operational_status='ENABLED'
+                  AND EXISTS (
+                      SELECT 1 FROM batch_bed_scope scope
+                      WHERE scope.batch_id=:batchId AND scope.bed_id=b.id
+                  )
+                  AND NOT EXISTS (
+                      SELECT 1 FROM room_assignment ra
+                      WHERE ra.bed_id=b.id AND ra.assignment_status='ACTIVE'
+                  )
+                ORDER BY b.position_index
+                LIMIT 1
+                """, new MapSqlParameterSource()
+                .addValue("roomId", roomId)
+                .addValue("batchId", batchId));
+        if (beds.isEmpty()) {
+            throw new BusinessException(
+                    "NO_AVAILABLE_BED",
+                    "推荐寝室当前没有真实可用床位",
+                    HttpStatus.CONFLICT);
+        }
+        return Map.of(
+                "selectionMode", "BED",
+                "room", room,
+                "bed", beds.getFirst(),
+                "explanation", "从符合条件的寝室中推荐匹配度较高的真实可用床位，确认前不会形成最终分配");
     }
 
     private void requireAccessibleBatch(long batchId, long studentId) {
@@ -168,7 +184,7 @@ public class StudentRoomRecommendationService {
                 """, new MapSqlParameterSource()
                 .addValue("batchId", batchId)
                 .addValue("studentId", studentId),
-                (resultSet, rowNumber) -> resultSet.getString(1));
+                (rs, rowNum) -> rs.getString(1));
         return rows.isEmpty() ? null : rows.getFirst();
     }
 }
