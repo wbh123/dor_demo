@@ -3,6 +3,8 @@ package com.wust.dormitory.admin;
 import com.wust.dormitory.audit.AuditService;
 import com.wust.dormitory.common.error.BusinessException;
 import com.wust.dormitory.security.CurrentUser;
+import com.wust.dormitory.subscription.FeatureAccessService;
+import com.wust.dormitory.subscription.FeatureCodes;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
@@ -23,12 +25,15 @@ public class BatchCopyService {
 
     private final NamedParameterJdbcTemplate jdbc;
     private final AuditService auditService;
+    private final FeatureAccessService featureAccessService;
 
     public BatchCopyService(
             NamedParameterJdbcTemplate jdbc,
-            AuditService auditService) {
+            AuditService auditService,
+            FeatureAccessService featureAccessService) {
         this.jdbc = jdbc;
         this.auditService = auditService;
+        this.featureAccessService = featureAccessService;
     }
 
     @Transactional
@@ -44,6 +49,9 @@ public class BatchCopyService {
             throw new BusinessException(
                     "BATCH_COPY_CANCELLED_FORBIDDEN",
                     "已取消的选寝批次不能作为复制来源");
+        }
+        if ("BED".equals(String.valueOf(source.get("selection_mode")))) {
+            featureAccessService.require(FeatureCodes.P2_BED_SELECTION_MODE);
         }
 
         ensureBatchCodeAvailable(normalized.batchCode());
@@ -73,6 +81,9 @@ public class BatchCopyService {
         result.put("id", newBatchId);
         result.put("sourceBatchId", sourceBatchId);
         result.put("batchStatus", "DRAFT");
+        result.put("selectionMode", source.get("selection_mode"));
+        result.put("separateStudentCategories",
+                ((Number) source.get("separate_student_categories")).intValue() == 1);
         result.put("ruleTemplateId", source.get("rule_template_id"));
         result.put("buildingScopeCount", copiedBuildings);
         result.put("roomScopeCount", copiedRooms);
@@ -83,6 +94,9 @@ public class BatchCopyService {
         before.put("sourceBatchCode", source.get("batch_code"));
         before.put("sourceBatchName", source.get("batch_name"));
         before.put("sourceBatchStatus", source.get("batch_status"));
+        before.put("selectionMode", source.get("selection_mode"));
+        before.put("separateStudentCategories",
+                ((Number) source.get("separate_student_categories")).intValue() == 1);
         before.put("ruleTemplateId", source.get("rule_template_id"));
 
         auditService.success(
@@ -117,6 +131,7 @@ public class BatchCopyService {
     private Map<String, Object> sourceBatchForUpdate(long sourceBatchId) {
         List<Map<String, Object>> rows = jdbc.queryForList("""
                 SELECT id, batch_code, batch_name, batch_status,
+                       selection_mode, separate_student_categories,
                        questionnaire_version_id, matching_weight_scheme_id, rule_template_id,
                        hold_duration_seconds, hold_renewal_limit,
                        allow_team, team_min_size, team_max_size,
@@ -240,12 +255,14 @@ public class BatchCopyService {
             jdbc.update("""
                     INSERT INTO selection_batch
                     (batch_code, batch_name, batch_status,
+                     selection_mode, separate_student_categories,
                      questionnaire_version_id, matching_weight_scheme_id, rule_template_id,
                      start_at, end_at, hold_duration_seconds, hold_renewal_limit,
                      allow_team, team_min_size, team_max_size,
                      allow_student_random, unselected_strategy, rule_version, created_by)
                     VALUES
                     (:batchCode, :batchName, 'DRAFT',
+                     :selectionMode, :separateStudentCategories,
                      :questionnaireVersionId, :matchingWeightSchemeId, :ruleTemplateId,
                      :startAt, :endAt, :holdDurationSeconds, :holdRenewalLimit,
                      :allowTeam, :teamMinSize, :teamMaxSize,
@@ -253,6 +270,8 @@ public class BatchCopyService {
                     """, new MapSqlParameterSource()
                     .addValue("batchCode", command.batchCode())
                     .addValue("batchName", command.batchName())
+                    .addValue("selectionMode", source.get("selection_mode"))
+                    .addValue("separateStudentCategories", source.get("separate_student_categories"))
                     .addValue("questionnaireVersionId", source.get("questionnaire_version_id"))
                     .addValue("matchingWeightSchemeId", source.get("matching_weight_scheme_id"))
                     .addValue("ruleTemplateId", source.get("rule_template_id"))
