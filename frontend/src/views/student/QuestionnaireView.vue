@@ -4,6 +4,12 @@ import { useRoute, useRouter } from 'vue-router'
 import { api } from '../../api/client'
 import type { DataObject, ObjectSuccessResponse } from '../../api/types'
 
+interface PreferenceChoice {
+  token: string
+  payload: unknown
+  label: string
+}
+
 const route = useRoute()
 const router = useRouter()
 const batchId = Number(route.params.batchId)
@@ -18,13 +24,13 @@ const message = ref('')
 const visibleQuestions = computed(() => questions.value.filter(isQuestionVisible))
 const completed = computed(() =>
   visibleQuestions.value.filter(isRequired).every((question) => {
-    const value = answers[String(question.question_code)]
+    const value = answerPayload(question)
     return value !== undefined && value !== null && value !== ''
   }),
 )
 const answeredCount = computed(() =>
   visibleQuestions.value.filter((question) => {
-    const value = answers[String(question.question_code)]
+    const value = answerPayload(question)
     return value !== undefined && value !== null && value !== ''
   }).length,
 )
@@ -43,18 +49,19 @@ async function load() {
     batch.value = (data.batch ?? {}) as DataObject
     questions.value = (data.questions ?? []) as DataObject[]
     const saved = (data.answers ?? []) as DataObject[]
-    const questionById = new Map(questions.value.map((q) => [Number(q.id), String(q.question_code)]))
+    const questionById = new Map(questions.value.map((question) => [Number(question.id), question]))
     for (const answer of saved) {
-      const code = questionById.get(Number(answer.question_id))
-      if (!code) continue
+      const question = questionById.get(Number(answer.question_id))
+      if (!question) continue
+      let parsed: unknown
       try {
-        answers[code] =
-          typeof answer.answer_json === 'string'
-            ? JSON.parse(answer.answer_json)
-            : answer.answer_json
+        parsed = typeof answer.answer_json === 'string'
+          ? JSON.parse(answer.answer_json)
+          : answer.answer_json
       } catch {
-        answers[code] = answer.answer_json
+        parsed = answer.answer_json
       }
+      answers[String(question.question_code)] = normalizeSavedAnswer(question, parsed)
     }
   } catch (reason) {
     error.value = reason instanceof Error ? reason.message : '个人偏好加载失败'
@@ -79,7 +86,7 @@ async function submit() {
     const payload: Record<string, unknown> = {}
     for (const question of visibleQuestions.value) {
       const code = String(question.question_code)
-      const value = answers[code]
+      const value = answerPayload(question)
       if (value !== undefined && value !== null && value !== '') payload[code] = value
     }
     await api.post(`/api/v1/student/batches/${batchId}/questionnaire`, payload)
@@ -99,7 +106,10 @@ async function submit() {
 function isQuestionVisible(question: DataObject) {
   const code = String(question.question_code)
   if (code === 'WINTER_HEATING_TEMPERATURE') {
-    const acceptance = Number(answers.WINTER_HEATING_ACCEPTANCE)
+    const acceptanceQuestion = questions.value.find(
+      (item) => String(item.question_code) === 'WINTER_HEATING_ACCEPTANCE',
+    )
+    const acceptance = Number(acceptanceQuestion ? answerPayload(acceptanceQuestion) : undefined)
     return Number.isFinite(acceptance) && acceptance > 1
   }
   return true
@@ -110,46 +120,90 @@ function isRequired(question: DataObject) {
     || String(question.question_code) === 'WINTER_HEATING_TEMPERATURE'
 }
 
-function choices(question: DataObject) {
+function choiceToken(question: DataObject, optionCode: string, index: number) {
+  return `${String(question.question_code)}:${optionCode}:${index}`
+}
+
+function choices(question: DataObject): PreferenceChoice[] {
   const configured = (question.options ?? []) as DataObject[]
   if (configured.length > 0) {
     const keepCode = ['SMOKING_ACCEPTANCE', 'BED_PREFERENCE']
       .includes(String(question.question_code))
-    return configured.map((option) => ({
-      value: keepCode || option.feature_value === null || option.feature_value === undefined
-        ? String(option.option_code)
-        : Number(option.feature_value),
-      label: String(option.option_text),
-    }))
+    return configured.map((option, index) => {
+      const optionCode = String(option.option_code)
+      const payload = keepCode || option.feature_value === null || option.feature_value === undefined
+        ? optionCode
+        : Number(option.feature_value)
+      return {
+        token: choiceToken(question, optionCode, index),
+        payload,
+        label: String(option.option_text),
+      }
+    })
   }
 
   const feature = String(question.feature_key)
   if (feature === 'smokingAcceptance') {
-    return [
-      { value: 'ACCEPT', label: '接受' },
-      { value: 'REJECT', label: '不接受' },
-      { value: 'ANY', label: '均可' },
-    ]
+    return fallbackChoices(question, [
+      ['ACCEPT', '接受'],
+      ['REJECT', '不接受'],
+      ['ANY', '均可'],
+    ])
   }
   if (feature === 'napHabit') {
-    return [
-      { value: 0, label: '基本不午休' },
-      { value: 1, label: '偶尔午休' },
-      { value: 2, label: '经常午休' },
-    ]
+    return fallbackChoices(question, [
+      [0, '基本不午休'],
+      [1, '偶尔午休'],
+      [2, '经常午休'],
+    ])
   }
   if (feature === 'bedPreference') {
-    return [
-      { value: 'ANY', label: '无特别偏好' },
-      { value: 'LOFT_BED_DESK', label: '上床下桌' },
-      { value: 'BUNK_UPPER', label: '上下铺上铺' },
-      { value: 'BUNK_LOWER', label: '上下铺下铺' },
-    ]
+    return fallbackChoices(question, [
+      ['ANY', '无特别偏好'],
+      ['LOFT_BED_DESK', '上床下桌'],
+      ['BUNK_UPPER', '上下铺上铺'],
+      ['BUNK_LOWER', '上下铺下铺'],
+    ])
   }
-  return [1, 2, 3, 4, 5].map((value) => ({
-    value,
-    label: ['非常低', '较低', '适中', '较高', '非常高'][value - 1],
+  return fallbackChoices(
+    question,
+    [1, 2, 3, 4, 5].map((value) => [
+      value,
+      ['非常低', '较低', '适中', '较高', '非常高'][value - 1],
+    ]),
+  )
+}
+
+function fallbackChoices(
+  question: DataObject,
+  values: Array<[unknown, string]>,
+): PreferenceChoice[] {
+  return values.map(([payload, label], index) => ({
+    token: choiceToken(question, `VALUE_${String(payload)}`, index),
+    payload,
+    label,
   }))
+}
+
+function choicePayload(question: DataObject, token: unknown) {
+  return choices(question).find((choice) => choice.token === token)?.payload
+}
+
+function answerPayload(question: DataObject) {
+  const code = String(question.question_code)
+  const value = answers[code]
+  if (question.question_type === 'SINGLE_CHOICE') {
+    return choicePayload(question, value)
+  }
+  return value
+}
+
+function normalizeSavedAnswer(question: DataObject, value: unknown) {
+  if (question.question_type !== 'SINGLE_CHOICE') return value
+  const matched = choices(question).find((choice) =>
+    choice.payload === value || String(choice.payload) === String(value),
+  )
+  return matched?.token ?? ''
 }
 
 function questionMin(question: DataObject) {
@@ -208,12 +262,12 @@ function questionMax(question: DataObject) {
             <span>℃</span>
           </label>
           <div v-else class="choice-grid">
-            <label v-for="choice in choices(question)" :key="String(choice.value)" class="choice-item">
+            <label v-for="choice in choices(question)" :key="choice.token" class="choice-item">
               <input
                 v-model="answers[String(question.question_code)]"
                 type="radio"
                 :name="String(question.question_code)"
-                :value="choice.value"
+                :value="choice.token"
                 :disabled="!canSave"
                 :required="isRequired(question)"
               />
