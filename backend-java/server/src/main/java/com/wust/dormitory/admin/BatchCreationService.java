@@ -3,6 +3,8 @@ package com.wust.dormitory.admin;
 import com.wust.dormitory.audit.AuditService;
 import com.wust.dormitory.common.error.BusinessException;
 import com.wust.dormitory.security.CurrentUser;
+import com.wust.dormitory.subscription.FeatureAccessService;
+import com.wust.dormitory.subscription.FeatureCodes;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
@@ -20,14 +22,17 @@ import java.util.Map;
 public class BatchCreationService {
     private final NamedParameterJdbcTemplate jdbc;
     private final BatchRuleTemplateService batchRuleTemplateService;
+    private final FeatureAccessService featureAccessService;
     private final AuditService auditService;
 
     public BatchCreationService(
             NamedParameterJdbcTemplate jdbc,
             BatchRuleTemplateService batchRuleTemplateService,
+            FeatureAccessService featureAccessService,
             AuditService auditService) {
         this.jdbc = jdbc;
         this.batchRuleTemplateService = batchRuleTemplateService;
+        this.featureAccessService = featureAccessService;
         this.auditService = auditService;
     }
 
@@ -35,6 +40,9 @@ public class BatchCreationService {
     public Map<String, Object> create(CreateCommand command, CurrentUser operator) {
         CreateCommand normalized = command.normalized();
         validate(normalized);
+        if ("BED".equals(normalized.selectionMode())) {
+            featureAccessService.require(FeatureCodes.P2_BED_SELECTION_MODE);
+        }
 
         Map<String, Object> questionnaire = one("""
                 SELECT id FROM questionnaire_version
@@ -55,13 +63,15 @@ public class BatchCreationService {
         try {
             jdbc.update("""
                     INSERT INTO selection_batch
-                    (batch_code, batch_name, batch_status,
+                    (batch_code, batch_name, batch_status, selection_mode,
+                     separate_student_categories,
                      questionnaire_version_id, matching_weight_scheme_id, rule_template_id,
                      start_at, end_at, hold_duration_seconds, hold_renewal_limit,
                      allow_team, team_min_size, team_max_size,
                      allow_student_random, unselected_strategy, rule_version, created_by)
                     VALUES
-                    (:batchCode, :batchName, 'DRAFT',
+                    (:batchCode, :batchName, 'DRAFT', :selectionMode,
+                     :separateStudentCategories,
                      :questionnaireId, :schemeId, :ruleTemplateId,
                      :startAt, :endAt, :holdDurationSeconds, :holdRenewalLimit,
                      :allowTeam, :teamMinSize, :teamMaxSize,
@@ -69,6 +79,8 @@ public class BatchCreationService {
                     """, new MapSqlParameterSource()
                     .addValue("batchCode", normalized.batchCode())
                     .addValue("batchName", normalized.batchName())
+                    .addValue("selectionMode", normalized.selectionMode())
+                    .addValue("separateStudentCategories", normalized.separateStudentCategories() ? 1 : 0)
                     .addValue("questionnaireId", questionnaire.get("id"))
                     .addValue("schemeId", scheme.get("id"))
                     .addValue("ruleTemplateId", snapshot.id())
@@ -101,6 +113,8 @@ public class BatchCreationService {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("id", batchId);
         result.put("batchStatus", "DRAFT");
+        result.put("selectionMode", normalized.selectionMode());
+        result.put("separateStudentCategories", normalized.separateStudentCategories());
         result.put("ruleTemplateId", snapshot.id());
         result.put("ruleTemplateCode", snapshot.code());
         result.put("ruleTemplateRevision", snapshot.revision());
@@ -143,6 +157,9 @@ public class BatchCreationService {
         if (!command.startAt().isBefore(command.endAt())) {
             throw new BusinessException("BATCH_TIME_INVALID", "选寝开始时间必须早于结束时间");
         }
+        if (!List.of("ROOM", "BED").contains(command.selectionMode())) {
+            throw new BusinessException("BATCH_SELECTION_MODE_INVALID", "批次选择模式必须为选寝室或选床位");
+        }
     }
 
     private Map<String, Object> one(
@@ -162,7 +179,9 @@ public class BatchCreationService {
             String batchName,
             LocalDateTime startAt,
             LocalDateTime endAt,
-            Long ruleTemplateId) {
+            Long ruleTemplateId,
+            String selectionMode,
+            boolean separateStudentCategories) {
 
         CreateCommand normalized() {
             return new CreateCommand(
@@ -170,7 +189,9 @@ public class BatchCreationService {
                     batchName == null ? "" : batchName.trim(),
                     startAt,
                     endAt,
-                    ruleTemplateId);
+                    ruleTemplateId,
+                    selectionMode == null ? "ROOM" : selectionMode.trim().toUpperCase(),
+                    separateStudentCategories);
         }
     }
 }
