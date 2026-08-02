@@ -4,10 +4,12 @@ on:
   push:
     branches:
       - main
+      - dev
       - 'feature/**'
   pull_request:
     branches:
       - main
+      - dev
 
 permissions:
   contents: read
@@ -47,10 +49,14 @@ jobs:
         run: python -m unittest scripts/phase2/test_room_bed_type_and_preference_ui.py -v
       - name: Run team, i18n and layout refinement tests
         run: python -m unittest scripts/phase2/test_team_i18n_layout_refinement.py -v
+      - name: Run post-merge hardening tests
+        run: python -m unittest scripts/phase2/test_post_merge_hardening.py -v
       - name: Run Phase 2 matching operations tests
         run: python -m unittest scripts/phase2/test_matching_operations.py -v
       - name: Run Phase 2 batch copy tests
         run: python -m unittest scripts/phase2/test_batch_copy.py -v
+      - name: Run Phase 2 batch rule template tests
+        run: python -m unittest scripts/phase2/test_batch_rule_templates.py -v
 
   backend:
     name: Generate OpenAPI and build backend
@@ -143,7 +149,7 @@ jobs:
           done
           cat /tmp/wust-dormitory.log
           exit 1
-      - name: Assert Flyway V9 and international student rules
+      - name: Assert Flyway V11 and rule template rules
         run: |
           python -m pip install --disable-pip-version-check pymysql
           python - <<'PY'
@@ -159,14 +165,20 @@ jobs:
           )
           with connection.cursor() as cursor:
               cursor.execute("SELECT MAX(CAST(version AS UNSIGNED)) FROM flyway_schema_history WHERE success=1")
-              assert cursor.fetchone()[0] >= 9
+              assert cursor.fetchone()[0] >= 11
               cursor.execute("SHOW TABLES LIKE 'major'")
               assert cursor.fetchone() is not None
               cursor.execute("SHOW TABLES LIKE 'organization'")
               assert cursor.fetchone() is None
-              for table in ('active_batch_student_lock', 'room_bed_layout', 'system_setting', 'student_notification'):
+              for table in ('active_batch_student_lock', 'room_bed_layout', 'system_setting', 'student_notification', 'batch_rule_template'):
                   cursor.execute(f"SHOW TABLES LIKE '{table}'")
                   assert cursor.fetchone() is not None, table
+              cursor.execute("SHOW COLUMNS FROM selection_batch LIKE 'rule_template_id'")
+              assert cursor.fetchone() is not None
+              cursor.execute("SELECT COUNT(*) FROM batch_rule_template WHERE enabled=1 AND is_default=1")
+              assert cursor.fetchone()[0] == 1
+              cursor.execute("SELECT COUNT(*) FROM selection_batch WHERE rule_template_id IS NULL")
+              assert cursor.fetchone()[0] == 0
               cursor.execute("SHOW COLUMNS FROM app_user LIKE 'welcome_acknowledged_at'")
               assert cursor.fetchone() is not None
               cursor.execute("SHOW COLUMNS FROM student")
@@ -179,6 +191,7 @@ jobs:
               assert cursor.fetchone()[0] == 520
               cursor.execute("SELECT setting_value FROM system_setting WHERE setting_key='STUDENT_WELCOME_MESSAGE'")
               welcome = json.loads(cursor.fetchone()[0])
+              assert isinstance(welcome, dict)
               assert welcome['zh-CN'] and welcome['en-US']
               cursor.execute("SHOW COLUMNS FROM room_bed_layout")
               layout_columns = {row[0] for row in cursor.fetchall()}
@@ -214,6 +227,7 @@ jobs:
           python scripts/e2e/phase2_room_layout_smoke.py
           python scripts/e2e/phase2_matching_operations_smoke.py
           python scripts/e2e/phase2_batch_copy_smoke.py
+          python scripts/e2e/phase2_batch_rule_template_smoke.py
       - name: Print service log
         if: always()
         run: cat /tmp/wust-dormitory.log || true

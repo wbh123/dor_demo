@@ -103,6 +103,9 @@ public class SystemSettingService {
                     rawValue,
                     new TypeReference<Map<String, String>>() { });
             Map<String, String> merged = new LinkedHashMap<>(DEFAULT_MESSAGES);
+            if (parsed == null) {
+                return merged;
+            }
             for (String locale : List.of("zh-CN", "en-US")) {
                 String value = parsed.get(locale);
                 if (value != null && !value.isBlank()) {

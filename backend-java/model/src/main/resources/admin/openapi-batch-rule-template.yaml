@@ -1,0 +1,169 @@
+openapi: 3.0.3
+info:
+  title: Wust Dormitory Select 批次规则模板接口
+  version: 1.0.0
+paths:
+  /api/v1/admin/batch-rule-templates:
+    get:
+      tags: [BatchRuleTemplate]
+      operationId: listBatchRuleTemplates
+      summary: 查询批次规则模板及修订
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: '../common-response/openapi-common-response.yaml#/components/schemas/ListSuccessResponse'
+    post:
+      tags: [BatchRuleTemplate]
+      operationId: createBatchRuleTemplate
+      summary: 创建批次规则模板首个修订
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BatchRuleTemplateCreateRequest'
+      responses:
+        '200':
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                $ref: '../common-response/openapi-common-response.yaml#/components/schemas/ObjectSuccessResponse'
+        '400':
+          description: 参数校验失败
+          content:
+            application/json:
+              schema:
+                $ref: '../common-response/openapi-common-response.yaml#/components/schemas/ErrorResponse'
+        '409':
+          description: 模板编码冲突
+          content:
+            application/json:
+              schema:
+                $ref: '../common-response/openapi-common-response.yaml#/components/schemas/ErrorResponse'
+
+  /api/v1/admin/batch-rule-templates/{templateId}/revisions:
+    post:
+      tags: [BatchRuleTemplate]
+      operationId: createBatchRuleTemplateRevision
+      summary: 基于已有模板创建不可变新修订
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: templateId
+          in: path
+          required: true
+          schema: { type: integer, format: int64, minimum: 1 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BatchRuleTemplateRevisionRequest'
+      responses:
+        '200':
+          description: 新修订创建成功
+          content:
+            application/json:
+              schema:
+                $ref: '../common-response/openapi-common-response.yaml#/components/schemas/ObjectSuccessResponse'
+        '400':
+          description: 参数校验失败
+          content:
+            application/json:
+              schema:
+                $ref: '../common-response/openapi-common-response.yaml#/components/schemas/ErrorResponse'
+        '404':
+          description: 原模板不存在
+          content:
+            application/json:
+              schema:
+                $ref: '../common-response/openapi-common-response.yaml#/components/schemas/ErrorResponse'
+        '409':
+          description: 模板版本冲突
+          content:
+            application/json:
+              schema:
+                $ref: '../common-response/openapi-common-response.yaml#/components/schemas/ErrorResponse'
+
+components:
+  schemas:
+    BatchRuleTemplateCreateRequest:
+      type: object
+      required:
+        - ruleCode
+        - ruleName
+        - holdDurationSeconds
+        - holdRenewalLimit
+        - allowTeam
+        - teamMinSize
+        - teamMaxSize
+        - allowStudentRandom
+        - unselectedStrategy
+        - ruleVersion
+        - enabled
+        - makeDefault
+        - changeReason
+      properties:
+        ruleCode:
+          type: string
+          minLength: 2
+          maxLength: 32
+          pattern: '^[A-Z0-9][A-Z0-9_-]*$'
+        ruleName: { type: string, minLength: 2, maxLength: 128 }
+        holdDurationSeconds: { type: integer, format: int32, minimum: 30, maximum: 3600 }
+        holdRenewalLimit: { type: integer, format: int32, minimum: 0, maximum: 20 }
+        allowTeam: { type: boolean }
+        teamMinSize: { type: integer, format: int32, minimum: 1, maximum: 5 }
+        teamMaxSize: { type: integer, format: int32, minimum: 1, maximum: 5 }
+        allowStudentRandom: { type: boolean }
+        unselectedStrategy:
+          type: string
+          enum: [NONE, ADMIN_ALLOCATION]
+        ruleVersion: { type: string, minLength: 2, maxLength: 32 }
+        enabled: { type: boolean }
+        makeDefault: { type: boolean }
+        changeReason: { type: string, minLength: 2, maxLength: 500 }
+
+    BatchRuleTemplateRevisionRequest:
+      type: object
+      required:
+        - ruleName
+        - holdDurationSeconds
+        - holdRenewalLimit
+        - allowTeam
+        - teamMinSize
+        - teamMaxSize
+        - allowStudentRandom
+        - unselectedStrategy
+        - ruleVersion
+        - enabled
+        - makeDefault
+        - expectedVersion
+        - changeReason
+      properties:
+        ruleName: { type: string, minLength: 2, maxLength: 128 }
+        holdDurationSeconds: { type: integer, format: int32, minimum: 30, maximum: 3600 }
+        holdRenewalLimit: { type: integer, format: int32, minimum: 0, maximum: 20 }
+        allowTeam: { type: boolean }
+        teamMinSize: { type: integer, format: int32, minimum: 1, maximum: 5 }
+        teamMaxSize: { type: integer, format: int32, minimum: 1, maximum: 5 }
+        allowStudentRandom: { type: boolean }
+        unselectedStrategy:
+          type: string
+          enum: [NONE, ADMIN_ALLOCATION]
+        ruleVersion: { type: string, minLength: 2, maxLength: 32 }
+        enabled: { type: boolean }
+        makeDefault: { type: boolean }
+        expectedVersion: { type: integer, format: int32, minimum: 0 }
+        changeReason: { type: string, minLength: 2, maxLength: 500 }
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: Token

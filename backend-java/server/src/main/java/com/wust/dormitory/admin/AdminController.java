@@ -42,13 +42,13 @@ public class AdminController implements AdminApi {
     private final RoomManagementService roomManagementService;
     private final RoomLayoutService roomLayoutService;
     private final MatchingSchemeService matchingSchemeService;
+    private final BatchCreationService batchCreationService;
     private final BatchLifecycleService batchLifecycleService;
     private final BatchCopyService batchCopyService;
     private final AdminAllocationService allocationService;
     private final AssignmentQueryService assignmentQueryService;
     private final AssignmentAdjustmentService adjustmentService;
     private final AssignmentExportService exportService;
-    private final BatchRuleValidator batchRuleValidator;
 
     public AdminController(
             AdminService adminService,
@@ -56,25 +56,25 @@ public class AdminController implements AdminApi {
             RoomManagementService roomManagementService,
             RoomLayoutService roomLayoutService,
             MatchingSchemeService matchingSchemeService,
+            BatchCreationService batchCreationService,
             BatchLifecycleService batchLifecycleService,
             BatchCopyService batchCopyService,
             AdminAllocationService allocationService,
             AssignmentQueryService assignmentQueryService,
             AssignmentAdjustmentService adjustmentService,
-            AssignmentExportService exportService,
-            BatchRuleValidator batchRuleValidator) {
+            AssignmentExportService exportService) {
         this.adminService = adminService;
         this.studentAdminService = studentAdminService;
         this.roomManagementService = roomManagementService;
         this.roomLayoutService = roomLayoutService;
         this.matchingSchemeService = matchingSchemeService;
+        this.batchCreationService = batchCreationService;
         this.batchLifecycleService = batchLifecycleService;
         this.batchCopyService = batchCopyService;
         this.allocationService = allocationService;
         this.assignmentQueryService = assignmentQueryService;
         this.adjustmentService = adjustmentService;
         this.exportService = exportService;
-        this.batchRuleValidator = batchRuleValidator;
     }
 
     @Override
@@ -227,18 +227,14 @@ public class AdminController implements AdminApi {
 
     @Override
     public ResponseEntity<ObjectSuccessResponse> createBatch(BatchRequest request) {
-        AdminService.BatchCommand command = new AdminService.BatchCommand(
+        BatchCreationService.CreateCommand command = new BatchCreationService.CreateCommand(
                 request.getBatchCode(),
                 request.getBatchName(),
                 toLocalDateTime(request.getStartAt()),
                 toLocalDateTime(request.getEndAt()),
-                request.getHoldDurationSeconds(),
-                request.getAllowTeam(),
-                request.getTeamMaxSize(),
-                request.getAllowStudentRandom());
-        batchRuleValidator.validate(command);
-        long id = adminService.createBatch(command, SecurityUsers.requireAdmin());
-        return ResponseEntity.ok(ResponseFactory.object(Map.of("id", id)));
+                request.getRuleTemplateId());
+        return ResponseEntity.ok(ResponseFactory.object(
+                batchCreationService.create(command, SecurityUsers.requireAdmin())));
     }
 
     @Override

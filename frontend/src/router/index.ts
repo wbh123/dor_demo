@@ -77,6 +77,12 @@ const router = createRouter({
           meta: { role: 'ADMIN' },
         },
         {
+          path: 'admin/rule-templates',
+          name: 'admin-rule-templates',
+          component: () => import('../views/admin/AdminRuleTemplateView.vue'),
+          meta: { role: 'ADMIN' },
+        },
+        {
           path: 'admin/batches',
           name: 'admin-batches',
           component: () => import('../views/admin/AdminBatchView.vue'),

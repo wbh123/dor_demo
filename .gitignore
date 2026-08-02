@@ -1,4 +1,7 @@
 Need.md
+scripts/*/__pycache__/
+.venv-local-ci/
+local-ci-logs/
 
 # 本地运行配置
 .env

@@ -78,6 +78,12 @@ def main() -> int:
             cursor.execute("SELECT id FROM matching_weight_scheme ORDER BY id LIMIT 1")
             scheme_id = int(cursor.fetchone()[0])
             cursor.execute("""
+                SELECT id FROM batch_rule_template
+                WHERE enabled=1 AND is_default=1
+                ORDER BY id LIMIT 1
+            """)
+            rule_template_id = int(cursor.fetchone()[0])
+            cursor.execute("""
                 SELECT bed.id, bed.operational_status, r.id, b.id
                 FROM bed JOIN room r ON r.id=bed.room_id
                 JOIN dormitory_floor f ON f.id=r.floor_id
@@ -93,14 +99,15 @@ def main() -> int:
             cursor.execute("""
                 INSERT INTO selection_batch
                 (batch_code, batch_name, batch_status, questionnaire_version_id,
-                 matching_weight_scheme_id, start_at, end_at, hold_duration_seconds,
+                 matching_weight_scheme_id, rule_template_id,
+                 start_at, end_at, hold_duration_seconds,
                  hold_renewal_limit, allow_team, team_min_size, team_max_size,
                  allow_student_random, unselected_strategy, rule_version, created_by)
-                VALUES (%s, '批次复制自动验收来源', 'FINISHED', %s, %s,
+                VALUES (%s, '批次复制自动验收来源', 'FINISHED', %s, %s, %s,
                         '2026-01-01 08:00:00', '2026-01-31 18:00:00',
                         420, 3, 1, 2, 4, 1, 'ADMIN_ALLOCATION',
                         'phase2-copy-smoke-v1', %s)
-            """, (source_code, questionnaire_id, scheme_id, admin_id))
+            """, (source_code, questionnaire_id, scheme_id, rule_template_id, admin_id))
             source_batch_id = int(cursor.lastrowid)
             cursor.execute("INSERT INTO batch_building_scope(batch_id, building_id) VALUES (%s, %s)", (source_batch_id, building_id))
             cursor.execute("INSERT INTO batch_room_scope(batch_id, room_id) VALUES (%s, %s)", (source_batch_id, room_id))
@@ -117,17 +124,22 @@ def main() -> int:
         copied = data(request("POST", f"/api/v1/admin/batches/{source_batch_id}/copy", token=admin_token, body=payload))
         copied_batch_id = int(copied["id"])
         assert copied["batchStatus"] == "DRAFT", copied
+        assert int(copied["ruleTemplateId"]) == rule_template_id, copied
         assert (int(copied["buildingScopeCount"]), int(copied["roomScopeCount"]), int(copied["bedScopeCount"])) == (1, 1, 1)
 
         with connection.cursor() as cursor:
             cursor.execute("""
                 SELECT batch_status, questionnaire_version_id, matching_weight_scheme_id,
-                       hold_duration_seconds, hold_renewal_limit, allow_team,
+                       rule_template_id, hold_duration_seconds, hold_renewal_limit, allow_team,
                        team_min_size, team_max_size, allow_student_random,
                        unselected_strategy, rule_version, published_at
                 FROM selection_batch WHERE id=%s
             """, (copied_batch_id,))
-            assert cursor.fetchone() == ('DRAFT', questionnaire_id, scheme_id, 420, 3, 1, 2, 4, 1, 'ADMIN_ALLOCATION', 'phase2-copy-smoke-v1', None)
+            assert cursor.fetchone() == (
+                'DRAFT', questionnaire_id, scheme_id, rule_template_id,
+                420, 3, 1, 2, 4, 1,
+                'ADMIN_ALLOCATION', 'phase2-copy-smoke-v1', None,
+            )
             for table in ("batch_building_scope", "batch_room_scope", "batch_bed_scope"):
                 cursor.execute(f"SELECT COUNT(*) FROM {table} WHERE batch_id=%s", (copied_batch_id,))
                 assert cursor.fetchone()[0] == 1, table
@@ -156,11 +168,13 @@ def main() -> int:
             cursor.execute("""
                 INSERT INTO selection_batch
                 (batch_code, batch_name, batch_status, questionnaire_version_id,
-                 matching_weight_scheme_id, start_at, end_at, hold_duration_seconds,
+                 matching_weight_scheme_id, rule_template_id,
+                 start_at, end_at, hold_duration_seconds,
                  hold_renewal_limit, allow_team, team_min_size, team_max_size,
                  allow_student_random, unselected_strategy, rule_version, created_by)
                 SELECT %s, '已取消复制来源', 'CANCELLED', questionnaire_version_id,
-                       matching_weight_scheme_id, start_at, end_at, hold_duration_seconds,
+                       matching_weight_scheme_id, rule_template_id,
+                       start_at, end_at, hold_duration_seconds,
                        hold_renewal_limit, allow_team, team_min_size, team_max_size,
                        allow_student_random, unselected_strategy, rule_version, created_by
                 FROM selection_batch WHERE id=%s

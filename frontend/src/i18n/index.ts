@@ -126,6 +126,7 @@ const textTranslations: Record<string, string> = {
   专业与学生: 'Majors and students',
   宿舍资源: 'Dormitory resources',
   匹配规则: 'Matching rules',
+  批次规则: 'Batch rules',
   选寝批次: 'Selection batches',
   分配与调整: 'Assignments',
   选寝首页: 'Selection home',
@@ -192,10 +193,12 @@ const subtitleTranslations: Record<string, string> = {
   'WUST DORMITORY SELECT': '武科大选寝',
 }
 
+const translatedAttributes = ['placeholder', 'title', 'aria-label'] as const
 const originalText = new WeakMap<Node, string>()
+const lastAppliedText = new WeakMap<Node, string>()
 const originalAttributes = new WeakMap<Element, Map<string, string>>()
+const lastAppliedAttributes = new WeakMap<Element, Map<string, string>>()
 let observer: MutationObserver | null = null
-let applying = false
 
 function interpolate(template: string, params: Record<string, unknown> = {}) {
   return template.replace(/\{(\w+)\}/g, (_, key: string) => String(params[key] ?? ''))
@@ -259,56 +262,92 @@ function translateTextValue(value: string, element?: Element) {
   return translated ? value.replace(trimmed, translated) : value
 }
 
+function applyTextTranslation(node: Node) {
+  const parent = node.parentElement
+  if (!originalText.has(node)) originalText.set(node, node.textContent ?? '')
+  const source = originalText.get(node) ?? ''
+  const translated = translateTextValue(source, parent ?? undefined)
+  if (node.textContent === translated) return
+  lastAppliedText.set(node, translated)
+  node.textContent = translated
+}
+
+function applyAttributeTranslations(element: Element) {
+  let sources = originalAttributes.get(element)
+  if (!sources) {
+    sources = new Map<string, string>()
+    originalAttributes.set(element, sources)
+  }
+  let applied = lastAppliedAttributes.get(element)
+  if (!applied) {
+    applied = new Map<string, string>()
+    lastAppliedAttributes.set(element, applied)
+  }
+  for (const name of translatedAttributes) {
+    const current = element.getAttribute(name)
+    if (current !== null && !sources.has(name)) sources.set(name, current)
+    const source = sources.get(name)
+    if (source === undefined) continue
+    const translated = translateTextValue(source, element)
+    if (current === translated) continue
+    applied.set(name, translated)
+    element.setAttribute(name, translated)
+  }
+}
+
 function translateNode(node: Node) {
   if (node.nodeType === Node.TEXT_NODE) {
-    const parent = node.parentElement
-    if (!originalText.has(node)) originalText.set(node, node.textContent ?? '')
-    const source = originalText.get(node) ?? ''
-    node.textContent = translateTextValue(source, parent ?? undefined)
+    applyTextTranslation(node)
     return
   }
   if (!(node instanceof Element)) return
-  const attributeNames = ['placeholder', 'title', 'aria-label']
-  let values = originalAttributes.get(node)
-  if (!values) {
-    values = new Map<string, string>()
-    originalAttributes.set(node, values)
-  }
-  for (const name of attributeNames) {
-    const current = node.getAttribute(name)
-    if (current !== null && !values.has(name)) values.set(name, current)
-    const source = values.get(name)
-    if (source !== undefined) node.setAttribute(name, translateTextValue(source, node))
-  }
+  applyAttributeTranslations(node)
   node.childNodes.forEach(translateNode)
 }
 
 function refreshDomTranslations() {
-  if (!document.body) return
-  applying = true
-  try {
-    translateNode(document.body)
-  } finally {
-    applying = false
-  }
+  if (document.body) translateNode(document.body)
 }
 
 function installDomI18n() {
   if (observer) return
   refreshDomTranslations()
   observer = new MutationObserver((mutations) => {
-    if (applying) return
-    applying = true
-    try {
-      for (const mutation of mutations) {
-        mutation.addedNodes.forEach(translateNode)
-        if (mutation.type === 'characterData') translateNode(mutation.target)
+    for (const mutation of mutations) {
+      mutation.addedNodes.forEach(translateNode)
+      if (mutation.type === 'characterData') {
+        const current = mutation.target.textContent ?? ''
+        if (lastAppliedText.get(mutation.target) === current) {
+          lastAppliedText.delete(mutation.target)
+          continue
+        }
+        originalText.set(mutation.target, current)
+        translateNode(mutation.target)
       }
-    } finally {
-      applying = false
+      if (mutation.type === 'attributes' && mutation.target instanceof Element && mutation.attributeName) {
+        const current = mutation.target.getAttribute(mutation.attributeName) ?? ''
+        const applied = lastAppliedAttributes.get(mutation.target)
+        if (applied?.get(mutation.attributeName) === current) {
+          applied.delete(mutation.attributeName)
+          continue
+        }
+        let sources = originalAttributes.get(mutation.target)
+        if (!sources) {
+          sources = new Map<string, string>()
+          originalAttributes.set(mutation.target, sources)
+        }
+        sources.set(mutation.attributeName, current)
+        applyAttributeTranslations(mutation.target)
+      }
     }
   })
-  observer.observe(document.body, { childList: true, subtree: true, characterData: true })
+  observer.observe(document.body, {
+    childList: true,
+    subtree: true,
+    characterData: true,
+    attributes: true,
+    attributeFilter: [...translatedAttributes],
+  })
 }
 
 watch(locale, () => {

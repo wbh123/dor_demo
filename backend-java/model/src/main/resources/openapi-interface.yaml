@@ -2,7 +2,7 @@ openapi: 3.0.3
 info:
   title: 武汉科技大学学生宿舍智能选择系统接口
   description: 第一阶段核心闭环与第二阶段质量运营能力OpenAPI契约
-  version: 2.5.0
+  version: 2.6.0
 servers:
   - url: http://localhost:8080
 paths:
@@ -43,6 +43,10 @@ paths:
     $ref: 'admin/openapi-matching.yaml#/paths/~1api~1v1~1admin~1matching-weight-schemes'
   /api/v1/admin/matching-weight-schemes/{schemeId}/revisions:
     $ref: 'admin/openapi-matching.yaml#/paths/~1api~1v1~1admin~1matching-weight-schemes~1{schemeId}~1revisions'
+  /api/v1/admin/batch-rule-templates:
+    $ref: 'admin/openapi-batch-rule-template.yaml#/paths/~1api~1v1~1admin~1batch-rule-templates'
+  /api/v1/admin/batch-rule-templates/{templateId}/revisions:
+    $ref: 'admin/openapi-batch-rule-template.yaml#/paths/~1api~1v1~1admin~1batch-rule-templates~1{templateId}~1revisions'
   /api/v1/admin/batches:
     $ref: 'admin/openapi-admin.yaml#/paths/~1api~1v1~1admin~1batches'
   /api/v1/admin/batches/{batchId}/copy:

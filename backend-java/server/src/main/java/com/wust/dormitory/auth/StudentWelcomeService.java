@@ -68,6 +68,9 @@ public class StudentWelcomeService {
             Map<String, String> configured = objectMapper.readValue(
                     rawValue,
                     new TypeReference<Map<String, String>>() { });
+            if (configured == null) {
+                return result;
+            }
             configured.forEach((locale, message) -> {
                 if (message != null && !message.isBlank()) {
                     result.put(locale, message.trim());

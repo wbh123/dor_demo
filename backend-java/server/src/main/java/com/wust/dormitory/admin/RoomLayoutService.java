@@ -66,6 +66,7 @@ public class RoomLayoutService {
                 ORDER BY bed.position_index, bed.id
                 """, Map.of("roomId", roomId));
 
+        Set<Long> genuineBunkFrames = genuineBunkFrameIds(rows);
         boolean hasCustom = false;
         List<Map<String, Object>> beds = new ArrayList<>(rows.size());
         for (Map<String, Object> row : rows) {
@@ -80,8 +81,10 @@ public class RoomLayoutService {
                 bed.put("layout_z", placement.z());
                 bed.put("rotation_degrees", placement.rotationDegrees());
             }
-            bed.put("layout_unit_type",
-                    row.get("bed_frame_id") == null ? "LOFT_BED_DESK" : "BUNK");
+            Object frameValue = row.get("bed_frame_id");
+            boolean genuineBunk = frameValue != null
+                    && genuineBunkFrames.contains(number(frameValue));
+            bed.put("layout_unit_type", genuineBunk ? "BUNK" : "LOFT_BED_DESK");
             beds.add(bed);
         }
 
@@ -207,21 +210,22 @@ public class RoomLayoutService {
         for (Map<String, Object> bed : roomBeds) {
             Object frameValue = bed.get("bed_frame_id");
             if (frameValue == null) {
-                units.add(new BedUnit(
-                        number(bed.get("id")),
-                        "LOFT_BED_DESK",
-                        List.of(bed),
-                        occupied(bed)));
+                units.add(loftUnit(bed));
                 continue;
             }
             frameBeds.computeIfAbsent(number(frameValue), ignored -> new ArrayList<>()).add(bed);
         }
         for (List<Map<String, Object>> beds : frameBeds.values()) {
-            beds.sort(Comparator.comparingInt(bed -> ((Number) bed.get("position_index")).intValue()));
+            beds.sort(Comparator.comparingInt(
+                    bed -> ((Number) bed.get("position_index")).intValue()));
+            if (!isGenuineBunkPair(beds)) {
+                beds.stream().map(this::loftUnit).forEach(units::add);
+                continue;
+            }
             Map<String, Object> representative = beds.stream()
                     .filter(bed -> "BUNK_UPPER".equals(bed.get("bed_type")))
                     .findFirst()
-                    .orElse(beds.getFirst());
+                    .orElseThrow();
             units.add(new BedUnit(
                     number(representative.get("id")),
                     "BUNK",
@@ -230,6 +234,43 @@ public class RoomLayoutService {
         }
         units.sort(Comparator.comparingLong(BedUnit::representativeBedId));
         return units;
+    }
+
+    private Set<Long> genuineBunkFrameIds(List<Map<String, Object>> roomBeds) {
+        Map<Long, List<Map<String, Object>>> frameBeds = new LinkedHashMap<>();
+        for (Map<String, Object> bed : roomBeds) {
+            Object frameValue = bed.get("bed_frame_id");
+            if (frameValue != null) {
+                frameBeds.computeIfAbsent(number(frameValue), ignored -> new ArrayList<>())
+                        .add(bed);
+            }
+        }
+        Set<Long> result = new HashSet<>();
+        frameBeds.forEach((frameId, beds) -> {
+            if (isGenuineBunkPair(beds)) {
+                result.add(frameId);
+            }
+        });
+        return result;
+    }
+
+    private boolean isGenuineBunkPair(List<Map<String, Object>> beds) {
+        if (beds.size() != 2) {
+            return false;
+        }
+        Set<String> types = new HashSet<>();
+        for (Map<String, Object> bed : beds) {
+            types.add(String.valueOf(bed.get("bed_type")));
+        }
+        return types.equals(Set.of("BUNK_UPPER", "BUNK_LOWER"));
+    }
+
+    private BedUnit loftUnit(Map<String, Object> bed) {
+        return new BedUnit(
+                number(bed.get("id")),
+                "LOFT_BED_DESK",
+                List.of(bed),
+                occupied(bed));
     }
 
     private void validateUnitSet(List<BedUnit> units, List<LayoutItem> items) {
