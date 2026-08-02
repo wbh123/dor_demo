@@ -59,6 +59,18 @@ def database_connection() -> pymysql.Connection:
     )
 
 
+def room_type_for_capacity(capacity: int) -> str:
+    return {
+        4: "FOUR_PERSON",
+        5: "FIVE_PERSON",
+        6: "SIX_PERSON",
+    }.get(capacity, "OTHER")
+
+
+def alternate_bed_type(current: str) -> str:
+    return "LOFT_BED_DESK" if current.startswith("BUNK_") else "BUNK_UPPER"
+
+
 def exercise_room_capacity_update(
     admin_token: str,
     room: dict[str, Any],
@@ -99,7 +111,6 @@ def exercise_room_capacity_update(
             f"/api/v1/admin/rooms/{room_id}",
             token=admin_token,
             body={
-                "roomType": room["room_type"],
                 "capacity": physical_bed_count,
                 "gender": room["gender_restriction"],
                 "operationalStatus": room["operational_status"],
@@ -117,6 +128,58 @@ def exercise_room_capacity_update(
         connection.close()
 
 
+def select_test_beds() -> tuple[int, int, int, int]:
+    connection = database_connection()
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT bed.room_id, bed.id
+                FROM bed
+                JOIN room ON room.id=bed.room_id
+                LEFT JOIN bed_assignment assignment ON assignment.bed_id=bed.id
+                WHERE room.gender_restriction='M'
+                  AND assignment.id IS NULL
+                ORDER BY room.id, bed.position_index
+                LIMIT 1
+                """)
+            empty_row = cursor.fetchone()
+            assert empty_row is not None
+
+            cursor.execute("""
+                SELECT bed.room_id, bed.id
+                FROM bed_assignment assignment
+                JOIN bed ON bed.id=assignment.bed_id
+                JOIN room ON room.id=bed.room_id
+                WHERE room.gender_restriction='M'
+                ORDER BY assignment.id
+                LIMIT 1
+                """)
+            occupied_row = cursor.fetchone()
+            assert occupied_row is not None
+            return int(empty_row[0]), int(empty_row[1]), int(occupied_row[0]), int(occupied_row[1])
+    finally:
+        connection.close()
+
+
+def payload_items(beds: list[dict[str, Any]], changed_bed_id: int | None = None) -> list[dict[str, Any]]:
+    result: list[dict[str, Any]] = []
+    for bed in beds:
+        bed_id = int(bed["id"])
+        x = float(bed["layout_x"])
+        bed_type = str(bed["bed_type"])
+        if bed_id == changed_bed_id:
+            x = max(-5.2, min(5.2, x + 0.5))
+            bed_type = alternate_bed_type(bed_type)
+        result.append({
+            "bedId": bed_id,
+            "bedType": bed_type,
+            "layoutX": x,
+            "layoutZ": float(bed["layout_z"]),
+            "rotationDegrees": int(bed["rotation_degrees"]),
+        })
+    return result
+
+
 def main() -> int:
     admin_token = data(request(
         "POST",
@@ -126,56 +189,45 @@ def main() -> int:
 
     rooms = data(request("GET", "/api/v1/admin/rooms?gender=M", token=admin_token))
     assert rooms, rooms
-    room = rooms[0]
-    room_id = int(room["id"])
+    empty_room_id, empty_bed_id, occupied_room_id, occupied_bed_id = select_test_beds()
+    room = next(item for item in rooms if int(item["id"]) == empty_room_id)
 
     exercise_room_capacity_update(admin_token, room)
 
     initial = data(request(
         "GET",
-        f"/api/v1/admin/rooms/{room_id}/bed-layout",
+        f"/api/v1/admin/rooms/{empty_room_id}/bed-layout",
         token=admin_token,
     ))
-    assert initial["layout_source"] == "DEFAULT_LAYOUT", initial
     initial_version = int(initial["room"]["room_version"])
     beds = initial["beds"]
     assert len(beds) == int(initial["room"]["capacity"]), initial
+    empty_bed = next(item for item in beds if int(item["id"]) == empty_bed_id)
+    assert int(empty_bed["occupied"]) == 0, empty_bed
+    original_type = str(empty_bed["bed_type"])
 
-    custom_items: list[dict[str, Any]] = []
-    changed_bed_id: int | None = None
-    for bed in beds:
-        x = float(bed["layout_x"])
-        z = float(bed["layout_z"])
-        if changed_bed_id is None and not str(bed["bed_type"]).startswith("BUNK_"):
-            x = max(-5.2, min(5.2, x + 0.5))
-            changed_bed_id = int(bed["id"])
-        custom_items.append({
-            "bedId": int(bed["id"]),
-            "layoutX": x,
-            "layoutZ": z,
-            "rotationDegrees": int(bed["rotation_degrees"]),
-        })
-    assert changed_bed_id is not None
-
+    custom_items = payload_items(beds, empty_bed_id)
     updated = data(request(
         "PUT",
-        f"/api/v1/admin/rooms/{room_id}/bed-layout",
+        f"/api/v1/admin/rooms/{empty_room_id}/bed-layout",
         token=admin_token,
         body={
             "expectedRoomVersion": initial_version,
-            "reason": "第二阶段自动化验收调整房间布局",
+            "reason": "第二阶段自动化验收调整空床类型和布局",
             "beds": custom_items,
         },
     ))
     assert updated["layout_source"] == "CUSTOM_LAYOUT", updated
     assert int(updated["room"]["room_version"]) == initial_version + 1, updated
-    changed = next(item for item in updated["beds"] if int(item["id"]) == changed_bed_id)
-    expected_x = next(item["layoutX"] for item in custom_items if item["bedId"] == changed_bed_id)
-    assert abs(float(changed["layout_x"]) - expected_x) < 0.001, changed
+    assert updated["room"]["room_type"] == room_type_for_capacity(len(beds)), updated
+    changed = next(item for item in updated["beds"] if int(item["id"]) == empty_bed_id)
+    expected_item = next(item for item in custom_items if item["bedId"] == empty_bed_id)
+    assert changed["bed_type"] == alternate_bed_type(original_type), changed
+    assert abs(float(changed["layout_x"]) - float(expected_item["layoutX"])) < 0.001, changed
 
     conflict = request(
         "PUT",
-        f"/api/v1/admin/rooms/{room_id}/bed-layout",
+        f"/api/v1/admin/rooms/{empty_room_id}/bed-layout",
         token=admin_token,
         body={
             "expectedRoomVersion": initial_version,
@@ -185,6 +237,32 @@ def main() -> int:
         expected_status=409,
     )
     assert conflict["error"]["code"] == "ROOM_LAYOUT_VERSION_CONFLICT", conflict
+
+    occupied_layout = data(request(
+        "GET",
+        f"/api/v1/admin/rooms/{occupied_room_id}/bed-layout",
+        token=admin_token,
+    ))
+    occupied_bed = next(
+        item for item in occupied_layout["beds"] if int(item["id"]) == occupied_bed_id
+    )
+    assert int(occupied_bed["occupied"]) == 1, occupied_bed
+    occupied_items = payload_items(occupied_layout["beds"])
+    for item in occupied_items:
+        if item["bedId"] == occupied_bed_id:
+            item["bedType"] = alternate_bed_type(str(occupied_bed["bed_type"]))
+    occupied_conflict = request(
+        "PUT",
+        f"/api/v1/admin/rooms/{occupied_room_id}/bed-layout",
+        token=admin_token,
+        body={
+            "expectedRoomVersion": int(occupied_layout["room"]["room_version"]),
+            "reason": "验证非空床位类型不可修改",
+            "beds": occupied_items,
+        },
+        expected_status=409,
+    )
+    assert occupied_conflict["error"]["code"] == "BED_TYPE_OCCUPIED", occupied_conflict
 
     request(
         "POST",
@@ -206,12 +284,12 @@ def main() -> int:
 
     snapshot = data(request(
         "GET",
-        f"/api/v1/student/batches/1/rooms/{room_id}",
+        f"/api/v1/student/batches/1/rooms/{empty_room_id}",
         token=student_token,
     ))
-    student_bed = next(item for item in snapshot["beds"] if int(item["id"]) == changed_bed_id)
+    student_bed = next(item for item in snapshot["beds"] if int(item["id"]) == empty_bed_id)
     assert student_bed["custom_layout"] is True, student_bed
-    assert abs(float(student_bed["layout_x"]) - expected_x) < 0.001, student_bed
+    assert student_bed["bed_type"] == alternate_bed_type(original_type), student_bed
     assert int(student_bed["rotation_degrees"]) in {0, 90, 180, 270}, student_bed
 
     audits = data(request("GET", "/api/v1/admin/audit-logs?limit=100", token=admin_token))
