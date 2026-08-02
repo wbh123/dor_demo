@@ -111,6 +111,24 @@
   padding: clamp(22px, 3vw, 32px);
 }
 
+.personal-preference-content {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(300px, 0.75fr);
+  gap: 20px;
+  align-items: stretch;
+}
+
+.personal-preference-table-column {
+  min-width: 0;
+}
+
+.personal-preference-side-column {
+  min-width: 0;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  gap: 16px;
+}
+
 .preference-profile-overview {
   display: grid;
   grid-template-columns: minmax(0, 1.3fr) minmax(280px, 0.7fr);
@@ -122,6 +140,13 @@
   background:
     radial-gradient(circle at 92% 12%, rgba(82, 134, 231, 0.12), transparent 34%),
     #f7faff;
+}
+
+.personal-preference-profile-panel {
+  grid-template-columns: 1fr;
+  align-content: start;
+  gap: 16px;
+  min-height: 0;
 }
 
 .preference-profile-overview h3 {
@@ -143,6 +168,10 @@
   flex-wrap: wrap;
   gap: 8px;
   justify-content: flex-end;
+}
+
+.personal-preference-profile-panel .profile-tag-row {
+  justify-content: flex-start;
 }
 
 .profile-tag {
@@ -167,11 +196,11 @@
 
 .personal-preference-row {
   display: grid;
-  grid-template-columns: minmax(105px, 0.48fr) minmax(0, 1fr);
-  gap: 14px;
+  grid-template-columns: minmax(82px, auto) minmax(0, 1fr);
+  gap: 8px;
   align-items: center;
-  min-height: 48px;
-  padding: 11px 15px;
+  min-height: 42px;
+  padding: 8px 12px;
   border-bottom: 1px solid #edf1f7;
 }
 
@@ -181,15 +210,20 @@
 
 .personal-preference-row dt {
   color: var(--muted);
-  font-size: 0.76rem;
+  font-size: 0.74rem;
+  white-space: nowrap;
 }
 
 .personal-preference-row dd {
+  min-width: 0;
   margin: 0;
+  overflow: hidden;
   color: #24344f;
-  font-size: 0.84rem;
+  font-size: 0.82rem;
   font-weight: 700;
   text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .student-primary-actions {
@@ -197,6 +231,17 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
   margin-top: 4px;
+}
+
+.personal-preference-action-panel {
+  grid-template-columns: 1fr;
+  align-content: end;
+  gap: 12px;
+  margin-top: 0;
+  padding: 18px;
+  border: 1px solid #e1e8f3;
+  border-radius: 18px;
+  background: #fbfcff;
 }
 
 .student-action-button {
@@ -313,9 +358,18 @@
 }
 
 @media (max-width: 900px) {
+  .personal-preference-content,
   .preference-profile-overview,
   .room-filter-bar {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1fr;
+  }
+
+  .personal-preference-side-column {
+    grid-template-rows: auto auto;
+  }
+
+  .personal-preference-action-panel {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .room-filter-search {
@@ -341,9 +395,9 @@
     border-radius: 24px;
   }
 
-  .preference-profile-overview,
   .personal-preference-list,
   .student-primary-actions,
+  .personal-preference-action-panel,
   .room-filter-bar {
     grid-template-columns: 1fr;
   }
@@ -354,6 +408,10 @@
 
   .personal-preference-row:nth-child(odd) {
     border-right: 0;
+  }
+
+  .personal-preference-row dd {
+    white-space: normal;
   }
 
   .room-filter-search {
