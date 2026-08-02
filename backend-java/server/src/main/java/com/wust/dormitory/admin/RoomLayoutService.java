@@ -27,6 +27,8 @@ public class RoomLayoutService {
     private static final double MIN_Z = -3.5;
     private static final double MAX_Z = 3.5;
     private static final Set<Integer> ROTATIONS = Set.of(0, 90, 180, 270);
+    private static final Set<String> BED_TYPES = Set.of(
+            "LOFT_BED_DESK", "BUNK_UPPER", "BUNK_LOWER");
 
     private final NamedParameterJdbcTemplate jdbc;
     private final AuditService auditService;
@@ -50,6 +52,10 @@ public class RoomLayoutService {
         List<Map<String, Object>> rows = jdbc.queryForList("""
                 SELECT bed.id, bed.bed_code, bed.bed_type, bed.position_index,
                        bed.bed_frame_id, bed.operational_status,
+                       CASE WHEN EXISTS (
+                           SELECT 1 FROM bed_assignment assignment
+                           WHERE assignment.bed_id=bed.id
+                       ) THEN 1 ELSE 0 END AS occupied,
                        layout.layout_x, layout.layout_z, layout.rotation_degrees,
                        CASE WHEN layout.bed_id IS NULL THEN 0 ELSE 1 END AS custom_layout
                 FROM bed
@@ -106,17 +112,30 @@ public class RoomLayoutService {
         }
 
         List<Map<String, Object>> roomBeds = jdbc.queryForList("""
-                SELECT id, bed_code, bed_type, position_index, bed_frame_id
+                SELECT bed.id, bed.bed_code, bed.bed_type, bed.position_index,
+                       bed.bed_frame_id,
+                       CASE WHEN EXISTS (
+                           SELECT 1 FROM bed_assignment assignment
+                           WHERE assignment.bed_id=bed.id
+                       ) THEN 1 ELSE 0 END AS occupied
                 FROM bed
-                WHERE room_id=:roomId
-                ORDER BY position_index, id
+                WHERE bed.room_id=:roomId
+                ORDER BY bed.position_index, bed.id
+                FOR UPDATE
                 """, Map.of("roomId", roomId));
         validateBedSet(roomBeds, command.beds());
         validateItems(command.beds());
+        validateBedTypeChanges(roomBeds, command.beds());
         validateBunkFrames(roomBeds, command.beds());
 
         Map<String, Object> before = getLayout(roomId);
         for (LayoutItem item : command.beds()) {
+            jdbc.update("""
+                    UPDATE bed SET bed_type=:bedType, version=version+1
+                    WHERE id=:bedId AND bed_type<>:bedType
+                    """, new MapSqlParameterSource()
+                    .addValue("bedId", item.bedId())
+                    .addValue("bedType", item.bedType()));
             jdbc.update("""
                     INSERT INTO room_bed_layout
                     (bed_id, layout_x, layout_z, rotation_degrees, updated_by)
@@ -135,12 +154,17 @@ public class RoomLayoutService {
                     .addValue("updatedBy", operator.userId()));
         }
 
+        int capacity = roomBeds.size();
+        String roomType = roomTypeForBedCount(capacity);
         int updated = jdbc.update("""
                 UPDATE room
-                SET version=version+1, state_version=state_version+1
+                SET room_type=:roomType, capacity=:capacity,
+                    version=version+1, state_version=state_version+1
                 WHERE id=:roomId AND version=:expectedVersion
                 """, new MapSqlParameterSource()
                 .addValue("roomId", roomId)
+                .addValue("roomType", roomType)
+                .addValue("capacity", capacity)
                 .addValue("expectedVersion", command.expectedRoomVersion()));
         if (updated != 1) {
             throw new BusinessException(
@@ -186,6 +210,11 @@ public class RoomLayoutService {
 
     private void validateItems(List<LayoutItem> items) {
         for (LayoutItem item : items) {
+            if (!BED_TYPES.contains(item.bedType())) {
+                throw new BusinessException(
+                        "BED_TYPE_INVALID",
+                        "床位类型只能为上床下桌、上下铺上铺或上下铺下铺");
+            }
             if (!Double.isFinite(item.layoutX()) || !Double.isFinite(item.layoutZ())
                     || item.layoutX() < MIN_X || item.layoutX() > MAX_X
                     || item.layoutZ() < MIN_Z || item.layoutZ() > MAX_Z) {
@@ -201,6 +230,27 @@ public class RoomLayoutService {
         }
     }
 
+    private void validateBedTypeChanges(
+            List<Map<String, Object>> roomBeds,
+            List<LayoutItem> items) {
+        Map<Long, LayoutItem> itemByBed = new HashMap<>();
+        for (LayoutItem item : items) {
+            itemByBed.put(item.bedId(), item);
+        }
+        for (Map<String, Object> bed : roomBeds) {
+            long bedId = ((Number) bed.get("id")).longValue();
+            String currentType = String.valueOf(bed.get("bed_type"));
+            LayoutItem item = itemByBed.get(bedId);
+            boolean occupied = ((Number) bed.get("occupied")).intValue() == 1;
+            if (!currentType.equals(item.bedType()) && occupied) {
+                throw new BusinessException(
+                        "BED_TYPE_OCCUPIED",
+                        "非空床位不能修改床位类型",
+                        HttpStatus.CONFLICT);
+            }
+        }
+    }
+
     private void validateBunkFrames(
             List<Map<String, Object>> roomBeds,
             List<LayoutItem> items) {
@@ -210,20 +260,27 @@ public class RoomLayoutService {
         }
 
         Map<Long, LayoutItem> frameAnchor = new HashMap<>();
+        Map<Long, Set<String>> frameTypes = new HashMap<>();
         for (Map<String, Object> bed : roomBeds) {
             Object frameValue = bed.get("bed_frame_id");
-            String type = String.valueOf(bed.get("bed_type"));
+            long bedId = ((Number) bed.get("id")).longValue();
+            LayoutItem item = itemByBed.get(bedId);
+            String type = item.bedType();
             if (frameValue == null || !(type.equals("BUNK_UPPER") || type.equals("BUNK_LOWER"))) {
                 continue;
             }
             long frameId = ((Number) frameValue).longValue();
-            long bedId = ((Number) bed.get("id")).longValue();
-            LayoutItem item = itemByBed.get(bedId);
             LayoutItem anchor = frameAnchor.putIfAbsent(frameId, item);
             if (anchor != null && !samePlacement(anchor, item)) {
                 throw new BusinessException(
                         "ROOM_LAYOUT_BUNK_MISMATCH",
                         "同一上下铺床架的上下层必须共享位置和朝向");
+            }
+            Set<String> types = frameTypes.computeIfAbsent(frameId, ignored -> new HashSet<>());
+            if (!types.add(type)) {
+                throw new BusinessException(
+                        "ROOM_LAYOUT_BUNK_TYPE_MISMATCH",
+                        "同一上下铺床架不能配置两个相同层级的床位");
             }
         }
     }
@@ -232,6 +289,15 @@ public class RoomLayoutService {
         return Math.abs(left.layoutX() - right.layoutX()) < 0.0001
                 && Math.abs(left.layoutZ() - right.layoutZ()) < 0.0001
                 && left.rotationDegrees() == right.rotationDegrees();
+    }
+
+    private String roomTypeForBedCount(int bedCount) {
+        return switch (bedCount) {
+            case 4 -> "FOUR_PERSON";
+            case 5 -> "FIVE_PERSON";
+            case 6 -> "SIX_PERSON";
+            default -> "OTHER";
+        };
     }
 
     private DefaultPlacement defaultPlacement(String bedType, int positionIndex) {
@@ -266,6 +332,7 @@ public class RoomLayoutService {
 
     public record LayoutItem(
             long bedId,
+            String bedType,
             double layoutX,
             double layoutZ,
             int rotationDegrees) {
