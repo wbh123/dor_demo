@@ -14,6 +14,8 @@ import './batch-copy.css'
 import './batch-rule-template.css'
 import './team-i18n-refinement.css'
 import './admin-i18n-refinement.css'
+import './admin-layout-canvas-refinement.css'
+import './admin-operations-refinement.css'
 
 createApp(App).use(pinia).use(router).mount('#app')
 useI18n().installDomI18n()
