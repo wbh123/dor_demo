@@ -1,0 +1,34 @@
+openapi: 3.0.3
+info:
+  title: Wust Dormitory Select 套餐修订接口
+  version: 1.0.0
+paths:
+  /api/v1/platform/plans/revisions/{revisionId}:
+    get:
+      operationId: getSubscriptionPlanRevision
+      tags: [Platform]
+      parameters:
+        - $ref: '#/components/parameters/RevisionIdPath'
+      responses:
+        '200': { description: 套餐修订 }
+    post:
+      operationId: createSubscriptionPlanRevision
+      tags: [Platform]
+      parameters:
+        - $ref: '#/components/parameters/RevisionIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: 'openapi-platform.yaml#/components/schemas/PlanRevisionCreateRequest'
+      responses:
+        '200': { description: 套餐新修订创建成功 }
+components:
+  parameters:
+    RevisionIdPath:
+      name: revisionId
+      in: path
+      required: true
+      description: 查询时为目标修订编号；创建新修订时为来源修订编号
+      schema: { type: integer, format: int64, minimum: 1 }
