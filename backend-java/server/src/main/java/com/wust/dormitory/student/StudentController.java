@@ -16,6 +16,7 @@ import com.wust.dormitory.residency.BedResidencySynchronizationService;
 import com.wust.dormitory.residency.ResidencyService;
 import com.wust.dormitory.residency.RoomSelectionService;
 import com.wust.dormitory.residency.SelectionModeGuard;
+import com.wust.dormitory.residency.TeamCategoryGuard;
 import com.wust.dormitory.security.CurrentUser;
 import com.wust.dormitory.security.SecurityUsers;
 import com.wust.dormitory.selection.BedHoldService;
@@ -41,6 +42,7 @@ public class StudentController implements StudentApi {
     private final ResidencyService residencyService;
     private final SelectionModeGuard selectionModeGuard;
     private final BedResidencySynchronizationService bedResidencySynchronizationService;
+    private final TeamCategoryGuard teamCategoryGuard;
 
     public StudentController(
             StudentService studentService,
@@ -53,7 +55,8 @@ public class StudentController implements StudentApi {
             RoomSelectionService roomSelectionService,
             ResidencyService residencyService,
             SelectionModeGuard selectionModeGuard,
-            BedResidencySynchronizationService bedResidencySynchronizationService) {
+            BedResidencySynchronizationService bedResidencySynchronizationService,
+            TeamCategoryGuard teamCategoryGuard) {
         this.studentService = studentService;
         this.profileService = profileService;
         this.roomLayoutService = roomLayoutService;
@@ -65,6 +68,7 @@ public class StudentController implements StudentApi {
         this.residencyService = residencyService;
         this.selectionModeGuard = selectionModeGuard;
         this.bedResidencySynchronizationService = bedResidencySynchronizationService;
+        this.teamCategoryGuard = teamCategoryGuard;
     }
 
     @Override
@@ -234,9 +238,12 @@ public class StudentController implements StudentApi {
     }
 
     @Override
+    @Transactional
     public ResponseEntity<ObjectSuccessResponse> inviteTeammate(InviteRequest request) {
+        CurrentUser user = student();
+        teamCategoryGuard.requireInvitationAllowed(request.getStudentNumber(), user);
         return ResponseEntity.ok(ResponseFactory.object(
-                teamService.inviteTeammate(request.getStudentNumber(), student())));
+                teamService.inviteTeammate(request.getStudentNumber(), user)));
     }
 
     @Override
@@ -248,8 +255,11 @@ public class StudentController implements StudentApi {
     }
 
     @Override
+    @Transactional
     public ResponseEntity<ObjectSuccessResponse> lockTeam(Long teamId) {
-        return ResponseEntity.ok(ResponseFactory.object(teamService.lockTeam(teamId, student())));
+        CurrentUser user = student();
+        teamCategoryGuard.requireLockAllowed(teamId, user);
+        return ResponseEntity.ok(ResponseFactory.object(teamService.lockTeam(teamId, user)));
     }
 
     @Override
