@@ -1,0 +1,92 @@
+openapi: 3.0.3
+info:
+  title: Wust Dormitory Select 批次双模式接口
+  version: 1.0.0
+paths:
+  /api/v1/admin/batches:
+    get:
+      tags: [Admin]
+      operationId: listBatches
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { $ref: '#/components/responses/ListSuccess' }
+    post:
+      tags: [Admin]
+      operationId: createBatch
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BatchRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/ObjectSuccess' }
+        '400': { $ref: '#/components/responses/ErrorResponse' }
+        '409': { $ref: '#/components/responses/ErrorResponse' }
+
+  /api/v1/admin/batches/{batchId}/room-preflight:
+    get:
+      tags: [Admin]
+      operationId: previewBatchRoomAvailability
+      summary: 发布前检查房间互斥、类别、容量和床位可识别性
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/BatchIdPath'
+      responses:
+        '200': { $ref: '#/components/responses/ObjectSuccess' }
+        '404': { $ref: '#/components/responses/ErrorResponse' }
+
+components:
+  parameters:
+    BatchIdPath:
+      name: batchId
+      in: path
+      required: true
+      schema: { type: integer, format: int64 }
+
+  responses:
+    ObjectSuccess:
+      description: 操作成功
+      content:
+        application/json:
+          schema: { $ref: '../common-response/openapi-common-response.yaml#/components/schemas/ObjectSuccessResponse' }
+    ListSuccess:
+      description: 查询成功
+      content:
+        application/json:
+          schema: { $ref: '../common-response/openapi-common-response.yaml#/components/schemas/ListSuccessResponse' }
+    ErrorResponse:
+      description: 业务错误
+      content:
+        application/json:
+          schema: { $ref: '../common-response/openapi-common-response.yaml#/components/schemas/ErrorResponse' }
+
+  schemas:
+    BatchRequest:
+      type: object
+      required:
+        [batchCode, batchName, startAt, endAt, selectionMode,
+         separateStudentCategories]
+      properties:
+        batchCode: { type: string, minLength: 1, maxLength: 32 }
+        batchName: { type: string, minLength: 1, maxLength: 128 }
+        startAt: { type: string, format: date-time }
+        endAt: { type: string, format: date-time }
+        selectionMode:
+          type: string
+          enum: [ROOM, BED]
+          description: ROOM仅选择寝室；BED选择具体床位
+        separateStudentCategories:
+          type: boolean
+          description: 开启后国内生和国际生只能进入各自专用宿舍
+        ruleTemplateId:
+          type: integer
+          format: int64
+          minimum: 1
+          description: 精确批次规则模板修订；为空时使用当前默认模板
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: Token
