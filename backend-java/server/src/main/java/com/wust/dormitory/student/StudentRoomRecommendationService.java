@@ -49,7 +49,7 @@ public class StudentRoomRecommendationService {
             int activeResidents = policy.activeResidentCount(roomId);
             int unknownBedResidents = policy.unknownBedResidentCount(roomId);
             int available = "BED".equals(mode)
-                    ? (unknownBedResidents == 0 ? policy.availableBedCount(roomId) : 0)
+                    ? (unknownBedResidents == 0 ? policy.availableBedCount(batchId, roomId) : 0)
                     : policy.availableCapacity(roomId);
             if (available <= 0) {
                 continue;
@@ -85,11 +85,9 @@ public class StudentRoomRecommendationService {
             view.put("recommendationReasons", match.recommendationReasons());
             view.put("conflictReasons", match.conflictReasons());
             view.put("dimensionCount", match.dimensionCount());
-            if ("ROOM".equals(mode)) {
-                view.put("selectionHint", "选择后仅确定寝室，具体床位由寝室成员自行协商");
-            } else {
-                view.put("selectionHint", "进入寝室后选择当前真实可用床位");
-            }
+            view.put("selectionHint", "ROOM".equals(mode)
+                    ? "选择后仅确定寝室，具体床位由寝室成员自行协商"
+                    : "进入寝室后选择当前批次范围内的真实可用床位");
             result.add(view);
         }
         result.sort(Comparator.comparingDouble(
@@ -125,19 +123,33 @@ public class StudentRoomRecommendationService {
         }
         long roomId = ((Number) room.get("id")).longValue();
         List<Map<String, Object>> beds = jdbc.queryForList("""
-                SELECT b.id, b.bed_code, b.bed_type, b.position_index
-                FROM bed b
-                WHERE b.room_id=:roomId
-                  AND b.operational_status='ENABLED'
-                  AND EXISTS (
-                      SELECT 1 FROM batch_bed_scope scope
-                      WHERE scope.batch_id=:batchId AND scope.bed_id=b.id
+                SELECT target_bed.id, target_bed.bed_code,
+                       target_bed.bed_type, target_bed.position_index
+                FROM bed target_bed
+                JOIN room target_room ON target_room.id=target_bed.room_id
+                JOIN dormitory_floor target_floor ON target_floor.id=target_room.floor_id
+                WHERE target_bed.room_id=:roomId
+                  AND target_bed.operational_status='ENABLED'
+                  AND (
+                      EXISTS (
+                          SELECT 1 FROM batch_bed_scope scope
+                          WHERE scope.batch_id=:batchId AND scope.bed_id=target_bed.id
+                      )
+                      OR EXISTS (
+                          SELECT 1 FROM batch_room_scope scope
+                          WHERE scope.batch_id=:batchId AND scope.room_id=target_room.id
+                      )
+                      OR EXISTS (
+                          SELECT 1 FROM batch_building_scope scope
+                          WHERE scope.batch_id=:batchId
+                            AND scope.building_id=target_floor.building_id
+                      )
                   )
                   AND NOT EXISTS (
                       SELECT 1 FROM room_assignment ra
-                      WHERE ra.bed_id=b.id AND ra.assignment_status='ACTIVE'
+                      WHERE ra.bed_id=target_bed.id AND ra.assignment_status='ACTIVE'
                   )
-                ORDER BY b.position_index
+                ORDER BY target_bed.position_index
                 LIMIT 1
                 """, new MapSqlParameterSource()
                 .addValue("roomId", roomId)
@@ -145,7 +157,7 @@ public class StudentRoomRecommendationService {
         if (beds.isEmpty()) {
             throw new BusinessException(
                     "NO_AVAILABLE_BED",
-                    "推荐寝室当前没有真实可用床位",
+                    "推荐寝室当前没有属于本批次的真实可用床位",
                     HttpStatus.CONFLICT);
         }
         return Map.of(
