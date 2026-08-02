@@ -1,0 +1,136 @@
+openapi: 3.0.3
+info:
+  title: Wust Dormitory Select 房间与床位布局管理接口
+  version: 1.0.0
+paths:
+  /api/v1/admin/rooms/{roomId}:
+    put:
+      tags: [Admin]
+      operationId: updateRoom
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/RoomIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RoomRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/VoidSuccess' }
+        '400': { $ref: '#/components/responses/ErrorResponse' }
+        '404': { $ref: '#/components/responses/ErrorResponse' }
+
+  /api/v1/admin/rooms/{roomId}/bed-layout:
+    get:
+      tags: [Admin]
+      operationId: getRoomBedLayout
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/RoomIdPath'
+      responses:
+        '200': { $ref: '#/components/responses/ObjectSuccess' }
+        '404': { $ref: '#/components/responses/ErrorResponse' }
+    put:
+      tags: [Admin]
+      operationId: updateRoomBedLayout
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/RoomIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RoomBedLayoutRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/ObjectSuccess' }
+        '400': { $ref: '#/components/responses/ErrorResponse' }
+        '404': { $ref: '#/components/responses/ErrorResponse' }
+        '409': { $ref: '#/components/responses/ErrorResponse' }
+
+components:
+  parameters:
+    RoomIdPath:
+      name: roomId
+      in: path
+      required: true
+      schema: { type: integer, format: int64 }
+
+  responses:
+    ObjectSuccess:
+      description: 操作成功
+      content:
+        application/json:
+          schema: { $ref: '../common-response/openapi-common-response.yaml#/components/schemas/ObjectSuccessResponse' }
+    VoidSuccess:
+      description: 操作成功
+      content:
+        application/json:
+          schema: { $ref: '../common-response/openapi-common-response.yaml#/components/schemas/VoidSuccessResponse' }
+    ErrorResponse:
+      description: 业务错误
+      content:
+        application/json:
+          schema: { $ref: '../common-response/openapi-common-response.yaml#/components/schemas/ErrorResponse' }
+
+  schemas:
+    RoomRequest:
+      type: object
+      required: [capacity, gender, operationalStatus, reason]
+      properties:
+        capacity: { type: integer, minimum: 1, maximum: 20 }
+        gender: { type: string, pattern: '^[MF]$' }
+        operationalStatus:
+          type: string
+          pattern: '^(ENABLED|DISABLED|MAINTENANCE)$'
+        remark: { type: string, maxLength: 500 }
+        reason: { type: string, minLength: 1, maxLength: 500 }
+
+    RoomBedLayoutRequest:
+      type: object
+      required: [expectedRoomVersion, reason, beds]
+      properties:
+        expectedRoomVersion:
+          type: integer
+          format: int64
+          minimum: 0
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 500
+        beds:
+          type: array
+          minItems: 1
+          maxItems: 20
+          items: { $ref: '#/components/schemas/RoomBedLayoutItem' }
+
+    RoomBedLayoutItem:
+      type: object
+      required: [bedId, bedType, layoutX, layoutZ, rotationDegrees]
+      properties:
+        bedId:
+          type: integer
+          format: int64
+          minimum: 1
+        bedType:
+          type: string
+          enum: [LOFT_BED_DESK, BUNK_UPPER, BUNK_LOWER]
+        layoutX:
+          type: number
+          format: double
+          minimum: -5.2
+          maximum: 5.2
+        layoutZ:
+          type: number
+          format: double
+          minimum: -3.5
+          maximum: 3.5
+        rotationDegrees:
+          type: integer
+          format: int32
+          enum: [0, 90, 180, 270]
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: Token
