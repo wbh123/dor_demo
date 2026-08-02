@@ -40,9 +40,12 @@ const ruleTemplateSummary = computed(() => {
   return `临时占用${item.hold_duration_seconds}秒，最多续期${item.hold_renewal_limit}次；${team}；${item.allow_student_random ? '允许' : '不允许'}随机推荐。`
 })
 
+const allocationSummary = computed(() => (preview.value?.summary ?? {}) as DataObject)
+const unassignedStudents = computed(() => (preview.value?.unassigned ?? []) as DataObject[])
+
 const stateGuide = [
   { status: 'DRAFT', label: '草稿', description: '配置资格与宿舍' },
-  { status: 'PUBLISHED', label: '已发布', description: '学生可填写问卷' },
+  { status: 'PUBLISHED', label: '已发布', description: '学生可填写个人偏好' },
   { status: 'OPEN', label: '选寝中', description: '允许选择和确认床位' },
   { status: 'PAUSED', label: '已暂停', description: '临时停止选寝' },
   { status: 'CLOSED', label: '已关闭', description: '学生入口关闭' },
@@ -143,7 +146,7 @@ async function copyBatch() {
 async function prepare(batchId: unknown) {
   await run(async () => {
     await api.post(`/api/v1/admin/batches/${Number(batchId)}/prepare`)
-    message.value = '学生资格和可选宿舍范围已准备。'
+    message.value = '全部学生资格和可选宿舍范围已准备，不要求学生账号提前激活。'
   })
 }
 
@@ -156,6 +159,7 @@ async function changeStatus(batchId: unknown, target: string) {
 
 async function previewAllocation(batchId: unknown) {
   error.value = ''
+  message.value = ''
   try {
     const id = Number(batchId)
     const response = await api.get<ObjectSuccessResponse>(
@@ -171,15 +175,30 @@ async function previewAllocation(batchId: unknown) {
 
 async function commitAllocation() {
   if (!previewBatchId.value) return
-  await run(async () => {
-    await api.post(`/api/v1/admin/batches/${previewBatchId.value}/allocation/commit`, {
-      randomSeed: 20260801,
-      idempotencyKey: crypto.randomUUID(),
-    })
-    message.value = '统一分配已正式执行，结果和明细已保存。'
-    preview.value = null
+  error.value = ''
+  message.value = ''
+  try {
+    const response = await api.post<ObjectSuccessResponse>(
+      `/api/v1/admin/batches/${previewBatchId.value}/allocation/commit`,
+      {
+        randomSeed: 20260801,
+        idempotencyKey: crypto.randomUUID(),
+      },
+    )
+    const result = (response.data.data ?? {}) as DataObject
+    preview.value = {
+      summary: result.summary ?? {},
+      unassigned: result.unassigned ?? [],
+    }
     previewBatchId.value = null
-  })
+    const failed = Number(((result.summary ?? {}) as DataObject).unassignedCount ?? 0)
+    message.value = failed > 0
+      ? `统一分配已执行，但有${failed}名学生未能分配，请查看失败清单并处理。`
+      : '统一分配已正式执行，全部学生均已完成分配。'
+    await load()
+  } catch (reason) {
+    error.value = reason instanceof Error ? reason.message : '统一分配执行失败'
+  }
 }
 
 async function download(batchId: unknown) {
@@ -254,7 +273,7 @@ function actionText(status: string) {
     <div class="page-title">
       <span class="eyebrow">SELECTION OPERATIONS</span>
       <h2>选寝批次与统一分配</h2>
-      <p>已发布表示学生可以查看活动并填写问卷；选寝中表示学生可以正式选择和确认床位。</p>
+      <p>批次使用精确规则模板修订；统一分配面向批次内全部学生，不要求学生账号提前激活，已锁定队伍优先保持同寝。</p>
     </div>
 
     <p v-if="error" class="alert error">{{ error }}</p>
@@ -316,7 +335,7 @@ function actionText(status: string) {
             <strong>{{ batch.assigned_count }}/{{ batch.eligible_count }}</strong>
           </div>
           <div class="button-row wrap">
-            <button v-if="batch.batch_status === 'DRAFT'" class="button secondary small" @click="prepare(batch.id)">准备学生与宿舍范围</button>
+            <button v-if="batch.batch_status === 'DRAFT'" class="button secondary small" @click="prepare(batch.id)">准备全部学生与宿舍范围</button>
             <button v-for="target in nextActions(batch.batch_status)" :key="target" class="button ghost small" @click="changeStatus(batch.id, target)">{{ actionText(target) }}</button>
             <button v-if="['CLOSED', 'ALLOCATING'].includes(String(batch.batch_status))" class="button accent small" @click="previewAllocation(batch.id)">预演统一分配</button>
             <button v-if="batch.batch_status !== 'CANCELLED'" class="button secondary small" @click="openCopy(batch)">复制配置</button>
@@ -326,15 +345,46 @@ function actionText(status: string) {
       </div>
     </section>
 
-    <section v-if="preview" class="panel preview-panel">
-      <div class="section-head"><div><span class="eyebrow">ALLOCATION PREVIEW</span><h3>统一分配预演</h3></div></div>
-      <div class="stat-grid compact-grid">
-        <article class="stat-card"><span>待分配学生</span><strong>{{ (preview.summary as DataObject)?.studentCount }}</strong></article>
-        <article class="stat-card"><span>可用床位</span><strong>{{ (preview.summary as DataObject)?.availableBedCount }}</strong></article>
-        <article class="stat-card"><span>预计成功</span><strong>{{ (preview.summary as DataObject)?.assignedCount }}</strong></article>
-        <article class="stat-card"><span>无法分配</span><strong>{{ (preview.summary as DataObject)?.unassignedCount }}</strong></article>
+    <section v-if="preview" class="panel preview-panel allocation-result-panel">
+      <div class="section-head">
+        <div>
+          <span class="eyebrow">ALLOCATION PREVIEW</span>
+          <h3>{{ previewBatchId ? '统一分配预演' : '统一分配执行结果' }}</h3>
+          <p>系统通常应完成全部学生分配；只有床位范围或性别容量不足等异常情况才会出现失败。</p>
+        </div>
       </div>
-      <div class="button-row"><button class="button ghost" @click="preview = null">关闭预演</button><button class="button primary" @click="commitAllocation">确认正式执行</button></div>
+      <div class="stat-grid compact-grid">
+        <article class="stat-card"><span>待分配学生</span><strong>{{ allocationSummary.studentCount }}</strong></article>
+        <article class="stat-card"><span>可用床位</span><strong>{{ allocationSummary.availableBedCount }}</strong></article>
+        <article class="stat-card"><span>预计成功</span><strong>{{ allocationSummary.assignedCount }}</strong></article>
+        <article class="stat-card"><span>无法分配</span><strong>{{ allocationSummary.unassignedCount }}</strong></article>
+      </div>
+
+      <section v-if="unassignedStudents.length" class="allocation-failure-list">
+        <div class="section-head compact-head">
+          <div><span class="eyebrow">FAILED STUDENTS</span><h4>未分配学生清单</h4></div>
+          <span class="status-chip warning">{{ unassignedStudents.length }}人</span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>学号</th><th>姓名</th><th>失败代码</th><th>失败原因</th></tr></thead>
+            <tbody>
+              <tr v-for="student in unassignedStudents" :key="String(student.studentId ?? student.student_id)">
+                <td>{{ student.studentNumber ?? student.student_number }}</td>
+                <td><strong>{{ student.studentName ?? student.student_name }}</strong></td>
+                <td>{{ student.failureCode ?? student.failure_code }}</td>
+                <td>{{ student.failureReason ?? student.failure_reason }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+      <p v-else class="alert success">当前预演中全部学生均可完成分配。</p>
+
+      <div class="button-row">
+        <button class="button ghost" @click="preview = null; previewBatchId = null">关闭</button>
+        <button v-if="previewBatchId" class="button primary" @click="commitAllocation">确认正式执行</button>
+      </div>
     </section>
   </div>
 </template>
