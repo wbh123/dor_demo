@@ -23,6 +23,34 @@ export interface PlatformLoginResponse {
   user: import('./session').PlatformUser
 }
 
+export type FeatureTargetState = 'ENABLED' | 'DISABLED' | 'INHERIT'
+export type FeaturePhase = 'PHASE1' | 'PHASE2' | 'PHASE3'
+export type FeatureScope = 'ADMIN' | 'STUDENT' | 'SHARED'
+export type FeatureRiskLevel = 'LOW' | 'MEDIUM' | 'HIGH'
+export type FeatureSource = 'PLAN_ENABLED' | 'PLAN_DISABLED' | 'OVERRIDE_GRANT' | 'OVERRIDE_REVOKE'
+
+export interface FeatureEntitlement {
+  featureCode: string
+  featureName: string
+  phase: FeaturePhase
+  scope: FeatureScope
+  granularity: 'MODULE' | 'OPERATION'
+  actionType: string
+  riskLevel: FeatureRiskLevel
+  enabledInProgram: boolean
+  sortOrder: number
+  planEnabled: boolean
+  effectiveEnabled: boolean
+  overrideType: 'GRANT' | 'REVOKE' | null
+  source: FeatureSource
+  lastChangedAt: string | null
+}
+
+export interface FeatureStateChange {
+  featureCode: string
+  targetState: FeatureTargetState
+}
+
 export const platformApi = {
   login: (username: string, password: string) => request<PlatformLoginResponse>('/login', {
     method: 'POST', body: JSON.stringify({ username, password }),
@@ -49,6 +77,13 @@ export const platformApi = {
     method: 'POST', body: JSON.stringify({ action, reason }),
   }),
   features: () => request<Record<string, unknown>[]>('/features'),
+  featureEntitlements: (includeFuture = false) => request<FeatureEntitlement[]>(`/features/entitlements?includeFuture=${includeFuture}`),
+  setFeatureState: (featureCode: string, targetState: FeatureTargetState, reason: string) => request<FeatureEntitlement>(`/features/${encodeURIComponent(featureCode)}/state`, {
+    method: 'PUT', body: JSON.stringify({ targetState, reason }),
+  }),
+  setFeatureStates: (changes: FeatureStateChange[], reason: string) => request<FeatureEntitlement[]>('/features/batch-state', {
+    method: 'POST', body: JSON.stringify({ changes, reason }),
+  }),
   featureOverrides: () => request<Record<string, unknown>[]>('/feature-overrides'),
   addFeatureOverride: (payload: Record<string, unknown>) => request<{ id: number }>('/feature-overrides', {
     method: 'POST', body: JSON.stringify(payload),
