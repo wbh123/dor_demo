@@ -1,7 +1,11 @@
 package com.wust.dormitory.admin;
 
 import com.wust.dormitory.common.error.BusinessException;
+import com.wust.dormitory.residency.BatchRoomLockService;
 import com.wust.dormitory.security.CurrentUser;
+import com.wust.dormitory.subscription.EntitlementSnapshotService;
+import com.wust.dormitory.subscription.FeatureAccessService;
+import com.wust.dormitory.subscription.FeatureCodes;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
@@ -18,22 +22,40 @@ public class BatchLifecycleService {
 
     private final NamedParameterJdbcTemplate jdbc;
     private final AdminService adminService;
+    private final BatchRoomLockService roomLockService;
+    private final FeatureAccessService featureAccessService;
+    private final EntitlementSnapshotService entitlementSnapshotService;
 
-    public BatchLifecycleService(NamedParameterJdbcTemplate jdbc, AdminService adminService) {
+    public BatchLifecycleService(
+            NamedParameterJdbcTemplate jdbc,
+            AdminService adminService,
+            BatchRoomLockService roomLockService,
+            FeatureAccessService featureAccessService,
+            EntitlementSnapshotService entitlementSnapshotService) {
         this.jdbc = jdbc;
         this.adminService = adminService;
+        this.roomLockService = roomLockService;
+        this.featureAccessService = featureAccessService;
+        this.entitlementSnapshotService = entitlementSnapshotService;
     }
 
     @Transactional
     public void changeStatus(long batchId, String targetStatus, CurrentUser operator) {
-        String currentStatus = currentStatus(batchId);
+        Map<String, Object> current = currentBatch(batchId);
+        String currentStatus = String.valueOf(current.get("batch_status"));
         boolean enteringActiveState = !ACTIVE_STATUSES.contains(currentStatus)
                 && ACTIVE_STATUSES.contains(targetStatus);
         boolean leavingActiveState = ACTIVE_STATUSES.contains(currentStatus)
                 && !ACTIVE_STATUSES.contains(targetStatus);
 
         if (enteringActiveState) {
+            if ("BED".equals(String.valueOf(current.get("selection_mode")))) {
+                featureAccessService.require(FeatureCodes.P2_BED_SELECTION_MODE);
+            }
+            roomLockService.requirePublishable(batchId);
             acquireStudentLocks(batchId);
+            roomLockService.acquire(batchId);
+            entitlementSnapshotService.captureForBatch(batchId);
         }
 
         adminService.changeBatchStatus(batchId, targetStatus, operator);
@@ -41,21 +63,21 @@ public class BatchLifecycleService {
         if (leavingActiveState) {
             jdbc.update(
                     "DELETE FROM active_batch_student_lock WHERE batch_id=:batchId",
-                    Map.of("batchId", batchId)
-            );
+                    Map.of("batchId", batchId));
+            roomLockService.release(batchId);
         }
     }
 
-    private String currentStatus(long batchId) {
-        List<String> statuses = jdbc.query(
-                "SELECT batch_status FROM selection_batch WHERE id=:batchId FOR UPDATE",
-                Map.of("batchId", batchId),
-                (resultSet, rowNumber) -> resultSet.getString(1)
-        );
-        if (statuses.isEmpty()) {
+    private Map<String, Object> currentBatch(long batchId) {
+        List<Map<String, Object>> rows = jdbc.queryForList("""
+                SELECT id, batch_status, selection_mode,
+                       separate_student_categories
+                FROM selection_batch WHERE id=:batchId FOR UPDATE
+                """, Map.of("batchId", batchId));
+        if (rows.isEmpty()) {
             throw new BusinessException("BATCH_NOT_FOUND", "选寝批次不存在", HttpStatus.NOT_FOUND);
         }
-        return statuses.getFirst();
+        return rows.getFirst();
     }
 
     private void acquireStudentLocks(long batchId) {
@@ -70,8 +92,7 @@ public class BatchLifecycleService {
             throw new BusinessException(
                     "BATCH_STUDENT_ACTIVE_CONFLICT",
                     "部分学生已经参加另一个正在进行的选寝活动，请调整学生范围后重试",
-                    HttpStatus.CONFLICT
-            );
+                    HttpStatus.CONFLICT);
         }
     }
 }
