@@ -28,28 +28,38 @@ public class AuthService {
 
     public LoginResult login(String username, String password) {
         List<Map<String, Object>> rows = jdbc.queryForList("""
-                SELECT id, student_id, username, password_hash, user_type, account_status, display_name
+                SELECT id, student_id, username, password_hash, user_type, account_status,
+                       display_name, password_change_required
                 FROM app_user WHERE username = :username
                 """, Map.of("username", username));
         if (rows.isEmpty()) {
             throw new BusinessException("AUTH_INVALID", "用户名或密码错误", HttpStatus.UNAUTHORIZED);
         }
         Map<String, Object> row = rows.getFirst();
+        if ("SYSTEM_ADMIN".equals(String.valueOf(row.get("user_type")))) {
+            throw new BusinessException("PLATFORM_LOGIN_REQUIRED", "请使用系统管理入口登录", HttpStatus.FORBIDDEN);
+        }
         String status = String.valueOf(row.get("account_status"));
         String hash = (String) row.get("password_hash");
         if (!"ACTIVE".equals(status) || hash == null || !passwordEncoder.matches(password, hash)) {
             throw new BusinessException("AUTH_INVALID", "用户名或密码错误，未激活学生请先完成激活", HttpStatus.UNAUTHORIZED);
         }
-        CurrentUser user = new CurrentUser(
+        CurrentUser user = toUser(row);
+        AuthTokenService.Token token = tokenService.issue(user);
+        jdbc.update("UPDATE app_user SET last_login_at=CURRENT_TIMESTAMP(3) WHERE id=:id", Map.of("id", user.userId()));
+        return new LoginResult(token.accessToken(), token.expiresInSeconds(), user);
+    }
+
+    private CurrentUser toUser(Map<String, Object> row) {
+        Object required = row.get("password_change_required");
+        return new CurrentUser(
                 ((Number) row.get("id")).longValue(),
                 row.get("student_id") == null ? null : ((Number) row.get("student_id")).longValue(),
                 String.valueOf(row.get("username")),
                 String.valueOf(row.get("display_name")),
-                String.valueOf(row.get("user_type"))
+                String.valueOf(row.get("user_type")),
+                required != null && ((Number) required).intValue() == 1
         );
-        AuthTokenService.Token token = tokenService.issue(user);
-        jdbc.update("UPDATE app_user SET last_login_at=CURRENT_TIMESTAMP(3) WHERE id=:id", Map.of("id", user.userId()));
-        return new LoginResult(token.accessToken(), token.expiresInSeconds(), user);
     }
 
     @Transactional
