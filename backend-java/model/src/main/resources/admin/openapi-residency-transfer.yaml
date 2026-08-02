@@ -1,0 +1,224 @@
+openapi: 3.0.3
+info:
+  title: Wust Dormitory Select 转学生与在住管理接口
+  version: 1.0.0
+paths:
+  /api/v1/admin/transfer-students:
+    post:
+      tags: [Admin]
+      operationId: onboardTransferStudent
+      summary: 手工录入转学生并可选直接分配或加入批次
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TransferStudentOnboardingRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/ObjectSuccess' }
+        '400': { $ref: '#/components/responses/ErrorResponse' }
+        '409': { $ref: '#/components/responses/ErrorResponse' }
+
+  /api/v1/admin/students/{studentId}/direct-assignment:
+    post:
+      tags: [Admin]
+      operationId: directlyAssignStudent
+      summary: 将已有学生直接分配到寝室或具体床位
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/StudentIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DirectResidencyAssignmentRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/ObjectSuccess' }
+        '400': { $ref: '#/components/responses/ErrorResponse' }
+        '404': { $ref: '#/components/responses/ErrorResponse' }
+        '409': { $ref: '#/components/responses/ErrorResponse' }
+
+  /api/v1/admin/batches/{batchId}/students/{studentId}/capacity-preview:
+    get:
+      tags: [Admin]
+      operationId: previewStudentBatchCapacity
+      summary: 检查学生加入现有批次后的可选宿舍容量
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/BatchIdPath'
+        - $ref: '#/components/parameters/StudentIdPath'
+      responses:
+        '200': { $ref: '#/components/responses/ObjectSuccess' }
+        '404': { $ref: '#/components/responses/ErrorResponse' }
+
+  /api/v1/admin/batches/{batchId}/students/{studentId}/enroll:
+    post:
+      tags: [Admin]
+      operationId: enrollStudentIntoBatch
+      summary: 通过容量预检后将学生加入现有批次
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/BatchIdPath'
+        - $ref: '#/components/parameters/StudentIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BatchEnrollmentRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/ObjectSuccess' }
+        '400': { $ref: '#/components/responses/ErrorResponse' }
+        '404': { $ref: '#/components/responses/ErrorResponse' }
+        '409': { $ref: '#/components/responses/ErrorResponse' }
+
+  /api/v1/admin/residencies:
+    get:
+      tags: [Admin]
+      operationId: listResidencies
+      summary: 图形化在住与床位确认页面的数据源
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: roomId
+          in: query
+          schema: { type: integer, format: int64 }
+        - name: keyword
+          in: query
+          schema: { type: string, maxLength: 128 }
+        - name: bedMappingStatus
+          in: query
+          schema: { type: string, enum: [ALL, CONFIRMED, UNCONFIRMED] }
+      responses:
+        '200': { $ref: '#/components/responses/ObjectSuccess' }
+
+  /api/v1/admin/residencies/{residencyId}/bed:
+    put:
+      tags: [Admin]
+      operationId: confirmResidencyBedByAdmin
+      summary: 管理员为在住学生确认或调整实际床位
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/ResidencyIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AdminBedConfirmationRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/ObjectSuccess' }
+        '400': { $ref: '#/components/responses/ErrorResponse' }
+        '404': { $ref: '#/components/responses/ErrorResponse' }
+        '409': { $ref: '#/components/responses/ErrorResponse' }
+
+  /api/v1/admin/residencies/{residencyId}/end:
+    post:
+      tags: [Admin]
+      operationId: endResidency
+      summary: 办理退宿或结束错误在住记录
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/ResidencyIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ResidencyEndRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/ObjectSuccess' }
+        '404': { $ref: '#/components/responses/ErrorResponse' }
+        '409': { $ref: '#/components/responses/ErrorResponse' }
+
+components:
+  parameters:
+    BatchIdPath:
+      name: batchId
+      in: path
+      required: true
+      schema: { type: integer, format: int64 }
+    StudentIdPath:
+      name: studentId
+      in: path
+      required: true
+      schema: { type: integer, format: int64 }
+    ResidencyIdPath:
+      name: residencyId
+      in: path
+      required: true
+      schema: { type: integer, format: int64 }
+
+  responses:
+    ObjectSuccess:
+      description: 操作成功
+      content:
+        application/json:
+          schema: { $ref: '../common-response/openapi-common-response.yaml#/components/schemas/ObjectSuccessResponse' }
+    ErrorResponse:
+      description: 业务错误
+      content:
+        application/json:
+          schema: { $ref: '../common-response/openapi-common-response.yaml#/components/schemas/ErrorResponse' }
+
+  schemas:
+    TransferStudentOnboardingRequest:
+      type: object
+      required:
+        [studentNumber, studentName, gender, majorId, nationalityCode,
+         studentCategory, action, reason]
+      properties:
+        studentNumber: { type: string, pattern: '^\d{12}$' }
+        studentName: { type: string, minLength: 1, maxLength: 128 }
+        gender: { type: string, enum: [M, F] }
+        majorId: { type: integer, format: int64, minimum: 1 }
+        nationalityCode: { type: string, pattern: '^[A-Z]{2}$' }
+        studentCategory: { type: string, enum: [DOMESTIC, INTERNATIONAL] }
+        phoneNumber:
+          type: string
+          nullable: true
+          maxLength: 32
+          pattern: '^\+?[0-9][0-9 -]{5,30}$'
+        action:
+          type: string
+          enum: [PROFILE_ONLY, DIRECT_ASSIGNMENT, ADD_TO_BATCH]
+        directAssignment:
+          $ref: '#/components/schemas/DirectResidencyAssignmentRequest'
+        batchEnrollment:
+          $ref: '#/components/schemas/TransferBatchEnrollment'
+        reason: { type: string, minLength: 1, maxLength: 500 }
+
+    DirectResidencyAssignmentRequest:
+      type: object
+      required: [roomId, reason]
+      properties:
+        roomId: { type: integer, format: int64, minimum: 1 }
+        bedId: { type: integer, format: int64, minimum: 1, nullable: true }
+        reason: { type: string, minLength: 1, maxLength: 500 }
+
+    TransferBatchEnrollment:
+      type: object
+      required: [batchId]
+      properties:
+        batchId: { type: integer, format: int64, minimum: 1 }
+
+    BatchEnrollmentRequest:
+      type: object
+      required: [reason]
+      properties:
+        reason: { type: string, minLength: 1, maxLength: 500 }
+
+    AdminBedConfirmationRequest:
+      type: object
+      required: [bedId, reason]
+      properties:
+        bedId: { type: integer, format: int64, minimum: 1 }
+        reason: { type: string, minLength: 1, maxLength: 500 }
+
+    ResidencyEndRequest:
+      type: object
+      required: [reason]
+      properties:
+        reason: { type: string, minLength: 1, maxLength: 500 }
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: Token
