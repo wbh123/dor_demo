@@ -7,7 +7,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 MIGRATION = ROOT / "backend-java/server/src/main/resources/db/migration/V5__add_room_bed_layout.sql"
 SCHEMA = ROOT / "backend-java/docs/sql/schema.sql"
-OPENAPI = ROOT / "backend-java/model/src/main/resources/admin/openapi-admin.yaml"
+OPENAPI = ROOT / "backend-java/model/src/main/resources/admin/openapi-room-management.yaml"
+MASTER_OPENAPI = ROOT / "backend-java/model/src/main/resources/openapi-interface.yaml"
 CONTROLLER = ROOT / "backend-java/server/src/main/java/com/wust/dormitory/admin/AdminController.java"
 ROOM_MANAGEMENT = ROOT / "backend-java/server/src/main/java/com/wust/dormitory/admin/RoomManagementService.java"
 SERVICE = ROOT / "backend-java/server/src/main/java/com/wust/dormitory/admin/RoomLayoutService.java"
@@ -45,14 +46,16 @@ class RoomLayoutPhaseTwoTest(unittest.TestCase):
         schema = SCHEMA.read_text(encoding="utf-8")
         self.assertIn("CREATE TABLE room_bed_layout", schema)
 
-    def test_openapi_exposes_read_and_update_layout(self) -> None:
+    def test_openapi_exposes_read_update_layout_and_bed_type(self) -> None:
         content = OPENAPI.read_text(encoding="utf-8")
+        master = MASTER_OPENAPI.read_text(encoding="utf-8")
+        self.assertIn("openapi-room-management.yaml", master)
         self.assertIn("/api/v1/admin/rooms/{roomId}/bed-layout:", content)
         self.assertIn("operationId: getRoomBedLayout", content)
         self.assertIn("operationId: updateRoomBedLayout", content)
         self.assertIn("RoomBedLayoutRequest:", content)
         self.assertIn("RoomBedLayoutItem:", content)
-        for field in ("expectedRoomVersion", "reason", "beds", "bedId", "layoutX", "layoutZ", "rotationDegrees"):
+        for field in ("expectedRoomVersion", "reason", "beds", "bedId", "bedType", "layoutX", "layoutZ", "rotationDegrees"):
             self.assertIn(field, content)
 
     def test_backend_has_transactional_layout_service_and_generated_controller_methods(self) -> None:
@@ -68,8 +71,10 @@ class RoomLayoutPhaseTwoTest(unittest.TestCase):
             "ROOM_LAYOUT_ROTATION_INVALID",
             "ROOM_LAYOUT_BUNK_MISMATCH",
             "ROOM_LAYOUT_VERSION_CONFLICT",
+            "BED_TYPE_OCCUPIED",
             "ROOM_LAYOUT_UPDATE",
             "DEFAULT_LAYOUT",
+            "roomTypeForBedCount",
         ):
             self.assertIn(expected, service)
 
@@ -77,6 +82,7 @@ class RoomLayoutPhaseTwoTest(unittest.TestCase):
         self.assertIn("getRoomBedLayout", controller)
         self.assertIn("updateRoomBedLayout", controller)
         self.assertIn("RoomLayoutService", controller)
+        self.assertIn("item.getBedType().getValue()", controller)
         self.assertNotIn("@GetMapping", controller)
         self.assertNotIn("@PutMapping", controller)
 
@@ -90,7 +96,7 @@ class RoomLayoutPhaseTwoTest(unittest.TestCase):
         controller = STUDENT_CONTROLLER.read_text(encoding="utf-8")
         self.assertIn("roomLayoutService.enrich", controller)
 
-    def test_admin_has_visual_drag_editor_with_bunk_grouping_and_mobile_inputs(self) -> None:
+    def test_admin_has_visual_drag_editor_with_type_switching_and_mobile_inputs(self) -> None:
         self.assertTrue(EDITOR.is_file())
         editor = EDITOR.read_text(encoding="utf-8")
         for expected in (
@@ -105,6 +111,9 @@ class RoomLayoutPhaseTwoTest(unittest.TestCase):
             "expectedRoomVersion",
             "修改原因",
             "layout-number-grid",
+            "layout-bed-type-grid",
+            "setBedType",
+            "bedType: bed.bed_type",
         ):
             self.assertIn(expected, editor)
 
@@ -121,7 +130,7 @@ class RoomLayoutPhaseTwoTest(unittest.TestCase):
         self.assertIn("./phase2-room-layout.css", main)
         self.assertIn("./room-scene-geometry-fix.css", main)
 
-    def test_admin_room_editor_uses_physical_bed_count_and_readonly_capacity(self) -> None:
+    def test_admin_room_editor_uses_physical_bed_count_and_readonly_room_type(self) -> None:
         self.assertTrue(ROOM_MANAGEMENT.is_file())
         service = ROOM_MANAGEMENT.read_text(encoding="utf-8")
         self.assertIn("class RoomManagementService", service)
@@ -129,32 +138,39 @@ class RoomLayoutPhaseTwoTest(unittest.TestCase):
         self.assertNotIn("room_id=:id AND operational_status='ENABLED'", service)
         self.assertIn("房间容量必须等于当前床位总数", service)
         self.assertIn("COALESCE(SUM(bed.operational_status='ENABLED'), 0) AS enabled_bed_count", service)
-        self.assertIn("ROOM_TYPE_CAPACITY_MISMATCH", service)
+        self.assertNotIn("ROOM_TYPE_CAPACITY_MISMATCH", service)
+        self.assertNotIn("SET room_type=:roomType", service)
 
         controller = CONTROLLER.read_text(encoding="utf-8")
         self.assertIn("roomManagementService.rooms", controller)
         self.assertIn("roomManagementService.updateRoom", controller)
+        self.assertNotIn("request.getRoomType()", controller)
 
         admin = ADMIN_VIEW.read_text(encoding="utf-8")
         for expected in (
             "physicalBedCount",
-            "roomTypeOptions",
             "room-editor-dialog",
             "room-editor-summary",
             "room-capacity-field",
+            "room-readonly-field",
+            "当前房型",
+            "房型由床位布局编辑器自动同步",
             "readonly",
             "容量由物理床位总数决定",
         ):
             self.assertIn(expected, admin)
-        self.assertIn("capacity: physicalBedCount(selectedRoom.value)", admin)
+        self.assertNotIn("roomTypeOptions", admin)
+        self.assertIn("capacity,", admin)
 
-    def test_layout_editor_uses_larger_bed_cards_and_wider_dialog(self) -> None:
+    def test_layout_editor_uses_larger_bed_cards_and_smaller_dialog(self) -> None:
         styles = STYLES.read_text(encoding="utf-8")
         for expected in (
-            "width: min(1240px, calc(100vw - 32px))",
-            "min-height: 500px",
-            "width: 154px",
-            "height: 84px",
+            "width: min(1080px, calc(100vw - 32px))",
+            "min-height: 400px",
+            "width: 190px",
+            "height: 90px",
+            "width: 114px",
+            "height: 54px",
             ".room-editor-dialog",
             ".room-editor-summary",
         ):
@@ -252,6 +268,7 @@ class RoomLayoutPhaseTwoTest(unittest.TestCase):
         self.assertTrue(SMOKE.is_file())
         workflow = WORKFLOW.read_text(encoding="utf-8")
         self.assertIn("python -m unittest scripts/phase2/test_room_layout.py -v", workflow)
+        self.assertIn("python -m unittest scripts/phase2/test_room_bed_type_and_preference_ui.py -v", workflow)
         self.assertIn("python scripts/e2e/phase2_room_layout_smoke.py", workflow)
         self.assertIn("room_bed_layout", workflow)
 
