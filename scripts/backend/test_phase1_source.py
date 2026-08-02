@@ -94,9 +94,10 @@ class Phase1BackendSourceTest(unittest.TestCase):
 
     def test_matching_is_deterministic_and_has_conflict_penalty(self) -> None:
         content = (JAVA_ROOT / "matching/MatchingService.java").read_text(encoding="utf-8")
-        self.assertIn("private static final Map<String, Double> WEIGHTS", content)
+        self.assertIn("schemeService.policyForBatch", content)
         self.assertIn("smokingAcceptance", content)
-        self.assertIn("score -= 25.0", content)
+        self.assertIn('rule(rules, "smokingConflictPenalty", 25)', content)
+        self.assertIn("Math.max(0, Math.min(100", content)
         self.assertNotIn("Random", content)
 
     def test_sse_is_room_scoped_and_has_heartbeat(self) -> None:

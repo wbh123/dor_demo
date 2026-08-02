@@ -12,6 +12,7 @@ const links = computed(() =>
         { to: '/admin', label: '工作台', icon: '总' },
         { to: '/admin/data', label: '专业与学生', icon: '学' },
         { to: '/admin/dormitories', label: '宿舍资源', icon: '舍' },
+        { to: '/admin/matching', label: '匹配规则', icon: '配' },
         { to: '/admin/batches', label: '选寝批次', icon: '批' },
         { to: '/admin/assignments', label: '分配与调整', icon: '调' },
       ]

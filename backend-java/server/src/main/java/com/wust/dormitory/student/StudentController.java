@@ -25,17 +25,21 @@ import java.util.Map;
 public class StudentController implements StudentApi {
     private final StudentService studentService;
     private final StudentRoomLayoutService roomLayoutService;
+    private final StudentRoomRecommendationService recommendationService;
     private final TeamService teamService;
     private final TeamHoldReleaseService teamHoldReleaseService;
     private final BedScopeGuard bedScopeGuard;
 
-    public StudentController(StudentService studentService,
-                             StudentRoomLayoutService roomLayoutService,
-                             TeamService teamService,
-                             TeamHoldReleaseService teamHoldReleaseService,
-                             BedScopeGuard bedScopeGuard) {
+    public StudentController(
+            StudentService studentService,
+            StudentRoomLayoutService roomLayoutService,
+            StudentRoomRecommendationService recommendationService,
+            TeamService teamService,
+            TeamHoldReleaseService teamHoldReleaseService,
+            BedScopeGuard bedScopeGuard) {
         this.studentService = studentService;
         this.roomLayoutService = roomLayoutService;
+        this.recommendationService = recommendationService;
         this.teamService = teamService;
         this.teamHoldReleaseService = teamHoldReleaseService;
         this.bedScopeGuard = bedScopeGuard;
@@ -65,7 +69,8 @@ public class StudentController implements StudentApi {
 
     @Override
     public ResponseEntity<ListSuccessResponse> listCandidateRooms(Long batchId) {
-        return ResponseEntity.ok(ResponseFactory.list(studentService.rooms(batchId, student())));
+        return ResponseEntity.ok(ResponseFactory.list(
+                recommendationService.rooms(batchId, student())));
     }
 
     @Override
@@ -104,7 +109,7 @@ public class StudentController implements StudentApi {
     @Override
     public ResponseEntity<ObjectSuccessResponse> getRandomRecommendation(Long batchId) {
         return ResponseEntity.ok(ResponseFactory.object(
-                studentService.randomRecommendation(batchId, student())));
+                recommendationService.randomRecommendation(batchId, student())));
     }
 
     @Override

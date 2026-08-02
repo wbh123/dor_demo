@@ -78,10 +78,12 @@ function roommateCount(room: DataObject) {
   return Number(room.assigned_count ?? 0)
 }
 
-function roommateTags(room: DataObject) {
-  const positives = ((room.matches ?? []) as string[]).slice(0, 3)
-  const warnings = ((room.warnings ?? []) as string[]).slice(0, 2)
-  return [...positives, ...warnings].slice(0, 3)
+function recommendationReasons(room: DataObject) {
+  return ((room.recommendationReasons ?? room.matches ?? []) as string[]).slice(0, 3)
+}
+
+function conflictReasons(room: DataObject) {
+  return ((room.conflictReasons ?? room.warnings ?? []) as string[]).slice(0, 2)
 }
 </script>
 
@@ -92,7 +94,7 @@ function roommateTags(room: DataObject) {
         <span class="eyebrow">ROOM MATCHING</span>
         <h2>{{ isTeamMode ? `为${memberCount}人队伍选择房间` : '选择宿舍房间' }}</h2>
         <p v-if="isTeamMode">只展示能够容纳全部成员的房间，队伍需要在同一房间完成选择。</p>
-        <p v-else>房间按生活习惯接近程度排序。已有室友时，会显示匿名偏好提示。</p>
+        <p v-else>房间按生活习惯接近程度排序。已有室友时，会显示匿名推荐理由和注意事项。</p>
       </div>
       <button v-if="!isTeamMode" class="button accent" @click="randomRecommend">帮我推荐一个</button>
     </div>
@@ -141,9 +143,14 @@ function roommateTags(room: DataObject) {
             <strong>室友偏好</strong>
             <span>{{ roommateCount(room) > 0 ? `已有 ${roommateCount(room)} 人` : '当前空房' }}</span>
           </div>
-          <div v-if="roommateCount(room) > 0" class="tag-row">
-            <span v-for="tag in roommateTags(room)" :key="tag" class="tag positive">{{ tag }}</span>
-          </div>
+          <template v-if="roommateCount(room) > 0">
+            <div v-if="recommendationReasons(room).length" class="tag-row recommendation-reasons">
+              <span v-for="tag in recommendationReasons(room)" :key="`positive-${tag}`" class="tag positive">{{ tag }}</span>
+            </div>
+            <div v-if="conflictReasons(room).length" class="tag-row conflict-reasons">
+              <span v-for="tag in conflictReasons(room)" :key="`warning-${tag}`" class="tag warning">{{ tag }}</span>
+            </div>
+          </template>
           <p v-else class="roommate-empty">暂无室友偏好信息，可优先选择喜欢的床位。</p>
         </div>
 

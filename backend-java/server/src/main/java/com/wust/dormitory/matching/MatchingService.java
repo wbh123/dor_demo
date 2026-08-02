@@ -6,12 +6,14 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @Service
 public class MatchingService {
-    private static final Map<String, Double> WEIGHTS = Map.ofEntries(
+    private static final Map<String, Double> FALLBACK_WEIGHTS = Map.ofEntries(
             Map.entry("sleepTimeMinutes", 1.2),
             Map.entry("wakeTimeMinutes", 1.0),
             Map.entry("sleepSensitivity", 1.2),
@@ -23,33 +25,47 @@ public class MatchingService {
             Map.entry("gamingVoiceFrequency", 1.1),
             Map.entry("socialActivity", 0.6)
     );
+    private static final Map<String, Double> FALLBACK_RULES = Map.of(
+            "smokingConflictPenalty", 25.0,
+            "sleepTimeWarningMinutes", 60.0,
+            "cleaningWarningDifference", 1.0,
+            "gamingVoiceWarningDifference", 1.0
+    );
 
     private final ObjectMapper objectMapper;
+    private final MatchingSchemeService schemeService;
 
-    public MatchingService(ObjectMapper objectMapper) {
+    public MatchingService(ObjectMapper objectMapper, MatchingSchemeService schemeService) {
         this.objectMapper = objectMapper;
+        this.schemeService = schemeService;
     }
 
+    /**
+     * Resolves the immutable policy referenced by
+     * selection_batch.matching_weight_scheme_id before calculating scores.
+     */
+    public MatchResult roomScore(
+            long batchId,
+            String studentFeatureJson,
+            List<String> roommateFeatureJson) {
+        MatchingSchemeService.Policy policy = schemeService.policyForBatch(batchId);
+        return calculate(
+                studentFeatureJson,
+                roommateFeatureJson,
+                policy.weights(),
+                policy.conflictRules());
+    }
+
+    /**
+     * Compatibility path used by frozen first-stage callers. New recommendation
+     * flows always call the batch-aware overload above.
+     */
     public MatchResult roomScore(String studentFeatureJson, List<String> roommateFeatureJson) {
-        if (studentFeatureJson == null || roommateFeatureJson.isEmpty()) {
-            return new MatchResult(100.0, List.of("当前为空房间，可优先选择床位"), List.of());
-        }
-        Map<String, Object> student = parse(studentFeatureJson);
-        double total = 0;
-        List<String> positives = new ArrayList<>();
-        List<String> warnings = new ArrayList<>();
-        for (String json : roommateFeatureJson) {
-            Map<String, Object> roommate = parse(json);
-            total += pairScore(student, roommate);
-        }
-        double score = Math.round(total / roommateFeatureJson.size() * 10.0) / 10.0;
-        compareTag(student, roommateFeatureJson, "sleepTimeMinutes", 60, "入睡时间接近", "入睡时间差异较大", positives, warnings);
-        compareTag(student, roommateFeatureJson, "cleaningFrequency", 1, "卫生习惯接近", "卫生频率存在差异", positives, warnings);
-        compareTag(student, roommateFeatureJson, "gamingVoiceFrequency", 1, "娱乐语音习惯接近", "游戏或语音频率存在差异", positives, warnings);
-        if (hasSmokingConflict(student, roommateFeatureJson)) {
-            warnings.add("吸烟接受偏好存在冲突");
-        }
-        return new MatchResult(score, positives.stream().limit(3).toList(), warnings.stream().distinct().limit(3).toList());
+        return calculate(
+                studentFeatureJson,
+                roommateFeatureJson,
+                FALLBACK_WEIGHTS,
+                FALLBACK_RULES);
     }
 
     public Map<String, Object> normalizeAnswers(Map<String, Object> answers) {
@@ -58,36 +74,133 @@ public class MatchingService {
         return normalized;
     }
 
-    private double pairScore(Map<String, Object> left, Map<String, Object> right) {
+    private MatchResult calculate(
+            String studentFeatureJson,
+            List<String> roommateFeatureJson,
+            Map<String, Double> weights,
+            Map<String, Double> rules) {
+        if (studentFeatureJson == null || studentFeatureJson.isBlank()) {
+            return result(80.0, List.of("完成生活习惯问卷后可获得更准确的推荐"), List.of(), 0);
+        }
+        if (roommateFeatureJson.isEmpty()) {
+            return result(100.0, List.of("当前为空房间，可优先选择床位"), List.of(), 0);
+        }
+
+        Map<String, Object> student = parse(studentFeatureJson);
+        List<Map<String, Object>> roommates = roommateFeatureJson.stream()
+                .map(this::parse)
+                .filter(map -> !map.isEmpty())
+                .toList();
+        if (roommates.isEmpty()) {
+            return result(100.0, List.of("当前房间暂无可比较的室友偏好"), List.of(), 0);
+        }
+
+        double total = 0;
+        int dimensionCount = 0;
+        for (Map<String, Object> roommate : roommates) {
+            PairResult pair = pairScore(student, roommate, weights, rules);
+            total += pair.score();
+            dimensionCount = Math.max(dimensionCount, pair.dimensionCount());
+        }
+        double score = Math.round(total / roommates.size() * 10.0) / 10.0;
+
+        Set<String> recommendationReasons = new LinkedHashSet<>();
+        Set<String> conflictReasons = new LinkedHashSet<>();
+        compareTag(
+                student,
+                roommates,
+                "sleepTimeMinutes",
+                rule(rules, "sleepTimeWarningMinutes", 60),
+                "入睡时间接近",
+                "入睡时间差异较大",
+                recommendationReasons,
+                conflictReasons);
+        compareTag(
+                student,
+                roommates,
+                "cleaningFrequency",
+                rule(rules, "cleaningWarningDifference", 1),
+                "卫生习惯接近",
+                "卫生频率存在差异",
+                recommendationReasons,
+                conflictReasons);
+        compareTag(
+                student,
+                roommates,
+                "gamingVoiceFrequency",
+                rule(rules, "gamingVoiceWarningDifference", 1),
+                "娱乐语音习惯接近",
+                "游戏或语音频率存在差异",
+                recommendationReasons,
+                conflictReasons);
+        if (hasSmokingConflict(student, roommates)) {
+            conflictReasons.add("吸烟接受偏好存在冲突");
+        } else if (student.containsKey("smokingAcceptance")) {
+            recommendationReasons.add("吸烟接受偏好无明显冲突");
+        }
+
+        return result(
+                score,
+                recommendationReasons.stream().limit(3).toList(),
+                conflictReasons.stream().limit(3).toList(),
+                dimensionCount);
+    }
+
+    private MatchResult result(
+            double score,
+            List<String> recommendationReasons,
+            List<String> conflictReasons,
+            int dimensionCount) {
+        return new MatchResult(
+                Math.max(0, Math.min(100, score)),
+                recommendationReasons,
+                conflictReasons,
+                recommendationReasons,
+                conflictReasons,
+                dimensionCount);
+    }
+
+    private PairResult pairScore(
+            Map<String, Object> left,
+            Map<String, Object> right,
+            Map<String, Double> weights,
+            Map<String, Double> rules) {
         double weightedDifference = 0;
         double maximum = 0;
-        for (Map.Entry<String, Double> entry : WEIGHTS.entrySet()) {
-            Double a = number(left.get(entry.getKey()));
-            Double b = number(right.get(entry.getKey()));
+        int dimensionCount = 0;
+        for (String key : MatchingSchemeService.SUPPORTED_WEIGHT_KEYS) {
+            double weight = weights.getOrDefault(key, 0.0);
+            if (weight <= 0) {
+                continue;
+            }
+            Double a = number(left.get(key));
+            Double b = number(right.get(key));
             if (a == null || b == null) {
                 continue;
             }
-            double range = entry.getKey().contains("Minutes") ? 720.0 : 5.0;
-            double difference = entry.getKey().contains("Minutes")
+            double range = key.contains("Minutes") ? 720.0 : 5.0;
+            double difference = key.contains("Minutes")
                     ? circularMinuteDifference(a, b)
                     : Math.abs(a - b);
-            weightedDifference += Math.min(difference / range, 1.0) * entry.getValue();
-            maximum += entry.getValue();
+            weightedDifference += Math.min(difference / range, 1.0) * weight;
+            maximum += weight;
+            dimensionCount++;
         }
         if (maximum == 0) {
-            return 80.0;
+            return new PairResult(80.0, 0);
         }
         double score = 100.0 * (1.0 - weightedDifference / maximum);
         if (smokingConflict(left.get("smokingAcceptance"), right.get("smokingAcceptance"))) {
-            score -= 25.0;
+            score -= rule(rules, "smokingConflictPenalty", 25);
         }
-        return Math.max(0, Math.min(100, score));
+        return new PairResult(Math.max(0, Math.min(100, score)), dimensionCount);
     }
 
-    private boolean hasSmokingConflict(Map<String, Object> student, List<String> roommates) {
+    private boolean hasSmokingConflict(
+            Map<String, Object> student,
+            List<Map<String, Object>> roommates) {
         Object own = student.get("smokingAcceptance");
         return roommates.stream()
-                .map(this::parse)
                 .map(map -> map.get("smokingAcceptance"))
                 .anyMatch(value -> smokingConflict(own, value));
     }
@@ -99,21 +212,38 @@ public class MatchingService {
                 || ("REJECT".equals(leftValue) && "ACCEPT".equals(rightValue));
     }
 
-    private void compareTag(Map<String, Object> student, List<String> roommates, String key,
-                            double threshold, String positive, String warning,
-                            List<String> positives, List<String> warnings) {
+    private void compareTag(
+            Map<String, Object> student,
+            List<Map<String, Object>> roommates,
+            String key,
+            double threshold,
+            String positive,
+            String warning,
+            Set<String> positives,
+            Set<String> warnings) {
         Double own = number(student.get(key));
         if (own == null) {
             return;
         }
-        double average = roommates.stream().map(this::parse).map(map -> number(map.get(key)))
-                .filter(value -> value != null).mapToDouble(Double::doubleValue).average().orElse(own);
-        double difference = key.contains("Minutes") ? circularMinuteDifference(own, average) : Math.abs(own - average);
+        double average = roommates.stream()
+                .map(map -> number(map.get(key)))
+                .filter(value -> value != null)
+                .mapToDouble(Double::doubleValue)
+                .average()
+                .orElse(own);
+        double difference = key.contains("Minutes")
+                ? circularMinuteDifference(own, average)
+                : Math.abs(own - average);
         if (difference <= threshold) {
             positives.add(positive);
         } else {
             warnings.add(warning);
         }
+    }
+
+    private double rule(Map<String, Double> rules, String key, double fallback) {
+        Double value = rules.get(key);
+        return value == null || !Double.isFinite(value) ? fallback : value;
     }
 
     private Map<String, Object> parse(String json) {
@@ -133,6 +263,15 @@ public class MatchingService {
         return Math.min(difference, 1440.0 - difference);
     }
 
-    public record MatchResult(double score, List<String> matches, List<String> warnings) {
+    private record PairResult(double score, int dimensionCount) {
+    }
+
+    public record MatchResult(
+            double score,
+            List<String> matches,
+            List<String> warnings,
+            List<String> recommendationReasons,
+            List<String> conflictReasons,
+            int dimensionCount) {
     }
 }

@@ -4,12 +4,15 @@ import com.wust.dormitory.allocation.AdminAllocationService;
 import com.wust.dormitory.allocation.AssignmentAdjustmentService;
 import com.wust.dormitory.allocation.AssignmentQueryService;
 import com.wust.dormitory.common.response.ResponseFactory;
+import com.wust.dormitory.matching.MatchingSchemeService;
 import com.wust.dormitory.model.api.AdminApi;
 import com.wust.dormitory.model.dto.AllocationCommitRequest;
 import com.wust.dormitory.model.dto.AssignmentAdjustmentRequest;
 import com.wust.dormitory.model.dto.BatchRequest;
 import com.wust.dormitory.model.dto.ListSuccessResponse;
 import com.wust.dormitory.model.dto.MajorRequest;
+import com.wust.dormitory.model.dto.MatchingWeightSchemeCreateRequest;
+import com.wust.dormitory.model.dto.MatchingWeightSchemeRevisionRequest;
 import com.wust.dormitory.model.dto.ObjectSuccessResponse;
 import com.wust.dormitory.model.dto.RoomBedLayoutItem;
 import com.wust.dormitory.model.dto.RoomBedLayoutRequest;
@@ -35,6 +38,7 @@ public class AdminController implements AdminApi {
     private final AdminService adminService;
     private final RoomManagementService roomManagementService;
     private final RoomLayoutService roomLayoutService;
+    private final MatchingSchemeService matchingSchemeService;
     private final BatchLifecycleService batchLifecycleService;
     private final AdminAllocationService allocationService;
     private final AssignmentQueryService assignmentQueryService;
@@ -42,18 +46,21 @@ public class AdminController implements AdminApi {
     private final AssignmentExportService exportService;
     private final BatchRuleValidator batchRuleValidator;
 
-    public AdminController(AdminService adminService,
-                           RoomManagementService roomManagementService,
-                           RoomLayoutService roomLayoutService,
-                           BatchLifecycleService batchLifecycleService,
-                           AdminAllocationService allocationService,
-                           AssignmentQueryService assignmentQueryService,
-                           AssignmentAdjustmentService adjustmentService,
-                           AssignmentExportService exportService,
-                           BatchRuleValidator batchRuleValidator) {
+    public AdminController(
+            AdminService adminService,
+            RoomManagementService roomManagementService,
+            RoomLayoutService roomLayoutService,
+            MatchingSchemeService matchingSchemeService,
+            BatchLifecycleService batchLifecycleService,
+            AdminAllocationService allocationService,
+            AssignmentQueryService assignmentQueryService,
+            AssignmentAdjustmentService adjustmentService,
+            AssignmentExportService exportService,
+            BatchRuleValidator batchRuleValidator) {
         this.adminService = adminService;
         this.roomManagementService = roomManagementService;
         this.roomLayoutService = roomLayoutService;
+        this.matchingSchemeService = matchingSchemeService;
         this.batchLifecycleService = batchLifecycleService;
         this.allocationService = allocationService;
         this.assignmentQueryService = assignmentQueryService;
@@ -158,6 +165,46 @@ public class AdminController implements AdminApi {
                 beds);
         return ResponseEntity.ok(ResponseFactory.object(
                 roomLayoutService.updateLayout(roomId, command, SecurityUsers.requireAdmin())));
+    }
+
+    @Override
+    public ResponseEntity<ListSuccessResponse> listMatchingWeightSchemes() {
+        SecurityUsers.requireAdmin();
+        return ResponseEntity.ok(ResponseFactory.list(matchingSchemeService.list()));
+    }
+
+    @Override
+    public ResponseEntity<ObjectSuccessResponse> createMatchingWeightScheme(
+            MatchingWeightSchemeCreateRequest request) {
+        MatchingSchemeService.CreateCommand command = new MatchingSchemeService.CreateCommand(
+                request.getSchemeCode(),
+                request.getSchemeName(),
+                request.getAlgorithmVersion(),
+                request.getWeights(),
+                request.getConflictRules(),
+                Boolean.TRUE.equals(request.getActivate()),
+                request.getReason());
+        return ResponseEntity.ok(ResponseFactory.object(
+                matchingSchemeService.create(command, SecurityUsers.requireAdmin())));
+    }
+
+    @Override
+    public ResponseEntity<ObjectSuccessResponse> createMatchingWeightSchemeRevision(
+            Long schemeId,
+            MatchingWeightSchemeRevisionRequest request) {
+        MatchingSchemeService.RevisionCommand command = new MatchingSchemeService.RevisionCommand(
+                request.getSchemeName(),
+                request.getAlgorithmVersion(),
+                request.getWeights(),
+                request.getConflictRules(),
+                Boolean.TRUE.equals(request.getActivate()),
+                request.getExpectedVersion(),
+                request.getReason());
+        return ResponseEntity.ok(ResponseFactory.object(
+                matchingSchemeService.createRevision(
+                        schemeId,
+                        command,
+                        SecurityUsers.requireAdmin())));
     }
 
     @Override

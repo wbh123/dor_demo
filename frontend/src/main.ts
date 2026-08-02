@@ -7,5 +7,6 @@ import './ux-refinement.css'
 import './room-selection-refinement.css'
 import './phase2-room-layout.css'
 import './room-scene-geometry-fix.css'
+import './matching-operations.css'
 
 createApp(App).use(pinia).use(router).mount('#app')

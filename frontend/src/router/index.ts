@@ -71,6 +71,12 @@ const router = createRouter({
           meta: { role: 'ADMIN' },
         },
         {
+          path: 'admin/matching',
+          name: 'admin-matching',
+          component: () => import('../views/admin/AdminMatchingView.vue'),
+          meta: { role: 'ADMIN' },
+        },
+        {
           path: 'admin/batches',
           name: 'admin-batches',
           component: () => import('../views/admin/AdminBatchView.vue'),

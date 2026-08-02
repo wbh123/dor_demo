@@ -253,7 +253,7 @@ class RoomLayoutPhaseTwoTest(unittest.TestCase):
         workflow = WORKFLOW.read_text(encoding="utf-8")
         self.assertIn("python -m unittest scripts/phase2/test_room_layout.py -v", workflow)
         self.assertIn("python scripts/e2e/phase2_room_layout_smoke.py", workflow)
-        self.assertIn("Assert Flyway V5 and room layout rules", workflow)
+        self.assertIn("room_bed_layout", workflow)
 
 
 if __name__ == "__main__":
