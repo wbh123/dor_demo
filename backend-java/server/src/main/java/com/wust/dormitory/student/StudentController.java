@@ -16,6 +16,7 @@ import com.wust.dormitory.security.SecurityUsers;
 import com.wust.dormitory.selection.BedHoldService;
 import com.wust.dormitory.selection.BedScopeGuard;
 import org.springframework.http.ResponseEntity;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.ArrayList;
@@ -104,9 +105,14 @@ public class StudentController implements StudentApi {
     }
 
     @Override
+    @Transactional
     public ResponseEntity<ObjectSuccessResponse> preparePersonalSelection(Long batchId) {
+        CurrentUser user = student();
+        teamHoldReleaseService.requireNoActiveHoldForPersonalSelection(
+                batchId,
+                user.studentId());
         return ResponseEntity.ok(ResponseFactory.object(
-                teamService.preparePersonalSelection(batchId, student())));
+                teamService.preparePersonalSelection(batchId, user)));
     }
 
     @Override
@@ -175,30 +181,40 @@ public class StudentController implements StudentApi {
     }
 
     @Override
+    @Transactional
     public ResponseEntity<ObjectSuccessResponse> leaveTeam(Long teamId) {
-        return ResponseEntity.ok(ResponseFactory.object(teamService.leaveTeam(teamId, student())));
+        CurrentUser user = student();
+        teamHoldReleaseService.requireNoActiveHoldForMember(teamId, user.studentId());
+        return ResponseEntity.ok(ResponseFactory.object(teamService.leaveTeam(teamId, user)));
     }
 
     @Override
+    @Transactional
     public ResponseEntity<ObjectSuccessResponse> removeTeamMember(
             Long teamId, Long studentId) {
+        CurrentUser user = student();
+        teamHoldReleaseService.requireNoActiveHoldForLeader(teamId, user.studentId());
         return ResponseEntity.ok(ResponseFactory.object(
-                teamService.removeMember(teamId, studentId, student())));
+                teamService.removeMember(teamId, studentId, user)));
     }
 
     @Override
+    @Transactional
     public ResponseEntity<ObjectSuccessResponse> holdTeamBeds(
             Long batchId, Long teamId, TeamBedsRequest request) {
+        CurrentUser user = student();
+        teamHoldReleaseService.lockTeamForHold(batchId, teamId, user.studentId());
         List<Long> bedIds = new ArrayList<>(request.getBedIds());
         bedScopeGuard.requireAllowed(batchId, bedIds);
         BedHoldService.HoldResult hold = studentService.holdTeam(
-                batchId, teamId, bedIds, student());
+                batchId, teamId, bedIds, user);
         return ResponseEntity.ok(ResponseFactory.object(Map.of(
                 "token", hold.token(),
                 "expiresAt", hold.expiresAt())));
     }
 
     @Override
+    @Transactional
     public ResponseEntity<VoidSuccessResponse> releaseTeamBeds(
             Long batchId, Long teamId, TeamConfirmRequest request) {
         CurrentUser user = student();
@@ -210,12 +226,15 @@ public class StudentController implements StudentApi {
     }
 
     @Override
+    @Transactional
     public ResponseEntity<VoidSuccessResponse> confirmTeamBeds(
             Long batchId, Long teamId, TeamConfirmRequest request) {
+        CurrentUser user = student();
+        teamHoldReleaseService.lockTeamForHold(batchId, teamId, user.studentId());
         List<Long> bedIds = new ArrayList<>(request.getBedIds());
         bedScopeGuard.requireAllowed(batchId, bedIds);
         studentService.confirmTeam(
-                batchId, teamId, bedIds, request.getToken(), student());
+                batchId, teamId, bedIds, request.getToken(), user);
         return ResponseEntity.ok(ResponseFactory.empty());
     }
 

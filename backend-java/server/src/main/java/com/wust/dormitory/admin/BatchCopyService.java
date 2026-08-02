@@ -73,6 +73,7 @@ public class BatchCopyService {
         result.put("id", newBatchId);
         result.put("sourceBatchId", sourceBatchId);
         result.put("batchStatus", "DRAFT");
+        result.put("ruleTemplateId", source.get("rule_template_id"));
         result.put("buildingScopeCount", copiedBuildings);
         result.put("roomScopeCount", copiedRooms);
         result.put("bedScopeCount", copiedBeds);
@@ -82,6 +83,7 @@ public class BatchCopyService {
         before.put("sourceBatchCode", source.get("batch_code"));
         before.put("sourceBatchName", source.get("batch_name"));
         before.put("sourceBatchStatus", source.get("batch_status"));
+        before.put("ruleTemplateId", source.get("rule_template_id"));
 
         auditService.success(
                 operator,
@@ -115,7 +117,7 @@ public class BatchCopyService {
     private Map<String, Object> sourceBatchForUpdate(long sourceBatchId) {
         List<Map<String, Object>> rows = jdbc.queryForList("""
                 SELECT id, batch_code, batch_name, batch_status,
-                       questionnaire_version_id, matching_weight_scheme_id,
+                       questionnaire_version_id, matching_weight_scheme_id, rule_template_id,
                        hold_duration_seconds, hold_renewal_limit,
                        allow_team, team_min_size, team_max_size,
                        allow_student_random, unselected_strategy, rule_version
@@ -148,10 +150,11 @@ public class BatchCopyService {
     private void validateTemplateReferences(Map<String, Object> source) {
         Object questionnaireId = source.get("questionnaire_version_id");
         Object schemeId = source.get("matching_weight_scheme_id");
-        if (questionnaireId == null || schemeId == null) {
+        Object ruleTemplateId = source.get("rule_template_id");
+        if (questionnaireId == null || schemeId == null || ruleTemplateId == null) {
             throw new BusinessException(
                     "BATCH_COPY_TEMPLATE_INCOMPLETE",
-                    "源批次缺少问卷版本或匹配方案，不能复制");
+                    "源批次缺少个人偏好版本、匹配方案或批次规则模板，不能复制");
         }
         int questionnaireCount = count(
                 "SELECT COUNT(*) FROM questionnaire_version WHERE id=:id",
@@ -159,10 +162,13 @@ public class BatchCopyService {
         int schemeCount = count(
                 "SELECT COUNT(*) FROM matching_weight_scheme WHERE id=:id",
                 Map.of("id", schemeId));
-        if (questionnaireCount != 1 || schemeCount != 1) {
+        int ruleTemplateCount = count(
+                "SELECT COUNT(*) FROM batch_rule_template WHERE id=:id",
+                Map.of("id", ruleTemplateId));
+        if (questionnaireCount != 1 || schemeCount != 1 || ruleTemplateCount != 1) {
             throw new BusinessException(
                     "BATCH_COPY_TEMPLATE_INCOMPLETE",
-                    "源批次引用的问卷版本或匹配方案已经不存在");
+                    "源批次引用的个人偏好版本、匹配方案或批次规则模板已经不存在");
         }
     }
 
@@ -234,13 +240,13 @@ public class BatchCopyService {
             jdbc.update("""
                     INSERT INTO selection_batch
                     (batch_code, batch_name, batch_status,
-                     questionnaire_version_id, matching_weight_scheme_id,
+                     questionnaire_version_id, matching_weight_scheme_id, rule_template_id,
                      start_at, end_at, hold_duration_seconds, hold_renewal_limit,
                      allow_team, team_min_size, team_max_size,
                      allow_student_random, unselected_strategy, rule_version, created_by)
                     VALUES
                     (:batchCode, :batchName, 'DRAFT',
-                     :questionnaireVersionId, :matchingWeightSchemeId,
+                     :questionnaireVersionId, :matchingWeightSchemeId, :ruleTemplateId,
                      :startAt, :endAt, :holdDurationSeconds, :holdRenewalLimit,
                      :allowTeam, :teamMinSize, :teamMaxSize,
                      :allowStudentRandom, :unselectedStrategy, :ruleVersion, :createdBy)
@@ -249,6 +255,7 @@ public class BatchCopyService {
                     .addValue("batchName", command.batchName())
                     .addValue("questionnaireVersionId", source.get("questionnaire_version_id"))
                     .addValue("matchingWeightSchemeId", source.get("matching_weight_scheme_id"))
+                    .addValue("ruleTemplateId", source.get("rule_template_id"))
                     .addValue("startAt", command.startAt())
                     .addValue("endAt", command.endAt())
                     .addValue("holdDurationSeconds", source.get("hold_duration_seconds"))

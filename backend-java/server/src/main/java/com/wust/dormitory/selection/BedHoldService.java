@@ -30,7 +30,7 @@ public class BedHoldService {
             }
             return new HoldResult(token, Instant.now().plus(ttl));
         } catch (RedisConnectionFailureException exception) {
-            throw new BusinessException("REDIS_UNAVAILABLE", "临时占用服务不可用，请稍后重试", HttpStatus.SERVICE_UNAVAILABLE);
+            throw redisUnavailable();
         }
     }
 
@@ -57,20 +57,25 @@ public class BedHoldService {
             }
             return new HoldResult(token, Instant.now().plus(ttl));
         } catch (RedisConnectionFailureException exception) {
-            throw new BusinessException("REDIS_UNAVAILABLE", "临时占用服务不可用，请稍后重试", HttpStatus.SERVICE_UNAVAILABLE);
+            throw redisUnavailable();
         }
     }
 
     public boolean validateStudent(long batchId, long bedId, long studentId, String token) {
-        return ("S:" + studentId + ":" + token).equals(redis.opsForValue().get(key(batchId, bedId)));
+        return ("S:" + studentId + ":" + token).equals(redisValue(batchId, bedId));
     }
 
     public boolean validateTeam(long batchId, long bedId, long teamId, String token) {
-        return ("T:" + teamId + ":" + token).equals(redis.opsForValue().get(key(batchId, bedId)));
+        return ("T:" + teamId + ":" + token).equals(redisValue(batchId, bedId));
+    }
+
+    public boolean isHeldByTeam(long batchId, long bedId, long teamId) {
+        String value = redisValue(batchId, bedId);
+        return value != null && value.startsWith("T:" + teamId + ":");
     }
 
     public String current(long batchId, long bedId) {
-        return redis.opsForValue().get(key(batchId, bedId));
+        return redisValue(batchId, bedId);
     }
 
     public void releaseStudent(long batchId, long bedId, long studentId, String token) {
@@ -79,6 +84,14 @@ public class BedHoldService {
 
     public void releaseTeam(long batchId, List<Long> bedIds, long teamId, String token) {
         release(bedIds.stream().map(id -> key(batchId, id)).toList(), "T:" + teamId + ":" + token);
+    }
+
+    private String redisValue(long batchId, long bedId) {
+        try {
+            return redis.opsForValue().get(key(batchId, bedId));
+        } catch (RedisConnectionFailureException exception) {
+            throw redisUnavailable();
+        }
     }
 
     private void release(List<String> keys, String expectedValue) {
@@ -92,7 +105,18 @@ public class BedHoldService {
                 end
                 return 1
                 """, Long.class);
-        redis.execute(script, keys, expectedValue);
+        try {
+            redis.execute(script, keys, expectedValue);
+        } catch (RedisConnectionFailureException exception) {
+            throw redisUnavailable();
+        }
+    }
+
+    private BusinessException redisUnavailable() {
+        return new BusinessException(
+                "REDIS_UNAVAILABLE",
+                "临时占用服务不可用，请稍后重试",
+                HttpStatus.SERVICE_UNAVAILABLE);
     }
 
     private String key(long batchId, long bedId) {

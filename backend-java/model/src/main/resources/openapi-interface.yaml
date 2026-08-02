@@ -1,8 +1,8 @@
 openapi: 3.0.3
 info:
   title: 武汉科技大学学生宿舍智能选择系统接口
-  description: 第一阶段核心闭环与第二阶段质量运营能力OpenAPI契约
-  version: 2.6.0
+  description: 第一阶段核心闭环、第二阶段质量运营与系统服务管理能力OpenAPI契约
+  version: 2.7.0
 servers:
   - url: http://localhost:8080
 paths:
@@ -47,6 +47,10 @@ paths:
     $ref: 'admin/openapi-matching.yaml#/paths/~1api~1v1~1admin~1matching-weight-schemes'
   /api/v1/admin/matching-weight-schemes/{schemeId}/revisions:
     $ref: 'admin/openapi-matching.yaml#/paths/~1api~1v1~1admin~1matching-weight-schemes~1{schemeId}~1revisions'
+  /api/v1/admin/batch-rule-templates:
+    $ref: 'admin/openapi-batch-rule-template.yaml#/paths/~1api~1v1~1admin~1batch-rule-templates'
+  /api/v1/admin/batch-rule-templates/{templateId}/revisions:
+    $ref: 'admin/openapi-batch-rule-template.yaml#/paths/~1api~1v1~1admin~1batch-rule-templates~1{templateId}~1revisions'
   /api/v1/admin/batches:
     $ref: 'admin/openapi-admin.yaml#/paths/~1api~1v1~1admin~1batches'
   /api/v1/admin/batches/{batchId}/copy:
@@ -115,3 +119,36 @@ paths:
 
   /api/v1/realtime/batches/{batchId}/rooms/{roomId}:
     $ref: 'realtime/openapi-realtime.yaml#/paths/~1api~1v1~1realtime~1batches~1{batchId}~1rooms~1{roomId}'
+
+  /api/v1/platform/login:
+    $ref: 'platform/openapi-platform.yaml#/paths/~1api~1v1~1platform~1login'
+  /api/v1/platform/me:
+    $ref: 'platform/openapi-platform.yaml#/paths/~1api~1v1~1platform~1me'
+  /api/v1/platform/password:
+    $ref: 'platform/openapi-platform.yaml#/paths/~1api~1v1~1platform~1password'
+  /api/v1/platform/plans:
+    $ref: 'platform/openapi-platform.yaml#/paths/~1api~1v1~1platform~1plans'
+  /api/v1/platform/plans/revisions/{revisionId}:
+    $ref: 'platform/openapi-platform.yaml#/paths/~1api~1v1~1platform~1plans~1revisions~1{revisionId}'
+  /api/v1/platform/plans/revisions/{sourceRevisionId}:
+    $ref: 'platform/openapi-platform.yaml#/paths/~1api~1v1~1platform~1plans~1revisions~1{sourceRevisionId}'
+  /api/v1/platform/subscription:
+    $ref: 'platform/openapi-platform.yaml#/paths/~1api~1v1~1platform~1subscription'
+  /api/v1/platform/subscription/history:
+    $ref: 'platform/openapi-platform.yaml#/paths/~1api~1v1~1platform~1subscription~1history'
+  /api/v1/platform/subscription/preview:
+    $ref: 'platform/openapi-platform.yaml#/paths/~1api~1v1~1platform~1subscription~1preview'
+  /api/v1/platform/subscription/plan:
+    $ref: 'platform/openapi-platform.yaml#/paths/~1api~1v1~1platform~1subscription~1plan'
+  /api/v1/platform/subscription/status:
+    $ref: 'platform/openapi-platform.yaml#/paths/~1api~1v1~1platform~1subscription~1status'
+  /api/v1/platform/features:
+    $ref: 'platform/openapi-platform.yaml#/paths/~1api~1v1~1platform~1features'
+  /api/v1/platform/feature-overrides:
+    $ref: 'platform/openapi-platform.yaml#/paths/~1api~1v1~1platform~1feature-overrides'
+  /api/v1/platform/quotas:
+    $ref: 'platform/openapi-platform.yaml#/paths/~1api~1v1~1platform~1quotas'
+  /api/v1/platform/quota-overrides:
+    $ref: 'platform/openapi-platform.yaml#/paths/~1api~1v1~1platform~1quota-overrides'
+  /api/v1/platform/audit:
+    $ref: 'platform/openapi-platform.yaml#/paths/~1api~1v1~1platform~1audit'

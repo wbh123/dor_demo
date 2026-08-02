@@ -4,6 +4,7 @@ import { api } from '../../api/client'
 import type { BatchCopyRequest, BatchRequest, DataObject, ListSuccessResponse, ObjectSuccessResponse } from '../../api/types'
 
 const batches = ref<DataObject[]>([])
+const ruleTemplates = ref<DataObject[]>([])
 const error = ref('')
 const message = ref('')
 const preview = ref<DataObject | null>(null)
@@ -23,11 +24,24 @@ const form = reactive({
   batchName: '',
   startAt: '',
   endAt: '',
-  holdDurationSeconds: 300,
-  allowTeam: true,
-  teamMaxSize: 5,
-  allowStudentRandom: true,
+  ruleTemplateId: 0,
 })
+
+const selectedRuleTemplate = computed(() =>
+  ruleTemplates.value.find((item) => Number(item.id) === Number(form.ruleTemplateId)) ?? null,
+)
+
+const ruleTemplateSummary = computed(() => {
+  const item = selectedRuleTemplate.value
+  if (!item) return '请选择可用的规则模板'
+  const team = item.allow_team
+    ? `允许${item.team_min_size}—${item.team_max_size}人组队`
+    : '不允许组队'
+  return `临时占用${item.hold_duration_seconds}秒，最多续期${item.hold_renewal_limit}次；${team}；${item.allow_student_random ? '允许' : '不允许'}随机推荐。`
+})
+
+const allocationSummary = computed(() => (preview.value?.summary ?? {}) as DataObject)
+const unassignedStudents = computed(() => (preview.value?.unassigned ?? []) as DataObject[])
 
 const stateGuide = [
   { status: 'DRAFT', label: '草稿', description: '配置资格与宿舍' },
@@ -38,15 +52,23 @@ const stateGuide = [
   { status: 'FINISHED', label: '已完成', description: '结果已经确定' },
 ]
 
-const allocationSummary = computed(() => (preview.value?.summary ?? {}) as DataObject)
-const unassignedStudents = computed(() => (preview.value?.unassigned ?? []) as DataObject[])
-
 onMounted(load)
 
 async function load() {
+  error.value = ''
   try {
-    const response = await api.get<ListSuccessResponse>('/api/v1/admin/batches')
-    batches.value = (response.data.data ?? []) as DataObject[]
+    const [batchResponse, templateResponse] = await Promise.all([
+      api.get<ListSuccessResponse>('/api/v1/admin/batches'),
+      api.get<ListSuccessResponse>('/api/v1/admin/batch-rule-templates'),
+    ])
+    batches.value = (batchResponse.data.data ?? []) as DataObject[]
+    ruleTemplates.value = ((templateResponse.data.data ?? []) as DataObject[])
+      .filter((item) => Boolean(item.enabled))
+    if (!ruleTemplates.value.some((item) => Number(item.id) === Number(form.ruleTemplateId))) {
+      const defaultTemplate = ruleTemplates.value.find((item) => Boolean(item.is_default))
+        ?? ruleTemplates.value[0]
+      form.ruleTemplateId = Number(defaultTemplate?.id ?? 0)
+    }
   } catch (reason) {
     error.value = reason instanceof Error ? reason.message : '批次加载失败'
   }
@@ -54,14 +76,18 @@ async function load() {
 
 async function createBatch() {
   error.value = ''
+  message.value = ''
   try {
+    if (!form.ruleTemplateId) throw new Error('请选择批次规则模板')
     const payload: BatchRequest = {
-      ...form,
+      batchCode: form.batchCode,
+      batchName: form.batchName,
       startAt: new Date(form.startAt).toISOString(),
       endAt: new Date(form.endAt).toISOString(),
+      ruleTemplateId: form.ruleTemplateId,
     }
     await api.post('/api/v1/admin/batches', payload)
-    message.value = '批次已创建为草稿。'
+    message.value = '批次已使用所选规则模板创建为草稿。'
     form.batchCode = ''
     form.batchName = ''
     await load()
@@ -106,7 +132,7 @@ async function copyBatch() {
       payload,
     )
     const copied = (response.data.data ?? {}) as DataObject
-    message.value = `批次配置已复制为草稿：楼栋${Number(copied.buildingScopeCount ?? 0)}、房间${Number(copied.roomScopeCount ?? 0)}、床位${Number(copied.bedScopeCount ?? 0)}。学生资格、队伍和分配结果未复制。`
+    message.value = `批次配置已复制为草稿：楼栋${Number(copied.buildingScopeCount ?? 0)}、房间${Number(copied.roomScopeCount ?? 0)}、床位${Number(copied.bedScopeCount ?? 0)}。规则模板修订和规则快照均保持不变，学生资格、队伍和分配结果未复制。`
     copyDialog.value = false
     copySource.value = null
     await load()
@@ -247,7 +273,7 @@ function actionText(status: string) {
     <div class="page-title">
       <span class="eyebrow">SELECTION OPERATIONS</span>
       <h2>选寝批次与统一分配</h2>
-      <p>统一分配面向批次内全部学生，不要求学生账号提前激活；已锁定队伍优先保持同寝，其余学生按个人分配。</p>
+      <p>批次使用精确规则模板修订；统一分配面向批次内全部学生，不要求学生账号提前激活，已锁定队伍优先保持同寝。</p>
     </div>
 
     <p v-if="error" class="alert error">{{ error }}</p>
@@ -259,7 +285,7 @@ function actionText(status: string) {
           <div>
             <span class="eyebrow">COPY BATCH CONFIGURATION</span>
             <h3 id="batch-copy-title">复制批次配置</h3>
-            <p>来源：{{ copySource?.batch_name }}。只复制规则和宿舍范围，不复制学生、队伍、占用或分配结果。</p>
+            <p>来源：{{ copySource?.batch_name }}。复制精确规则模板修订、规则快照和宿舍范围，不复制学生、队伍、占用或分配结果。</p>
           </div>
           <button class="icon-button" type="button" aria-label="关闭复制窗口" :disabled="copying" @click="closeCopy">×</button>
         </header>
@@ -292,12 +318,10 @@ function actionText(status: string) {
       <form class="form-grid three-column" @submit.prevent="createBatch">
         <label><span>批次编号</span><input v-model.trim="form.batchCode" class="input" required maxlength="32" /></label>
         <label><span>批次名称</span><input v-model.trim="form.batchName" class="input" required maxlength="128" /></label>
-        <label><span>床位保留时间（秒）</span><input v-model.number="form.holdDurationSeconds" class="input" type="number" min="30" max="3600" /></label>
+        <label><span>规则模板</span><select v-model.number="form.ruleTemplateId" class="input" required><option :value="0" disabled>请选择规则模板</option><option v-for="item in ruleTemplates" :key="String(item.id)" :value="Number(item.id)">{{ item.rule_name }} · 修订{{ item.revision }}{{ item.is_default ? '（默认）' : '' }}</option></select></label>
         <label><span>开始时间</span><input v-model="form.startAt" class="input" type="datetime-local" required /></label>
         <label><span>结束时间</span><input v-model="form.endAt" class="input" type="datetime-local" required /></label>
-        <label><span>队伍最大人数</span><input v-model.number="form.teamMaxSize" class="input" type="number" min="2" max="5" /></label>
-        <label class="checkbox-line"><input v-model="form.allowTeam" type="checkbox" />允许组队选寝</label>
-        <label class="checkbox-line"><input v-model="form.allowStudentRandom" type="checkbox" />允许学生随机推荐</label>
+        <div class="rule-template-summary"><strong>当前模板</strong><span>{{ ruleTemplateSummary }}</span></div>
         <button class="button primary">创建草稿批次</button>
       </form>
     </section>
