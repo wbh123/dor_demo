@@ -1,0 +1,44 @@
+name: Temporary validation finalizer
+
+on:
+  workflow_run:
+    workflows: [Temporary feature validation]
+    types: [completed]
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  merge-and-clean:
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Merge validated pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh pr merge 21 \
+            --repo ${{ github.repository }} \
+            --squash \
+            --subject "feat: 完善五人组队、国际化与床位拆分" \
+            --body "已通过静态契约、OpenAPI生成、Java构建、前端构建、MySQL/Redis运行时及完整HTTP冒烟验证。"
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Remove temporary validation workflows
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm \
+            .github/workflows/temporary-feature-validation.yml \
+            .github/workflows/temporary-validation-dispatcher.yml \
+            .github/workflows/temporary-validation-finalizer.yml
+          git commit -m "ci: 清理临时功能验证任务"
+          git push origin HEAD:main
+      - name: Close temporary validation issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh issue close 22 --repo ${{ github.repository }} --comment "PR #21 已通过完整验证并合并，临时验证任务已清理。"
