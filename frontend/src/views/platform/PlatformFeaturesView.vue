@@ -101,7 +101,7 @@ const batchChanges = computed<FeatureStateChange[]>(() => features.value
     featureCode: feature.featureCode,
     targetState: draftStates.value[feature.featureCode] ?? sourceTarget(feature),
   }))
-  .filter((change) => change.targetState !== sourceTarget(findFeature(change.featureCode))))
+  .filter((change) => change.targetState !== sourceTarget(findFeature(change.featureCode)))
 )
 
 const batchSummary = computed(() => ({
