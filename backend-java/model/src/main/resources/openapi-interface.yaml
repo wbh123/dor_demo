@@ -45,6 +45,8 @@ paths:
     $ref: 'admin/openapi-matching.yaml#/paths/~1api~1v1~1admin~1matching-weight-schemes~1{schemeId}~1revisions'
   /api/v1/admin/batches:
     $ref: 'admin/openapi-admin.yaml#/paths/~1api~1v1~1admin~1batches'
+  /api/v1/admin/batches/{batchId}/copy:
+    $ref: 'admin/openapi-admin.yaml#/paths/~1api~1v1~1admin~1batches~1{batchId}~1copy'
   /api/v1/admin/batches/{batchId}/prepare:
     $ref: 'admin/openapi-admin.yaml#/paths/~1api~1v1~1admin~1batches~1{batchId}~1prepare'
   /api/v1/admin/batches/{batchId}/status/{targetStatus}:

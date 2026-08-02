@@ -8,6 +8,7 @@ import com.wust.dormitory.matching.MatchingSchemeService;
 import com.wust.dormitory.model.api.AdminApi;
 import com.wust.dormitory.model.dto.AllocationCommitRequest;
 import com.wust.dormitory.model.dto.AssignmentAdjustmentRequest;
+import com.wust.dormitory.model.dto.BatchCopyRequest;
 import com.wust.dormitory.model.dto.BatchRequest;
 import com.wust.dormitory.model.dto.ListSuccessResponse;
 import com.wust.dormitory.model.dto.MajorRequest;
@@ -40,6 +41,7 @@ public class AdminController implements AdminApi {
     private final RoomLayoutService roomLayoutService;
     private final MatchingSchemeService matchingSchemeService;
     private final BatchLifecycleService batchLifecycleService;
+    private final BatchCopyService batchCopyService;
     private final AdminAllocationService allocationService;
     private final AssignmentQueryService assignmentQueryService;
     private final AssignmentAdjustmentService adjustmentService;
@@ -52,6 +54,7 @@ public class AdminController implements AdminApi {
             RoomLayoutService roomLayoutService,
             MatchingSchemeService matchingSchemeService,
             BatchLifecycleService batchLifecycleService,
+            BatchCopyService batchCopyService,
             AdminAllocationService allocationService,
             AssignmentQueryService assignmentQueryService,
             AssignmentAdjustmentService adjustmentService,
@@ -62,6 +65,7 @@ public class AdminController implements AdminApi {
         this.roomLayoutService = roomLayoutService;
         this.matchingSchemeService = matchingSchemeService;
         this.batchLifecycleService = batchLifecycleService;
+        this.batchCopyService = batchCopyService;
         this.allocationService = allocationService;
         this.assignmentQueryService = assignmentQueryService;
         this.adjustmentService = adjustmentService;
@@ -226,6 +230,18 @@ public class AdminController implements AdminApi {
         batchRuleValidator.validate(command);
         long id = adminService.createBatch(command, SecurityUsers.requireAdmin());
         return ResponseEntity.ok(ResponseFactory.object(Map.of("id", id)));
+    }
+
+    @Override
+    public ResponseEntity<ObjectSuccessResponse> copyBatch(Long batchId, BatchCopyRequest request) {
+        BatchCopyService.CopyCommand command = new BatchCopyService.CopyCommand(
+                request.getBatchCode(),
+                request.getBatchName(),
+                toLocalDateTime(request.getStartAt()),
+                toLocalDateTime(request.getEndAt()),
+                request.getReason());
+        return ResponseEntity.ok(ResponseFactory.object(
+                batchCopyService.copy(batchId, command, SecurityUsers.requireAdmin())));
     }
 
     @Override

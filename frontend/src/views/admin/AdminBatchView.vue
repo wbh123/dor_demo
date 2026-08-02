@@ -1,13 +1,23 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
 import { api } from '../../api/client'
-import type { BatchRequest, DataObject, ListSuccessResponse, ObjectSuccessResponse } from '../../api/types'
+import type { BatchCopyRequest, BatchRequest, DataObject, ListSuccessResponse, ObjectSuccessResponse } from '../../api/types'
 
 const batches = ref<DataObject[]>([])
 const error = ref('')
 const message = ref('')
 const preview = ref<DataObject | null>(null)
 const previewBatchId = ref<number | null>(null)
+const copyDialog = ref(false)
+const copying = ref(false)
+const copySource = ref<DataObject | null>(null)
+const copyForm = reactive({
+  batchCode: '',
+  batchName: '',
+  startAt: '',
+  endAt: '',
+  reason: '',
+})
 const form = reactive({
   batchCode: '',
   batchName: '',
@@ -54,6 +64,53 @@ async function createBatch() {
     await load()
   } catch (reason) {
     error.value = reason instanceof Error ? reason.message : '批次创建失败'
+  }
+}
+
+function openCopy(batch: DataObject) {
+  error.value = ''
+  message.value = ''
+  copySource.value = batch
+  copyForm.batchCode = ''
+  copyForm.batchName = ''
+  copyForm.startAt = ''
+  copyForm.endAt = ''
+  copyForm.reason = ''
+  copyDialog.value = true
+}
+
+function closeCopy() {
+  if (copying.value) return
+  copyDialog.value = false
+  copySource.value = null
+}
+
+async function copyBatch() {
+  if (!copySource.value) return
+  error.value = ''
+  message.value = ''
+  copying.value = true
+  try {
+    const payload: BatchCopyRequest = {
+      batchCode: copyForm.batchCode,
+      batchName: copyForm.batchName,
+      startAt: new Date(copyForm.startAt).toISOString(),
+      endAt: new Date(copyForm.endAt).toISOString(),
+      reason: copyForm.reason,
+    }
+    const response = await api.post<ObjectSuccessResponse>(
+      `/api/v1/admin/batches/${Number(copySource.value.id)}/copy`,
+      payload,
+    )
+    const copied = (response.data.data ?? {}) as DataObject
+    message.value = `批次配置已复制为草稿：楼栋${Number(copied.buildingScopeCount ?? 0)}、房间${Number(copied.roomScopeCount ?? 0)}、床位${Number(copied.bedScopeCount ?? 0)}。学生资格、队伍和分配结果未复制。`
+    copyDialog.value = false
+    copySource.value = null
+    await load()
+  } catch (reason) {
+    error.value = reason instanceof Error ? reason.message : '批次配置复制失败'
+  } finally {
+    copying.value = false
   }
 }
 
@@ -177,6 +234,30 @@ function actionText(status: string) {
     <p v-if="error" class="alert error">{{ error }}</p>
     <p v-if="message" class="alert success">{{ message }}</p>
 
+    <div v-if="copyDialog" class="batch-copy-overlay" @click.self="closeCopy">
+      <section class="batch-copy-dialog" role="dialog" aria-modal="true" aria-labelledby="batch-copy-title">
+        <header class="batch-copy-head">
+          <div>
+            <span class="eyebrow">COPY BATCH CONFIGURATION</span>
+            <h3 id="batch-copy-title">复制批次配置</h3>
+            <p>来源：{{ copySource?.batch_name }}。只复制规则和宿舍范围，不复制学生、队伍、占用或分配结果。</p>
+          </div>
+          <button class="icon-button" type="button" aria-label="关闭复制窗口" :disabled="copying" @click="closeCopy">×</button>
+        </header>
+        <form class="batch-copy-form" @submit.prevent="copyBatch">
+          <label><span>新批次编号</span><input v-model.trim="copyForm.batchCode" class="input" required maxlength="32" pattern="[A-Za-z0-9_-]+" /></label>
+          <label><span>新批次名称</span><input v-model.trim="copyForm.batchName" class="input" required maxlength="128" /></label>
+          <label><span>新开始时间</span><input v-model="copyForm.startAt" class="input" type="datetime-local" required /></label>
+          <label><span>新结束时间</span><input v-model="copyForm.endAt" class="input" type="datetime-local" required /></label>
+          <label class="batch-copy-reason"><span>复制原因</span><textarea v-model.trim="copyForm.reason" class="input" required maxlength="500" rows="3" placeholder="例如：复用上一年度选寝配置"></textarea></label>
+          <div class="batch-copy-actions">
+            <button class="button ghost" type="button" :disabled="copying" @click="closeCopy">取消</button>
+            <button class="button primary" type="submit" :disabled="copying">{{ copying ? '正在复制…' : '创建草稿副本' }}</button>
+          </div>
+        </form>
+      </section>
+    </div>
+
     <section class="panel">
       <div class="section-head"><div><span class="eyebrow">STATUS GUIDE</span><h3>批次状态流程</h3></div></div>
       <div class="batch-state-guide">
@@ -214,6 +295,7 @@ function actionText(status: string) {
             <button v-if="batch.batch_status === 'DRAFT'" class="button secondary small" @click="prepare(batch.id)">准备学生与宿舍范围</button>
             <button v-for="target in nextActions(batch.batch_status)" :key="target" class="button ghost small" @click="changeStatus(batch.id, target)">{{ actionText(target) }}</button>
             <button v-if="['CLOSED', 'ALLOCATING'].includes(String(batch.batch_status))" class="button accent small" @click="previewAllocation(batch.id)">预演统一分配</button>
+            <button v-if="batch.batch_status !== 'CANCELLED'" class="button secondary small" @click="openCopy(batch)">复制配置</button>
             <button class="button ghost small" @click="download(batch.id)">导出结果</button>
           </div>
         </article>

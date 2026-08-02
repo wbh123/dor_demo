@@ -2,17 +2,18 @@
 
 > 仓库：`Wust-Dormitory-Select`  
 > 第一阶段：已完成并最终冻结  
-> 第二阶段：开发中，逐房间床位布局配置已完成  
-> 最后更新：2026-08-01
+> 第二阶段：开发中，房间布局、匹配运营与批次复制已完成  
+> 最后更新：2026-08-02
 
-本项目面向高校新生宿舍选择与分配场景，为学生提供问卷、个人选寝、邀请式组队选寝、随机推荐和三维床位选择，为管理人员提供专业、学生、宿舍、批次、逐房间床位布局、统一分配、结果导出、人工调整和审计能力。
+本项目面向高校新生宿舍选择与分配场景，为学生提供账号激活、个人偏好、房间推荐、邀请式组队、三维选床和住宿结果查询，为管理人员提供学生、宿舍、床位、批次、匹配规则、统一分配、结果导出、人工调整和审计能力。
 
 ## 1. 核心业务闭环
 
 ```text
-管理人员维护专业、学生、宿舍和房间布局
-→ 创建、准备并开放选寝活动
-→ 学生激活账号并填写生活习惯问卷
+管理员维护专业、学生、宿舍、床位类型和房间布局
+→ 配置匹配规则并创建或复制选寝批次
+→ 准备、发布并开放选寝活动
+→ 学生激活账号并填写个人偏好
 → 学生个人选择、邀请队友或使用随机推荐
 → Redis临时占用候选床位
 → 房间级服务器发送事件推送状态变化
@@ -35,7 +36,7 @@ Spring Boot 4单体后端
 
 固定边界：
 
-- 对外接口先写OpenAPI，再由生成器生成接口和模型；
+- 所有对外接口先修改OpenAPI，再由生成器生成接口和模型；
 - Controller只实现生成接口，不手写对外路由；
 - Redis不是最终床位归属；
 - 正式分配由MySQL事务和唯一约束确认；
@@ -47,27 +48,27 @@ Spring Boot 4单体后端
 
 ### 学生端
 
-- 学生账号激活、登录、退出和个人资料；
-- 三态吸烟偏好等生活习惯问卷；
-- 问卷结果查看与修改；
-- 房间匹配排序、匿名室友偏好和随机推荐；
-- Three.js三维床位选择、下拉框联动和移动端适配；
-- 三维场景读取每个房间的自定义床位坐标与朝向；
-- 个人床位临时占用、直接换床和最终确认；
+- 学生账号激活、登录、退出、首次欢迎和个人资料；
+- 完整个人偏好填写、查看与修改；
+- 夏季空调、冬季取暖、熄灯后活动、闹钟和气味接受度等高影响偏好；
+- 候选房间排序、楼层与剩余床位筛选；
+- 匿名室友偏好、推荐理由和冲突提示；
+- Three.js三维床位选择、下拉框联动、直接换床和移动端适配；
+- 三维场景读取每个房间的自定义床位坐标、朝向和床位类型；
 - 邀请式组队：输入12位学号直接邀请，系统内部自动建立小组；
 - 小组名称和内部编号不在学生端展示；
-- 多床位整体占用与确认；
-- 最终住宿结果查询。
+- 多床位整体占用、确认和最终住宿结果查询。
 
 ### 管理端
 
 - 专业、学生、楼栋、房间和床位资源管理；
+- 空闲床位类型维护及占用床位保护；
 - 每个房间独立床位布局编辑；
-- 俯视拖拽、0.25单位吸附、90度旋转和数值输入；
-- 上下铺作为同一床架整体调整位置；
+- 俯视拖拽、0.25单位吸附、90度旋转、数值输入和上下铺整体移动；
 - 布局乐观锁、修改原因和审计；
-- 学生批量导入；
-- 批次创建、准备、发布、开放、暂停、关闭和完成；
+- 匹配权重方案、不可变修订、启用切换和推荐解释；
+- 新生欢迎语配置；
+- 批次创建、完整配置复制、准备、发布、开放、暂停、关闭和完成；
 - 批次资格与楼栋、房间、床位开放范围；
 - 未选学生统一分配预演与提交；
 - 正式分配查询、CSV导出、人工换床和审计。
@@ -78,6 +79,8 @@ Spring Boot 4单体后端
 - MySQL双唯一约束与事务确认；
 - 同一学生同一时刻只参加一个活动批次；
 - 房间布局使用`room.version`避免管理员互相覆盖；
+- 匹配方案使用不可变修订保证历史批次结果稳定；
+- 批次复制使用单事务，异常资源会整体阻止复制；
 - 房间级服务器发送事件连接、心跳和重连。
 
 ## 4. 当前宿舍与数据边界
@@ -99,7 +102,7 @@ Spring Boot 4单体后端
 - 64个男生五人间、80个女生四人间；
 - 144个房间、640个床位。
 
-男生五人间当前为3个上床下桌和1组上下铺，女生四人间为4个上床下桌。房型可扩展，但每个房间必须固定为男寝或女寝。
+男生五人间当前为3个上床下桌和1组上下铺，女生四人间为4个上床下桌。房型和床位类型允许后续调整，但每个房间必须固定为男寝或女寝。
 
 ## 5. 数据库基线
 
@@ -111,12 +114,13 @@ backend-java/server/src/main/resources/db/migration/
 ├── V2__enforce_fixed_room_gender.sql
 ├── V3__normalize_major_and_minimize_student.sql
 ├── V4__refine_questionnaire_and_active_batch_rules.sql
-└── V5__add_room_bed_layout.sql
+├── V5__add_room_bed_layout.sql
+├── V6__version_matching_weight_schemes.sql
+├── V7__add_student_welcome_settings.sql
+└── V8__expand_personal_preferences.sql
 ```
 
-V5新增`room_bed_layout`，保存每个床位的平面坐标和朝向；没有记录的旧房间继续使用默认布局；同一上下铺床架的上下层必须共享平面位置和朝向。
-
-固化结构：
+批次复制复用现有批次与范围表，不新增数据库结构。固化结构位于：
 
 ```text
 backend-java/docs/sql/schema.sql
@@ -159,8 +163,6 @@ bash scripts/dev/reset-local-environment.sh
 bash scripts/dev/reset-local-environment.sh --yes
 ```
 
-脚本会删除本地`data/mysql`和`data/redis`，自动扫描并执行正式目录中的最新Flyway迁移，再导入520名学生和640个床位的开发数据。
-
 ### 6.3 启动后端
 
 ```bash
@@ -185,7 +187,21 @@ npm run dev
 
 学生示例：学号`202600000001`、姓名`测试男生001`，首次使用需自行设置密码并激活。
 
-## 7. 自动化验证
+## 7. 批次复制规则
+
+管理员可以复制除“已取消”外的批次。复制时必须重新填写：
+
+```text
+唯一批次编码
+批次名称
+开始时间
+结束时间
+复制原因
+```
+
+新批次固定为草稿。系统复制问卷版本、匹配方案精确修订、选寝规则以及楼栋、房间、床位开放范围，但不复制学生资格、队伍、临时占用、分配结果和运行状态。只要源范围包含停用、维护或不可用资源，复制会整体失败并返回异常资源信息。
+
+## 8. 自动化验证
 
 ```bash
 python -m unittest scripts/dev/test_infra_config.py -v
@@ -194,24 +210,30 @@ python -m unittest scripts/api/test_openapi_contract.py -v
 python -m unittest scripts/backend/test_phase1_source.py -v
 python -m unittest scripts/frontend/test_frontend_baseline.py -v
 python -m unittest scripts/ux/test_ux_refinement.py -v
+python -m unittest scripts/experience/test_student_experience.py -v
 python -m unittest scripts/phase2/test_room_layout.py -v
+python -m unittest scripts/phase2/test_room_bed_type_and_preference_ui.py -v
+python -m unittest scripts/phase2/test_matching_operations.py -v
+python -m unittest scripts/phase2/test_batch_copy.py -v
 mvn -f backend-java/pom.xml clean verify
 cd frontend && npm run build
 ```
 
-GitHub Actions还会在全新MySQL和Redis中执行Flyway V1至V5、Spring Boot健康检查、第一阶段回归和第二阶段房间布局HTTP验收。
+GitHub Actions会在全新MySQL和Redis中执行Flyway V1至V8、Spring Boot健康检查以及第一、第二阶段完整HTTP流程。
 
-## 8. 第二阶段进度
+## 9. 第二阶段进度
 
 1. **已完成：** 每个房间独立床位布局和上下铺位置配置；
-2. **下一项：** 匹配权重、冲突解释与运营界面；
-3. 待开发：批次复制、规则模板和复杂组队异常处理；
-4. 待开发：导入安全、数据质量、统计、性能与恢复能力；
-5. 待开发：分配优化和公平性评估。
+2. **已完成：** 匹配权重管理、不可变修订、冲突解释和推荐理由；
+3. **已完成：** 学生个人偏好扩展、首次欢迎、房间筛选和床位类型维护；
+4. **已完成：** 完整批次配置复制；
+5. **当前开发：** 规则模板与复杂组队异常处理；
+6. 待开发：导入安全、数据质量、统计、性能与恢复能力；
+7. 待开发：分配优化和公平性评估。
 
 第一阶段冻结边界不得被破坏：OpenAPI先行、Flyway只增不改、Redis不作为最终事实、关键分配事务化并可审计。
 
-## 9. 文档入口
+## 10. 文档入口
 
 - [`docs/README.md`](docs/README.md)：文档总索引；
 - [`docs/03_开发阶段/README.md`](docs/03_开发阶段/README.md)：阶段总览；

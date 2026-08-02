@@ -217,6 +217,24 @@ paths:
         '200': { $ref: '#/components/responses/ObjectSuccess' }
         '400': { $ref: '#/components/responses/ErrorResponse' }
 
+  /api/v1/admin/batches/{batchId}/copy:
+    post:
+      tags: [Admin]
+      operationId: copyBatch
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/BatchIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BatchCopyRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/ObjectSuccess' }
+        '400': { $ref: '#/components/responses/ErrorResponse' }
+        '404': { $ref: '#/components/responses/ErrorResponse' }
+        '409': { $ref: '#/components/responses/ErrorResponse' }
+
   /api/v1/admin/batches/{batchId}/prepare:
     post:
       tags: [Admin]
@@ -430,6 +448,20 @@ components:
         allowTeam: { type: boolean }
         teamMaxSize: { type: integer, minimum: 2, maximum: 20 }
         allowStudentRandom: { type: boolean }
+
+    BatchCopyRequest:
+      type: object
+      required: [batchCode, batchName, startAt, endAt, reason]
+      properties:
+        batchCode:
+          type: string
+          minLength: 1
+          maxLength: 32
+          pattern: '^[A-Za-z0-9_-]+$'
+        batchName: { type: string, minLength: 1, maxLength: 128 }
+        startAt: { type: string, format: date-time }
+        endAt: { type: string, format: date-time }
+        reason: { type: string, minLength: 1, maxLength: 500 }
 
     AllocationCommitRequest:
       type: object
