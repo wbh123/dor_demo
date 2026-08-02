@@ -45,14 +45,19 @@ public class RoomManagementService {
                        COALESCE(SUM(bed.operational_status='ENABLED'), 0) AS enabled_bed_count,
                        COALESCE(SUM(bed.operational_status='DISABLED'), 0) AS disabled_bed_count,
                        COALESCE(SUM(bed.operational_status='MAINTENANCE'), 0) AS maintenance_bed_count,
-                       COUNT(DISTINCT ra.id) AS active_resident_count,
-                       COALESCE(SUM(ra.id IS NOT NULL AND ra.bed_id IS NULL),0) AS unconfirmed_bed_count,
-                       GREATEST(r.capacity-COUNT(DISTINCT ra.id),0) AS remaining_capacity
+                       (SELECT COUNT(*) FROM room_assignment ra
+                        WHERE ra.room_id=r.id AND ra.assignment_status='ACTIVE') AS active_resident_count,
+                       (SELECT COUNT(*) FROM room_assignment ra
+                        WHERE ra.room_id=r.id AND ra.assignment_status='ACTIVE'
+                          AND ra.bed_id IS NOT NULL) AS confirmed_bed_count,
+                       (SELECT COUNT(*) FROM room_assignment ra
+                        WHERE ra.room_id=r.id AND ra.assignment_status='ACTIVE'
+                          AND ra.bed_id IS NULL) AS unconfirmed_bed_count,
+                       GREATEST(r.capacity-(SELECT COUNT(*) FROM room_assignment ra
+                        WHERE ra.room_id=r.id AND ra.assignment_status='ACTIVE'),0) AS remaining_capacity
                 FROM room r JOIN dormitory_floor f ON f.id=r.floor_id
                 JOIN dormitory_building b ON b.id=f.building_id
                 LEFT JOIN bed ON bed.room_id=r.id
-                LEFT JOIN room_assignment ra
-                       ON ra.room_id=r.id AND ra.assignment_status='ACTIVE'
                 """ + where + " GROUP BY r.id, b.id, b.building_name, f.floor_number, r.room_number, " +
                 "r.room_type, r.capacity, r.gender_restriction, r.resident_scope, " +
                 "r.operational_status, r.state_version, r.remark " +
