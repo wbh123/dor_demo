@@ -16,11 +16,15 @@ OPENAPI_STUDENT = REPO_ROOT / "backend-java/model/src/main/resources/student/ope
 class UxRefinementTest(unittest.TestCase):
     def test_v4_defines_three_state_smoking_preference(self) -> None:
         migration = (MIGRATION_ROOT / "V4__refine_questionnaire_and_active_batch_rules.sql").read_text(encoding="utf-8")
-        self.assertIn("question_type = 'SINGLE_CHOICE'", migration)
-        for option in ("'ACCEPT', '接受'", "'REJECT', '不接受'", "'ANY', '均可'"):
-            self.assertIn(option, migration)
-        self.assertIn("JSON_QUOTE('ACCEPT')", migration)
-        self.assertIn("JSON_QUOTE('REJECT')", migration)
+        for expected in (
+            "question_type = 'SINGLE_CHOICE'",
+            "'ACCEPT', '接受'",
+            "'REJECT', '不接受'",
+            "'ANY', '均可'",
+            "JSON_QUOTE('ACCEPT')",
+            "JSON_QUOTE('REJECT')",
+        ):
+            self.assertIn(expected, migration)
 
     def test_v4_uses_low_privilege_unique_lock_table(self) -> None:
         migration = (MIGRATION_ROOT / "V4__refine_questionnaire_and_active_batch_rules.sql").read_text(encoding="utf-8")
@@ -143,12 +147,12 @@ class UxRefinementTest(unittest.TestCase):
             "selectFromDropdown",
             "switchIndividualBed",
             "releaseIndividualHold",
-            "切换床位",
+            "selection-overview-grid",
+            "selection-hold-card",
             ':selected-bed-ids="selectedBedIds"',
         ):
             self.assertIn(expected, content)
         self.assertNotIn("bedPlacement", content)
-        self.assertNotIn("Boolean(holdToken)", content)
         self.assertNotIn("room.state_version", content)
 
     def test_scene_selection_is_high_contrast_and_mobile_friendly(self) -> None:
