@@ -3,23 +3,106 @@
 }
 
 .room-layout-dialog {
-  width: min(1240px, calc(100vw - 32px));
+  width: min(1080px, calc(100vw - 32px));
   max-height: calc(100vh - 32px);
   overflow: auto;
 }
 
 .room-layout-head {
   align-items: flex-start;
+  margin-bottom: 10px;
+}
+
+.layout-room-type-summary {
+  display: grid;
+  grid-template-columns: minmax(140px, auto) auto minmax(140px, auto) minmax(220px, 1fr);
+  gap: 12px;
+  align-items: center;
   margin-bottom: 12px;
+  padding: 12px 15px;
+  border: 1px solid #d8e2f0;
+  border-radius: 14px;
+  background: #f7faff;
+}
+
+.layout-room-type-summary div {
+  display: grid;
+  gap: 2px;
+}
+
+.layout-room-type-summary span,
+.layout-room-type-summary small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.layout-room-type-summary strong {
+  color: #244a7a;
+  font-size: 15px;
+}
+
+.layout-room-type-arrow {
+  font-size: 20px !important;
+}
+
+.layout-bed-type-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.layout-bed-type-card {
+  display: grid;
+  grid-template-columns: minmax(92px, 0.72fr) minmax(120px, 1fr);
+  gap: 10px;
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px solid #d8e2ef;
+  border-radius: 13px;
+  background: #fff;
+}
+
+.layout-bed-type-card > div {
+  min-width: 0;
+}
+
+.layout-bed-type-card strong,
+.layout-bed-type-card small {
+  display: block;
+}
+
+.layout-bed-type-card small {
+  margin-top: 2px;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.layout-bed-type-card .input {
+  min-height: 38px;
+}
+
+.layout-bed-type-card.occupied {
+  border-color: #ead7d7;
+  background: #fff8f8;
+}
+
+.layout-bed-type-card.occupied .input {
+  color: #8a6e6e;
+  background: #f4eeee;
+  cursor: not-allowed;
 }
 
 .room-layout-stage {
   position: relative;
-  min-height: 500px;
+  min-height: 400px;
   aspect-ratio: 11.5 / 8;
   overflow: hidden;
   border: 2px solid #aabbd3;
-  border-radius: 20px;
+  border-radius: 18px;
   background:
     linear-gradient(90deg, rgba(147, 168, 196, 0.16) 1px, transparent 1px),
     linear-gradient(rgba(147, 168, 196, 0.16) 1px, transparent 1px),
@@ -60,8 +143,8 @@
   z-index: 3;
   display: grid;
   place-items: center;
-  width: 154px;
-  height: 84px;
+  width: 190px;
+  height: 90px;
   padding: 8px 12px;
   border: 3px solid #4e77ae;
   border-radius: 16px;
@@ -97,17 +180,17 @@
 
 .layout-number-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
-  gap: 14px;
-  margin-top: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  margin-top: 12px;
 }
 
 .layout-number-card {
   display: grid;
-  gap: 10px;
+  gap: 9px;
   border: 1px solid #d9e2ef;
-  border-radius: 16px;
-  padding: 15px;
+  border-radius: 14px;
+  padding: 13px;
   background: #fff;
 }
 
@@ -119,11 +202,11 @@
 }
 
 .layout-number-card .input {
-  min-height: 40px;
+  min-height: 38px;
 }
 
 .layout-reason-field {
-  margin-top: 16px;
+  margin-top: 13px;
 }
 
 .layout-reason-field small {
@@ -136,7 +219,7 @@
 
 .room-layout-actions {
   justify-content: flex-end;
-  margin-top: 16px;
+  margin-top: 14px;
 }
 
 .room-editor-dialog {
@@ -210,13 +293,20 @@
   font-size: 12px;
 }
 
-.room-capacity-field .input[readonly] {
+.room-capacity-field .input[readonly],
+.room-readonly-value {
   color: #46566d;
   background: #f1f4f8;
   cursor: not-allowed;
 }
 
-.room-capacity-field small {
+.room-readonly-value {
+  display: flex;
+  align-items: center;
+}
+
+.room-capacity-field small,
+.room-readonly-field small {
   color: var(--muted);
   line-height: 1.45;
 }
@@ -224,6 +314,16 @@
 .room-editor-actions {
   justify-content: flex-end;
   padding-top: 4px;
+}
+
+@media (max-width: 760px) {
+  .layout-room-type-summary {
+    grid-template-columns: 1fr auto 1fr;
+  }
+
+  .layout-room-type-summary > small {
+    grid-column: 1 / -1;
+  }
 }
 
 @media (max-width: 640px) {
@@ -248,22 +348,31 @@
     font-size: 18px;
   }
 
+  .layout-bed-type-grid {
+    grid-template-columns: 1fr;
+  }
+
   .room-layout-stage {
-    min-height: 320px;
+    min-height: 300px;
     aspect-ratio: 11.5 / 8;
     background-size: 18px 18px;
   }
 
   .layout-bed-unit {
-    width: 108px;
-    height: 64px;
+    width: 114px;
+    height: 54px;
     padding: 5px 7px;
     border-width: 2px;
+    border-radius: 12px;
     font-size: 12px;
   }
 
   .layout-bed-unit strong {
     font-size: 12px;
+  }
+
+  .layout-bed-unit small {
+    font-size: 9px;
   }
 
   .layout-window,
