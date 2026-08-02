@@ -6,9 +6,9 @@ SET setting_value = JSON_OBJECT(
         'zh-CN',
         CASE
             WHEN JSON_TYPE(setting_value) = 'OBJECT'
-                 AND COALESCE(JSON_TYPE(JSON_EXTRACT(setting_value, '$.zh-CN')), '') = 'STRING'
-                 AND LENGTH(TRIM(JSON_UNQUOTE(JSON_EXTRACT(setting_value, '$.zh-CN')))) > 0
-                THEN LEFT(TRIM(JSON_UNQUOTE(JSON_EXTRACT(setting_value, '$.zh-CN'))), 700)
+                 AND COALESCE(JSON_TYPE(JSON_EXTRACT(setting_value, '$."zh-CN"')), '') = 'STRING'
+                 AND LENGTH(TRIM(JSON_UNQUOTE(JSON_EXTRACT(setting_value, '$."zh-CN"')))) > 0
+                THEN LEFT(TRIM(JSON_UNQUOTE(JSON_EXTRACT(setting_value, '$."zh-CN"'))), 700)
             WHEN JSON_TYPE(setting_value) = 'STRING'
                  AND LENGTH(TRIM(JSON_UNQUOTE(setting_value))) > 0
                 THEN LEFT(TRIM(JSON_UNQUOTE(setting_value)), 700)
@@ -17,9 +17,9 @@ SET setting_value = JSON_OBJECT(
         'en-US',
         CASE
             WHEN JSON_TYPE(setting_value) = 'OBJECT'
-                 AND COALESCE(JSON_TYPE(JSON_EXTRACT(setting_value, '$.en-US')), '') = 'STRING'
-                 AND LENGTH(TRIM(JSON_UNQUOTE(JSON_EXTRACT(setting_value, '$.en-US')))) > 0
-                THEN LEFT(TRIM(JSON_UNQUOTE(JSON_EXTRACT(setting_value, '$.en-US'))), 220)
+                 AND COALESCE(JSON_TYPE(JSON_EXTRACT(setting_value, '$."en-US"')), '') = 'STRING'
+                 AND LENGTH(TRIM(JSON_UNQUOTE(JSON_EXTRACT(setting_value, '$."en-US"')))) > 0
+                THEN LEFT(TRIM(JSON_UNQUOTE(JSON_EXTRACT(setting_value, '$."en-US"'))), 220)
             ELSE 'Welcome to the Wuhan University of Science and Technology dormitory selection system. Complete your personal preferences first, then choose a suitable room and bed.'
         END
     ),
@@ -27,8 +27,8 @@ SET setting_value = JSON_OBJECT(
 WHERE setting_key = 'STUDENT_WELCOME_MESSAGE'
   AND (
       JSON_TYPE(setting_value) <> 'OBJECT'
-      OR COALESCE(JSON_TYPE(JSON_EXTRACT(setting_value, '$.zh-CN')), '') <> 'STRING'
-      OR COALESCE(LENGTH(TRIM(JSON_UNQUOTE(JSON_EXTRACT(setting_value, '$.zh-CN')))), 0) = 0
-      OR COALESCE(JSON_TYPE(JSON_EXTRACT(setting_value, '$.en-US')), '') <> 'STRING'
-      OR COALESCE(LENGTH(TRIM(JSON_UNQUOTE(JSON_EXTRACT(setting_value, '$.en-US')))), 0) = 0
+      OR COALESCE(JSON_TYPE(JSON_EXTRACT(setting_value, '$."zh-CN"')), '') <> 'STRING'
+      OR COALESCE(LENGTH(TRIM(JSON_UNQUOTE(JSON_EXTRACT(setting_value, '$."zh-CN"')))), 0) = 0
+      OR COALESCE(JSON_TYPE(JSON_EXTRACT(setting_value, '$."en-US"')), '') <> 'STRING'
+      OR COALESCE(LENGTH(TRIM(JSON_UNQUOTE(JSON_EXTRACT(setting_value, '$."en-US"')))), 0) = 0
   );

@@ -5,7 +5,7 @@
 --   mysql -u<user> -p <database> < backend-java/docs/sql/reset_and_seed_test_data.sql
 --
 -- 约束：
--- 1. 必须先完成 Flyway V1-V9 数据库迁移；
+-- 1. 必须先完成 Flyway V1 至当前最新正式版本数据库迁移；
 -- 2. 清空全部业务数据，但保留 flyway_schema_history；
 -- 3. 管理员 username='admin' 的账号主键、密码哈希和状态原样保留；
 -- 4. 学生学号均为12位数字；

@@ -19,6 +19,7 @@ ROUTER = ROOT / "frontend/src/router/index.ts"
 SHELL = ROOT / "frontend/src/layouts/AppShell.vue"
 MAIN = ROOT / "frontend/src/main.ts"
 TYPES = ROOT / "frontend/src/api/types.ts"
+SCHEMA_TS = ROOT / "frontend/src/api/schema.d.ts"
 STYLE = ROOT / "frontend/src/batch-rule-template.css"
 SMOKE = ROOT / "scripts/e2e/phase2_batch_rule_template_smoke.py"
 WORKFLOW = ROOT / ".github/workflows/phase1-ci.yml"
@@ -135,9 +136,9 @@ class BatchRuleTemplateTest(unittest.TestCase):
         self.assertIn("ruleTemplates", batch)
         self.assertIn("form.ruleTemplateId", batch)
         self.assertIn("ruleTemplateSummary", batch)
-        self.assertIn("ruleTemplateId", TYPES.read_text(encoding="utf-8"))
+        self.assertIn("ruleTemplateId", SCHEMA_TS.read_text(encoding="utf-8"))
         self.assertIn("AdminRuleTemplateView", ROUTER.read_text(encoding="utf-8"))
-        self.assertIn("/admin/rule-templates", ROUTER.read_text(encoding="utf-8"))
+        self.assertIn("admin/rule-templates", ROUTER.read_text(encoding="utf-8"))
         self.assertIn("批次规则", SHELL.read_text(encoding="utf-8"))
         self.assertIn("batch-rule-template.css", MAIN.read_text(encoding="utf-8"))
         self.assertTrue(STYLE.is_file())
