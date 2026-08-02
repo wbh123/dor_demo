@@ -194,8 +194,12 @@ const subtitleTranslations: Record<string, string> = {
 
 const originalText = new WeakMap<Node, string>()
 const originalAttributes = new WeakMap<Element, Map<string, string>>()
+const observerOptions: MutationObserverInit = {
+  childList: true,
+  subtree: true,
+  characterData: true,
+}
 let observer: MutationObserver | null = null
-let applying = false
 
 function interpolate(template: string, params: Record<string, unknown> = {}) {
   return template.replace(/\{(\w+)\}/g, (_, key: string) => String(params[key] ?? ''))
@@ -259,12 +263,24 @@ function translateTextValue(value: string, element?: Element) {
   return translated ? value.replace(trimmed, translated) : value
 }
 
+function pauseObserver() {
+  observer?.disconnect()
+}
+
+function resumeObserver() {
+  if (!observer || !document.body) return
+  observer.observe(document.body, observerOptions)
+}
+
 function translateNode(node: Node) {
   if (node.nodeType === Node.TEXT_NODE) {
+    const current = node.textContent ?? ''
     const parent = node.parentElement
-    if (!originalText.has(node)) originalText.set(node, node.textContent ?? '')
+    if (!originalText.has(node)) originalText.set(node, current)
     const source = originalText.get(node) ?? ''
-    node.textContent = translateTextValue(source, parent ?? undefined)
+    const translated = translateTextValue(source, parent ?? undefined)
+    if (translated === current) return
+    node.textContent = translated
     return
   }
   if (!(node instanceof Element)) return
@@ -278,37 +294,41 @@ function translateNode(node: Node) {
     const current = node.getAttribute(name)
     if (current !== null && !values.has(name)) values.set(name, current)
     const source = values.get(name)
-    if (source !== undefined) node.setAttribute(name, translateTextValue(source, node))
+    if (source === undefined) continue
+    const translated = translateTextValue(source, node)
+    if (translated !== current) node.setAttribute(name, translated)
   }
   node.childNodes.forEach(translateNode)
 }
 
 function refreshDomTranslations() {
   if (!document.body) return
-  applying = true
+  pauseObserver()
   try {
     translateNode(document.body)
   } finally {
-    applying = false
+    resumeObserver()
   }
 }
 
 function installDomI18n() {
   if (observer) return
-  refreshDomTranslations()
   observer = new MutationObserver((mutations) => {
-    if (applying) return
-    applying = true
+    pauseObserver()
     try {
       for (const mutation of mutations) {
+        if (mutation.type === 'characterData') {
+          originalText.set(mutation.target, mutation.target.textContent ?? '')
+          translateNode(mutation.target)
+          continue
+        }
         mutation.addedNodes.forEach(translateNode)
-        if (mutation.type === 'characterData') translateNode(mutation.target)
       }
     } finally {
-      applying = false
+      resumeObserver()
     }
   })
-  observer.observe(document.body, { childList: true, subtree: true, characterData: true })
+  refreshDomTranslations()
 }
 
 watch(locale, () => {
