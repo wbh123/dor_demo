@@ -137,7 +137,6 @@ public class AdminController implements AdminApi {
     @Override
     public ResponseEntity<VoidSuccessResponse> updateRoom(Long roomId, RoomRequest request) {
         roomManagementService.updateRoom(roomId, new RoomManagementService.RoomCommand(
-                request.getRoomType(),
                 request.getCapacity(),
                 request.getGender(),
                 request.getOperationalStatus(),
@@ -313,6 +312,7 @@ public class AdminController implements AdminApi {
     private RoomLayoutService.LayoutItem layoutItem(RoomBedLayoutItem item) {
         return new RoomLayoutService.LayoutItem(
                 item.getBedId(),
+                item.getBedType().getValue(),
                 item.getLayoutX(),
                 item.getLayoutZ(),
                 item.getRotationDegrees().getValue());
