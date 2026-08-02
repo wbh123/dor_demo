@@ -36,16 +36,58 @@ def discover_migrations(directory: Path) -> list[Path]:
     return sorted(migrations, key=version_key)
 
 
-def build_baseline(migrations: list[Path]) -> str:
+def repository_relative(path: Path) -> str:
+    try:
+        return path.resolve().relative_to(REPO_ROOT.resolve()).as_posix()
+    except ValueError as exception:
+        raise ValueError(f"迁移文件必须位于仓库目录内：{path}") from exception
+
+
+def build_source_entry(migrations: list[Path]) -> str:
+    latest = version_key(migrations[-1])
+    latest_text = ".".join(str(part) for part in latest)
     header = [
         "-- ============================================================",
         "-- 武汉科技大学学生宿舍智能选择系统",
-        "-- 数据库固化基线 SQL",
+        f"-- 数据库架构安装入口：Flyway V1～V{latest_text}",
         "--",
         "-- 生成方式：python scripts/db/build_frozen_baseline.py",
-        "-- 开发期间 Flyway 迁移是唯一事实来源；本文件是便于部署和审阅的合并快照。",
-        "-- 第一阶段冻结后重新运行脚本并将输出纳入验收记录。",
-        "-- 不包含 src/test/resources 下的开发测试数据。",
+        "-- 正式Flyway版本迁移是数据库结构的唯一事实来源。",
+        "-- 本文件使用MySQL客户端SOURCE命令按版本顺序执行全部正式迁移，",
+        "-- 从而避免复制型schema.sql在新增迁移后长期未更新。",
+        "--",
+        "-- 必须从仓库根目录执行，例如：",
+        "--   mysql --binary-mode=1 -u<user> -p <database> < backend-java/docs/sql/schema.sql",
+        "--",
+        "-- 注意：SOURCE是MySQL客户端命令，本文件不能作为JDBC单条SQL执行。",
+        "-- 生产升级仍应优先使用Flyway，不应重复导入本文件。",
+        "-- ============================================================",
+        "",
+        "SET NAMES utf8mb4;",
+        "",
+    ]
+    body: list[str] = []
+    for migration in migrations:
+        relative = repository_relative(migration)
+        body.extend(
+            [
+                f"-- V{'.'.join(str(part) for part in version_key(migration))}: {migration.name}",
+                f"SOURCE {relative}",
+                "",
+            ]
+        )
+    return "\n".join(header + body).rstrip() + "\n"
+
+
+def build_inline_snapshot(migrations: list[Path]) -> str:
+    header = [
+        "-- ============================================================",
+        "-- 武汉科技大学学生宿舍智能选择系统",
+        "-- 数据库独立内联快照 SQL",
+        "--",
+        "-- 生成方式：python scripts/db/build_frozen_baseline.py --mode inline",
+        "-- 正式Flyway版本迁移仍是唯一事实来源。",
+        "-- 不包含src/test/resources下的开发测试数据。",
         "-- ============================================================",
         "",
     ]
@@ -62,9 +104,14 @@ def build_baseline(migrations: list[Path]) -> str:
     return "\n".join(header + body).rstrip() + "\n"
 
 
+def build_baseline(migrations: list[Path]) -> str:
+    """兼容旧测试入口，默认生成可执行的SOURCE架构安装入口。"""
+    return build_source_entry(migrations)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="将已冻结的 Flyway 版本迁移合并为独立部署 SQL。"
+        description="根据正式Flyway迁移生成数据库架构安装入口或独立内联快照。"
     )
     parser.add_argument(
         "--migration-dir",
@@ -78,13 +125,24 @@ def main() -> int:
         default=DEFAULT_OUTPUT,
         help=f"输出文件，默认：{DEFAULT_OUTPUT}",
     )
+    parser.add_argument(
+        "--mode",
+        choices=("source", "inline"),
+        default="source",
+        help="source生成轻量安装入口；inline生成完整独立快照",
+    )
     args = parser.parse_args()
     migrations = discover_migrations(args.migration_dir)
-    baseline = build_baseline(migrations)
+    output = (
+        build_source_entry(migrations)
+        if args.mode == "source"
+        else build_inline_snapshot(migrations)
+    )
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(baseline, encoding="utf-8")
+    args.output.write_text(output, encoding="utf-8")
+    latest = ".".join(str(part) for part in version_key(migrations[-1]))
     print(
-        f"已将 {len(migrations)} 个 Flyway 版本迁移固化到 {args.output}。"
+        f"已根据{len(migrations)}个Flyway版本迁移生成V{latest}数据库架构文件：{args.output}"
     )
     return 0
 

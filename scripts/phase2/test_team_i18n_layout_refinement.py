@@ -17,7 +17,11 @@ WELCOME_SETTING = ROOT / "backend-java/server/src/main/java/com/wust/dormitory/a
 WELCOME_SERVICE = ROOT / "backend-java/server/src/main/java/com/wust/dormitory/auth/StudentWelcomeService.java"
 AUTH_OPENAPI = ROOT / "backend-java/model/src/main/resources/auth/openapi-auth.yaml"
 MIGRATION = ROOT / "backend-java/server/src/main/resources/db/migration/V9__add_student_contact_and_notifications.sql"
+V14_MIGRATION = ROOT / "backend-java/server/src/main/resources/db/migration/V14__fix_system_admin_password_encoding.sql"
+V15_MIGRATION = ROOT / "backend-java/server/src/main/resources/db/migration/V15__add_batch_selection_modes.sql"
+V16_MIGRATION = ROOT / "backend-java/server/src/main/resources/db/migration/V16__add_residency_student_category_and_transfer_support.sql"
 RESET_SEED = ROOT / "backend-java/docs/sql/reset_and_seed_test_data.sql"
+RESET_SEED_CORE = ROOT / "backend-java/docs/sql/reset_and_seed_test_data_core.sql"
 I18N = ROOT / "frontend/src/i18n/index.ts"
 APP_SHELL = ROOT / "frontend/src/layouts/AppShell.vue"
 STUDENT_HOME = ROOT / "frontend/src/views/student/StudentHomeView.vue"
@@ -104,7 +108,7 @@ class TeamI18nLayoutRefinementTest(unittest.TestCase):
         self.assertIn("grid-template-columns: repeat(5, minmax(0, 1fr))", styles)
         self.assertIn("aspect-ratio: 1 / 0.94", styles)
 
-    def test_student_data_model_has_nationality_phone_notifications_and_reset_seed(self) -> None:
+    def test_student_data_model_has_v16_schema_and_500_student_seed(self) -> None:
         migration = MIGRATION.read_text(encoding="utf-8")
         for expected in (
             "nationality_code",
@@ -114,6 +118,30 @@ class TeamI18nLayoutRefinementTest(unittest.TestCase):
             "DEFAULT 'CN'",
         ):
             self.assertIn(expected, migration)
+
+        v14 = V14_MIGRATION.read_text(encoding="utf-8")
+        self.assertIn("{bcrypt}", v14)
+        self.assertIn("user_type = 'SYSTEM_ADMIN'", v14)
+
+        v15 = V15_MIGRATION.read_text(encoding="utf-8")
+        for expected in (
+            "selection_mode",
+            "CREATE TABLE active_batch_room_lock",
+            "CREATE TABLE room_assignment",
+            "P2_BED_SELECTION_MODE",
+        ):
+            self.assertIn(expected, v15)
+
+        v16 = V16_MIGRATION.read_text(encoding="utf-8")
+        for expected in (
+            "student_category",
+            "enrollment_source",
+            "resident_scope",
+            "separate_student_categories",
+            "CREATE TABLE room_assignment_history",
+            "active_student_marker",
+        ):
+            self.assertIn(expected, v16)
 
         profile_service = STUDENT_PROFILE_SERVICE.read_text(encoding="utf-8")
         self.assertIn("nationality_code", profile_service)
@@ -129,16 +157,30 @@ class TeamI18nLayoutRefinementTest(unittest.TestCase):
         self.assertIn("phoneNumber", openapi)
         self.assertIn("pattern: '^\\d{12}$'", openapi)
 
-        seed = RESET_SEED.read_text(encoding="utf-8")
+        seed_entry = RESET_SEED.read_text(encoding="utf-8")
+        seed_core = RESET_SEED_CORE.read_text(encoding="utf-8")
+        combined = seed_entry + seed_core
         for expected in (
-            "preserved_admin_account",
-            "clear_all_business_data",
-            "flyway_schema_history",
-            "202600000001",
-            "nationality_code",
-            "international_student_count",
+            "assert_v16_schema",
+            "reset_and_seed_test_data_core.sql",
+            "student_category",
+            "resident_scope",
+            "separate_student_categories",
+            "active_batch_room_lock",
+            "room_assignment_history",
+            "P2_BED_SELECTION_MODE",
+            "expected_schema_version",
+            "WHILE i <= 500",
+            "student_total <> 500",
+            "male_total <> 250",
+            "female_total <> 250",
+            "domestic_total <> 400",
+            "international_total <> 100",
+            "room_total <> 100",
+            "bed_total <> 500",
+            "password_hash LIKE '{bcrypt}$2%'",
         ):
-            self.assertIn(expected, seed)
+            self.assertIn(expected, combined)
 
     def test_frontend_has_country_aware_language_switch_vectors_and_reversed_subtitles(self) -> None:
         content = I18N.read_text(encoding="utf-8")

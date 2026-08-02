@@ -1,17 +1,22 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-# 本地数据库与 Docker 基础设施从零重建脚本。
-# 仅操作 MySQL、Redis 和 Flyway 容器，不构建或启动前后端。
+# 本地 MySQL 与 Redis 数据清空脚本。
 #
-# 重建策略：
-#   1. 删除本地 MySQL、Redis 持久化数据；
-#   2. 使用 Flyway执行正式目录中的全部版本迁移；
-#   3. 在全新数据库中建立默认测试管理员；
-#   4. 导入 backend-java/docs/sql/reset_and_seed_test_data.sql；
-#   5. 全部测试数据不写入 flyway_schema_history。
+# 本脚本只负责：
+#   1. 停止项目 MySQL、Redis 容器；
+#   2. 删除项目根目录 data/mysql 与 data/redis；
+#   3. 重新创建并启动空的 MySQL、Redis 容器；
+#   4. 等待两个容器进入 healthy 状态。
 #
-# 警告：会永久删除项目根目录 data/mysql 和 data/redis。
+# 本脚本不会：
+#   - 执行 Flyway 迁移；
+#   - 导入 backend-java/docs/sql/schema.sql；
+#   - 创建管理员账号；
+#   - 导入 backend-java/docs/sql/reset_and_seed_test_data.sql；
+#   - 构建或启动前后端。
+#
+# 警告：会永久删除本项目本地 MySQL 和 Redis 数据。
 #
 # 用法：
 #   bash scripts/dev/reset-local-environment.sh
@@ -22,18 +27,11 @@ PROJECT_ROOT="$(cd -- "${SCRIPT_DIR}/../.." && pwd)"
 
 ENV_FILE="${PROJECT_ROOT}/.env"
 COMPOSE_FILE="${PROJECT_ROOT}/docker/docker-compose.yml"
-FORMAL_SQL_DIR="${PROJECT_ROOT}/backend-java/server/src/main/resources/db/migration"
-ADMIN_BOOTSTRAP_SQL="${PROJECT_ROOT}/backend-java/docs/sql/bootstrap_test_admin.sql"
-FULL_TEST_DATA_SQL="${PROJECT_ROOT}/backend-java/docs/sql/reset_and_seed_test_data.sql"
-
 MYSQL_DATA_DIR="${PROJECT_ROOT}/data/mysql"
 REDIS_DATA_DIR="${PROJECT_ROOT}/data/redis"
 
 MYSQL_CONTAINER="wust-dormitory-mysql"
 REDIS_CONTAINER="wust-dormitory-redis"
-DOCKER_NETWORK="wust-dormitory-network"
-FLYWAY_IMAGE="${WUST_DORMITORY_FLYWAY_IMAGE:-flyway/flyway:11.14.1-alpine}"
-LATEST_MIGRATION_VERSION=""
 
 ASSUME_YES=0
 case "${1:-}" in
@@ -61,17 +59,6 @@ fail() {
 
 require_command() {
   command -v "$1" >/dev/null 2>&1 || fail "未找到命令：$1"
-}
-
-latest_migration_version() {
-  find "${FORMAL_SQL_DIR}" \
-    -maxdepth 1 \
-    -type f \
-    -name 'V[0-9]*__*.sql' \
-    -printf '%f\n' \
-    | sed -nE 's/^V([0-9]+)__.*/\1/p' \
-    | sort -n \
-    | tail -n 1
 }
 
 compose() {
@@ -126,12 +113,6 @@ wait_for_container() {
 validate_environment() {
   [[ -f "${ENV_FILE}" ]] || fail "未找到 ${ENV_FILE}。请先执行：cp .env.example .env"
   [[ -f "${COMPOSE_FILE}" ]] || fail "未找到 Docker Compose 文件：${COMPOSE_FILE}"
-  [[ -d "${FORMAL_SQL_DIR}" ]] || fail "未找到正式迁移目录：${FORMAL_SQL_DIR}"
-  [[ -f "${ADMIN_BOOTSTRAP_SQL}" ]] || fail "未找到测试管理员引导脚本：${ADMIN_BOOTSTRAP_SQL}"
-  [[ -f "${FULL_TEST_DATA_SQL}" ]] || fail "未找到全量测试数据脚本：${FULL_TEST_DATA_SQL}"
-
-  LATEST_MIGRATION_VERSION="$(latest_migration_version)"
-  [[ "${LATEST_MIGRATION_VERSION}" =~ ^[0-9]+$ ]] || fail "无法从正式迁移目录识别最新Flyway版本"
 
   if grep -q '请替换为' "${ENV_FILE}"; then
     fail ".env 中仍有“请替换为...”占位配置，请先填写 MySQL 和 Redis 密码。"
@@ -139,19 +120,6 @@ validate_environment() {
   if grep -qE '^[A-Za-z_][A-Za-z0-9_]*=\$\{[^}]+\}$' "${ENV_FILE}"; then
     fail ".env 中存在未展开的变量表达式，请直接填写真实配置值。"
   fi
-
-  local required_variables=(
-    WUST_DORMITORY_MYSQL_IMAGE
-    WUST_DORMITORY_DB_NAME
-    WUST_DORMITORY_DB_USER
-    WUST_DORMITORY_DB_PASSWORD
-    WUST_DORMITORY_DB_ROOT_PASSWORD
-    WUST_DORMITORY_REDIS_IMAGE
-    WUST_DORMITORY_REDIS_PASSWORD
-  )
-  for variable_name in "${required_variables[@]}"; do
-    grep -qE "^${variable_name}=.+" "${ENV_FILE}" || fail ".env 缺少有效配置：${variable_name}"
-  done
 }
 
 confirm_destruction() {
@@ -165,12 +133,14 @@ confirm_destruction() {
 危险操作确认
 ============================================================
 
-即将永久删除：
+即将永久删除本项目本地数据：
 
   ${MYSQL_DATA_DIR}
   ${REDIS_DATA_DIR}
 
-随后会执行正式迁移，并导入V9全量测试数据。
+删除后只会重新启动空的 MySQL 与 Redis。
+不会执行数据库迁移，也不会导入测试数据。
+
 请输入大写 RESET 继续，输入其他内容将取消。
 ============================================================
 EOF
@@ -202,168 +172,42 @@ remove_data_directory() {
 }
 
 reset_containers_and_data() {
-  log "停止 MySQL 和 Redis 容器"
+  log "停止项目容器并移除孤立容器"
   compose down --remove-orphans
-  log "删除 MySQL 和 Redis 持久化数据"
+
+  log "删除 MySQL 和 Redis 持久化目录"
   remove_data_directory "${MYSQL_DATA_DIR}"
   remove_data_directory "${REDIS_DATA_DIR}"
   mkdir -p "${MYSQL_DATA_DIR}" "${REDIS_DATA_DIR}"
-  log "启动全新的 MySQL 和 Redis"
+
+  log "启动空的 MySQL 和 Redis"
   compose up -d mysql redis
   wait_for_container "${MYSQL_CONTAINER}" "MySQL" 60
   wait_for_container "${REDIS_CONTAINER}" "Redis" 60
-}
-
-mysql_env() {
-  case "$1" in
-    database) docker exec "${MYSQL_CONTAINER}" sh -ec 'printf "%s" "$MYSQL_DATABASE"' ;;
-    user) docker exec "${MYSQL_CONTAINER}" sh -ec 'printf "%s" "$MYSQL_USER"' ;;
-    password) docker exec "${MYSQL_CONTAINER}" sh -ec 'printf "%s" "$MYSQL_PASSWORD"' ;;
-    *) fail "未知 MySQL 配置项：$1" ;;
-  esac
-}
-
-run_formal_migrations() {
-  local database user password
-  database="$(mysql_env database)"
-  user="$(mysql_env user)"
-  password="$(mysql_env password)"
-  [[ -n "${database}" && -n "${user}" && -n "${password}" ]] || fail "无法从 MySQL 容器读取数据库连接信息"
-
-  docker image inspect "${FLYWAY_IMAGE}" >/dev/null 2>&1 || docker pull "${FLYWAY_IMAGE}"
-  log "使用 Flyway 容器执行正式版本迁移 V1～V${LATEST_MIGRATION_VERSION}"
-  docker run --rm \
-    --network "${DOCKER_NETWORK}" \
-    -e "FLYWAY_URL=jdbc:mysql://${MYSQL_CONTAINER}:3306/${database}?useUnicode=true&characterEncoding=utf8&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai" \
-    -e "FLYWAY_USER=${user}" \
-    -e "FLYWAY_PASSWORD=${password}" \
-    -e "FLYWAY_LOCATIONS=filesystem:/flyway/sql/formal" \
-    -e "FLYWAY_CONNECT_RETRIES=60" \
-    -e "FLYWAY_VALIDATE_ON_MIGRATE=true" \
-    -e "FLYWAY_CLEAN_DISABLED=true" \
-    -v "${FORMAL_SQL_DIR}:/flyway/sql/formal:ro" \
-    "${FLYWAY_IMAGE}" migrate
-}
-
-import_sql_file() {
-  local sql_file="$1"
-  local display_name="$2"
-  log "导入${display_name}"
-  docker exec -i "${MYSQL_CONTAINER}" sh -ec '
-    MYSQL_PWD="$MYSQL_PASSWORD" \
-    exec mysql --binary-mode=1 --default-character-set=utf8mb4 -u"$MYSQL_USER" "$MYSQL_DATABASE"
-  ' < "${sql_file}"
-}
-
-import_test_data() {
-  import_sql_file "${ADMIN_BOOTSTRAP_SQL}" "默认测试管理员"
-  import_sql_file "${FULL_TEST_DATA_SQL}" "V9全量测试数据"
-}
-
-query() {
-  docker exec -i "${MYSQL_CONTAINER}" sh -ec '
-    MYSQL_PWD="$MYSQL_PASSWORD" \
-    exec mysql --batch --skip-column-names --default-character-set=utf8mb4 -u"$MYSQL_USER" "$MYSQL_DATABASE"
-  '
-}
-
-verify() {
-  log "校验正式迁移历史和全量测试数据"
-  local version unresolved_repeatable counts statuses fixtures admin_count
-
-  version="$(query <<'SQL'
-SELECT MAX(CAST(version AS UNSIGNED)) FROM flyway_schema_history WHERE success=1 AND version IS NOT NULL;
-SQL
-)"
-  [[ "${version}" == "${LATEST_MIGRATION_VERSION}" ]] || fail "Flyway版本应为${LATEST_MIGRATION_VERSION}，实际为：${version}"
-
-  unresolved_repeatable="$(query <<'SQL'
-SELECT COUNT(*) FROM flyway_schema_history WHERE success=1 AND version IS NULL;
-SQL
-)"
-  [[ "${unresolved_repeatable}" == "0" ]] || fail "Flyway历史中不应记录测试数据脚本，实际数量：${unresolved_repeatable}"
-
-  counts="$(query <<'SQL'
-SELECT CONCAT_WS(',',
-  (SELECT COUNT(*) FROM major),
-  (SELECT COUNT(*) FROM student),
-  (SELECT COUNT(*) FROM student WHERE gender='M'),
-  (SELECT COUNT(*) FROM student WHERE gender='F'),
-  (SELECT COUNT(*) FROM room),
-  (SELECT COUNT(*) FROM bed),
-  (SELECT COUNT(*) FROM selection_batch)
-);
-SQL
-)"
-  [[ "${counts}" == "5,20,10,10,8,36,1" ]] || fail "全量测试数据数量异常：${counts}"
-
-  statuses="$(query <<'SQL'
-SELECT CONCAT_WS(',',
-  (SELECT COUNT(*) FROM app_user WHERE user_type='STUDENT' AND account_status='PENDING'),
-  (SELECT COUNT(*) FROM batch_student_eligibility WHERE batch_id=1 AND eligibility_status='ELIGIBLE'),
-  (SELECT COUNT(*) FROM student WHERE nationality_code<>'CN')
-);
-SQL
-)"
-  [[ "${statuses}" == "20,20,10" ]] || fail "学生账号、批次资格或国际学生数量异常：${statuses}"
-
-  fixtures="$(query <<'SQL'
-SELECT CONCAT_WS(',',
-  (SELECT COUNT(*) FROM questionnaire_answer),
-  (SELECT COUNT(*) FROM student_feature),
-  (SELECT COUNT(*) FROM selection_team),
-  (SELECT COUNT(*) FROM team_invitation),
-  (SELECT COUNT(*) FROM student_notification),
-  (SELECT COUNT(*) FROM allocation_run_result WHERE result_status='UNASSIGNED')
-);
-SQL
-)"
-  [[ "${fixtures}" == "1,1,1,1,1,1" ]] || fail "学生重置或分配失败测试样例异常：${fixtures}"
-
-  admin_count="$(query <<'SQL'
-SELECT COUNT(*) FROM app_user WHERE username='admin' AND user_type='ADMIN' AND account_status='ACTIVE';
-SQL
-)"
-  [[ "${admin_count}" == "1" ]] || fail "管理员测试账号未正确保留"
-  log "数据库结构、Flyway历史和V9全量测试数据校验通过"
 }
 
 print_summary() {
   cat <<EOF
 
 ============================================================
-本地数据库与 Docker 基础设施已从零重建
+MySQL 与 Redis 本地数据已清空
 ============================================================
 
-容器：
+容器状态：
   MySQL：healthy
   Redis：healthy
 
-正式结构：
-  Flyway：V1～V${LATEST_MIGRATION_VERSION}
-  数据字典：backend-java/docs/database-dictionary.md
+当前数据库仅包含 MySQL 镜像初始化时创建的空数据库。
+本脚本没有执行 Flyway、schema.sql 或测试数据导入。
 
-测试数据：
-  专业：5
-  学生：20（男生10、女生10）
-  学生账号：全部为待激活，统一分配仍应包含全部学生
-  国际学生：10
-  房间：8
-  床位：36
-  测试批次：1
-  重置样例：个人偏好、组队邀请、系统通知
-  分配样例：1条未分配结果及失败原因
+后续操作请按需要单独执行：
 
-管理员登录：
-  用户名：admin
-  密码：Dormitory@2026
+  1. 建议开发环境通过 Flyway 执行正式迁移 V1～V16；或手动导入：
+     backend-java/docs/sql/schema.sql
 
-学生示例：
-  学号：202600000001
-  姓名：张明宇
-  首次登录前需自行激活并设置密码
+  2. 导入 500 人测试数据：
+     backend-java/docs/sql/reset_and_seed_test_data.sql
 
-脚本没有构建或启动前后端。
 ============================================================
 EOF
 }
@@ -375,9 +219,6 @@ main() {
   validate_environment
   confirm_destruction
   reset_containers_and_data
-  run_formal_migrations
-  import_test_data
-  verify
   print_summary
 }
 

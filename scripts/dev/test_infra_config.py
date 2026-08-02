@@ -116,14 +116,21 @@ class InfrastructureConfigurationTest(unittest.TestCase):
         self.assertIn("compose up -d --force-recreate mysql redis", script)
         self.assertNotIn("compose restart mysql redis", script)
 
-    def test_reset_script_discovers_latest_formal_migration_version(self) -> None:
+    def test_reset_script_only_clears_mysql_and_redis(self) -> None:
         script = (REPO_ROOT / "scripts/dev/reset-local-environment.sh").read_text(encoding="utf-8")
-        self.assertIn("latest_migration_version()", script)
-        self.assertIn('find "${FORMAL_SQL_DIR}"', script)
-        self.assertIn('LATEST_MIGRATION_VERSION="$(latest_migration_version)"', script)
-        self.assertIn('[[ "${version}" == "${LATEST_MIGRATION_VERSION}" ]]', script)
-        self.assertNotIn('[[ "${version}" == "4" ]]', script)
-        self.assertNotIn("Flyway：V1～V4", script)
+        self.assertIn('remove_data_directory "${MYSQL_DATA_DIR}"', script)
+        self.assertIn('remove_data_directory "${REDIS_DATA_DIR}"', script)
+        self.assertIn("compose up -d mysql redis", script)
+        self.assertIn("不会执行数据库迁移", script)
+        self.assertIn("不会导入测试数据", script)
+        for forbidden in (
+            "run_formal_migrations",
+            "import_test_data",
+            "flyway/flyway",
+            "FULL_TEST_DATA_SQL",
+            "ADMIN_BOOTSTRAP_SQL",
+        ):
+            self.assertNotIn(forbidden, script)
 
     def test_shell_scripts_have_valid_bash_syntax(self) -> None:
         for relative in (
