@@ -73,6 +73,12 @@ const router = createRouter({
           meta: { role: 'ADMIN' },
         },
         {
+          path: 'admin/residencies',
+          name: 'admin-residencies',
+          component: () => import('../views/admin/AdminResidencyView.vue'),
+          meta: { role: 'ADMIN' },
+        },
+        {
           path: 'admin/matching',
           name: 'admin-matching',
           component: () => import('../views/admin/AdminMatchingView.vue'),
