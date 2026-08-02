@@ -154,9 +154,9 @@ async function createHold() {
   message.value = ''
   try {
     await requestHold([...selectedBedIds.value])
-    message.value = isTeamMode.value
-      ? `${memberCount}个床位已整体临时保留，请在倒计时内确认。`
-      : '床位已临时保留；点击其他空床位可以直接切换床位。'
+    if (isTeamMode.value) {
+      message.value = `${memberCount}个床位已整体临时保留，请在倒计时内确认。`
+    }
     await load(false)
   } catch (reason) {
     selectedBedIds.value = []
@@ -192,7 +192,7 @@ async function switchIndividualBed(nextBed: DataObject) {
     selectedBedIds.value = [nextBedId]
 
     await requestHold([nextBedId])
-    message.value = `已切换到 ${String(nextBed.bed_code)} 床，请在倒计时结束前确认。`
+    message.value = `已切换到 ${String(nextBed.bed_code)} 床。`
     await load(false)
   } catch (reason) {
     if (previousReleased) {
@@ -344,14 +344,41 @@ function bedTypeText(value: unknown) {
           </select>
         </label>
 
-        <div class="selected-bed-summary" :class="{ active: selectedBeds.length > 0 }" aria-live="polite">
-          <span>{{ selectedBeds.length ? '当前选择' : '尚未选择' }}</span>
-          <strong v-if="selectedBeds.length">
-            {{ selectedBeds.map((bed) => `${String(bed.bed_code)}床`).join('、') }}
-          </strong>
-          <small v-if="selectedBeds.length">
-            {{ selectedBeds.map((bed) => bedTypeText(bed.bed_type)).join('、') }}
-          </small>
+        <div class="selection-overview-grid">
+          <div class="selected-bed-summary" :class="{ active: selectedBeds.length > 0 }" aria-live="polite">
+            <span>{{ selectedBeds.length ? '当前选择' : '尚未选择' }}</span>
+            <strong v-if="selectedBeds.length">
+              {{ selectedBeds.map((bed) => `${String(bed.bed_code)}床`).join('、') }}
+            </strong>
+            <small v-if="selectedBeds.length">
+              {{ selectedBeds.map((bed) => bedTypeText(bed.bed_type)).join('、') }}
+            </small>
+            <small v-else>请从下拉框或三维床位中选择</small>
+          </div>
+
+          <div class="selection-hold-card" :class="{ active: Boolean(holdToken) }" aria-live="polite">
+            <div class="selection-hold-status">
+              <span>临时保留</span>
+              <strong>{{ holdToken ? '已临时保留' : '尚未临时保留' }}</strong>
+            </div>
+            <div v-if="holdToken" class="countdown compact-countdown">
+              {{ remainingSeconds }}<small>秒</small>
+            </div>
+            <div class="selection-hold-actions">
+              <button
+                class="button ghost"
+                :disabled="!holdToken || submitting"
+                @click="releaseHold"
+              >主动释放</button>
+              <button
+                class="button primary"
+                :disabled="!holdToken || submitting || remainingSeconds <= 0"
+                @click="confirmSelection"
+              >
+                {{ submitting ? '正在处理…' : isTeamMode ? '确认小组选寝' : '确认当前床位' }}
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -372,22 +399,6 @@ function bedTypeText(value: unknown) {
       <div v-if="isTeamMode && !holdToken" class="button-row centered">
         <button class="button primary" :disabled="!selectionReady || submitting" @click="createHold">
           整体保留 {{ memberCount }} 个床位
-        </button>
-      </div>
-    </section>
-
-    <section v-if="holdToken" class="panel hold-panel bed-selection-action-bar">
-      <div>
-        <span class="eyebrow">TEMPORARY HOLD</span>
-        <h3>{{ isTeamMode ? '小组床位已整体保留' : '床位已临时保留' }}</h3>
-        <p v-if="isTeamMode">请在倒计时结束前确认；超时后床位会重新开放选择。</p>
-        <p v-else>可直接点击其他空床位切换，或在倒计时结束前确认当前床位。</p>
-      </div>
-      <div class="countdown">{{ remainingSeconds }}<small>秒</small></div>
-      <div class="button-row">
-        <button class="button ghost" :disabled="submitting" @click="releaseHold">主动释放</button>
-        <button class="button primary" :disabled="submitting || remainingSeconds <= 0" @click="confirmSelection">
-          {{ submitting ? '正在处理…' : isTeamMode ? '确认小组整体选寝' : '确认选择此床位' }}
         </button>
       </div>
     </section>
