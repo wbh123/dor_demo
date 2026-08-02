@@ -64,17 +64,21 @@ def main() -> int:
         "/api/v1/admin/settings/student-welcome",
         token=admin_token,
     ))
-    configured_message = "欢迎新同学！请先完成个人偏好，再选择适合自己的宿舍和床位。"
+    configured_messages = {
+        "zh-CN": "欢迎新同学！请先完成个人偏好，再选择适合自己的宿舍和床位。",
+        "en-US": "Welcome! Complete your personal preferences before choosing a suitable room and bed.",
+    }
     updated_setting = data(request(
         "PUT",
         "/api/v1/admin/settings/student-welcome",
         token=admin_token,
         body={
-            "message": configured_message,
+            "messages": configured_messages,
             "expectedVersion": int(current_setting["version"]),
         },
     ))
-    assert updated_setting["message"] == configured_message, updated_setting
+    assert updated_setting["messages"] == configured_messages, updated_setting
+    assert updated_setting["message"] == configured_messages["zh-CN"], updated_setting
     assert int(updated_setting["version"]) == int(current_setting["version"]) + 1
 
     stale_update = request(
@@ -82,7 +86,10 @@ def main() -> int:
         "/api/v1/admin/settings/student-welcome",
         token=admin_token,
         body={
-            "message": "此请求应因版本过期而失败",
+            "messages": {
+                "zh-CN": "此请求应因版本过期而失败",
+                "en-US": "This stale request must fail.",
+            },
             "expectedVersion": int(current_setting["version"]),
         },
         expected_status=409,
@@ -110,7 +117,29 @@ def main() -> int:
     welcome = first_login["user"]["welcome"]
     assert welcome["required"] is True, welcome
     assert welcome["title"] == "新同学，欢迎你", welcome
-    assert welcome["message"] == configured_message, welcome
+    assert welcome["messages"] == configured_messages, welcome
+    assert welcome["message"] == configured_messages["zh-CN"], welcome
+
+    profile = data(request("GET", "/api/v1/student/profile", token=student_token))
+    assert profile["nationality_code"] == "CN", profile
+    updated_profile = data(request(
+        "PUT",
+        "/api/v1/student/profile",
+        token=student_token,
+        body={"phoneNumber": "+86 138 0000 0002"},
+    ))
+    assert updated_profile["phone_number"] == "+86 138 0000 0002", updated_profile
+
+    invalid_phone = request(
+        "PUT",
+        "/api/v1/student/profile",
+        token=student_token,
+        body={"phoneNumber": "abc"},
+        expected_status=400,
+    )
+    assert invalid_phone["error"]["code"] in {
+        "VALIDATION_FAILED", "PHONE_NUMBER_INVALID", "VALIDATION_ERROR"
+    }, invalid_phone
 
     request(
         "POST",

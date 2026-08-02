@@ -227,8 +227,8 @@ class UxRefinementTest(unittest.TestCase):
         shell = (FRONTEND / "layouts/AppShell.vue").read_text(encoding="utf-8")
         store = (FRONTEND / "stores/auth.ts").read_text(encoding="utf-8")
         styles = (FRONTEND / "student-experience.css").read_text(encoding="utf-8")
+        i18n = (FRONTEND / "i18n/index.ts").read_text(encoding="utf-8")
         for expected in (
-            "新同学，欢迎你",
             "welcome-overlay",
             "welcome-dialog",
             "acknowledgeWelcome",
@@ -236,6 +236,8 @@ class UxRefinementTest(unittest.TestCase):
             "prefers-reduced-motion",
         ):
             self.assertIn(expected, shell + store + styles)
+        self.assertIn("新同学，欢迎你", i18n)
+        self.assertIn("welcome?.messages", shell)
         self.assertIn('v-if="auth.isAdmin" class="topbar"', shell)
         self.assertNotIn("学生选寝中心", shell)
 
@@ -243,10 +245,12 @@ class UxRefinementTest(unittest.TestCase):
         dashboard = (FRONTEND / "views/admin/AdminDashboardView.vue").read_text(encoding="utf-8")
         for expected in (
             "/api/v1/admin/settings/student-welcome",
-            "welcomeMessage",
+            "welcomeMessages",
             "welcomeVersion",
             "新生欢迎语",
             "保存欢迎语",
+            "zh-CN",
+            "en-US",
         ):
             self.assertIn(expected, dashboard)
 

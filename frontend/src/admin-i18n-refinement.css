@@ -1,0 +1,46 @@
+.multilingual-welcome-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.multilingual-welcome-grid label {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 7px;
+  align-items: center;
+}
+
+.multilingual-welcome-grid label > span {
+  color: #304764;
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.multilingual-welcome-grid label > small {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.multilingual-welcome-grid textarea {
+  grid-column: 1 / -1;
+}
+
+.student-admin-form {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.student-admin-form .span-2 {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 720px) {
+  .multilingual-welcome-grid,
+  .student-admin-form {
+    grid-template-columns: 1fr;
+  }
+
+  .student-admin-form .span-2 {
+    grid-column: auto;
+  }
+}

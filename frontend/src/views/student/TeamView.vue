@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { api } from '../../api/client'
 import type { DataObject, ListSuccessResponse, ObjectSuccessResponse } from '../../api/types'
+import { useI18n } from '../../i18n'
 
+const router = useRouter()
 const teams = ref<DataObject[]>([])
 const invitations = ref<DataObject[]>([])
 const inviteStudentNumber = ref('')
@@ -10,11 +13,19 @@ const error = ref('')
 const message = ref('')
 const loading = ref(true)
 const submitting = ref(false)
+const showStartSelectionConfirm = ref<DataObject | null>(null)
+const showLeaveConfirm = ref<DataObject | null>(null)
+const removeCandidate = ref<{ team: DataObject; member: DataObject } | null>(null)
+
+const { t, subtitle, translateError } = useI18n()
 
 const currentTeam = computed(() => teams.value[0] ?? null)
+const currentMembers = computed(() => ((currentTeam.value?.members ?? []) as DataObject[]))
 const canInvite = computed(() => {
   if (!currentTeam.value) return true
-  return currentTeam.value.member_role === 'LEADER' && currentTeam.value.team_status === 'FORMING'
+  return currentTeam.value.member_role === 'LEADER'
+    && currentTeam.value.team_status === 'FORMING'
+    && currentMembers.value.length < 5
 })
 
 onMounted(load)
@@ -30,7 +41,7 @@ async function load() {
     teams.value = (teamResponse.data.data ?? []) as DataObject[]
     invitations.value = (invitationResponse.data.data ?? []) as DataObject[]
   } catch (reason) {
-    error.value = reason instanceof Error ? reason.message : '小组信息加载失败'
+    error.value = translateError(reason)
   } finally {
     loading.value = false
   }
@@ -39,7 +50,6 @@ async function load() {
 async function invite() {
   const studentNumber = inviteStudentNumber.value.trim()
   if (!/^\d{12}$/.test(studentNumber) || submitting.value) return
-
   submitting.value = true
   error.value = ''
   message.value = ''
@@ -53,7 +63,7 @@ async function invite() {
     message.value = `已向 ${String(invited.studentName)} 发送邀请。`
     await load()
   } catch (reason) {
-    error.value = reason instanceof Error ? reason.message : '邀请发送失败'
+    error.value = translateError(reason)
   } finally {
     submitting.value = false
   }
@@ -70,20 +80,85 @@ async function respond(token: unknown, accepted: boolean) {
     message.value = accepted ? '已加入小组。' : '已拒绝邀请。'
     await load()
   } catch (reason) {
-    error.value = reason instanceof Error ? reason.message : '邀请处理失败'
+    error.value = translateError(reason)
   }
 }
 
-async function lock(teamId: unknown) {
+function requestStartSelection(team: DataObject) {
+  if (Number(team.pending_invitation_count ?? 0) > 0) {
+    showStartSelectionConfirm.value = team
+    return
+  }
+  void startSelection(team)
+}
+
+async function startSelection(team: DataObject) {
+  submitting.value = true
   error.value = ''
   message.value = ''
   try {
-    await api.post(`/api/v1/student/teams/${Number(teamId)}/lock`)
-    message.value = '小组成员已确认，可以开始整体选择床位。'
+    const response = await api.post<ObjectSuccessResponse>(
+      `/api/v1/student/teams/${Number(team.id)}/lock`,
+    )
+    const result = (response.data.data ?? {}) as DataObject
+    showStartSelectionConfirm.value = null
+    await router.push({
+      path: `/student/batches/${Number(result.batchId ?? team.batch_id)}/rooms`,
+      query: {
+        teamId: String(team.id),
+        memberCount: String(result.memberCount ?? team.confirmed_member_count),
+      },
+    })
+  } catch (reason) {
+    error.value = translateError(reason)
+  } finally {
+    submitting.value = false
+  }
+}
+
+async function leaveTeam(team: DataObject) {
+  submitting.value = true
+  error.value = ''
+  try {
+    await api.post(`/api/v1/student/teams/${Number(team.id)}/leave`)
+    showLeaveConfirm.value = null
+    message.value = team.member_role === 'LEADER' ? '小组已解散。' : '你已退出小组。'
     await load()
   } catch (reason) {
-    error.value = reason instanceof Error ? reason.message : '成员确认失败'
+    error.value = translateError(reason)
+  } finally {
+    submitting.value = false
   }
+}
+
+async function removeMember() {
+  if (!removeCandidate.value) return
+  submitting.value = true
+  error.value = ''
+  const { team, member } = removeCandidate.value
+  try {
+    await api.delete(
+      `/api/v1/student/teams/${Number(team.id)}/members/${Number(member.student_id)}`,
+    )
+    message.value = `已将 ${String(member.student_name)} 移出小组。`
+    removeCandidate.value = null
+    await load()
+  } catch (reason) {
+    error.value = translateError(reason)
+  } finally {
+    submitting.value = false
+  }
+}
+
+function memberSlots(team: DataObject) {
+  const members = (team.members ?? []) as DataObject[]
+  return Array.from({ length: 5 }, (_, index) => members[index] ?? null)
+}
+
+function canRemoveMember(team: DataObject, member: DataObject) {
+  return team.member_role === 'LEADER'
+    && member.member_role !== 'LEADER'
+    && ['JOINED', 'LOCKED'].includes(String(member.member_status))
 }
 
 function teamStatusText(status: unknown) {
@@ -113,20 +188,20 @@ function memberRoleText(role: unknown) {
 </script>
 
 <template>
-  <div class="content-column">
-    <div class="page-title">
-      <span class="eyebrow">TEAM SELECTION</span>
+  <div class="content-column team-page-refined">
+    <div class="page-title team-page-heading">
+      <span class="eyebrow">{{ subtitle('组队选寝', 'TEAM SELECTION') }}</span>
       <h2>邀请队友一起选寝</h2>
-      <p>输入同学的12位学号发送邀请。对方接受后即可成为小组成员，成员确认后由邀请发起人整体选择床位。</p>
+      <p>{{ t('team.maxHint') }}</p>
     </div>
 
     <p v-if="error" class="alert error">{{ error }}</p>
     <p v-if="message" class="alert success">{{ message }}</p>
 
-    <section v-if="invitations.length" class="panel">
+    <section v-if="invitations.length" class="panel team-invitation-panel">
       <div class="section-head">
         <div>
-          <span class="eyebrow">INVITATIONS</span>
+          <span class="eyebrow">{{ subtitle('待处理邀请', 'INVITATIONS') }}</span>
           <h3>待处理邀请</h3>
         </div>
       </div>
@@ -141,20 +216,19 @@ function memberRoleText(role: unknown) {
             <p>邀请人学号：{{ invitation.inviter_student_number }}</p>
           </div>
           <div class="button-row">
-            <button class="button ghost" @click="respond(invitation.invitation_token, false)">拒绝</button>
-            <button class="button primary" @click="respond(invitation.invitation_token, true)">接受</button>
+            <button class="button ghost" @click="respond(invitation.invitation_token, false)">{{ t('common.reject') }}</button>
+            <button class="button primary" @click="respond(invitation.invitation_token, true)">{{ t('common.accept') }}</button>
           </div>
         </article>
       </div>
     </section>
 
-    <section v-if="canInvite" class="panel">
+    <section v-if="canInvite" class="panel compact-team-invite-panel">
       <div class="section-head">
         <div>
-          <span class="eyebrow">INVITE A ROOMMATE</span>
+          <span class="eyebrow">{{ subtitle('邀请队友', 'INVITE A ROOMMATE') }}</span>
           <h3>邀请队友</h3>
-          <p v-if="!currentTeam">首次发送邀请时，系统会自动建立当前选寝小组。</p>
-          <p v-else>可以继续邀请同批次、同性别且尚未加入其他小组的同学。</p>
+          <p>请输入同批次、同性别同学的12位学号。待确认邀请也会占用一个小组名额。</p>
         </div>
       </div>
       <form class="team-invite-panel" @submit.prevent="invite">
@@ -182,46 +256,101 @@ function memberRoleText(role: unknown) {
       你还没有加入小组，可以直接邀请一名队友开始组队。
     </p>
 
-    <div v-else class="team-grid">
-      <article v-for="team in teams" :key="String(team.id)" class="panel team-card">
-        <div class="section-head">
+    <div v-else class="team-grid refined-team-grid">
+      <article v-for="team in teams" :key="String(team.id)" class="panel team-card refined-team-card">
+        <div class="section-head split-title">
           <div>
             <span class="status-chip compact">{{ teamStatusText(team.team_status) }}</span>
             <h3>我的小组</h3>
-            <p>当前共 {{ team.member_count }} 名成员</p>
+            <p>
+              已确认 {{ team.confirmed_member_count }} 人
+              <template v-if="Number(team.pending_invitation_count) > 0">
+                · 待确认 {{ team.pending_invitation_count }} 人
+              </template>
+            </p>
           </div>
+          <button class="button ghost" type="button" @click="showLeaveConfirm = team">退出队伍</button>
         </div>
 
-        <div class="team-member-list" aria-label="小组成员">
+        <div class="team-member-slot-grid" aria-label="小组成员">
           <article
-            v-for="member in (team.members as DataObject[])"
-            :key="String(member.student_number)"
-            class="team-member-item"
+            v-for="(member, index) in memberSlots(team)"
+            :key="member ? String(member.student_number) : `empty-${index}`"
+            class="team-member-slot-card"
+            :class="{ empty: !member, pending: member?.member_status === 'INVITED' }"
           >
-            <div class="team-member-identity">
-              <strong>{{ member.student_name }}</strong>
-              <span>{{ member.student_number }}</span>
-            </div>
-            <div class="button-row">
-              <span class="status-chip compact">{{ memberRoleText(member.member_role) }}</span>
-              <span class="status-chip compact">{{ memberStatusText(member.member_status) }}</span>
-            </div>
+            <template v-if="member">
+              <div class="team-member-slot-index">{{ index + 1 }}</div>
+              <div class="team-member-identity">
+                <strong>{{ member.student_name }}</strong>
+                <span>{{ member.student_number }}</span>
+              </div>
+              <div class="team-member-slot-status">
+                <span>{{ memberRoleText(member.member_role) }}</span>
+                <b>{{ memberStatusText(member.member_status) }}</b>
+              </div>
+              <button
+                v-if="canRemoveMember(team, member)"
+                class="team-member-remove-button"
+                type="button"
+                @click="removeCandidate = { team, member }"
+              >删除队友</button>
+            </template>
+            <template v-else>
+              <span class="empty-team-slot-plus">+</span>
+              <strong>等待队友</strong>
+              <small>可继续邀请</small>
+            </template>
           </article>
         </div>
 
-        <div class="button-row">
+        <div class="button-row team-selection-actions">
           <button
             v-if="team.member_role === 'LEADER' && team.team_status === 'FORMING'"
             class="button primary"
-            @click="lock(team.id)"
-          >确认小组成员</button>
+            :disabled="Number(team.confirmed_member_count) < 2 || submitting"
+            @click="requestStartSelection(team)"
+          >开始组队选寝</button>
           <RouterLink
             v-if="team.member_role === 'LEADER' && team.team_status === 'LOCKED'"
             class="button primary"
-            :to="`/student/batches/${team.batch_id}/rooms?teamId=${team.id}&memberCount=${team.member_count}`"
-          >整体选择床位</RouterLink>
+            :to="`/student/batches/${team.batch_id}/rooms?teamId=${team.id}&memberCount=${team.confirmed_member_count}`"
+          >继续整体选择床位</RouterLink>
         </div>
       </article>
+    </div>
+
+    <div v-if="showStartSelectionConfirm" class="modal-overlay" role="presentation">
+      <section class="modal-card confirmation-dialog" role="dialog" aria-modal="true">
+        <h3>{{ t('team.pendingInvalidation.title') }}</h3>
+        <p>{{ t('team.pendingInvalidation.message') }}</p>
+        <div class="button-row">
+          <button class="button ghost" @click="showStartSelectionConfirm = null">{{ t('common.cancel') }}</button>
+          <button class="button primary" :disabled="submitting" @click="startSelection(showStartSelectionConfirm)">{{ t('common.confirm') }}</button>
+        </div>
+      </section>
+    </div>
+
+    <div v-if="showLeaveConfirm" class="modal-overlay" role="presentation">
+      <section class="modal-card confirmation-dialog" role="dialog" aria-modal="true">
+        <h3>{{ t('team.leave.title') }}</h3>
+        <p>{{ showLeaveConfirm.member_role === 'LEADER' ? '邀请发起人退出后，小组会解散，已接受成员将收到系统通知。' : '退出后你可以加入其他队伍或进行个人选寝。' }}</p>
+        <div class="button-row">
+          <button class="button ghost" @click="showLeaveConfirm = null">{{ t('common.cancel') }}</button>
+          <button class="button danger" :disabled="submitting" @click="leaveTeam(showLeaveConfirm)">{{ t('common.leave') }}</button>
+        </div>
+      </section>
+    </div>
+
+    <div v-if="removeCandidate" class="modal-overlay" role="presentation">
+      <section class="modal-card confirmation-dialog" role="dialog" aria-modal="true">
+        <h3>{{ t('team.remove.title') }}</h3>
+        <p>移除 {{ removeCandidate.member.student_name }} 后，对方会收到系统通知，并可立即进行个人选寝。</p>
+        <div class="button-row">
+          <button class="button ghost" @click="removeCandidate = null">{{ t('common.cancel') }}</button>
+          <button class="button danger" :disabled="submitting" @click="removeMember">{{ t('common.remove') }}</button>
+        </div>
+      </section>
     </div>
   </div>
 </template>

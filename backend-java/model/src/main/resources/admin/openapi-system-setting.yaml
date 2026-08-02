@@ -1,13 +1,13 @@
 openapi: 3.0.3
 info:
   title: Wust Dormitory Select 系统设置接口
-  version: 1.0.0
+  version: 1.1.0
 paths:
   /api/v1/admin/settings/student-welcome:
     get:
       tags: [SystemSetting]
       operationId: getStudentWelcomeSetting
-      summary: 获取学生首次登录欢迎语
+      summary: 获取学生首次登录多语言欢迎语
       security:
         - bearerAuth: []
       responses:
@@ -17,14 +17,12 @@ paths:
             application/json:
               schema:
                 $ref: '../common-response/openapi-common-response.yaml#/components/schemas/ObjectSuccessResponse'
-        '401':
-          $ref: '#/components/responses/ErrorResponse'
-        '403':
-          $ref: '#/components/responses/ErrorResponse'
+        '401': { $ref: '#/components/responses/ErrorResponse' }
+        '403': { $ref: '#/components/responses/ErrorResponse' }
     put:
       tags: [SystemSetting]
       operationId: updateStudentWelcomeSetting
-      summary: 更新学生首次登录欢迎语
+      summary: 更新学生首次登录多语言欢迎语
       security:
         - bearerAuth: []
       requestBody:
@@ -40,14 +38,10 @@ paths:
             application/json:
               schema:
                 $ref: '../common-response/openapi-common-response.yaml#/components/schemas/ObjectSuccessResponse'
-        '400':
-          $ref: '#/components/responses/ErrorResponse'
-        '401':
-          $ref: '#/components/responses/ErrorResponse'
-        '403':
-          $ref: '#/components/responses/ErrorResponse'
-        '409':
-          $ref: '#/components/responses/ErrorResponse'
+        '400': { $ref: '#/components/responses/ErrorResponse' }
+        '401': { $ref: '#/components/responses/ErrorResponse' }
+        '403': { $ref: '#/components/responses/ErrorResponse' }
+        '409': { $ref: '#/components/responses/ErrorResponse' }
 components:
   responses:
     ErrorResponse:
@@ -59,12 +53,15 @@ components:
   schemas:
     StudentWelcomeSettingUpdateRequest:
       type: object
-      required: [message, expectedVersion]
+      required: [messages, expectedVersion]
       properties:
-        message:
-          type: string
-          minLength: 1
-          maxLength: 1000
+        messages:
+          type: object
+          minProperties: 2
+          additionalProperties:
+            type: string
+            minLength: 1
+            maxLength: 1000
         expectedVersion:
           type: integer
           format: int32

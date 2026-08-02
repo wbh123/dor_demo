@@ -2,6 +2,7 @@ import { createApp } from 'vue'
 import App from './App.vue'
 import router from './router'
 import { pinia } from './stores'
+import { useI18n } from './i18n'
 import './style.css'
 import './ux-refinement.css'
 import './room-selection-refinement.css'
@@ -10,5 +11,8 @@ import './room-scene-geometry-fix.css'
 import './matching-operations.css'
 import './student-experience.css'
 import './batch-copy.css'
+import './team-i18n-refinement.css'
+import './admin-i18n-refinement.css'
 
 createApp(App).use(pinia).use(router).mount('#app')
+useI18n().installDomI18n()

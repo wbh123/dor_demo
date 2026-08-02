@@ -90,87 +90,137 @@ def assert_internal_identity_hidden(team: dict[str, Any]) -> None:
 
 
 def main() -> int:
-    inviter_token = activate_and_login("202600000003", "测试男生003")
-    invitee_token = activate_and_login("202600000004", "测试男生004")
+    student_names = {
+        "202600000003": "测试男生003",
+        "202600000004": "测试男生004",
+        "202600000005": "测试男生005",
+        "202600000006": "测试男生006",
+        "202600000007": "测试男生007",
+        "202600000008": "测试男生008",
+    }
+    tokens = {
+        number: activate_and_login(number, name)
+        for number, name in student_names.items()
+    }
+    inviter_token = tokens["202600000003"]
+    accepted_token = tokens["202600000004"]
 
-    invitation_result = data(
-        request(
+    for invitee_number in (
+        "202600000004",
+        "202600000005",
+        "202600000006",
+        "202600000007",
+    ):
+        invitation_result = data(request(
             "POST",
             "/api/v1/student/team-invitations",
             token=inviter_token,
-            body={"studentNumber": "202600000004"},
-        )
+            body={"studentNumber": invitee_number},
+        ))
+        assert invitation_result["invited"] is True, invitation_result
+        assert invitation_result["studentNumber"] == invitee_number, invitation_result
+
+    size_limit = request(
+        "POST",
+        "/api/v1/student/team-invitations",
+        token=inviter_token,
+        body={"studentNumber": "202600000008"},
+        expected_status=409,
     )
-    assert invitation_result["invited"] is True, invitation_result
-    assert invitation_result["studentNumber"] == "202600000004", invitation_result
-    assert invitation_result["studentName"] == "测试男生004", invitation_result
+    assert size_limit["error"]["code"] == "TEAM_SIZE_LIMIT", size_limit
 
     inviter_teams = data(request("GET", "/api/v1/student/teams", token=inviter_token))
     assert len(inviter_teams) == 1, inviter_teams
     forming_team = inviter_teams[0]
     assert_internal_identity_hidden(forming_team)
     assert forming_team["team_status"] == "FORMING", forming_team
-    assert forming_team["member_role"] == "LEADER", forming_team
-    assert int(forming_team["member_count"]) == 1, forming_team
-    assert len(forming_team["members"]) == 2, forming_team
-    member_statuses = {
-        member["student_number"]: member["member_status"]
-        for member in forming_team["members"]
-    }
-    assert member_statuses == {
-        "202600000003": "JOINED",
-        "202600000004": "INVITED",
-    }, member_statuses
+    assert int(forming_team["confirmed_member_count"]) == 1, forming_team
+    assert int(forming_team["pending_invitation_count"]) == 4, forming_team
+    assert len(forming_team["members"]) == 5, forming_team
 
-    invitee_teams_before = data(request("GET", "/api/v1/student/teams", token=invitee_token))
-    assert invitee_teams_before == [], invitee_teams_before
-
-    invitations = data(
-        request("GET", "/api/v1/student/team-invitations", token=invitee_token)
-    )
-    assert len(invitations) == 1, invitations
-    invitation = invitations[0]
-    assert_internal_identity_hidden(invitation)
-    assert invitation["inviter_name"] == "测试男生003", invitation
-    assert invitation["inviter_student_number"] == "202600000003", invitation
-    invitation_token = invitation["invitation_token"]
-
+    accepted_invitations = data(request(
+        "GET", "/api/v1/student/team-invitations", token=accepted_token
+    ))
+    assert len(accepted_invitations) == 1, accepted_invitations
+    accepted_invitation = accepted_invitations[0]
     request(
         "POST",
         "/api/v1/student/team-invitations/respond",
-        token=invitee_token,
-        body={"invitationToken": invitation_token, "accepted": True},
+        token=accepted_token,
+        body={
+            "invitationToken": accepted_invitation["invitation_token"],
+            "accepted": True,
+        },
     )
 
-    inviter_teams_after = data(request("GET", "/api/v1/student/teams", token=inviter_token))
-    assert len(inviter_teams_after) == 1, inviter_teams_after
-    accepted_team = inviter_teams_after[0]
-    assert_internal_identity_hidden(accepted_team)
-    assert int(accepted_team["member_count"]) == 2, accepted_team
-    assert all(
-        member["member_status"] == "JOINED"
-        for member in accepted_team["members"]
-    ), accepted_team
+    accepted_team = data(request("GET", "/api/v1/student/teams", token=inviter_token))[0]
+    assert int(accepted_team["confirmed_member_count"]) == 2, accepted_team
+    assert int(accepted_team["pending_invitation_count"]) == 3, accepted_team
 
-    invitee_teams_after = data(request("GET", "/api/v1/student/teams", token=invitee_token))
-    assert len(invitee_teams_after) == 1, invitee_teams_after
-    assert_internal_identity_hidden(invitee_teams_after[0])
-    assert invitee_teams_after[0]["member_role"] == "MEMBER", invitee_teams_after
-
-    internal_team_id = int(accepted_team["id"])
-    request(
+    team_id = int(accepted_team["id"])
+    lock_result = data(request(
         "POST",
-        f"/api/v1/student/teams/{internal_team_id}/lock",
+        f"/api/v1/student/teams/{team_id}/lock",
         token=inviter_token,
-    )
+    ))
+    assert int(lock_result["memberCount"]) == 2, lock_result
+    assert int(lock_result["invalidatedInvitationCount"]) == 3, lock_result
+
     locked_team = data(request("GET", "/api/v1/student/teams", token=inviter_token))[0]
     assert locked_team["team_status"] == "LOCKED", locked_team
-    assert int(locked_team["member_count"]) == 2, locked_team
-    assert_internal_identity_hidden(locked_team)
+    assert int(locked_team["confirmed_member_count"]) == 2, locked_team
+    assert int(locked_team["pending_invitation_count"]) == 0, locked_team
+    assert len(locked_team["members"]) == 2, locked_team
 
-    request("POST", "/api/v1/auth/logout", token=invitee_token)
-    request("POST", "/api/v1/auth/logout", token=inviter_token)
-    print("Invitation-first team smoke flow passed")
+    for pending_number in ("202600000005", "202600000006", "202600000007"):
+        pending_token = tokens[pending_number]
+        pending_invitations = data(request(
+            "GET", "/api/v1/student/team-invitations", token=pending_token
+        ))
+        assert pending_invitations == [], pending_invitations
+        pending_notifications = data(request(
+            "GET", "/api/v1/student/notifications", token=pending_token
+        ))
+        assert any(
+            item["notification_type"] == "TEAM_INVITATION_CANCELLED"
+            for item in pending_notifications
+        ), pending_notifications
+
+    accepted_member = next(
+        member for member in locked_team["members"]
+        if member["student_number"] == "202600000004"
+    )
+    remove_result = data(request(
+        "DELETE",
+        f"/api/v1/student/teams/{team_id}/members/{int(accepted_member['student_id'])}",
+        token=inviter_token,
+    ))
+    assert remove_result["removed"] is True, remove_result
+
+    accepted_teams_after_remove = data(request(
+        "GET", "/api/v1/student/teams", token=accepted_token
+    ))
+    assert accepted_teams_after_remove == [], accepted_teams_after_remove
+    accepted_notifications = data(request(
+        "GET", "/api/v1/student/notifications", token=accepted_token
+    ))
+    assert any(
+        item["notification_type"] == "TEAM_MEMBER_REMOVED"
+        for item in accepted_notifications
+    ), accepted_notifications
+
+    personal_prepare = data(request(
+        "POST",
+        "/api/v1/student/batches/1/personal-selection/prepare",
+        token=inviter_token,
+    ))
+    assert personal_prepare["leftTeam"] is True, personal_prepare
+    assert personal_prepare["dissolved"] is True, personal_prepare
+    assert data(request("GET", "/api/v1/student/teams", token=inviter_token)) == []
+
+    for token in tokens.values():
+        request("POST", "/api/v1/auth/logout", token=token)
+    print("Five-member invitation, invalidation, removal and leave smoke flow passed")
     return 0
 
 
@@ -178,5 +228,5 @@ if __name__ == "__main__":
     try:
         raise SystemExit(main())
     except Exception as exception:
-        print(f"Invitation-first team smoke flow failed: {exception}", file=sys.stderr)
+        print(f"Team invitation smoke flow failed: {exception}", file=sys.stderr)
         raise

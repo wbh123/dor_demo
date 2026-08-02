@@ -253,8 +253,10 @@ VALUES
   'smokingAcceptance',2.0,'bedPreference',0.5
  ),
  JSON_OBJECT(
-  'smokingAcceptance',JSON_OBJECT('type','HARD_CONFLICT','penalty',100),
-  'sleepSensitivityVsGamingVoice',JSON_OBJECT('type','PAIRWISE','penalty',20)
+  'smokingConflictPenalty',25,
+  'sleepTimeWarningMinutes',60,
+  'cleaningWarningDifference',1,
+  'gamingVoiceWarningDifference',1
  ),
  1)
 ON DUPLICATE KEY UPDATE

@@ -32,11 +32,13 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Date;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 @RestController
 public class AdminController implements AdminApi {
     private final AdminService adminService;
+    private final StudentAdminService studentAdminService;
     private final RoomManagementService roomManagementService;
     private final RoomLayoutService roomLayoutService;
     private final MatchingSchemeService matchingSchemeService;
@@ -50,6 +52,7 @@ public class AdminController implements AdminApi {
 
     public AdminController(
             AdminService adminService,
+            StudentAdminService studentAdminService,
             RoomManagementService roomManagementService,
             RoomLayoutService roomLayoutService,
             MatchingSchemeService matchingSchemeService,
@@ -61,6 +64,7 @@ public class AdminController implements AdminApi {
             AssignmentExportService exportService,
             BatchRuleValidator batchRuleValidator) {
         this.adminService = adminService;
+        this.studentAdminService = studentAdminService;
         this.roomManagementService = roomManagementService;
         this.roomLayoutService = roomLayoutService;
         this.matchingSchemeService = matchingSchemeService;
@@ -98,7 +102,7 @@ public class AdminController implements AdminApi {
     @Override
     public ResponseEntity<ObjectSuccessResponse> listStudents(
             String keyword, String gender, Long majorId, Integer page, Integer size) {
-        return ResponseEntity.ok(ResponseFactory.object(adminService.students(
+        return ResponseEntity.ok(ResponseFactory.object(studentAdminService.students(
                 keyword,
                 gender,
                 majorId,
@@ -108,23 +112,29 @@ public class AdminController implements AdminApi {
 
     @Override
     public ResponseEntity<ObjectSuccessResponse> createStudent(StudentRequest request) {
-        long id = adminService.saveStudent(null, studentCommand(request), SecurityUsers.requireAdmin());
+        long id = studentAdminService.saveStudent(
+                null,
+                studentCommand(request),
+                SecurityUsers.requireAdmin());
         return ResponseEntity.ok(ResponseFactory.object(Map.of("id", id)));
     }
 
     @Override
     public ResponseEntity<ObjectSuccessResponse> updateStudent(Long id, StudentRequest request) {
-        adminService.saveStudent(id, studentCommand(request), SecurityUsers.requireAdmin());
+        studentAdminService.saveStudent(
+                id,
+                studentCommand(request),
+                SecurityUsers.requireAdmin());
         return ResponseEntity.ok(ResponseFactory.object(Map.of("id", id)));
     }
 
     @Override
     public ResponseEntity<ObjectSuccessResponse> importStudents(List<StudentRequest> requests) {
-        List<AdminService.StudentCommand> commands = requests.stream()
+        List<StudentAdminService.StudentCommand> commands = requests.stream()
                 .map(this::studentCommand)
                 .toList();
         return ResponseEntity.ok(ResponseFactory.object(
-                adminService.importStudents(commands, SecurityUsers.requireAdmin())));
+                studentAdminService.importStudents(commands, SecurityUsers.requireAdmin())));
     }
 
     @Override
@@ -225,8 +235,7 @@ public class AdminController implements AdminApi {
                 request.getHoldDurationSeconds(),
                 request.getAllowTeam(),
                 request.getTeamMaxSize(),
-                request.getAllowStudentRandom()
-        );
+                request.getAllowStudentRandom());
         batchRuleValidator.validate(command);
         long id = adminService.createBatch(command, SecurityUsers.requireAdmin());
         return ResponseEntity.ok(ResponseFactory.object(Map.of("id", id)));
@@ -254,9 +263,8 @@ public class AdminController implements AdminApi {
     public ResponseEntity<VoidSuccessResponse> changeBatchStatus(Long batchId, String targetStatus) {
         batchLifecycleService.changeStatus(
                 batchId,
-                targetStatus.toUpperCase(),
-                SecurityUsers.requireAdmin()
-        );
+                targetStatus.toUpperCase(Locale.ROOT),
+                SecurityUsers.requireAdmin());
         return ResponseEntity.ok(ResponseFactory.empty());
     }
 
@@ -266,8 +274,7 @@ public class AdminController implements AdminApi {
         return ResponseEntity.ok(ResponseFactory.object(
                 allocationService.preview(
                         batchId,
-                        randomSeed == null ? 20260801L : randomSeed
-                )));
+                        randomSeed == null ? 20260801L : randomSeed)));
     }
 
     @Override
@@ -279,16 +286,14 @@ public class AdminController implements AdminApi {
                         batchId,
                         request.getRandomSeed(),
                         request.getIdempotencyKey(),
-                        SecurityUsers.requireAdmin()
-                )));
+                        SecurityUsers.requireAdmin())));
     }
 
     @Override
     public ResponseEntity<ListSuccessResponse> listAssignments(Long batchId, String keyword) {
         SecurityUsers.requireAdmin();
         return ResponseEntity.ok(ResponseFactory.list(
-                assignmentQueryService.list(batchId, keyword)
-        ));
+                assignmentQueryService.list(batchId, keyword)));
     }
 
     @Override
@@ -300,16 +305,14 @@ public class AdminController implements AdminApi {
                         assignmentId,
                         request.getNewBedId(),
                         request.getReason(),
-                        SecurityUsers.requireAdmin()
-                )));
+                        SecurityUsers.requireAdmin())));
     }
 
     @Override
     public ResponseEntity<ListSuccessResponse> listAuditLogs(Integer limit) {
         SecurityUsers.requireAdmin();
         return ResponseEntity.ok(ResponseFactory.list(
-                adminService.auditLogs(limit == null ? 100 : limit)
-        ));
+                adminService.auditLogs(limit == null ? 100 : limit)));
     }
 
     @Override
@@ -319,8 +322,7 @@ public class AdminController implements AdminApi {
         return ResponseEntity.ok()
                 .header(
                         HttpHeaders.CONTENT_DISPOSITION,
-                        "attachment; filename=assignments-" + batchId + ".csv"
-                )
+                        "attachment; filename=assignments-" + batchId + ".csv")
                 .contentType(new MediaType("text", "csv", StandardCharsets.UTF_8))
                 .body(resource);
     }
@@ -338,17 +340,28 @@ public class AdminController implements AdminApi {
         return new AdminService.MajorCommand(
                 request.getMajorCode().trim(),
                 request.getMajorName().trim(),
-                request.getEnabled()
-        );
+                request.getEnabled());
     }
 
-    private AdminService.StudentCommand studentCommand(StudentRequest request) {
-        return new AdminService.StudentCommand(
+    private StudentAdminService.StudentCommand studentCommand(StudentRequest request) {
+        String nationalityCode = request.getNationalityCode();
+        if (nationalityCode == null || nationalityCode.isBlank()) {
+            nationalityCode = "CN";
+        }
+        String phoneNumber = request.getPhoneNumber();
+        if (phoneNumber != null) {
+            phoneNumber = phoneNumber.trim();
+            if (phoneNumber.isEmpty()) {
+                phoneNumber = null;
+            }
+        }
+        return new StudentAdminService.StudentCommand(
                 request.getStudentNumber(),
                 request.getStudentName().trim(),
                 request.getGender(),
-                request.getMajorId()
-        );
+                request.getMajorId(),
+                nationalityCode.trim().toUpperCase(Locale.ROOT),
+                phoneNumber);
     }
 
     private LocalDateTime toLocalDateTime(Date value) {

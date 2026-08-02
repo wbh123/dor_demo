@@ -27,11 +27,13 @@ public class MatchingSchemeService {
     public static final Set<String> SUPPORTED_WEIGHT_KEYS = Set.of(
             "sleepTimeMinutes",
             "wakeTimeMinutes",
+            "napHabit",
             "sleepSensitivity",
             "noiseTolerance",
             "cleaningFrequency",
             "tidinessRequirement",
             "airConditionerTemperature",
+            "ventilationPreference",
             "summerAirConditionerTemperature",
             "winterHeatingTemperature",
             "summerOvernightAirConditioner",
@@ -41,7 +43,9 @@ public class MatchingSchemeService {
             "strongFoodOdorAcceptance",
             "studyFrequency",
             "gamingVoiceFrequency",
-            "socialActivity"
+            "socialActivity",
+            "smokingAcceptance",
+            "bedPreference"
     );
 
     public static final Set<String> SUPPORTED_RULE_KEYS = Set.of(

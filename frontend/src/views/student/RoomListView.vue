@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { api } from '../../api/client'
 import type { DataObject, ListSuccessResponse, ObjectSuccessResponse } from '../../api/types'
+import { useI18n } from '../../i18n'
 
 const route = useRoute()
 const router = useRouter()
@@ -11,12 +12,16 @@ const teamId = route.query.teamId ? Number(route.query.teamId) : null
 const memberCount = route.query.memberCount ? Number(route.query.memberCount) : 0
 const isTeamMode = computed(() => Boolean(teamId))
 const rooms = ref<DataObject[]>([])
+const activePersonalTeam = ref<DataObject | null>(null)
+const showPersonalExitConfirm = ref(false)
 const loading = ref(true)
+const preparingPersonalSelection = ref(false)
 const error = ref('')
 const randomResult = ref<DataObject | null>(null)
 const keyword = ref('')
 const floorFilter = ref('')
 const minimumAvailableBeds = ref(0)
+const { t, subtitle, translateError } = useI18n()
 
 const floorOptions = computed(() =>
   [...new Set(rooms.value.map((room) => Number(room.floor_number)))]
@@ -38,7 +43,45 @@ const filteredRooms = computed(() => {
   })
 })
 
-onMounted(load)
+onMounted(initialize)
+
+async function initialize() {
+  if (isTeamMode.value) {
+    await load()
+    return
+  }
+  loading.value = true
+  error.value = ''
+  try {
+    const response = await api.get<ListSuccessResponse>('/api/v1/student/teams')
+    const teams = (response.data.data ?? []) as DataObject[]
+    activePersonalTeam.value = teams.find((team) => Number(team.batch_id) === batchId) ?? null
+    if (activePersonalTeam.value) {
+      showPersonalExitConfirm.value = true
+      loading.value = false
+      return
+    }
+    await load()
+  } catch (reason) {
+    error.value = translateError(reason)
+    loading.value = false
+  }
+}
+
+async function confirmPersonalSelection() {
+  preparingPersonalSelection.value = true
+  error.value = ''
+  try {
+    await api.post(`/api/v1/student/batches/${batchId}/personal-selection/prepare`)
+    showPersonalExitConfirm.value = false
+    activePersonalTeam.value = null
+    await load()
+  } catch (reason) {
+    error.value = translateError(reason)
+  } finally {
+    preparingPersonalSelection.value = false
+  }
+}
 
 async function load() {
   loading.value = true
@@ -49,7 +92,7 @@ async function load() {
     )
     rooms.value = (response.data.data ?? []) as DataObject[]
   } catch (reason) {
-    error.value = reason instanceof Error ? reason.message : '宿舍加载失败'
+    error.value = translateError(reason)
   } finally {
     loading.value = false
   }
@@ -63,7 +106,7 @@ async function randomRecommend() {
     )
     randomResult.value = (response.data.data ?? {}) as DataObject
   } catch (reason) {
-    error.value = reason instanceof Error ? reason.message : '随机推荐失败'
+    error.value = translateError(reason)
   }
 }
 
@@ -102,9 +145,9 @@ function conflictReasons(room: DataObject) {
   <div class="content-column">
     <div class="page-title split-title">
       <div>
-        <span class="eyebrow">ROOM MATCHING</span>
+        <span class="eyebrow">{{ subtitle('宿舍匹配', 'ROOM MATCHING') }}</span>
         <h2>{{ isTeamMode ? `为${memberCount}人队伍选择房间` : '选择宿舍房间' }}</h2>
-        <p v-if="isTeamMode">只展示能够容纳全部成员的房间，队伍需要在同一房间完成选择。</p>
+        <p v-if="isTeamMode">只展示能够容纳全部已确认成员的房间，队伍需要在同一房间完成选择。</p>
         <p v-else>房间按个人偏好接近程度排序，可结合楼层和剩余铺位快速筛选。</p>
       </div>
       <button v-if="!isTeamMode" class="button accent" @click="randomRecommend">帮我推荐一个</button>
@@ -112,7 +155,7 @@ function conflictReasons(room: DataObject) {
 
     <section v-if="randomResult" class="panel recommendation-card">
       <div>
-        <span class="eyebrow">RECOMMENDATION</span>
+        <span class="eyebrow">{{ subtitle('推荐结果', 'RECOMMENDATION') }}</span>
         <h3>已找到一个当前可选床位</h3>
         <p>{{ randomResult.explanation }}</p>
       </div>
@@ -189,6 +232,19 @@ function conflictReasons(room: DataObject) {
           {{ isTeamMode ? '选择队伍床位' : '查看床位布局' }}
         </button>
       </article>
+    </div>
+
+    <div v-if="showPersonalExitConfirm" class="modal-overlay" role="presentation">
+      <section class="modal-card confirmation-dialog" role="dialog" aria-modal="true">
+        <h3>{{ t('team.personalExit.title') }}</h3>
+        <p>{{ t('team.personalExit.message') }}</p>
+        <div class="button-row">
+          <button class="button ghost" type="button" @click="router.back()">{{ t('common.cancel') }}</button>
+          <button class="button primary" :disabled="preparingPersonalSelection" @click="confirmPersonalSelection">
+            {{ t('common.confirm') }}
+          </button>
+        </div>
+      </section>
     </div>
   </div>
 </template>

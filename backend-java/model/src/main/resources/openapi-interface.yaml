@@ -2,7 +2,7 @@ openapi: 3.0.3
 info:
   title: 武汉科技大学学生宿舍智能选择系统接口
   description: 第一阶段核心闭环与第二阶段质量运营能力OpenAPI契约
-  version: 2.3.0
+  version: 2.5.0
 servers:
   - url: http://localhost:8080
 paths:
@@ -26,11 +26,11 @@ paths:
   /api/v1/admin/majors/{id}:
     $ref: 'admin/openapi-admin.yaml#/paths/~1api~1v1~1admin~1majors~1{id}'
   /api/v1/admin/students:
-    $ref: 'admin/openapi-admin.yaml#/paths/~1api~1v1~1admin~1students'
+    $ref: 'admin/openapi-student-management.yaml#/paths/~1api~1v1~1admin~1students'
   /api/v1/admin/students/{id}:
-    $ref: 'admin/openapi-admin.yaml#/paths/~1api~1v1~1admin~1students~1{id}'
+    $ref: 'admin/openapi-student-management.yaml#/paths/~1api~1v1~1admin~1students~1{id}'
   /api/v1/admin/students/import:
-    $ref: 'admin/openapi-admin.yaml#/paths/~1api~1v1~1admin~1students~1import'
+    $ref: 'admin/openapi-student-management.yaml#/paths/~1api~1v1~1admin~1students~1import'
   /api/v1/admin/buildings:
     $ref: 'admin/openapi-admin.yaml#/paths/~1api~1v1~1admin~1buildings'
   /api/v1/admin/rooms:
@@ -66,6 +66,10 @@ paths:
 
   /api/v1/student/profile:
     $ref: 'student/openapi-student.yaml#/paths/~1api~1v1~1student~1profile'
+  /api/v1/student/notifications:
+    $ref: 'student/openapi-student.yaml#/paths/~1api~1v1~1student~1notifications'
+  /api/v1/student/notifications/{notificationId}/read:
+    $ref: 'student/openapi-student.yaml#/paths/~1api~1v1~1student~1notifications~1{notificationId}~1read'
   /api/v1/student/batches:
     $ref: 'student/openapi-student.yaml#/paths/~1api~1v1~1student~1batches'
   /api/v1/student/batches/{batchId}/questionnaire:
@@ -74,6 +78,8 @@ paths:
     $ref: 'student/openapi-student.yaml#/paths/~1api~1v1~1student~1batches~1{batchId}~1rooms'
   /api/v1/student/batches/{batchId}/rooms/{roomId}:
     $ref: 'student/openapi-student.yaml#/paths/~1api~1v1~1student~1batches~1{batchId}~1rooms~1{roomId}'
+  /api/v1/student/batches/{batchId}/personal-selection/prepare:
+    $ref: 'student/openapi-student.yaml#/paths/~1api~1v1~1student~1batches~1{batchId}~1personal-selection~1prepare'
   /api/v1/student/batches/{batchId}/beds/{bedId}/hold:
     $ref: 'student/openapi-student.yaml#/paths/~1api~1v1~1student~1batches~1{batchId}~1beds~1{bedId}~1hold'
   /api/v1/student/batches/{batchId}/beds/{bedId}/release:
@@ -92,6 +98,10 @@ paths:
     $ref: 'student/openapi-student.yaml#/paths/~1api~1v1~1student~1team-invitations~1respond'
   /api/v1/student/teams/{teamId}/lock:
     $ref: 'student/openapi-student.yaml#/paths/~1api~1v1~1student~1teams~1{teamId}~1lock'
+  /api/v1/student/teams/{teamId}/leave:
+    $ref: 'student/openapi-student.yaml#/paths/~1api~1v1~1student~1teams~1{teamId}~1leave'
+  /api/v1/student/teams/{teamId}/members/{studentId}:
+    $ref: 'student/openapi-student.yaml#/paths/~1api~1v1~1student~1teams~1{teamId}~1members~1{studentId}'
   /api/v1/student/batches/{batchId}/teams/{teamId}/hold:
     $ref: 'student/openapi-student.yaml#/paths/~1api~1v1~1student~1batches~1{batchId}~1teams~1{teamId}~1hold'
   /api/v1/student/batches/{batchId}/teams/{teamId}/release:

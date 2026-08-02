@@ -43,10 +43,12 @@ class StudentExperienceTest(unittest.TestCase):
         self.assertIn("/api/v1/auth/welcome/acknowledge", master)
         self.assertIn("/api/v1/admin/settings/student-welcome", master)
         self.assertIn("WelcomeData:", auth)
+        self.assertIn("messages:", auth)
         self.assertIn("welcome:", auth)
         self.assertIn("operationId: acknowledgeStudentWelcome", welcome)
         self.assertIn("operationId: getStudentWelcomeSetting", settings)
         self.assertIn("operationId: updateStudentWelcomeSetting", settings)
+        self.assertIn("required: [messages, expectedVersion]", settings)
 
     def test_backend_separates_welcome_and_setting_services(self) -> None:
         welcome_service = (JAVA_ROOT / "auth/StudentWelcomeService.java").read_text(encoding="utf-8")
@@ -56,9 +58,11 @@ class StudentExperienceTest(unittest.TestCase):
         auth_controller = (JAVA_ROOT / "auth/AuthController.java").read_text(encoding="utf-8")
         self.assertIn("welcome_acknowledged_at", welcome_service)
         self.assertIn("STUDENT_WELCOME_MESSAGE", welcome_service)
+        self.assertIn("setMessages", welcome_service)
         self.assertIn("implements WelcomeApi", welcome_controller)
         self.assertIn("implements SystemSettingApi", setting_controller)
         self.assertIn("expectedVersion", setting_service)
+        self.assertIn("readMessages", setting_service)
         self.assertIn("auditService.success", setting_service)
         self.assertIn("setWelcome", auth_controller)
 
@@ -108,12 +112,15 @@ class StudentExperienceTest(unittest.TestCase):
         shell = (FRONTEND / "layouts/AppShell.vue").read_text(encoding="utf-8")
         auth = (FRONTEND / "stores/auth.ts").read_text(encoding="utf-8")
         dashboard = (FRONTEND / "views/admin/AdminDashboardView.vue").read_text(encoding="utf-8")
+        i18n = (FRONTEND / "i18n/index.ts").read_text(encoding="utf-8")
         styles = (FRONTEND / "student-experience.css").read_text(encoding="utf-8")
-        self.assertIn("新同学，欢迎你", shell)
+        self.assertIn("新同学，欢迎你", i18n)
+        self.assertIn("welcome.messages", shell)
         self.assertIn("acknowledgeWelcome", auth)
         self.assertIn("welcome-overlay", styles)
         self.assertIn("prefers-reduced-motion", styles)
         self.assertIn("新生欢迎语", dashboard)
+        self.assertIn("welcomeMessages", dashboard)
         self.assertIn("/api/v1/admin/settings/student-welcome", dashboard)
 
 

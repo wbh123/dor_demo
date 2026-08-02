@@ -18,6 +18,7 @@ public class SystemSettingController implements SystemSettingApi {
 
     @Override
     public ResponseEntity<ObjectSuccessResponse> getStudentWelcomeSetting() {
+        SecurityUsers.requireAdmin();
         return ResponseEntity.ok(ResponseFactory.object(settingService.studentWelcome()));
     }
 
@@ -26,8 +27,8 @@ public class SystemSettingController implements SystemSettingApi {
             StudentWelcomeSettingUpdateRequest request) {
         return ResponseEntity.ok(ResponseFactory.object(
                 settingService.updateStudentWelcome(
-                        request.getMessage(),
+                        request.getMessages(),
                         request.getExpectedVersion(),
-                        SecurityUsers.current())));
+                        SecurityUsers.requireAdmin())));
     }
 }

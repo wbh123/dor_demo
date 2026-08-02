@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { api } from '../../api/client'
 import type { DataObject, ObjectSuccessResponse } from '../../api/types'
+import { useI18n } from '../../i18n'
 
 interface LayoutBed {
   id: number
@@ -20,11 +21,14 @@ interface LayoutBed {
 interface LayoutUnit {
   key: string
   label: string
+  representativeBedId: number
   bedIds: number[]
   x: number
   z: number
   rotation: number
-  bunk: boolean
+  originalType: 'LOFT_BED_DESK' | 'BUNK'
+  unitType: 'LOFT_BED_DESK' | 'BUNK'
+  occupied: boolean
 }
 
 const props = defineProps<{
@@ -42,15 +46,17 @@ const MAX_X = 5.2
 const MIN_Z = -3.5
 const MAX_Z = 3.5
 const SNAP = 0.25
+const MAX_CAPACITY = 8
 const BED_TYPE_OPTIONS = [
   { value: 'LOFT_BED_DESK', label: '上床下桌' },
-  { value: 'BUNK_UPPER', label: '上下铺上铺' },
-  { value: 'BUNK_LOWER', label: '上下铺下铺' },
-]
+  { value: 'BUNK', label: '上下铺' },
+] as const
 
+const { t, subtitle, translateError } = useI18n()
 const stage = ref<HTMLDivElement | null>(null)
 const reasonInput = ref<HTMLTextAreaElement | null>(null)
 const beds = ref<LayoutBed[]>([])
+const unitTypes = ref<Record<string, 'LOFT_BED_DESK' | 'BUNK'>>({})
 const roomVersion = ref(0)
 const currentRoomType = ref('OTHER')
 const reason = ref('')
@@ -60,7 +66,6 @@ const error = ref('')
 const message = ref('')
 const dragKey = ref<string | null>(null)
 
-const synchronizedRoomType = computed(() => roomTypeForBedCount(beds.value.length))
 const layoutUnits = computed<LayoutUnit[]>(() => {
   const groups = new Map<string, LayoutBed[]>()
   for (const bed of beds.value) {
@@ -71,18 +76,33 @@ const layoutUnits = computed<LayoutUnit[]>(() => {
     groups.set(key, items)
   }
   return [...groups.entries()].map(([key, items]) => {
-    const first = items[0]
+    const sorted = [...items].sort((left, right) => left.position_index - right.position_index)
+    const representative = sorted.find((item) => item.bed_type === 'BUNK_UPPER') ?? sorted[0]
+    const originalType = sorted.some((item) => item.bed_type.startsWith('BUNK_'))
+      ? 'BUNK'
+      : 'LOFT_BED_DESK'
     return {
       key,
-      label: items.map((item) => item.bed_code).join(' / '),
-      bedIds: items.map((item) => item.id),
-      x: first.layout_x,
-      z: first.layout_z,
-      rotation: first.rotation_degrees,
-      bunk: items.length > 1 || first.bed_type.startsWith('BUNK_'),
+      label: sorted.map((item) => item.bed_code).join(' / '),
+      representativeBedId: representative.id,
+      bedIds: sorted.map((item) => item.id),
+      x: representative.layout_x,
+      z: representative.layout_z,
+      rotation: representative.rotation_degrees,
+      originalType,
+      unitType: unitTypes.value[key] ?? originalType,
+      occupied: sorted.some((item) => item.occupied),
     }
   })
 })
+
+const projectedCapacity = computed(() => {
+  const additions = layoutUnits.value.filter((unit) =>
+    unit.originalType === 'LOFT_BED_DESK' && unit.unitType === 'BUNK').length
+  return beds.value.length + additions
+})
+const synchronizedRoomType = computed(() => roomTypeForBedCount(projectedCapacity.value))
+const capacityLimitReached = computed(() => projectedCapacity.value >= MAX_CAPACITY)
 
 onMounted(load)
 onBeforeUnmount(stopDrag)
@@ -99,8 +119,9 @@ async function load() {
     roomVersion.value = Number(room.room_version)
     currentRoomType.value = String(room.room_type ?? 'OTHER')
     beds.value = ((data.beds ?? []) as DataObject[]).map(parseBed)
+    unitTypes.value = {}
   } catch (reasonValue) {
-    error.value = reasonValue instanceof Error ? reasonValue.message : '房间布局加载失败'
+    error.value = translateError(reasonValue)
   } finally {
     loading.value = false
   }
@@ -170,8 +191,7 @@ function updateUnit(key: string, x: number, z: number, rotation?: number) {
 }
 
 function cycleRotation(unit: LayoutUnit) {
-  const rotation = (unit.rotation + 90) % 360
-  updateUnit(unit.key, unit.x, unit.z, rotation)
+  updateUnit(unit.key, unit.x, unit.z, (unit.rotation + 90) % 360)
 }
 
 function setUnitCoordinate(key: string, axis: 'x' | 'z', value: number) {
@@ -187,13 +207,32 @@ function setUnitRotation(unit: LayoutUnit, value: number) {
   updateUnit(unit.key, unit.x, unit.z, value)
 }
 
-function setBedType(bedId: number, bedType: string) {
-  beds.value = beds.value.map((bed) => {
-    if (bed.id !== bedId || bed.occupied) return bed
-    return { ...bed, bed_type: bedType }
-  })
+function setUnitType(unit: LayoutUnit, value: string) {
+  if (!['LOFT_BED_DESK', 'BUNK'].includes(value)) return
+  if (unit.occupied && value !== unit.originalType) {
+    error.value = '非空床位不可修改类型。'
+    return
+  }
+  if (unit.originalType === 'BUNK' && value === 'LOFT_BED_DESK') {
+    error.value = '已有上下铺不能直接合并为上床下桌。'
+    return
+  }
+  const nextType = value as 'LOFT_BED_DESK' | 'BUNK'
+  const currentAdditional = layoutUnits.value.filter((item) =>
+    item.key !== unit.key
+    && item.originalType === 'LOFT_BED_DESK'
+    && item.unitType === 'BUNK').length
+  if (unit.originalType === 'LOFT_BED_DESK'
+    && nextType === 'BUNK'
+    && beds.value.length + currentAdditional >= MAX_CAPACITY) {
+    error.value = '房间最多只能配置8个床位。'
+    return
+  }
+  unitTypes.value = { ...unitTypes.value, [unit.key]: nextType }
   error.value = ''
-  message.value = '床位类型已更新预览，保存后会同步房型。'
+  message.value = nextType === 'BUNK' && unit.originalType === 'LOFT_BED_DESK'
+    ? '保存后将新增一个独立下铺床位，并同步增加1人居住容量。'
+    : '床具类型已更新预览，保存后会同步房型。'
 }
 
 function restoreDefaultLayout() {
@@ -228,10 +267,6 @@ function unitStyle(unit: LayoutUnit) {
   }
 }
 
-function bedTypeText(value: string) {
-  return BED_TYPE_OPTIONS.find((option) => option.value === value)?.label ?? value
-}
-
 function roomTypeForBedCount(count: number) {
   return count === 4
     ? 'FOUR_PERSON'
@@ -259,6 +294,10 @@ async function save() {
     reasonInput.value?.focus()
     return
   }
+  if (projectedCapacity.value > MAX_CAPACITY) {
+    error.value = '房间最多只能配置8个床位。'
+    return
+  }
 
   saving.value = true
   error.value = ''
@@ -267,20 +306,20 @@ async function save() {
     await api.put(`/api/v1/admin/rooms/${props.roomId}/bed-layout`, {
       expectedRoomVersion: roomVersion.value,
       reason: reason.value.trim(),
-      beds: beds.value.map((bed) => ({
-        bedId: bed.id,
-        bedType: bed.bed_type,
-        layoutX: bed.layout_x,
-        layoutZ: bed.layout_z,
-        rotationDegrees: bed.rotation_degrees,
+      beds: layoutUnits.value.map((unit) => ({
+        bedId: unit.representativeBedId,
+        bedType: unit.unitType,
+        layoutX: unit.x,
+        layoutZ: unit.z,
+        rotationDegrees: unit.rotation,
       })),
     })
-    message.value = '床位类型和布局已保存，房型已同步。'
+    message.value = '床具类型和布局已保存，房型与容量已同步。'
     reason.value = ''
     await load()
     emit('saved')
   } catch (reasonValue) {
-    error.value = reasonValue instanceof Error ? reasonValue.message : '床位布局保存失败'
+    error.value = translateError(reasonValue)
   } finally {
     saving.value = false
   }
@@ -292,9 +331,9 @@ async function save() {
     <section class="modal-card room-layout-dialog" role="dialog" aria-modal="true" aria-labelledby="layout-title">
       <div class="section-head room-layout-head">
         <div>
-          <span class="eyebrow">ROOM LAYOUT</span>
+          <span class="eyebrow">{{ subtitle('床具布局', 'ROOM LAYOUT') }}</span>
           <h3 id="layout-title">{{ roomLabel }}床位布局</h3>
-          <p>拖动床位调整位置；空床位可以切换类型，已有学生的床位不可修改类型。</p>
+          <p>拖动床具调整位置；空的上床下桌可以拆分为上下铺，已有学生的床位不可修改类型。</p>
         </div>
         <button class="button ghost" type="button" @click="emit('close')">关闭</button>
       </div>
@@ -314,42 +353,62 @@ async function save() {
             <span>同步房型</span>
             <strong>{{ roomTypeText(synchronizedRoomType) }}</strong>
           </div>
-          <small>保存时按物理床位数量自动同步房型和容量。</small>
+          <div>
+            <span>同步容量</span>
+            <strong>{{ projectedCapacity }} / 8 人</strong>
+          </div>
+          <small>{{ t('layout.maximum') }}。保存时按独立可选床位数量自动同步房型和容量。</small>
         </div>
 
-        <div class="layout-bed-type-grid" aria-label="床位类型设置">
-          <article v-for="bed in beds" :key="`type-${bed.id}`" class="layout-bed-type-card" :class="{ occupied: bed.occupied }">
+        <div class="layout-bed-type-grid" aria-label="床具类型设置">
+          <article
+            v-for="unit in layoutUnits"
+            :key="`type-${unit.key}`"
+            class="layout-bed-type-card"
+            :class="{ occupied: unit.occupied }"
+          >
             <div>
-              <strong>{{ bed.bed_code }}床</strong>
-              <small>{{ bed.occupied ? '非空床位不可修改类型' : bedTypeText(bed.bed_type) }}</small>
+              <strong>{{ unit.label }}</strong>
+              <small v-if="unit.occupied">非空床位不可修改类型</small>
+              <small v-else-if="unit.originalType === 'LOFT_BED_DESK' && unit.unitType === 'BUNK'">新增一个独立下铺床位</small>
+              <small v-else>{{ unit.unitType === 'BUNK' ? '上下铺，包含两个可选床位' : '上床下桌' }}</small>
             </div>
             <select
               class="input"
-              :value="bed.bed_type"
-              :disabled="saving || bed.occupied"
-              @change="setBedType(bed.id, String(($event.target as HTMLSelectElement).value))"
+              :value="unit.unitType"
+              :disabled="saving || unit.occupied"
+              @change="setUnitType(unit, String(($event.target as HTMLSelectElement).value))"
             >
-              <option v-for="option in BED_TYPE_OPTIONS" :key="option.value" :value="option.value">
+              <option
+                v-for="option in BED_TYPE_OPTIONS"
+                :key="option.value"
+                :value="option.value"
+                :disabled="unit.originalType === 'BUNK' && option.value === 'LOFT_BED_DESK'"
+              >
                 {{ option.label }}
               </option>
             </select>
           </article>
         </div>
 
-        <div ref="stage" class="room-layout-stage" aria-label="房间床位俯视布局编辑区">
+        <p class="layout-bunk-explanation">
+          {{ t('layout.bunkHint') }} {{ capacityLimitReached ? '当前预览已达到最多8人。' : '' }}
+        </p>
+
+        <div ref="stage" class="room-layout-stage" aria-label="房间床具俯视布局编辑区">
           <span class="layout-window">窗户</span>
           <span class="layout-door">入口</span>
           <button
             v-for="unit in layoutUnits"
             :key="unit.key"
             class="layout-bed-unit"
-            :class="{ bunk: unit.bunk, dragging: dragKey === unit.key }"
+            :class="{ bunk: unit.unitType === 'BUNK', dragging: dragKey === unit.key }"
             :style="unitStyle(unit)"
             type="button"
             @pointerdown.prevent="startDrag(unit, $event)"
           >
             <strong>{{ unit.label }}</strong>
-            <small>{{ unit.bunk ? '上下铺床架' : '上床下桌' }}</small>
+            <small>{{ unit.unitType === 'BUNK' ? '上下铺' : '上床下桌' }}</small>
           </button>
         </div>
 
@@ -358,27 +417,11 @@ async function save() {
             <strong>{{ unit.label }}</strong>
             <label>
               <span>横向位置X</span>
-              <input
-                class="input"
-                type="number"
-                min="-5.2"
-                max="5.2"
-                step="0.25"
-                :value="unit.x"
-                @change="setUnitCoordinate(unit.key, 'x', Number(($event.target as HTMLInputElement).value))"
-              />
+              <input class="input" type="number" min="-5.2" max="5.2" step="0.25" :value="unit.x" @change="setUnitCoordinate(unit.key, 'x', Number(($event.target as HTMLInputElement).value))" />
             </label>
             <label>
               <span>纵向位置Z</span>
-              <input
-                class="input"
-                type="number"
-                min="-3.5"
-                max="3.5"
-                step="0.25"
-                :value="unit.z"
-                @change="setUnitCoordinate(unit.key, 'z', Number(($event.target as HTMLInputElement).value))"
-              />
+              <input class="input" type="number" min="-3.5" max="3.5" step="0.25" :value="unit.z" @change="setUnitCoordinate(unit.key, 'z', Number(($event.target as HTMLInputElement).value))" />
             </label>
             <label>
               <span>朝向</span>
@@ -404,7 +447,7 @@ async function save() {
             required
             placeholder="例如：按该房间实际床具类型和摆放位置调整"
           />
-          <small>保存床位类型和布局必须填写原因，用于操作审计。</small>
+          <small>保存床具类型和布局必须填写原因，用于操作审计。</small>
         </label>
 
         <div class="button-row room-layout-actions">

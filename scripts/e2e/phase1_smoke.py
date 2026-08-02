@@ -164,16 +164,16 @@ def main() -> int:
     questionnaire = response_data(
         request("GET", "/api/v1/student/batches/1/questionnaire", token=student_token)
     )
-    assert len(questionnaire["questions"]) == 20, questionnaire
+    assert len(questionnaire["questions"]) == 14, questionnaire
     question_codes = {question["question_code"] for question in questionnaire["questions"]}
     for expected_code in (
-        "SUMMER_AC_OVERNIGHT",
-        "SUMMER_AC_TEMPERATURE",
-        "WINTER_HEATING_ACCEPTANCE",
-        "WINTER_HEATING_TEMPERATURE",
-        "AFTER_LIGHTS_ACTIVITY",
-        "ALARM_SNOOZE",
-        "STRONG_FOOD_ODOR_ACCEPTANCE",
+        "NAP_HABIT",
+        "GAMING_VOICE",
+        "SOCIAL_ACTIVITY",
+        "SMOKING_ACCEPTANCE",
+        "BED_PREFERENCE",
+        "SLEEP_SENSITIVITY",
+        "NOISE_TOLERANCE",
     ):
         assert expected_code in question_codes, question_codes
     smoking_question = next(
@@ -200,13 +200,7 @@ def main() -> int:
             "NOISE_TOLERANCE": 3,
             "CLEANING_FREQUENCY": 4,
             "TIDINESS_REQUIREMENT": 4,
-            "SUMMER_AC_OVERNIGHT": 2,
-            "SUMMER_AC_TEMPERATURE": 25,
-            "WINTER_HEATING_ACCEPTANCE": 3,
-            "WINTER_HEATING_TEMPERATURE": 22,
-            "AFTER_LIGHTS_ACTIVITY": 2,
-            "ALARM_SNOOZE": 1,
-            "STRONG_FOOD_ODOR_ACCEPTANCE": 2,
+            "AC_TEMPERATURE": 25,
             "VENTILATION": 3,
             "STUDY_FREQUENCY": 3,
             "GAMING_VOICE": 2,

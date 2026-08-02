@@ -7,6 +7,7 @@ import com.wust.dormitory.model.dto.InvitationResponseRequest;
 import com.wust.dormitory.model.dto.InviteRequest;
 import com.wust.dormitory.model.dto.ListSuccessResponse;
 import com.wust.dormitory.model.dto.ObjectSuccessResponse;
+import com.wust.dormitory.model.dto.StudentPhoneUpdateRequest;
 import com.wust.dormitory.model.dto.TeamBedsRequest;
 import com.wust.dormitory.model.dto.TeamConfirmRequest;
 import com.wust.dormitory.model.dto.VoidSuccessResponse;
@@ -24,6 +25,7 @@ import java.util.Map;
 @RestController
 public class StudentController implements StudentApi {
     private final StudentService studentService;
+    private final StudentProfileService profileService;
     private final StudentRoomLayoutService roomLayoutService;
     private final StudentRoomRecommendationService recommendationService;
     private final TeamService teamService;
@@ -32,12 +34,14 @@ public class StudentController implements StudentApi {
 
     public StudentController(
             StudentService studentService,
+            StudentProfileService profileService,
             StudentRoomLayoutService roomLayoutService,
             StudentRoomRecommendationService recommendationService,
             TeamService teamService,
             TeamHoldReleaseService teamHoldReleaseService,
             BedScopeGuard bedScopeGuard) {
         this.studentService = studentService;
+        this.profileService = profileService;
         this.roomLayoutService = roomLayoutService;
         this.recommendationService = recommendationService;
         this.teamService = teamService;
@@ -47,7 +51,25 @@ public class StudentController implements StudentApi {
 
     @Override
     public ResponseEntity<ObjectSuccessResponse> getStudentProfile() {
-        return ResponseEntity.ok(ResponseFactory.object(studentService.profile(student())));
+        return ResponseEntity.ok(ResponseFactory.object(profileService.profile(student())));
+    }
+
+    @Override
+    public ResponseEntity<ObjectSuccessResponse> updateStudentPhoneNumber(
+            StudentPhoneUpdateRequest request) {
+        return ResponseEntity.ok(ResponseFactory.object(
+                profileService.updatePhoneNumber(request.getPhoneNumber(), student())));
+    }
+
+    @Override
+    public ResponseEntity<ListSuccessResponse> listNotifications() {
+        return ResponseEntity.ok(ResponseFactory.list(teamService.notifications(student())));
+    }
+
+    @Override
+    public ResponseEntity<VoidSuccessResponse> markNotificationRead(Long notificationId) {
+        teamService.markNotificationRead(notificationId, student());
+        return ResponseEntity.ok(ResponseFactory.empty());
     }
 
     @Override
@@ -79,6 +101,12 @@ public class StudentController implements StudentApi {
                 studentService.room(batchId, roomId, student()));
         return ResponseEntity.ok(ResponseFactory.object(
                 bedScopeGuard.filterRoomSnapshot(batchId, snapshot)));
+    }
+
+    @Override
+    public ResponseEntity<ObjectSuccessResponse> preparePersonalSelection(Long batchId) {
+        return ResponseEntity.ok(ResponseFactory.object(
+                teamService.preparePersonalSelection(batchId, student())));
     }
 
     @Override
@@ -134,16 +162,28 @@ public class StudentController implements StudentApi {
     }
 
     @Override
-    public ResponseEntity<VoidSuccessResponse> respondTeamInvitation(InvitationResponseRequest request) {
-        studentService.respondInvitation(
+    public ResponseEntity<VoidSuccessResponse> respondTeamInvitation(
+            InvitationResponseRequest request) {
+        teamService.respondInvitation(
                 request.getInvitationToken(), request.getAccepted(), student());
         return ResponseEntity.ok(ResponseFactory.empty());
     }
 
     @Override
-    public ResponseEntity<VoidSuccessResponse> lockTeam(Long teamId) {
-        studentService.lockTeam(teamId, student());
-        return ResponseEntity.ok(ResponseFactory.empty());
+    public ResponseEntity<ObjectSuccessResponse> lockTeam(Long teamId) {
+        return ResponseEntity.ok(ResponseFactory.object(teamService.lockTeam(teamId, student())));
+    }
+
+    @Override
+    public ResponseEntity<ObjectSuccessResponse> leaveTeam(Long teamId) {
+        return ResponseEntity.ok(ResponseFactory.object(teamService.leaveTeam(teamId, student())));
+    }
+
+    @Override
+    public ResponseEntity<ObjectSuccessResponse> removeTeamMember(
+            Long teamId, Long studentId) {
+        return ResponseEntity.ok(ResponseFactory.object(
+                teamService.removeMember(teamId, studentId, student())));
     }
 
     @Override
