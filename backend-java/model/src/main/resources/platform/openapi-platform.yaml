@@ -137,6 +137,65 @@ paths:
       tags: [Platform]
       responses:
         '200': { description: 固化功能目录 }
+  /api/v1/platform/features/entitlements:
+    get:
+      operationId: listFeatureEntitlements
+      tags: [Platform]
+      parameters:
+        - name: includeFuture
+          in: query
+          required: false
+          schema: { type: boolean, default: false }
+      responses:
+        '200':
+          description: 套餐默认、覆盖来源与最终授权状态
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/FeatureEntitlement'
+  /api/v1/platform/features/{featureCode}/state:
+    put:
+      operationId: setFeatureEntitlementState
+      tags: [Platform]
+      parameters:
+        - name: featureCode
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FeatureStateRequest'
+      responses:
+        '200':
+          description: 单项授权状态已更新
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FeatureEntitlement'
+  /api/v1/platform/features/batch-state:
+    post:
+      operationId: setFeatureEntitlementStates
+      tags: [Platform]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BatchFeatureStateRequest'
+      responses:
+        '200':
+          description: 批量授权状态已在同一事务中更新
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/FeatureEntitlement'
   /api/v1/platform/feature-overrides:
     get:
       operationId: listFeatureOverrides
@@ -265,6 +324,64 @@ components:
       required: [action, reason]
       properties:
         action: { type: string, enum: [SUSPEND, RESUME, TERMINATE, EMERGENCY_STOP, EMERGENCY_RESUME] }
+        reason: { type: string, minLength: 1, maxLength: 500 }
+    FeatureTargetState:
+      type: string
+      enum: [ENABLED, DISABLED, INHERIT]
+    FeatureEntitlement:
+      type: object
+      required:
+        - featureCode
+        - featureName
+        - phase
+        - scope
+        - granularity
+        - actionType
+        - riskLevel
+        - enabledInProgram
+        - sortOrder
+        - planEnabled
+        - effectiveEnabled
+        - source
+      properties:
+        featureCode: { type: string }
+        featureName: { type: string }
+        phase: { type: string, enum: [PHASE1, PHASE2, PHASE3] }
+        scope: { type: string, enum: [ADMIN, STUDENT, SHARED] }
+        granularity: { type: string, enum: [MODULE, OPERATION] }
+        actionType: { type: string }
+        riskLevel: { type: string, enum: [LOW, MEDIUM, HIGH] }
+        enabledInProgram: { type: boolean }
+        sortOrder: { type: integer }
+        planEnabled: { type: boolean }
+        effectiveEnabled: { type: boolean }
+        overrideType: { type: string, enum: [GRANT, REVOKE], nullable: true }
+        source: { type: string, enum: [PLAN_ENABLED, PLAN_DISABLED, OVERRIDE_GRANT, OVERRIDE_REVOKE] }
+        lastChangedAt: { type: string, format: date-time, nullable: true }
+    FeatureStateRequest:
+      type: object
+      required: [targetState, reason]
+      properties:
+        targetState:
+          $ref: '#/components/schemas/FeatureTargetState'
+        reason: { type: string, minLength: 1, maxLength: 500 }
+    FeatureStateChange:
+      type: object
+      required: [featureCode, targetState]
+      properties:
+        featureCode: { type: string }
+        targetState:
+          $ref: '#/components/schemas/FeatureTargetState'
+    BatchFeatureStateRequest:
+      type: object
+      required: [changes, reason]
+      properties:
+        changes:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items:
+            $ref: '#/components/schemas/FeatureStateChange'
         reason: { type: string, minLength: 1, maxLength: 500 }
     FeatureOverrideRequest:
       type: object
