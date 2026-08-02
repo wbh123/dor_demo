@@ -40,16 +40,22 @@ public class RoomManagementService {
         return jdbc.queryForList("""
                 SELECT r.id, b.id AS building_id, b.building_name, f.floor_number,
                        r.room_number, r.room_type, r.capacity, r.gender_restriction,
-                       r.operational_status, r.state_version, r.remark,
+                       r.resident_scope, r.operational_status, r.state_version, r.remark,
                        COUNT(bed.id) AS bed_count,
                        COALESCE(SUM(bed.operational_status='ENABLED'), 0) AS enabled_bed_count,
                        COALESCE(SUM(bed.operational_status='DISABLED'), 0) AS disabled_bed_count,
-                       COALESCE(SUM(bed.operational_status='MAINTENANCE'), 0) AS maintenance_bed_count
+                       COALESCE(SUM(bed.operational_status='MAINTENANCE'), 0) AS maintenance_bed_count,
+                       COUNT(DISTINCT ra.id) AS active_resident_count,
+                       COALESCE(SUM(ra.id IS NOT NULL AND ra.bed_id IS NULL),0) AS unconfirmed_bed_count,
+                       GREATEST(r.capacity-COUNT(DISTINCT ra.id),0) AS remaining_capacity
                 FROM room r JOIN dormitory_floor f ON f.id=r.floor_id
                 JOIN dormitory_building b ON b.id=f.building_id
                 LEFT JOIN bed ON bed.room_id=r.id
+                LEFT JOIN room_assignment ra
+                       ON ra.room_id=r.id AND ra.assignment_status='ACTIVE'
                 """ + where + " GROUP BY r.id, b.id, b.building_name, f.floor_number, r.room_number, " +
-                "r.room_type, r.capacity, r.gender_restriction, r.operational_status, r.state_version, r.remark " +
+                "r.room_type, r.capacity, r.gender_restriction, r.resident_scope, " +
+                "r.operational_status, r.state_version, r.remark " +
                 "ORDER BY b.building_code, f.floor_number, r.room_number", parameters);
     }
 
@@ -69,16 +75,42 @@ public class RoomManagementService {
                     "ROOM_CAPACITY_MISMATCH",
                     "房间容量必须等于当前床位总数");
         }
+        if (!List.of("DOMESTIC_ONLY", "INTERNATIONAL_ONLY", "MIXED")
+                .contains(command.residentScope())) {
+            throw new BusinessException(
+                    "ROOM_RESIDENT_SCOPE_INVALID",
+                    "请选择国内生宿舍、国际生宿舍或混住宿舍");
+        }
+
+        int incompatibleResidents = count("""
+                SELECT COUNT(*)
+                FROM room_assignment ra
+                JOIN student s ON s.id=ra.student_id
+                WHERE ra.room_id=:roomId AND ra.assignment_status='ACTIVE'
+                  AND (
+                    (:scope='DOMESTIC_ONLY' AND s.student_category<>'DOMESTIC')
+                    OR (:scope='INTERNATIONAL_ONLY' AND s.student_category<>'INTERNATIONAL')
+                  )
+                """, Map.of("roomId", roomId, "scope", command.residentScope()));
+        if (incompatibleResidents > 0) {
+            throw new BusinessException(
+                    "ROOM_RESIDENT_SCOPE_CONFLICT",
+                    "当前已有在住学生与新的宿舍属性不一致，请先办理换寝或退宿",
+                    HttpStatus.CONFLICT);
+        }
 
         jdbc.update("""
                 UPDATE room SET capacity=:capacity,
-                    gender_restriction=:gender, operational_status=:status,
+                    gender_restriction=:gender,
+                    resident_scope=:residentScope,
+                    operational_status=:status,
                     remark=:remark, state_version=state_version+1, version=version+1
                 WHERE id=:id
                 """, new MapSqlParameterSource()
                 .addValue("id", roomId)
                 .addValue("capacity", physicalBedCount)
                 .addValue("gender", command.gender())
+                .addValue("residentScope", command.residentScope())
                 .addValue("status", command.operationalStatus())
                 .addValue("remark", normalizeNullable(command.remark()), Types.VARCHAR));
 
@@ -123,6 +155,7 @@ public class RoomManagementService {
     public record RoomCommand(
             int capacity,
             String gender,
+            String residentScope,
             String operationalStatus,
             String remark,
             String reason) {
@@ -131,6 +164,7 @@ public class RoomManagementService {
             Map<String, Object> result = new LinkedHashMap<>();
             result.put("capacity", capacity);
             result.put("gender", gender);
+            result.put("residentScope", residentScope);
             result.put("operationalStatus", operationalStatus);
             result.put("remark", remark);
             return result;
