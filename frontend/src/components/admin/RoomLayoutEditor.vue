@@ -10,6 +10,7 @@ interface LayoutBed {
   position_index: number
   bed_frame_id: number | null
   operational_status: string
+  occupied: boolean
   layout_x: number
   layout_z: number
   rotation_degrees: number
@@ -41,11 +42,17 @@ const MAX_X = 5.2
 const MIN_Z = -3.5
 const MAX_Z = 3.5
 const SNAP = 0.25
+const BED_TYPE_OPTIONS = [
+  { value: 'LOFT_BED_DESK', label: '上床下桌' },
+  { value: 'BUNK_UPPER', label: '上下铺上铺' },
+  { value: 'BUNK_LOWER', label: '上下铺下铺' },
+]
 
 const stage = ref<HTMLDivElement | null>(null)
 const reasonInput = ref<HTMLTextAreaElement | null>(null)
 const beds = ref<LayoutBed[]>([])
 const roomVersion = ref(0)
+const currentRoomType = ref('OTHER')
 const reason = ref('')
 const loading = ref(true)
 const saving = ref(false)
@@ -53,6 +60,7 @@ const error = ref('')
 const message = ref('')
 const dragKey = ref<string | null>(null)
 
+const synchronizedRoomType = computed(() => roomTypeForBedCount(beds.value.length))
 const layoutUnits = computed<LayoutUnit[]>(() => {
   const groups = new Map<string, LayoutBed[]>()
   for (const bed of beds.value) {
@@ -89,6 +97,7 @@ async function load() {
     const data = (response.data.data ?? {}) as DataObject
     const room = (data.room ?? {}) as DataObject
     roomVersion.value = Number(room.room_version)
+    currentRoomType.value = String(room.room_type ?? 'OTHER')
     beds.value = ((data.beds ?? []) as DataObject[]).map(parseBed)
   } catch (reasonValue) {
     error.value = reasonValue instanceof Error ? reasonValue.message : '房间布局加载失败'
@@ -105,6 +114,7 @@ function parseBed(value: DataObject): LayoutBed {
     position_index: Number(value.position_index),
     bed_frame_id: value.bed_frame_id == null ? null : Number(value.bed_frame_id),
     operational_status: String(value.operational_status),
+    occupied: Number(value.occupied ?? 0) === 1,
     layout_x: Number(value.layout_x),
     layout_z: Number(value.layout_z),
     rotation_degrees: Number(value.rotation_degrees),
@@ -177,6 +187,15 @@ function setUnitRotation(unit: LayoutUnit, value: number) {
   updateUnit(unit.key, unit.x, unit.z, value)
 }
 
+function setBedType(bedId: number, bedType: string) {
+  beds.value = beds.value.map((bed) => {
+    if (bed.id !== bedId || bed.occupied) return bed
+    return { ...bed, bed_type: bedType }
+  })
+  error.value = ''
+  message.value = '床位类型已更新预览，保存后会同步房型。'
+}
+
 function restoreDefaultLayout() {
   beds.value = beds.value.map((bed) => {
     const placement = defaultPlacement(bed)
@@ -209,6 +228,29 @@ function unitStyle(unit: LayoutUnit) {
   }
 }
 
+function bedTypeText(value: string) {
+  return BED_TYPE_OPTIONS.find((option) => option.value === value)?.label ?? value
+}
+
+function roomTypeForBedCount(count: number) {
+  return count === 4
+    ? 'FOUR_PERSON'
+    : count === 5
+      ? 'FIVE_PERSON'
+      : count === 6
+        ? 'SIX_PERSON'
+        : 'OTHER'
+}
+
+function roomTypeText(value: string) {
+  return {
+    FOUR_PERSON: '四人间',
+    FIVE_PERSON: '五人间',
+    SIX_PERSON: '六人间',
+    OTHER: '其他房型',
+  }[value] ?? value
+}
+
 async function save() {
   if (saving.value) return
   if (!reason.value.trim()) {
@@ -227,12 +269,13 @@ async function save() {
       reason: reason.value.trim(),
       beds: beds.value.map((bed) => ({
         bedId: bed.id,
+        bedType: bed.bed_type,
         layoutX: bed.layout_x,
         layoutZ: bed.layout_z,
         rotationDegrees: bed.rotation_degrees,
       })),
     })
-    message.value = '床位布局已保存。'
+    message.value = '床位类型和布局已保存，房型已同步。'
     reason.value = ''
     await load()
     emit('saved')
@@ -251,7 +294,7 @@ async function save() {
         <div>
           <span class="eyebrow">ROOM LAYOUT</span>
           <h3 id="layout-title">{{ roomLabel }}床位布局</h3>
-          <p>拖动床位调整位置，点击旋转按钮改变朝向。上下铺作为同一床架整体移动。</p>
+          <p>拖动床位调整位置；空床位可以切换类型，已有学生的床位不可修改类型。</p>
         </div>
         <button class="button ghost" type="button" @click="emit('close')">关闭</button>
       </div>
@@ -261,6 +304,38 @@ async function save() {
       <p v-if="loading" class="empty-state">正在加载布局…</p>
 
       <template v-else>
+        <div class="layout-room-type-summary">
+          <div>
+            <span>当前房型</span>
+            <strong>{{ roomTypeText(currentRoomType) }}</strong>
+          </div>
+          <span class="layout-room-type-arrow">→</span>
+          <div>
+            <span>同步房型</span>
+            <strong>{{ roomTypeText(synchronizedRoomType) }}</strong>
+          </div>
+          <small>保存时按物理床位数量自动同步房型和容量。</small>
+        </div>
+
+        <div class="layout-bed-type-grid" aria-label="床位类型设置">
+          <article v-for="bed in beds" :key="`type-${bed.id}`" class="layout-bed-type-card" :class="{ occupied: bed.occupied }">
+            <div>
+              <strong>{{ bed.bed_code }}床</strong>
+              <small>{{ bed.occupied ? '非空床位不可修改类型' : bedTypeText(bed.bed_type) }}</small>
+            </div>
+            <select
+              class="input"
+              :value="bed.bed_type"
+              :disabled="saving || bed.occupied"
+              @change="setBedType(bed.id, String(($event.target as HTMLSelectElement).value))"
+            >
+              <option v-for="option in BED_TYPE_OPTIONS" :key="option.value" :value="option.value">
+                {{ option.label }}
+              </option>
+            </select>
+          </article>
+        </div>
+
         <div ref="stage" class="room-layout-stage" aria-label="房间床位俯视布局编辑区">
           <span class="layout-window">窗户</span>
           <span class="layout-door">入口</span>
@@ -327,16 +402,16 @@ async function save() {
             rows="2"
             maxlength="500"
             required
-            placeholder="例如：按该房间实际家具摆放调整"
+            placeholder="例如：按该房间实际床具类型和摆放位置调整"
           />
-          <small>保存布局必须填写原因，用于操作审计。</small>
+          <small>保存床位类型和布局必须填写原因，用于操作审计。</small>
         </label>
 
         <div class="button-row room-layout-actions">
           <button class="button ghost" type="button" @click="restoreDefaultLayout">恢复默认布局</button>
           <button class="button ghost" type="button" @click="emit('close')">取消</button>
           <button class="button primary" type="button" :disabled="saving" @click="save">
-            {{ saving ? '正在保存…' : '保存布局' }}
+            {{ saving ? '正在保存…' : '保存类型与布局' }}
           </button>
         </div>
       </template>
