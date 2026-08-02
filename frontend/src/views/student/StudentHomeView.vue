@@ -271,36 +271,43 @@ function bedTypeText(value: unknown) {
 
       <p v-if="!currentActivity" class="empty-state">当前没有需要参与的选寝活动。</p>
       <p v-else-if="answerSummary.length === 0" class="empty-state">尚未填写个人偏好。</p>
-      <template v-else>
-        <div class="preference-profile-overview">
-          <div>
-            <span class="profile-caption">用户画像概述</span>
-            <h3>{{ preferenceProfileSummary }}</h3>
-          </div>
-          <div v-if="preferenceProfileTags.length" class="profile-tag-row">
-            <span v-for="tag in preferenceProfileTags" :key="tag" class="profile-tag">{{ tag }}</span>
-          </div>
+      <div v-else class="personal-preference-content">
+        <div class="personal-preference-table-column">
+          <dl class="personal-preference-list">
+            <div v-for="item in answerSummary" :key="item.code" class="personal-preference-row">
+              <dt>{{ item.label }}</dt>
+              <dd>{{ item.value }}</dd>
+            </div>
+          </dl>
         </div>
 
-        <dl class="personal-preference-list">
-          <div v-for="item in answerSummary" :key="item.code" class="personal-preference-row">
-            <dt>{{ item.label }}</dt>
-            <dd>{{ item.value }}</dd>
+        <aside class="personal-preference-side-column">
+          <div class="preference-profile-overview personal-preference-profile-panel">
+            <div>
+              <span class="profile-caption">用户画像概述</span>
+              <h3>{{ preferenceProfileSummary }}</h3>
+            </div>
+            <div v-if="preferenceProfileTags.length" class="profile-tag-row">
+              <span v-for="tag in preferenceProfileTags" :key="tag" class="profile-tag">{{ tag }}</span>
+            </div>
           </div>
-        </dl>
-      </template>
 
-      <div v-if="currentActivity && !assigned" class="student-primary-actions">
-        <RouterLink
-          v-if="canSelectRoom"
-          class="button primary student-action-button"
-          :to="`/student/batches/${currentActivityId}/rooms`"
-        >选择宿舍和床位</RouterLink>
-        <RouterLink
-          v-if="canSelectRoom && currentActivity.allow_team"
-          class="button accent student-action-button"
-          to="/student/teams"
-        >组队选寝</RouterLink>
+          <div
+            v-if="currentActivity && !assigned"
+            class="student-primary-actions personal-preference-action-panel"
+          >
+            <RouterLink
+              v-if="canSelectRoom"
+              class="button primary student-action-button"
+              :to="`/student/batches/${currentActivityId}/rooms`"
+            >选择宿舍和床位</RouterLink>
+            <RouterLink
+              v-if="canSelectRoom && currentActivity.allow_team"
+              class="button accent student-action-button"
+              to="/student/teams"
+            >组队选寝</RouterLink>
+          </div>
+        </aside>
       </div>
     </section>
 
