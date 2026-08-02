@@ -14,6 +14,8 @@ EDITOR = ROOT / "frontend/src/components/admin/RoomLayoutEditor.vue"
 LAYOUT_STYLES = ROOT / "frontend/src/phase2-room-layout.css"
 QUESTIONNAIRE = ROOT / "frontend/src/views/student/QuestionnaireView.vue"
 STUDENT_STYLES = ROOT / "frontend/src/student-experience.css"
+ROOM_DETAIL = ROOT / "frontend/src/views/student/RoomDetailView.vue"
+ROOM_SELECTION_STYLES = ROOT / "frontend/src/room-selection-refinement.css"
 
 
 class RoomBedTypeAndPreferenceUiTest(unittest.TestCase):
@@ -98,6 +100,23 @@ class RoomBedTypeAndPreferenceUiTest(unittest.TestCase):
             self.assertIn(expected, questionnaire)
         self.assertNotIn(':key="String(choice.value)"', questionnaire)
         self.assertNotIn(':value="choice.value"', questionnaire)
+
+    def test_temporary_hold_is_fixed_next_to_current_selection(self) -> None:
+        detail = ROOM_DETAIL.read_text(encoding="utf-8")
+        styles = ROOM_SELECTION_STYLES.read_text(encoding="utf-8")
+        for expected in (
+            "selection-overview-grid",
+            "selection-hold-card",
+            "尚未临时保留",
+            "已临时保留",
+            'v-if="holdToken" class="countdown compact-countdown"',
+            ':disabled="!holdToken || submitting || remainingSeconds <= 0"',
+        ):
+            self.assertIn(expected, detail)
+        self.assertNotIn("床位已临时保留；点击其他空床位可以直接切换床位。", detail)
+        self.assertNotIn('v-if="holdToken" class="panel hold-panel bed-selection-action-bar"', detail)
+        self.assertIn(".selection-overview-grid", styles)
+        self.assertIn(".selection-hold-card", styles)
 
 
 if __name__ == "__main__":
