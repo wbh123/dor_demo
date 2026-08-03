@@ -94,6 +94,9 @@ const groups = computed<FeatureGroup[]>(() => {
 const enabledCount = computed(() => features.value.filter(displayEnabled).length)
 const overriddenCount = computed(() => features.value.filter((feature) => Boolean(feature.overrideType)).length)
 const futureCount = computed(() => features.value.filter((feature) => !feature.enabledInProgram).length)
+const bedSelectionFeature = computed(() =>
+  features.value.find((feature) => feature.featureCode === 'P2_BED_SELECTION_MODE') ?? null,
+)
 
 const batchChanges = computed<FeatureStateChange[]>(() => features.value
   .filter((feature) => feature.enabledInProgram)
@@ -329,6 +332,42 @@ onMounted(() => void load())
       <article class="summary-card"><span>未来规划</span><strong>{{ futureCount }}</strong></article>
     </div>
 
+    <section
+      v-if="bedSelectionFeature"
+      class="bed-mode-control panel"
+      :class="{ enabled: displayEnabled(bedSelectionFeature) }"
+    >
+      <div>
+        <p class="eyebrow">核心模式开关</p>
+        <h2>学生选择具体床位</h2>
+        <p>开启后，学校管理员可以创建“选择床位”批次；关闭后只能创建“选择寝室”批次。</p>
+        <small>功能代码：{{ bedSelectionFeature.featureCode }} · 当前来源：{{ sourceLabels[bedSelectionFeature.source] }}</small>
+      </div>
+      <div class="bed-mode-state">
+        <strong>{{ displayEnabled(bedSelectionFeature) ? '已开启' : '已关闭' }}</strong>
+        <button
+          class="switch bed-mode-switch"
+          :class="{ checked: displayEnabled(bedSelectionFeature), loading: isSaving(bedSelectionFeature.featureCode) }"
+          type="button"
+          role="switch"
+          :aria-checked="displayEnabled(bedSelectionFeature)"
+          :aria-label="`${displayEnabled(bedSelectionFeature) ? '关闭' : '开启'}学生选择具体床位模式`"
+          :disabled="!bedSelectionFeature.enabledInProgram || isSaving(bedSelectionFeature.featureCode)"
+          @click="toggleFeature(bedSelectionFeature)"
+        >
+          <span class="switch-thumb" />
+        </button>
+      </div>
+    </section>
+
+    <section v-else-if="!loading" class="bed-mode-control missing panel">
+      <div>
+        <p class="eyebrow">核心模式开关</p>
+        <h2>学生选择具体床位</h2>
+        <p>当前数据库缺少选床模式功能定义，请使用最新一键重置数据库脚本后刷新。</p>
+      </div>
+    </section>
+
     <div class="toolbar panel">
       <label class="search-box">
         <span>搜索</span>
@@ -501,6 +540,15 @@ h1 { margin: 0; font-size: 30px; color: #0f172a; }
 .summary-card { padding: 18px; background: linear-gradient(145deg, #fff, #f8fafc); border: 1px solid #e2e8f0; border-radius: 14px; }
 .summary-card span { display: block; color: #64748b; font-size: 13px; }
 .summary-card strong { display: block; margin-top: 6px; color: #0f172a; font-size: 28px; }
+.bed-mode-control { display: flex; justify-content: space-between; align-items: center; gap: 24px; padding: 22px; margin-bottom: 16px; border-color: #cbd5e1; background: linear-gradient(135deg, #fff, #f8fafc); }
+.bed-mode-control.enabled { border-color: #86efac; background: linear-gradient(135deg, #f0fdf4, #fff); box-shadow: 0 12px 30px rgba(22, 163, 74, .09); }
+.bed-mode-control.missing { border-color: #fca5a5; background: #fff7f7; }
+.bed-mode-control h2 { margin: 4px 0 8px; color: #0f172a; font-size: 21px; }
+.bed-mode-control p { max-width: 760px; margin: 0; color: #475569; }
+.bed-mode-control small { display: block; margin-top: 9px; color: #64748b; }
+.bed-mode-state { display: flex; align-items: center; gap: 14px; flex: 0 0 auto; }
+.bed-mode-state strong { color: #0f172a; font-size: 15px; }
+.bed-mode-switch { transform: scale(1.16); transform-origin: center; }
 .toolbar { display: grid; grid-template-columns: minmax(220px, 2fr) repeat(3, minmax(140px, 1fr)) auto auto; gap: 12px; align-items: end; padding: 16px; margin-bottom: 16px; }
 .toolbar label { display: grid; gap: 6px; color: #475569; font-size: 12px; font-weight: 700; }
 input, select, textarea { width: 100%; box-sizing: border-box; border: 1px solid #cbd5e1; border-radius: 9px; padding: 10px 11px; background: #fff; color: #0f172a; font: inherit; }
@@ -569,6 +617,7 @@ code { color: #64748b; font-size: 11px; word-break: break-all; }
 }
 @media (max-width: 700px) {
   .page-header, .group-header { align-items: stretch; flex-direction: column; }
+  .bed-mode-control { align-items: flex-start; flex-direction: column; }
   .summary-grid, .toolbar { grid-template-columns: 1fr 1fr; }
   .search-box { grid-column: 1 / -1; }
   .feature-grid { padding: 10px; }
