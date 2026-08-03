@@ -7,6 +7,7 @@ const { state, clearSession } = usePlatformSession()
 const institutionName = String(import.meta.env.VITE_INSTITUTION_NAME || '示例大学')
 const operatorName = String(import.meta.env.VITE_OPERATOR_NAME || '运营单位信息待填写')
 const icpRecord = String(import.meta.env.VITE_ICP_RECORD || 'ICP备案信息待填写')
+const logoTitleRight = `${import.meta.env.BASE_URL}logo-title-right.png`
 
 function logout() {
   clearSession()
@@ -17,7 +18,7 @@ function logout() {
 <template>
   <div class="platform-shell">
     <aside class="platform-nav">
-      <div class="platform-brand"><img src="/logo-title-right.png" :alt="`${institutionName}校徽`" /><span>系统服务管理</span></div>
+      <div class="platform-brand"><img :src="logoTitleRight" :alt="`${institutionName}校徽`" /><span>系统服务管理</span></div>
       <nav>
         <RouterLink to="/platform">服务概览</RouterLink>
         <RouterLink to="/platform/plans">套餐管理</RouterLink>
