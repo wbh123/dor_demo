@@ -31,7 +31,8 @@ public class BatchScopeService {
         Map<String, Object> batch = currentBatch(batchId, false);
         List<Map<String, Object>> students = jdbc.queryForList("""
                 SELECT s.id, s.student_number, s.student_name, s.gender,
-                       s.student_category, s.major_id, m.major_code, m.major_name,
+                       s.student_category, s.nationality_code, s.degree_level, s.grade_year,
+                       s.major_id, m.major_code, m.major_name,
                        CASE WHEN e.id IS NULL THEN 0 ELSE 1 END AS selected
                 FROM student s
                 JOIN major m ON m.id=s.major_id

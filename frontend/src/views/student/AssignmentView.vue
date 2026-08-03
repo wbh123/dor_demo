@@ -1,14 +1,19 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { api } from '../../api/client'
 import type { DataObject, ObjectSuccessResponse } from '../../api/types'
+import { bedTypeLabel } from '../../utils/bedLabels'
 
 const route = useRoute()
+const router = useRouter()
 const batchId = Number(route.params.batchId)
 const result = ref<DataObject>({ assigned: false })
 const loading = ref(true)
 const error = ref('')
+const cancelling = ref(false)
+const showCancelConfirm = ref(false)
+const canReselect = ref(false)
 const assignment = computed(() => (result.value.assignment ?? {}) as DataObject)
 const bedConfirmed = computed(() => Boolean(assignment.value.bed_id ?? assignment.value.bed_confirmed))
 
@@ -22,10 +27,36 @@ async function load() {
       `/api/v1/student/batches/${batchId}/assignment`,
     )
     result.value = (response.data.data ?? { assigned: false }) as DataObject
+    const readiness = await api.get<ObjectSuccessResponse>(`/api/v1/student/batches/${batchId}/selection-readiness`)
+    canReselect.value = Boolean((readiness.data.data as DataObject | undefined)?.allowStudentReselect)
   } catch (reason) {
     error.value = reason instanceof Error ? reason.message : '结果加载失败'
   } finally {
     loading.value = false
+  }
+}
+
+
+function requestCancelAssignment() {
+  if (!cancelling.value) showCancelConfirm.value = true
+}
+
+function closeCancelConfirm() {
+  if (!cancelling.value) showCancelConfirm.value = false
+}
+
+async function cancelAssignment() {
+  if (cancelling.value) return
+  cancelling.value = true
+  error.value = ''
+  try {
+    await api.post(`/api/v1/student/batches/${batchId}/assignment/cancel`)
+    showCancelConfirm.value = false
+    await router.replace(`/student/batches/${batchId}/rooms`)
+  } catch (reason) {
+    error.value = reason instanceof Error ? reason.message : '取消当前分配失败'
+  } finally {
+    cancelling.value = false
   }
 }
 
@@ -68,7 +99,7 @@ function methodText(value: unknown) {
         </div>
         <div>
           <dt>床位类型</dt>
-          <dd>{{ bedConfirmed ? assignment.bed_type : '未固定床位' }}</dd>
+          <dd>{{ bedConfirmed ? bedTypeLabel(assignment.bed_type) : '未固定床位' }}</dd>
         </div>
         <div>
           <dt>分配方式</dt>
@@ -76,8 +107,17 @@ function methodText(value: unknown) {
         </div>
       </dl>
       <p v-if="!bedConfirmed" class="assignment-room-only-note">当前只记录寝室归属。管理员完成现实床位核对前，系统不会把任何具体床位标记为你的床位。</p>
-      <RouterLink class="button primary" to="/student">返回选寝首页</RouterLink>
+      <div class="button-row"><button v-if="canReselect" class="button secondary" :disabled="cancelling" @click="requestCancelAssignment">{{ cancelling ? '正在取消…' : '取消并重新选择' }}</button><RouterLink class="button primary" to="/student">返回选寝首页</RouterLink></div>
     </section>
+
+    <div v-if="showCancelConfirm" class="modal-overlay" @click.self="closeCancelConfirm">
+      <section class="modal-card confirmation-dialog assignment-cancel-dialog" role="dialog" aria-modal="true" aria-labelledby="assignment-cancel-title">
+        <span class="eyebrow">RESELECT CONFIRMATION</span>
+        <h3 id="assignment-cancel-title">确认取消当前住宿结果？</h3>
+        <p>该操作会立即释放当前寝室或床位，并返回选寝页面重新选择。释放后无法保证仍可选回原位置。</p>
+        <div class="button-row dialog-actions"><button class="button ghost" type="button" :disabled="cancelling" @click="closeCancelConfirm">暂不取消</button><button class="button danger" type="button" :disabled="cancelling" @click="cancelAssignment">{{ cancelling ? '正在取消…' : '确认取消并重选' }}</button></div>
+      </section>
+    </div>
 
     <section v-else class="panel empty-state large">
       <div class="empty-icon">○</div>
@@ -89,6 +129,7 @@ function methodText(value: unknown) {
 </template>
 
 <style scoped>
+.assignment-cancel-dialog{width:min(520px,calc(100vw - 32px));padding:24px}.assignment-cancel-dialog p{color:var(--text-muted);line-height:1.7}.dialog-actions{justify-content:flex-end;margin-top:20px}
 .assignment-room-only-note {
   margin: 16px 0;
   padding: 12px 14px;

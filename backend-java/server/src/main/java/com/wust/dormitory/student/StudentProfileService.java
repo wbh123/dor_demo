@@ -27,7 +27,7 @@ public class StudentProfileService {
     public Map<String, Object> profile(CurrentUser user) {
         List<Map<String, Object>> rows = jdbc.queryForList("""
                 SELECT s.id, s.student_number, s.student_name, s.gender,
-                       s.nationality_code, s.phone_number,
+                       s.nationality_code, s.student_category, s.degree_level, s.grade_year, s.phone_number,
                        m.id AS major_id, m.major_code, m.major_name
                 FROM student s
                 JOIN major m ON m.id=s.major_id

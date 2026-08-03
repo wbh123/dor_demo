@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import RoomBedScene3D from '../../components/student/RoomBedScene3D.vue'
 import { api, subscribeRoomEvents } from '../../api/client'
 import type { DataObject, ObjectSuccessResponse } from '../../api/types'
+import { bedTypeLabel } from '../../utils/bedLabels'
 
 const route = useRoute()
 const router = useRouter()
@@ -192,7 +193,6 @@ async function switchIndividualBed(nextBed: DataObject) {
     selectedBedIds.value = [nextBedId]
 
     await requestHold([nextBedId])
-    message.value = `已切换到 ${String(nextBed.bed_code)} 床。`
     await load(false)
   } catch (reason) {
     if (previousReleased) {
@@ -285,13 +285,7 @@ function statusText(status: unknown) {
   }[String(status)] ?? String(status)
 }
 
-function bedTypeText(value: unknown) {
-  return {
-    LOFT_BED_DESK: '上床下桌',
-    BUNK_UPPER: '上下铺上铺',
-    BUNK_LOWER: '上下铺下铺',
-  }[String(value)] ?? String(value)
-}
+function bedTypeText(value: unknown) { return bedTypeLabel(value) }
 </script>
 
 <template>
@@ -308,7 +302,7 @@ function bedTypeText(value: unknown) {
         <span class="eyebrow">ROOM LAYOUT</span>
         <h2>{{ room.building_name }} · {{ room.room_number }} 室</h2>
         <p v-if="isTeamMode">请选择 {{ memberCount }} 个床位，全部选好后再整体保留。</p>
-        <p v-else>{{ room.floor_number }} 层 · {{ room.capacity }}个床位</p>
+        <p v-else>{{ room.floor_number }} 层 · {{ room.capacity }}个床位。可以直接点击三维图像中的床位进行选择。</p>
       </div>
       <button class="button ghost" @click="router.back()">返回房间列表</button>
     </div>
@@ -359,9 +353,9 @@ function bedTypeText(value: unknown) {
           <div class="selection-hold-card" :class="{ active: Boolean(holdToken) }" aria-live="polite">
             <div class="selection-hold-status">
               <span>临时保留</span>
-              <strong>{{ holdToken ? '已临时保留' : '尚未临时保留' }}</strong>
+              <strong>{{ holdToken ? '床位已临时预留，请在倒计时结束前确认' : '选择床位后将为你临时预留' }}</strong>
             </div>
-            <div v-if="holdToken" class="countdown compact-countdown">
+            <div v-if="holdToken" class="countdown compact-countdown enlarged-countdown">
               {{ remainingSeconds }}<small>秒</small>
             </div>
             <div class="selection-hold-actions">
@@ -404,3 +398,8 @@ function bedTypeText(value: unknown) {
     </section>
   </div>
 </template>
+
+<style scoped>
+.enlarged-countdown { min-width: 116px; font-size: 44px !important; font-weight: 850; }
+.selection-hold-status strong { max-width: 360px; font-size: 16px; line-height: 1.45; }
+</style>

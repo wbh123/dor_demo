@@ -53,7 +53,7 @@ const links = computed(() =>
 
 const welcomeText = computed(() => {
   const welcome = auth.user?.welcome as (DataObject & { messages?: Record<string, string> }) | undefined
-  return welcomeMessage(welcome?.messages) || String(welcome?.message ?? '')
+  return String(welcome?.message ?? '') || welcomeMessage(welcome?.messages)
 })
 
 onMounted(async () => {
@@ -164,3 +164,10 @@ async function logout() {
     </Transition>
   </div>
 </template>
+
+<style scoped>
+.account-card-without-avatar { padding: 14px 16px; }
+.account-card-without-avatar > div { min-width: 0; }
+.account-card-without-avatar strong,
+.account-card-without-avatar small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+</style>

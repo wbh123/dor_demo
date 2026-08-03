@@ -126,6 +126,16 @@ components:
           nullable: true
           maxLength: 32
           pattern: '^\+?[0-9][0-9 -]{5,30}$'
+        degreeLevel:
+          type: string
+          nullable: true
+          enum: [UNDERGRADUATE, MASTER, DOCTOR, MASTER_DOCTOR]
+        gradeYear:
+          type: integer
+          format: int32
+          nullable: true
+          minimum: 2000
+          maximum: 2100
 
   securitySchemes:
     bearerAuth:

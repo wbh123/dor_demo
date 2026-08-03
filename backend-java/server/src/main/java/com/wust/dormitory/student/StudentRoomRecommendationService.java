@@ -4,6 +4,8 @@ import com.wust.dormitory.common.error.BusinessException;
 import com.wust.dormitory.matching.MatchingService;
 import com.wust.dormitory.residency.ResidencyPolicyService;
 import com.wust.dormitory.security.CurrentUser;
+import com.wust.dormitory.subscription.FeatureAccessService;
+import com.wust.dormitory.subscription.FeatureCodes;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
@@ -20,14 +22,20 @@ public class StudentRoomRecommendationService {
     private final NamedParameterJdbcTemplate jdbc;
     private final MatchingService matchingService;
     private final ResidencyPolicyService policy;
+    private final StudentPreferenceService preferenceService;
+    private final FeatureAccessService featureAccessService;
 
     public StudentRoomRecommendationService(
             NamedParameterJdbcTemplate jdbc,
             MatchingService matchingService,
-            ResidencyPolicyService policy) {
+            ResidencyPolicyService policy,
+            StudentPreferenceService preferenceService,
+            FeatureAccessService featureAccessService) {
         this.jdbc = jdbc;
         this.matchingService = matchingService;
         this.policy = policy;
+        this.preferenceService = preferenceService;
+        this.featureAccessService = featureAccessService;
     }
 
     public List<Map<String, Object>> rooms(long batchId, CurrentUser user) {
@@ -56,22 +64,20 @@ public class StudentRoomRecommendationService {
             }
 
             List<String> roommateFeatures = jdbc.query("""
-                    SELECT sf.feature_vector_json
+                    SELECT COALESCE(sf.feature_vector_json, spp.feature_vector_json) AS feature_vector_json
                     FROM room_assignment ra
-                    JOIN student_feature sf
-                      ON sf.student_id=ra.student_id
-                     AND sf.batch_id=:batchId
-                    WHERE ra.room_id=:roomId
-                      AND ra.assignment_status='ACTIVE'
+                    LEFT JOIN student_feature sf ON sf.student_id=ra.student_id AND sf.batch_id=:batchId
+                    LEFT JOIN student_preference_profile spp ON spp.student_id=ra.student_id
+                    WHERE ra.room_id=:roomId AND ra.assignment_status='ACTIVE'
+                      AND COALESCE(sf.feature_vector_json, spp.feature_vector_json) IS NOT NULL
                     ORDER BY ra.assigned_at
-                    """, new MapSqlParameterSource()
-                    .addValue("batchId", batchId)
-                    .addValue("roomId", roomId),
+                    """, new MapSqlParameterSource().addValue("batchId", batchId).addValue("roomId", roomId),
                     (rs, rowNum) -> rs.getString(1));
-            MatchingService.MatchResult match = matchingService.roomScore(
-                    batchId,
-                    feature,
-                    roommateFeatures);
+            int missingPreferenceCount = activeResidents - roommateFeatures.size();
+            boolean recommendationEnabled = featureAccessService.has(FeatureCodes.P2_ROOM_RECOMMENDATION);
+            MatchingService.MatchResult match = recommendationEnabled
+                    ? matchingService.roomScore(batchId, feature, roommateFeatures)
+                    : matchingService.roomScore("", List.of());
             Map<String, Object> view = new LinkedHashMap<>(room);
             view.put("selectionMode", mode);
             view.put("activeResidentCount", activeResidents);
@@ -85,6 +91,19 @@ public class StudentRoomRecommendationService {
             view.put("recommendationReasons", match.recommendationReasons());
             view.put("conflictReasons", match.conflictReasons());
             view.put("dimensionCount", match.dimensionCount());
+            view.put("preferenceCompleted", preferenceService.completed(user.studentId()));
+            view.put("missingPreferenceCount", Math.max(0, missingPreferenceCount));
+            view.put("recommendationEnabled", recommendationEnabled);
+            Map<String, Integer> bedTypes = availableBedTypes(batchId, roomId);
+            view.put("availableLoftBedCount", bedTypes.getOrDefault("LOFT_BED_DESK", 0));
+            view.put("availableBunkUpperCount", bedTypes.getOrDefault("BUNK_UPPER", 0));
+            view.put("availableBunkLowerCount", bedTypes.getOrDefault("BUNK_LOWER", 0));
+            String bedWarning = bedPreferenceWarning(feature, bedTypes);
+            if (bedWarning != null) {
+                List<String> warnings = new ArrayList<>(match.conflictReasons());
+                warnings.add(bedWarning);
+                view.put("conflictReasons", warnings.stream().distinct().limit(7).toList());
+            }
             view.put("selectionHint", "ROOM".equals(mode)
                     ? "选择后仅确定寝室，具体床位由寝室成员自行协商"
                     : "进入寝室后选择当前批次范围内的真实可用床位");
@@ -106,6 +125,7 @@ public class StudentRoomRecommendationService {
     }
 
     public Map<String, Object> randomRecommendation(long batchId, CurrentUser user) {
+        featureAccessService.require(FeatureCodes.P2_ROOM_RECOMMENDATION);
         Map<String, Object> batch = policy.batch(batchId);
         List<Map<String, Object>> candidates = rooms(batchId, user);
         if (candidates.isEmpty()) {
@@ -197,6 +217,35 @@ public class StudentRoomRecommendationService {
                 .addValue("batchId", batchId)
                 .addValue("studentId", studentId),
                 (rs, rowNum) -> rs.getString(1));
-        return rows.isEmpty() ? null : rows.getFirst();
+        return rows.isEmpty() ? preferenceService.featureJson(studentId) : rows.getFirst();
+    }
+
+    private Map<String, Integer> availableBedTypes(long batchId, long roomId) {
+        List<Map<String, Object>> rows = jdbc.queryForList("""
+                SELECT b.bed_type, COUNT(*) AS amount
+                FROM bed b
+                WHERE b.room_id=:roomId AND b.operational_status='ENABLED'
+                  AND NOT EXISTS (SELECT 1 FROM room_assignment ra WHERE ra.bed_id=b.id AND ra.assignment_status='ACTIVE')
+                  AND (EXISTS (SELECT 1 FROM batch_bed_scope s WHERE s.batch_id=:batchId AND s.bed_id=b.id)
+                    OR EXISTS (SELECT 1 FROM batch_room_scope s WHERE s.batch_id=:batchId AND s.room_id=:roomId)
+                    OR EXISTS (SELECT 1 FROM batch_building_scope bs JOIN dormitory_floor f ON f.building_id=bs.building_id
+                               JOIN room r ON r.floor_id=f.id WHERE bs.batch_id=:batchId AND r.id=:roomId))
+                GROUP BY b.bed_type
+                """, Map.of("batchId",batchId,"roomId",roomId));
+        Map<String,Integer> result=new LinkedHashMap<>();
+        rows.forEach(row -> result.put(String.valueOf(row.get("bed_type")), ((Number)row.get("amount")).intValue()));
+        return result;
+    }
+
+    private String bedPreferenceWarning(String featureJson, Map<String,Integer> counts) {
+        if (featureJson == null || featureJson.isBlank()) return null;
+        String preference;
+        try { preference = String.valueOf(new com.fasterxml.jackson.databind.ObjectMapper().readTree(featureJson).path("bedPreference").asText("")); }
+        catch (Exception ignored) { return null; }
+        int loft=counts.getOrDefault("LOFT_BED_DESK",0);
+        int bunk=counts.getOrDefault("BUNK_UPPER",0)+counts.getOrDefault("BUNK_LOWER",0);
+        if ("LOFT_BED_DESK".equals(preference) && loft==0 && bunk>0) return "仅剩上下铺";
+        if (("BUNK_UPPER".equals(preference)||"BUNK_LOWER".equals(preference)) && bunk==0 && loft>0) return "仅剩上床下桌";
+        return null;
     }
 }

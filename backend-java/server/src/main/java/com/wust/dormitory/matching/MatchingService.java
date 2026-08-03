@@ -2,6 +2,7 @@ package com.wust.dormitory.matching;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.wust.dormitory.common.error.BusinessException;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -70,6 +71,15 @@ public class MatchingService {
     public Map<String, Object> normalizeAnswers(Map<String, Object> answers) {
         Map<String, Object> normalized = new LinkedHashMap<>();
         normalized.putAll(answers);
+        for (String key : List.of("airConditionerTemperature", "summerAirConditionerTemperature", "winterHeatingTemperature")) {
+            Object value = normalized.get(key);
+            if (value == null) continue;
+            Double temperature = number(value);
+            if (temperature == null || temperature < 16 || temperature > 30) {
+                throw new BusinessException("AIR_CONDITIONER_TEMPERATURE_INVALID", "空调温度必须在16至30摄氏度之间");
+            }
+            normalized.put(key, temperature.intValue());
+        }
         return normalized;
     }
 
@@ -186,6 +196,11 @@ public class MatchingService {
                 "宿舍饮食气味接受度存在差异",
                 recommendationReasons,
                 conflictReasons);
+        compareTag(student, roommates, "wakeTimeMinutes", 60, "起床时间接近", "起床时间差异较大", recommendationReasons, conflictReasons);
+        compareTag(student, roommates, "noiseTolerance", 1, "噪声接受度接近", "噪声接受度存在差异", recommendationReasons, conflictReasons);
+        compareTag(student, roommates, "tidinessRequirement", 1, "整洁要求接近", "整洁要求存在差异", recommendationReasons, conflictReasons);
+        compareTag(student, roommates, "studyFrequency", 1, "学习频率接近", "学习频率存在差异", recommendationReasons, conflictReasons);
+        compareTag(student, roommates, "socialActivity", 1, "社交活跃度接近", "社交活跃度存在差异", recommendationReasons, conflictReasons);
         if (hasSmokingConflict(student, roommates)) {
             conflictReasons.add("吸烟接受偏好存在冲突");
         } else if (student.containsKey("smokingAcceptance")) {
@@ -194,8 +209,8 @@ public class MatchingService {
 
         return result(
                 score,
-                recommendationReasons.stream().limit(3).toList(),
-                conflictReasons.stream().limit(3).toList(),
+                recommendationReasons.stream().limit(6).toList(),
+                conflictReasons.stream().limit(6).toList(),
                 dimensionCount);
     }
 

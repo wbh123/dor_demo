@@ -27,7 +27,16 @@ const scopeData = ref<DataObject | null>(null)
 const selectedStudentIds = ref<number[]>([])
 const selectedRoomIds = ref<number[]>([])
 const studentFilter = ref('')
+const studentGenderFilter = ref('')
+const studentCategoryFilter = ref('')
+const studentDegreeFilter = ref('')
+const studentMajorFilter = ref('')
+const studentGradeFilter = ref('')
 const roomFilter = ref('')
+const roomGenderFilter = ref('')
+const roomScopeFilter = ref('')
+const roomBuildingFilter = ref('')
+const roomFloorFilter = ref('')
 const publishAfterScope = ref(false)
 
 const form = reactive({
@@ -67,24 +76,34 @@ const unassignedStudents = computed(() => (allocationPreview.value?.unassigned ?
 const scopeStudents = computed(() => (scopeData.value?.students ?? []) as DataObject[])
 const scopeRooms = computed(() => (scopeData.value?.rooms ?? []) as DataObject[])
 
+const scopeMajorOptions = computed(() => [...new Map(scopeStudents.value.map((student) => [String(student.major_id), { id: String(student.major_id), label: `${student.major_code} · ${student.major_name}` }])).values()])
+const scopeGradeOptions = computed(() => [...new Set(scopeStudents.value.map((student) => String(student.grade_year ?? '')).filter(Boolean))].sort())
+const scopeBuildingOptions = computed(() => [...new Map(scopeRooms.value.map((room) => [String(room.building_id), { id: String(room.building_id), label: String(room.building_name) }])).values()])
+const scopeFloorOptions = computed(() => [...new Set(scopeRooms.value.map((room) => String(room.floor_number ?? '')).filter(Boolean))].sort((a,b)=>Number(a)-Number(b)))
+
 const filteredStudents = computed(() => {
   const keyword = studentFilter.value.trim().toLowerCase()
-  if (!keyword) return scopeStudents.value
-  return scopeStudents.value.filter((student) =>
-    [student.student_number, student.student_name, student.major_name].some((value) =>
-      String(value ?? '').toLowerCase().includes(keyword),
-    ),
-  )
+  return scopeStudents.value.filter((student) => {
+    if (keyword && ![student.student_number, student.student_name, student.major_name].some((value) => String(value ?? '').toLowerCase().includes(keyword))) return false
+    if (studentGenderFilter.value && String(student.gender) !== studentGenderFilter.value) return false
+    if (studentCategoryFilter.value && String(student.student_category) !== studentCategoryFilter.value) return false
+    if (studentDegreeFilter.value && String(student.degree_level ?? '') !== studentDegreeFilter.value) return false
+    if (studentMajorFilter.value && String(student.major_id) !== studentMajorFilter.value) return false
+    if (studentGradeFilter.value && String(student.grade_year ?? '') !== studentGradeFilter.value) return false
+    return true
+  })
 })
 
 const filteredRooms = computed(() => {
   const keyword = roomFilter.value.trim().toLowerCase()
-  if (!keyword) return scopeRooms.value
-  return scopeRooms.value.filter((room) =>
-    [room.building_code, room.building_name, room.room_number, room.floor_number].some((value) =>
-      String(value ?? '').toLowerCase().includes(keyword),
-    ),
-  )
+  return scopeRooms.value.filter((room) => {
+    if (keyword && ![room.building_code, room.building_name, room.room_number, room.floor_number].some((value) => String(value ?? '').toLowerCase().includes(keyword))) return false
+    if (roomGenderFilter.value && String(room.gender_restriction) !== roomGenderFilter.value) return false
+    if (roomScopeFilter.value && String(room.resident_scope) !== roomScopeFilter.value) return false
+    if (roomBuildingFilter.value && String(room.building_id) !== roomBuildingFilter.value) return false
+    if (roomFloorFilter.value && String(room.floor_number) !== roomFloorFilter.value) return false
+    return true
+  })
 })
 
 onMounted(load)
@@ -146,8 +165,8 @@ async function openScope(batch: DataObject, continuePublish = false) {
   scopeData.value = null
   selectedStudentIds.value = []
   selectedRoomIds.value = []
-  studentFilter.value = ''
-  roomFilter.value = ''
+  studentFilter.value = ''; studentGenderFilter.value = ''; studentCategoryFilter.value = ''; studentDegreeFilter.value = ''; studentMajorFilter.value = ''; studentGradeFilter.value = ''
+  roomFilter.value = ''; roomGenderFilter.value = ''; roomScopeFilter.value = ''; roomBuildingFilter.value = ''; roomFloorFilter.value = ''
   publishAfterScope.value = continuePublish
   error.value = ''
   try {
@@ -492,8 +511,8 @@ function issueText(room: DataObject) {
           <label><span>批次编号</span><input v-model.trim="form.batchCode" class="input" required maxlength="32" /></label>
           <label><span>批次名称</span><input v-model.trim="form.batchName" class="input" required maxlength="128" /></label>
           <label><span>规则模板</span><select v-model.number="form.ruleTemplateId" class="input" required><option :value="0" disabled>请选择</option><option v-for="item in ruleTemplates" :key="String(item.id)" :value="Number(item.id)">{{ item.rule_name }} · 修订{{ item.revision }}</option></select></label>
-          <label><span>开始时间</span><input v-model="form.startAt" class="input" type="datetime-local" required /></label>
-          <label><span>结束时间</span><input v-model="form.endAt" class="input" type="datetime-local" required /></label>
+          <label><span>开始时间</span><input v-model="form.startAt" class="input" type="datetime-local" required /><small>请使用24小时制，例如 18:30</small></label>
+          <label><span>结束时间</span><input v-model="form.endAt" class="input" type="datetime-local" required /><small>请使用24小时制，例如 21:00</small></label>
           <div class="rule-summary"><strong>规则摘要</strong><span>{{ ruleTemplateSummary }}</span></div>
         </div>
         <button class="button primary">创建草稿批次</button>
@@ -523,23 +542,23 @@ function issueText(room: DataObject) {
 
     <div v-if="scopeDialog" class="modal-overlay" @click.self="closeScope">
       <section class="modal-card scope-dialog">
-        <header class="section-head split-title"><div><span class="eyebrow">BATCH SCOPE</span><h3>{{ scopeBatch?.batch_name }} · 参与范围</h3><p>选择本批次允许参与的学生和宿舍，保存后才可发布。</p></div><button class="button ghost small" :disabled="scopeSaving" @click="closeScope">关闭</button></header>
+        <header class="section-head split-title scope-sticky-header"><div><span class="eyebrow">BATCH SCOPE</span><h3>{{ scopeBatch?.batch_name }} · 参与范围</h3><p>通过筛选批量选择，最终仍保存精确学生和宿舍清单。</p></div><div class="button-row"><button class="button ghost small" :disabled="scopeSaving" @click="closeScope">关闭</button><button class="button primary" :disabled="scopeSaving" @click="saveScope">{{ scopeSaving ? '保存中…' : publishAfterScope ? '保存并继续发布' : '保存参与范围' }}</button></div></header>
         <p v-if="scopeLoading" class="empty-state">正在加载学生与宿舍…</p>
         <template v-else>
           <div class="scope-summary"><article><span>已选学生</span><strong>{{ selectedStudentIds.length }}</strong></article><article><span>已选宿舍</span><strong>{{ selectedRoomIds.length }}</strong></article></div>
           <div class="scope-grid">
             <section class="scope-column">
               <header><div><strong>参与学生</strong><small>按学号、姓名或专业筛选</small></div><div class="button-row"><button class="button ghost small" @click="selectAllStudents">全选当前结果</button><button class="button ghost small" @click="selectedStudentIds = []">清空</button></div></header>
-              <input v-model.trim="studentFilter" class="input" placeholder="搜索学号、姓名或专业" />
+              <div class="scope-filter-grid"><input v-model.trim="studentFilter" class="input span-2" placeholder="搜索学号、姓名或专业" /><select v-model="studentGenderFilter" class="input"><option value="">全部性别</option><option value="M">男生</option><option value="F">女生</option></select><select v-model="studentCategoryFilter" class="input"><option value="">国内外不限</option><option value="DOMESTIC">国内生</option><option value="INTERNATIONAL">国际生</option></select><select v-model="studentDegreeFilter" class="input"><option value="">培养层次不限</option><option value="UNDERGRADUATE">本科生</option><option value="MASTER">硕士生</option><option value="DOCTOR">博士生</option><option value="MASTER_DOCTOR">硕博生</option></select><select v-model="studentMajorFilter" class="input"><option value="">全部专业</option><option v-for="major in scopeMajorOptions" :key="major.id" :value="major.id">{{ major.label }}</option></select><select v-model="studentGradeFilter" class="input span-2"><option value="">全部年级</option><option v-for="grade in scopeGradeOptions" :key="grade" :value="grade">{{ grade }}级</option></select></div>
               <div class="scope-options"><label v-for="student in filteredStudents" :key="String(student.id)" class="scope-option"><input type="checkbox" :checked="selectedStudentIds.includes(Number(student.id))" @change="toggleStudent(Number(student.id))" /><div><strong>{{ student.student_number }} · {{ student.student_name }}</strong><span>{{ student.major_name }} · {{ student.gender === 'M' ? '男' : '女' }} · {{ student.student_category === 'INTERNATIONAL' ? '国际生' : '国内生' }}</span></div></label></div>
             </section>
             <section class="scope-column">
               <header><div><strong>可选宿舍</strong><small>停用或维护中的宿舍不可选择</small></div><div class="button-row"><button class="button ghost small" @click="selectAllRooms">全选当前可用</button><button class="button ghost small" @click="selectedRoomIds = []">清空</button></div></header>
-              <input v-model.trim="roomFilter" class="input" placeholder="搜索楼栋、楼层或房间号" />
+              <div class="scope-filter-grid"><input v-model.trim="roomFilter" class="input span-2" placeholder="搜索楼栋、楼层或房间号" /><select v-model="roomGenderFilter" class="input"><option value="">全部性别</option><option value="M">男寝</option><option value="F">女寝</option></select><select v-model="roomScopeFilter" class="input"><option value="">国内外不限</option><option value="DOMESTIC_ONLY">国内生宿舍</option><option value="INTERNATIONAL_ONLY">国际生宿舍</option><option value="MIXED">混住宿舍</option></select><select v-model="roomBuildingFilter" class="input"><option value="">全部楼栋</option><option v-for="building in scopeBuildingOptions" :key="building.id" :value="building.id">{{ building.label }}</option></select><select v-model="roomFloorFilter" class="input"><option value="">全部楼层</option><option v-for="floor in scopeFloorOptions" :key="floor" :value="floor">{{ floor }}层</option></select></div>
               <div class="scope-options"><label v-for="room in filteredRooms" :key="String(room.id)" class="scope-option" :class="{ disabled: !room.selectable }"><input type="checkbox" :disabled="!room.selectable" :checked="selectedRoomIds.includes(Number(room.id))" @change="toggleRoom(Number(room.id))" /><div><strong>{{ room.building_name }} {{ room.room_number }}</strong><span>{{ room.floor_number }}层 · 容量{{ room.capacity }} · {{ room.gender_restriction === 'M' ? '男寝' : '女寝' }} · {{ room.operational_status }}</span></div></label></div>
             </section>
           </div>
-          <div class="scope-footer"><span>{{ publishAfterScope ? '保存后将自动执行宿舍预检并发布。' : '草稿阶段可以反复调整范围。' }}</span><button class="button primary" :disabled="scopeSaving" @click="saveScope">{{ scopeSaving ? '保存中…' : publishAfterScope ? '保存范围并继续发布' : '保存参与范围' }}</button></div>
+          <div class="scope-footer"><span>{{ publishAfterScope ? '保存后将自动执行宿舍预检并发布。' : '草稿阶段可以反复调整范围。保存按钮固定在右上方。' }}</span></div>
         </template>
       </section>
     </div>
@@ -553,12 +572,79 @@ function issueText(room: DataObject) {
       </section>
     </div>
 
-    <div v-if="copyDialog" class="modal-overlay" @click.self="closeCopy"><section class="modal-card copy-dialog"><header class="section-head split-title"><div><span class="eyebrow">COPY BATCH</span><h3>复制“{{ copySource?.batch_name }}”</h3><p>自动保留选择模式、类别隔离、规则模板和宿舍范围。</p></div><button class="button ghost small" @click="closeCopy">关闭</button></header><form class="form-grid two-column" @submit.prevent="copyBatch"><label><span>新批次编号</span><input v-model.trim="copyForm.batchCode" class="input" required /></label><label><span>新批次名称</span><input v-model.trim="copyForm.batchName" class="input" required /></label><label><span>开始时间</span><input v-model="copyForm.startAt" class="input" type="datetime-local" required /></label><label><span>结束时间</span><input v-model="copyForm.endAt" class="input" type="datetime-local" required /></label><label class="span-2"><span>复制原因</span><textarea v-model.trim="copyForm.reason" class="input" required rows="3" /></label><div class="button-row span-2"><button class="button ghost" type="button" @click="closeCopy">取消</button><button class="button primary" :disabled="copying">{{ copying ? '复制中…' : '创建草稿副本' }}</button></div></form></section></div>
+    <div v-if="copyDialog" class="modal-overlay" @click.self="closeCopy"><section class="modal-card copy-dialog"><header class="section-head split-title"><div><span class="eyebrow">COPY BATCH</span><h3>复制“{{ copySource?.batch_name }}”</h3><p>自动保留选择模式、类别隔离、规则模板和宿舍范围。</p></div><button class="button ghost small" @click="closeCopy">关闭</button></header><form class="form-grid two-column" @submit.prevent="copyBatch"><label><span>新批次编号</span><input v-model.trim="copyForm.batchCode" class="input" required /></label><label><span>新批次名称</span><input v-model.trim="copyForm.batchName" class="input" required /></label><label><span>开始时间</span><input v-model="copyForm.startAt" class="input" type="datetime-local" required /><small>24小时制</small></label><label><span>结束时间</span><input v-model="copyForm.endAt" class="input" type="datetime-local" required /><small>24小时制</small></label><label class="span-2"><span>复制原因</span><textarea v-model.trim="copyForm.reason" class="input" required rows="3" /></label><div class="button-row span-2"><button class="button ghost" type="button" @click="closeCopy">取消</button><button class="button primary" :disabled="copying">{{ copying ? '复制中…' : '创建草稿副本' }}</button></div></form></section></div>
 
     <div v-if="allocationPreview" class="modal-overlay" @click.self="allocationPreview = null; allocationBatchId = null"><section class="modal-card allocation-dialog"><header class="section-head split-title"><div><span class="eyebrow">ALLOCATION PREVIEW</span><h3>统一分配预演</h3></div><button class="button ghost small" @click="allocationPreview = null; allocationBatchId = null">关闭</button></header><div class="allocation-stats"><article><span>学生</span><strong>{{ allocationSummary.studentCount ?? 0 }}</strong></article><article><span>预计成功</span><strong>{{ allocationSummary.assignedCount ?? 0 }}</strong></article><article><span>未分配</span><strong>{{ allocationSummary.unassignedCount ?? 0 }}</strong></article></div><div v-if="unassignedStudents.length" class="table-wrap"><table><thead><tr><th>学号</th><th>姓名</th><th>原因</th></tr></thead><tbody><tr v-for="student in unassignedStudents" :key="String(student.studentId)"><td>{{ student.studentNumber }}</td><td>{{ student.studentName }}</td><td>{{ student.reason }}</td></tr></tbody></table></div><button v-if="allocationBatchId" class="button primary" @click="commitAllocation">确认执行统一分配</button></section></div>
   </div>
 </template>
 
 <style scoped>
-.batch-create-form{display:grid;gap:18px}.mode-card-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}.mode-card{display:grid;gap:8px;padding:20px;border:1px solid var(--border);border-radius:16px;background:var(--surface);text-align:left;color:inherit}.mode-card span,.mode-card small{color:var(--text-muted)}.mode-card.selected{border-color:var(--primary);box-shadow:0 0 0 3px color-mix(in srgb,var(--primary) 14%,transparent)}.mode-card.disabled{opacity:.55}.separation-switch{display:flex;align-items:center;gap:14px;padding:16px;border:1px solid var(--border);border-radius:14px;background:var(--surface-soft)}.separation-switch>button{position:relative;width:50px;height:28px;border:0;border-radius:999px;background:#cbd5e1;flex:0 0 auto}.separation-switch>button span{position:absolute;left:3px;top:3px;width:22px;height:22px;border-radius:50%;background:white;transition:.2s}.separation-switch>button.checked{background:var(--primary)}.separation-switch>button.checked span{transform:translateX(22px)}.separation-switch p{margin:4px 0 0;color:var(--text-muted)}.rule-summary{display:grid;gap:6px;padding:12px;border-radius:12px;background:var(--surface-soft)}.batch-list{display:grid;gap:14px}.batch-card{padding:18px;border:1px solid var(--border);border-radius:16px;background:var(--surface)}.batch-card header{display:flex;justify-content:space-between;gap:16px}.batch-card h3{margin:8px 0 3px}.batch-card p{margin:0;color:var(--text-muted)}.badge-row,.batch-facts{display:flex;gap:8px;flex-wrap:wrap}.status-chip.mode{background:#eff6ff;color:#1d4ed8}.status-chip.category{background:#f5f3ff;color:#6d28d9}.batch-counts{text-align:right}.batch-counts strong{display:block;font-size:26px}.batch-counts span,.batch-facts{color:var(--text-muted);font-size:13px}.batch-facts{margin:14px 0}.batch-facts .warn{color:#b45309;font-weight:700}.scope-dialog{width:min(1180px,calc(100vw - 32px));max-height:calc(100vh - 32px);overflow:auto;padding:24px}.scope-summary{display:grid;grid-template-columns:repeat(2,minmax(0,180px));gap:12px;margin-bottom:14px}.scope-summary article{padding:14px;border-radius:12px;background:var(--surface-soft)}.scope-summary strong{display:block;font-size:24px}.scope-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}.scope-column{display:grid;gap:12px;min-width:0}.scope-column>header{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.scope-column>header small{display:block;color:var(--text-muted);margin-top:4px}.scope-options{display:grid;gap:8px;max-height:440px;overflow:auto;padding-right:4px}.scope-option{display:flex;gap:10px;align-items:flex-start;padding:11px;border:1px solid var(--border);border-radius:11px;background:var(--surface)}.scope-option input{margin-top:4px}.scope-option div{display:grid;gap:3px}.scope-option span{color:var(--text-muted);font-size:12px}.scope-option.disabled{opacity:.55;background:var(--surface-soft)}.scope-footer{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-top:18px;padding-top:16px;border-top:1px solid var(--border);color:var(--text-muted)}.preflight-dialog,.allocation-dialog{width:min(980px,calc(100vw - 32px));max-height:calc(100vh - 32px);overflow:auto;padding:24px}.preflight-summary{display:grid;gap:5px;padding:15px;border-radius:13px;background:#fef2f2;color:#991b1b}.preflight-summary.pass{background:#f0fdf4;color:#166534}.preflight-action{margin-top:12px}.preflight-room-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px;margin-top:14px}.preflight-room-grid article{display:grid;gap:5px;padding:14px;border:1px solid var(--border);border-radius:12px}.preflight-room-grid article.blocker{border-color:#fecaca;background:#fff7f7}.preflight-room-grid span,.preflight-room-grid small{color:var(--text-muted)}.copy-dialog{width:min(720px,calc(100vw - 32px));padding:24px}.allocation-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:14px 0}.allocation-stats article{padding:14px;background:var(--surface-soft);border-radius:12px}.allocation-stats strong{display:block;font-size:24px}@media(max-width:900px){.scope-grid{grid-template-columns:1fr}.scope-options{max-height:320px}}@media(max-width:720px){.mode-card-grid,.allocation-stats,.scope-summary{grid-template-columns:1fr}.batch-card header,.scope-footer,.scope-column>header{flex-direction:column}.batch-counts{text-align:left}}
+.batch-create-form { display: grid; gap: 18px; }
+.mode-card-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+.mode-card { display: grid; gap: 8px; padding: 20px; border: 1px solid var(--border); border-radius: 16px; background: var(--surface); text-align: left; color: inherit; }
+.mode-card span, .mode-card small { color: var(--text-muted); }
+.mode-card.selected { border-color: var(--primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 14%, transparent); }
+.mode-card.disabled { opacity: .55; }
+.separation-switch { display: flex; align-items: center; gap: 14px; padding: 16px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface-soft); }
+.separation-switch > button { position: relative; width: 50px; height: 28px; border: 0; border-radius: 999px; background: #cbd5e1; flex: 0 0 auto; }
+.separation-switch > button span { position: absolute; left: 3px; top: 3px; width: 22px; height: 22px; border-radius: 50%; background: white; transition: .2s; }
+.separation-switch > button.checked { background: var(--primary); }
+.separation-switch > button.checked span { transform: translateX(22px); }
+.separation-switch p { margin: 4px 0 0; color: var(--text-muted); }
+.rule-summary { display: grid; gap: 6px; padding: 12px; border-radius: 12px; background: var(--surface-soft); }
+.batch-list { display: grid; gap: 14px; }
+.batch-card { padding: 18px; border: 1px solid var(--border); border-radius: 16px; background: var(--surface); }
+.batch-card header { display: flex; justify-content: space-between; gap: 16px; }
+.batch-card h3 { margin: 8px 0 3px; }
+.batch-card p { margin: 0; color: var(--text-muted); }
+.badge-row, .batch-facts { display: flex; gap: 8px; flex-wrap: wrap; }
+.status-chip.mode { background: #eff6ff; color: #1d4ed8; }
+.status-chip.category { background: #f5f3ff; color: #6d28d9; }
+.batch-counts { text-align: right; }
+.batch-counts strong { display: block; font-size: 26px; }
+.batch-counts span, .batch-facts { color: var(--text-muted); font-size: 13px; }
+.batch-facts { margin: 14px 0; }
+.batch-facts .warn { color: #b45309; font-weight: 700; }
+.scope-dialog { width: min(1180px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow: auto; padding: 24px; }
+.scope-sticky-header { position: sticky; top: -24px; z-index: 3; margin: -24px -24px 16px; padding: 20px 24px; border-bottom: 1px solid var(--border); background: var(--surface); }
+.scope-filter-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.scope-filter-grid .span-2 { grid-column: span 2; }
+.scope-summary { display: grid; grid-template-columns: repeat(2, minmax(0, 180px)); gap: 12px; margin-bottom: 14px; }
+.scope-summary article { padding: 14px; border-radius: 12px; background: var(--surface-soft); }
+.scope-summary strong { display: block; font-size: 24px; }
+.scope-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.scope-column { display: grid; gap: 12px; min-width: 0; }
+.scope-column > header { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
+.scope-column > header small { display: block; color: var(--text-muted); margin-top: 4px; }
+.scope-options { display: grid; gap: 8px; max-height: 440px; overflow: auto; padding-right: 4px; }
+.scope-option { display: flex; gap: 10px; align-items: flex-start; padding: 11px; border: 1px solid var(--border); border-radius: 11px; background: var(--surface); }
+.scope-option input { margin-top: 4px; }
+.scope-option div { display: grid; gap: 3px; }
+.scope-option span { color: var(--text-muted); font-size: 12px; }
+.scope-option.disabled { opacity: .55; background: var(--surface-soft); }
+.scope-footer { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--border); color: var(--text-muted); }
+.preflight-dialog, .allocation-dialog { width: min(980px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow: auto; padding: 24px; }
+.preflight-summary { display: grid; gap: 5px; padding: 15px; border-radius: 13px; background: #fef2f2; color: #991b1b; }
+.preflight-summary.pass { background: #f0fdf4; color: #166534; }
+.preflight-action { margin-top: 12px; }
+.preflight-room-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; margin-top: 14px; }
+.preflight-room-grid article { display: grid; gap: 5px; padding: 14px; border: 1px solid var(--border); border-radius: 12px; }
+.preflight-room-grid article.blocker { border-color: #fecaca; background: #fff7f7; }
+.preflight-room-grid span, .preflight-room-grid small { color: var(--text-muted); }
+.copy-dialog { width: min(720px, calc(100vw - 32px)); padding: 24px; }
+.allocation-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 14px 0; }
+.allocation-stats article { padding: 14px; background: var(--surface-soft); border-radius: 12px; }
+.allocation-stats strong { display: block; font-size: 24px; }
+@media (max-width: 900px) {
+  .scope-grid { grid-template-columns: 1fr; }
+  .scope-options { max-height: 320px; }
+}
+@media (max-width: 720px) {
+  .mode-card-grid, .allocation-stats, .scope-filter-grid { grid-template-columns: 1fr; }
+  .scope-filter-grid .span-2 { grid-column: auto; }
+  .scope-summary { grid-template-columns: 1fr; }
+  .batch-card header, .scope-footer, .scope-column > header { flex-direction: column; }
+  .batch-counts { text-align: left; }
+  .scope-sticky-header { top: -24px; flex-direction: column; }
+}
 </style>

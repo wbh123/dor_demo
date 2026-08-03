@@ -498,7 +498,9 @@ public class AdminController implements AdminApi {
                 nationalityCode.trim().toUpperCase(Locale.ROOT),
                 request.getStudentCategory().getValue(),
                 enrollmentSource,
-                phoneNumber);
+                phoneNumber,
+                request.getDegreeLevel() == null ? null : request.getDegreeLevel().getValue(),
+                request.getGradeYear());
     }
 
     private LocalDateTime toLocalDateTime(Date value) {
