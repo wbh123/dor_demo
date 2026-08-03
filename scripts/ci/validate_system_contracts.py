@@ -199,12 +199,89 @@ def validate_overlay_style(errors: list[str]) -> None:
         ".dialog-backdrop",
         "[class$='-overlay']",
         "[class$='-backdrop']",
+        ".scope-dialog",
+        ".preflight-dialog",
     ):
         require(selector in overlay, f"shared overlay style misses selector: {selector}", errors)
     require(
-        "backdrop-filter: blur(8px)" in overlay
-        and "background: rgba(12, 24, 48, 0.62)" in overlay,
+        "position: fixed" in overlay
+        and "inset: 0" in overlay
+        and "backdrop-filter: blur(8px)" in overlay
+        and "background: rgba(12, 24, 48, 0.68)" in overlay,
         "shared overlay background does not match the dormitory editor visual layer",
+        errors,
+    )
+
+
+def validate_layout_and_selection_regressions(errors: list[str]) -> None:
+    editor = read("frontend/src/components/admin/RoomLayoutEditor.vue")
+    editor_css = read("frontend/src/admin-layout-canvas-refinement.css")
+    room_list = read("frontend/src/views/student/RoomListView.vue")
+    assignment_view = read("frontend/src/views/student/AssignmentView.vue")
+    batch_view = read("frontend/src/views/admin/AdminBatchView.vue")
+    residency_query = read(
+        "backend-java/server/src/main/java/com/wust/dormitory/residency/CurrentResidencyQueryService.java"
+    )
+    team_guard = read(
+        "backend-java/server/src/main/java/com/wust/dormitory/residency/TeamCategoryGuard.java"
+    )
+
+    require(
+        "transform: `translate(-50%, -50%) rotate(" not in editor,
+        "room layout still rotates text and controls with the bed card",
+        errors,
+    )
+    require(
+        "layout-bed-surface" in editor
+        and "layout-bed-content" in editor
+        and "isQuarterTurn(unit.rotation)" in editor,
+        "room layout does not separate the rotating shape from upright controls",
+        errors,
+    )
+    require(
+        "恢复标准2×2布局" in editor
+        and "new DefaultPlacement(-2.35, -1.65, 0)" in read(
+            "backend-java/server/src/main/java/com/wust/dormitory/admin/RoomLayoutService.java"
+        ),
+        "standard horizontal 2x2 default layout is not preserved",
+        errors,
+    )
+    require(
+        ".layout-bed-surface" in editor_css
+        and ".layout-bed-unit.vertical .layout-bed-type-actions" in editor_css,
+        "rotated bed cards do not keep controls inside the new orientation",
+        errors,
+    )
+    require(
+        "window.confirm" not in room_list
+        and "roomSelectionTarget" in room_list
+        and "room-selection-overlay" in room_list,
+        "room-mode confirmation still uses a browser alert instead of an overlay dialog",
+        errors,
+    )
+    require(
+        '<div v-if="scopeDialog" class="modal-overlay"' in batch_view
+        and '<div v-if="preflightBatch && roomPreflight" class="modal-overlay"' in batch_view,
+        "batch scope or preflight no longer uses the common modal overlay",
+        errors,
+    )
+    require(
+        "db.id AS building_id" in residency_query
+        and "public Map<String, Object> assignment(long studentId)" in residency_query,
+        "room-mode assignment query is not normalized or still uses an invalid building column",
+        errors,
+    )
+    require(
+        "具体床位待寝室成员协商" in assignment_view
+        and "未固定床位" in assignment_view,
+        "assignment page does not support room-only residency",
+        errors,
+    )
+    require(
+        "invitationContext" in team_guard
+        and "active_batch_student_lock" in team_guard
+        and "leaderFormingTeam" not in team_guard,
+        "first teammate invitation still requires a pre-existing forming team",
         errors,
     )
 
@@ -302,6 +379,8 @@ def validate_test_inventory(errors: list[str]) -> int:
         "SecurityConfigTest.java",
         "BatchScopeServiceTest.java",
         "BatchLifecycleServiceTest.java",
+        "RoomLayoutServiceTest.java",
+        "ResidencyServiceTest.java",
     }
     names = {path.name for path in tests}
     for name in sorted(expected):
@@ -316,6 +395,7 @@ def main() -> int:
     validate_batch_scope(errors)
     validate_business_feature_projection(errors)
     validate_overlay_style(errors)
+    validate_layout_and_selection_regressions(errors)
     validate_frontend(errors)
     validate_security_configuration(errors)
     test_count = validate_test_inventory(errors)

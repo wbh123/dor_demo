@@ -14,6 +14,7 @@ const isTeamMode = computed(() => Boolean(teamId))
 const rooms = ref<DataObject[]>([])
 const activePersonalTeam = ref<DataObject | null>(null)
 const showPersonalExitConfirm = ref(false)
+const roomSelectionTarget = ref<DataObject | null>(null)
 const loading = ref(true)
 const preparingPersonalSelection = ref(false)
 const selectingRoomId = ref<number | null>(null)
@@ -78,9 +79,20 @@ async function randomRecommend() {
   } catch (reason) { error.value = translateError(reason) }
 }
 
-async function chooseRoom(room: DataObject) {
-  const countText = isTeamMode.value ? `为${memberCount}名队员` : '为你'
-  if (!window.confirm(`确认${countText}选择 ${room.building_name} ${room.room_number} 吗？\n系统只记录寝室归属，具体床位由寝室成员入住后自行协商。`)) return
+function requestRoomSelection(room: DataObject) {
+  roomSelectionTarget.value = room
+  error.value = ''
+  message.value = ''
+}
+
+function closeRoomSelectionConfirm() {
+  if (selectingRoomId.value !== null) return
+  roomSelectionTarget.value = null
+}
+
+async function confirmRoomSelection() {
+  const room = roomSelectionTarget.value
+  if (!room) return
   selectingRoomId.value = Number(room.id); error.value = ''; message.value = ''
   try {
     const path = isTeamMode.value
@@ -88,13 +100,17 @@ async function chooseRoom(room: DataObject) {
       : `/api/v1/student/batches/${batchId}/rooms/${room.id}/select`
     await api.post(path)
     message.value = `已成功选择 ${room.building_name} ${room.room_number}，具体床位由寝室成员自行协商。`
+    roomSelectionTarget.value = null
     window.setTimeout(() => { void router.replace(isTeamMode.value ? '/student/teams' : '/student') }, 900)
   } catch (reason) { error.value = translateError(reason) }
   finally { selectingRoomId.value = null }
 }
 
 function openRoom(room: DataObject) {
-  if (isRoomMode.value) return chooseRoom(room)
+  if (isRoomMode.value) {
+    requestRoomSelection(room)
+    return
+  }
   void router.push({ path: `/student/batches/${batchId}/rooms/${Number(room.id)}`, query: isTeamMode.value ? { teamId: String(teamId), memberCount: String(memberCount) } : undefined })
 }
 function roomType(value: unknown) { return ({ FOUR_PERSON:'四人间',FIVE_PERSON:'五人间',SIX_PERSON:'六人间',OTHER:'其他房型' } as Record<string,string>)[String(value)] ?? String(value) }
@@ -131,5 +147,87 @@ function conflictReasons(room: DataObject) { return ((room.conflictReasons ?? ro
     </div>
 
     <div v-if="showPersonalExitConfirm" class="modal-overlay"><section class="modal-card confirmation-dialog"><h3>{{ t('team.personalExit.title') }}</h3><p>{{ t('team.personalExit.message') }}</p><div class="button-row"><button class="button ghost" @click="router.back()">{{ t('common.cancel') }}</button><button class="button primary" :disabled="preparingPersonalSelection" @click="confirmPersonalSelection">{{ t('common.confirm') }}</button></div></section></div>
+
+    <div v-if="roomSelectionTarget" class="modal-overlay room-selection-overlay" @click.self="closeRoomSelectionConfirm">
+      <section class="modal-card room-selection-dialog" role="dialog" aria-modal="true" aria-labelledby="room-selection-title">
+        <div class="room-selection-head">
+          <div>
+            <span class="eyebrow">ROOM CONFIRMATION</span>
+            <h3 id="room-selection-title">确认选择 {{ roomSelectionTarget.building_name }} {{ roomSelectionTarget.room_number }}</h3>
+            <p>{{ isTeamMode ? `本次将为${memberCount}名队员确认同一寝室归属。` : '本次只确认你的寝室归属。' }}</p>
+          </div>
+          <button class="modal-close" type="button" :disabled="selectingRoomId !== null" @click="closeRoomSelectionConfirm">×</button>
+        </div>
+        <div class="room-selection-summary">
+          <article><span>房型</span><strong>{{ roomType(roomSelectionTarget.room_type) }}</strong></article>
+          <article><span>楼层</span><strong>{{ roomSelectionTarget.floor_number }}层</strong></article>
+          <article><span>剩余名额</span><strong>{{ roomSelectionTarget.availableCount }}</strong></article>
+        </div>
+        <div class="room-selection-notice">
+          <strong>不会自动分配具体床位</strong>
+          <p>系统只记录寝室归属，入住后由寝室成员自行协商实际床位。后续开放选床模式前，管理员需要完成现实床位核对。</p>
+        </div>
+        <div class="button-row room-selection-actions">
+          <button class="button ghost" type="button" :disabled="selectingRoomId !== null" @click="closeRoomSelectionConfirm">取消</button>
+          <button class="button primary" type="button" :disabled="selectingRoomId !== null" @click="confirmRoomSelection">
+            {{ selectingRoomId !== null ? '正在确认…' : isTeamMode ? '确认队伍选择' : '确认选择寝室' }}
+          </button>
+        </div>
+      </section>
+    </div>
   </div>
 </template>
+
+<style scoped>
+.room-selection-overlay {
+  z-index: 1250;
+  padding: 30px;
+  background: rgba(9, 23, 48, 0.78) !important;
+  backdrop-filter: blur(7px) !important;
+}
+.room-selection-dialog {
+  width: min(680px, calc(100vw - 60px));
+  padding: 24px;
+  border: 1px solid var(--border);
+  border-radius: 26px;
+  background: var(--surface, #fff);
+}
+.room-selection-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 18px;
+}
+.room-selection-head h3 { margin: 6px 0; }
+.room-selection-head p { margin: 0; color: var(--text-muted); }
+.room-selection-summary {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin: 20px 0;
+}
+.room-selection-summary article {
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface-soft);
+}
+.room-selection-summary span,
+.room-selection-summary strong { display: block; }
+.room-selection-summary span { color: var(--text-muted); font-size: 12px; }
+.room-selection-summary strong { margin-top: 5px; }
+.room-selection-notice {
+  padding: 15px;
+  border: 1px solid #d7e4f8;
+  border-radius: 14px;
+  background: #f3f8ff;
+  color: #36577f;
+}
+.room-selection-notice p { margin: 6px 0 0; line-height: 1.55; }
+.room-selection-actions { justify-content: flex-end; margin-top: 20px; }
+@media (max-width: 640px) {
+  .room-selection-overlay { padding: 10px; }
+  .room-selection-dialog { width: 100%; padding: 18px; border-radius: 22px; }
+  .room-selection-summary { grid-template-columns: 1fr; }
+}
+</style>
