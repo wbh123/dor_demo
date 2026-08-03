@@ -12,15 +12,16 @@ def read(path: Path) -> str:
 
 
 class ThousandStudentSqlTest(unittest.TestCase):
-    def test_latest_schema_installer_contains_v17(self):
+    def test_latest_schema_installer_contains_v18(self):
         schema = read(SQL_DIR / "schema.sql")
-        self.assertIn("Schema version: V1-V17", schema)
+        self.assertIn("Schema version: V1-V18", schema)
         self.assertIn("V15__add_batch_selection_modes.sql", schema)
         self.assertIn("V16__add_residency_student_category_and_transfer_support.sql", schema)
         self.assertIn("V17__restore_required_system_configuration.sql", schema)
+        self.assertIn("V18__seed_required_business_reference_data.sql", schema)
         self.assertLess(
-            schema.index("V16__add_residency_student_category_and_transfer_support.sql"),
             schema.index("V17__restore_required_system_configuration.sql"),
+            schema.index("V18__seed_required_business_reference_data.sql"),
         )
 
     def test_common_base_generates_enough_resources_and_students(self):
@@ -42,8 +43,10 @@ class ThousandStudentSqlTest(unittest.TestCase):
     def test_clean_entry_contains_no_business_state(self):
         clean = read(DATA_DIR / "1000_students_clean.sql")
         self.assertIn("SOURCE 1000_students_base.sql", clean)
+        self.assertIn("DELETE FROM service_quota_alert", clean)
         self.assertIn("COUNT(*) FROM selection_batch) <> 0", clean)
         self.assertIn("COUNT(*) FROM room_assignment) <> 0", clean)
+        self.assertIn("STUDENT_WELCOME_MESSAGE", clean)
         self.assertIn("CLEAN_1000_READY", clean)
 
     def test_realistic_entry_models_room_and_bed_modes(self):
@@ -83,12 +86,15 @@ class ThousandStudentSqlTest(unittest.TestCase):
         self.assertIn("CREATE DATABASE `wust_dormitory`", reset)
         self.assertIn("USE `wust_dormitory`", reset)
         migration_files = sorted((NAVICAT_DIR / "01_数据库架构").glob("[0-9][0-9]_V*.sql"))
-        self.assertEqual(17, len(migration_files))
+        self.assertEqual(18, len(migration_files))
         self.assertTrue(
             (NAVICAT_DIR / "01_数据库架构/17_V17__restore_required_system_configuration.sql").exists()
         )
+        self.assertTrue(
+            (NAVICAT_DIR / "01_数据库架构/18_V18__seed_required_business_reference_data.sql").exists()
+        )
         baseline = read(NAVICAT_DIR / "01_数据库架构/99_写入Flyway基线.sql")
-        self.assertIn("'17'", baseline)
+        self.assertIn("'18'", baseline)
 
     def test_navicat_data_packages_select_database_and_clear_business_data(self):
         for folder, filename, ready_token in (
@@ -97,9 +103,12 @@ class ThousandStudentSqlTest(unittest.TestCase):
         ):
             selector = read(NAVICAT_DIR / folder / "00_使用统一数据库.sql")
             data = read(NAVICAT_DIR / folder / filename)
+            recovery = read(NAVICAT_DIR / folder / "02_恢复必需系统配置.sql")
             self.assertIn("USE `wust_dormitory`", selector)
             self.assertIn("CALL clear_1000_test_data();", data)
             self.assertIn(ready_token, data)
+            self.assertIn("STUDENT_WELCOME_MESSAGE", recovery)
+            self.assertIn("DELETE FROM service_quota_alert", recovery)
             self.assertNotIn("DROP DATABASE", data)
 
     def test_navicat_integrity_checker_is_available(self):
@@ -107,6 +116,8 @@ class ThousandStudentSqlTest(unittest.TestCase):
             NAVICAT_DIR / "04_数据库完整性检查/00_修复并检查数据库完整性.sql"
         )
         self.assertIn("STUDENT_WELCOME_MESSAGE", integrity)
+        self.assertIn("缺少已发布的个人偏好问卷", integrity)
+        self.assertIn("缺少已启用的匹配权重方案", integrity)
         self.assertIn("DB_INTEGRITY_OK", integrity)
         self.assertIn("information_schema.tables", integrity)
         self.assertIn("information_schema.columns", integrity)
@@ -123,6 +134,7 @@ class ThousandStudentSqlTest(unittest.TestCase):
         self.assertIn('choices=("source", "inline", "navicat")', schema_generator)
         self.assertIn("--check", schema_generator)
         self.assertIn("--check", data_generator)
+        self.assertIn("04_数据库完整性检查.sql", orchestrator)
 
 
 if __name__ == "__main__":
