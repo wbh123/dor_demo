@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { api } from '../../api/client'
-import type { DataObject, ListSuccessResponse } from '../../api/types'
+import type { DataObject, ListSuccessResponse, ObjectSuccessResponse } from '../../api/types'
 
 interface WeightDefinition {
   key: string
@@ -51,6 +51,8 @@ const saving = ref(false)
 const error = ref('')
 const message = ref('')
 const creating = ref(false)
+const policySaving = ref(false)
+const selectionPolicy = reactive({ allowWithoutQuestionnaire: false, allowStudentReselect: false, questionnaireBypassFeatureEnabled: false, studentReselectFeatureEnabled: false, version: 0, reason: '' })
 
 const form = reactive({
   schemeCode: '',
@@ -98,8 +100,17 @@ async function load() {
   loading.value = true
   error.value = ''
   try {
-    const response = await api.get<ListSuccessResponse>('/api/v1/admin/matching-weight-schemes')
+    const [response, policyResponse] = await Promise.all([
+      api.get<ListSuccessResponse>('/api/v1/admin/matching-weight-schemes'),
+      api.get<ObjectSuccessResponse>('/api/v1/admin/settings/selection-policy'),
+    ])
     schemes.value = (response.data.data ?? []) as DataObject[]
+    const policy = (policyResponse.data.data ?? {}) as DataObject
+    selectionPolicy.allowWithoutQuestionnaire = Boolean(policy.allowWithoutQuestionnaire)
+    selectionPolicy.allowStudentReselect = Boolean(policy.allowStudentReselect)
+    selectionPolicy.questionnaireBypassFeatureEnabled = Boolean(policy.questionnaireBypassFeatureEnabled)
+    selectionPolicy.studentReselectFeatureEnabled = Boolean(policy.studentReselectFeatureEnabled)
+    selectionPolicy.version = Number(policy.version ?? 0)
     if (!selected.value && schemes.value.length > 0 && !creating.value) {
       selectScheme(schemes.value[0])
     } else if (selected.value) {
@@ -209,6 +220,33 @@ async function save() {
   }
 }
 
+
+async function saveSelectionPolicy() {
+  if (!selectionPolicy.reason.trim()) {
+    error.value = '请填写选寝策略修改原因。'
+    return
+  }
+  policySaving.value = true
+  error.value = ''
+  message.value = ''
+  try {
+    const response = await api.put<ObjectSuccessResponse>('/api/v1/admin/settings/selection-policy', {
+      allowWithoutQuestionnaire: selectionPolicy.allowWithoutQuestionnaire,
+      allowStudentReselect: selectionPolicy.allowStudentReselect,
+      expectedVersion: selectionPolicy.version,
+      reason: selectionPolicy.reason.trim(),
+    })
+    const policy = (response.data.data ?? {}) as DataObject
+    selectionPolicy.version = Number(policy.version ?? selectionPolicy.version + 1)
+    selectionPolicy.reason = ''
+    message.value = '选寝策略已保存。'
+  } catch (reason) {
+    error.value = reason instanceof Error ? reason.message : '选寝策略保存失败'
+  } finally {
+    policySaving.value = false
+  }
+}
+
 function revisionLabel(scheme: DataObject) {
   return `${String(scheme.scheme_name)} · 第${Number(scheme.revision)}版`
 }
@@ -224,6 +262,10 @@ function revisionLabel(scheme: DataObject) {
 
     <p v-if="error" class="alert error">{{ error }}</p>
     <p v-if="message" class="alert success">{{ message }}</p>
+
+    <section class="panel selection-policy-card"><div class="section-head"><div><span class="eyebrow">SELECTION POLICY</span><h3>选寝行为策略</h3><p>策略受系统管理员功能授权控制，学校管理员只配置当前学校的具体行为。</p></div></div><div class="policy-switch-grid"><label :class="{ disabled: !selectionPolicy.questionnaireBypassFeatureEnabled }"><input v-model="selectionPolicy.allowWithoutQuestionnaire" type="checkbox" :disabled="!selectionPolicy.questionnaireBypassFeatureEnabled" /><span><strong>允许未填写问卷直接选寝</strong><small>学生进入选择前仍会收到提醒，房间卡片会标记未填写偏好的室友。</small></span></label><label :class="{ disabled: !selectionPolicy.studentReselectFeatureEnabled }"><input v-model="selectionPolicy.allowStudentReselect" type="checkbox" :disabled="!selectionPolicy.studentReselectFeatureEnabled" /><span><strong>允许学生取消已确定结果并重选</strong><small>管理员始终可以人工调整；学生只有在此策略和系统权限同时开启时才能自主取消。</small></span></label></div><label class="matching-reason"><span>策略修改原因</span><textarea v-model.trim="selectionPolicy.reason" class="input" rows="2" maxlength="500" placeholder="必填，将写入审计" /></label><div class="button-row"><button class="button primary" :disabled="policySaving" @click="saveSelectionPolicy">{{ policySaving ? '保存中…' : '保存选寝策略' }}</button></div></section>
+
+    <section class="panel weight-manual"><span class="eyebrow">WEIGHT GUIDE</span><h3>权重控制说明</h3><div class="weight-manual-grid"><article><strong>0</strong><p>完全忽略该维度，不参与排序和差异分析。</p></article><article><strong>0.1～1.0</strong><p>弱影响，仅在其他维度相近时起辅助作用。</p></article><article><strong>1.1～2.5</strong><p>中等影响，适合睡眠、噪声、卫生等常用维度。</p></article><article><strong>2.6～5.0</strong><p>强影响，应谨慎使用，避免单一偏好压过整体兼容性。</p></article></div><p>匹配分是各维度归一化差异的加权结果，再叠加吸烟等明确冲突扣分。提示标签只解释差异，不评价学生人格；已有批次固定使用创建时的权重修订。</p></section>
 
     <div class="matching-layout">
       <aside class="panel matching-scheme-list">
@@ -327,3 +369,7 @@ function revisionLabel(scheme: DataObject) {
     </div>
   </div>
 </template>
+
+<style scoped>
+.policy-switch-grid,.weight-manual-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.policy-switch-grid label{display:flex;gap:12px;padding:15px;border:1px solid var(--border);border-radius:14px;background:var(--surface-soft)}.policy-switch-grid label.disabled{opacity:.55}.policy-switch-grid span,.policy-switch-grid small{display:block}.policy-switch-grid small{margin-top:5px;color:var(--text-muted)}.weight-manual{display:grid;gap:14px}.weight-manual-grid article{padding:14px;border:1px solid var(--border);border-radius:13px}.weight-manual-grid strong{font-size:20px}.weight-manual-grid p{margin:5px 0 0;color:var(--text-muted)}@media(max-width:720px){.policy-switch-grid,.weight-manual-grid{grid-template-columns:1fr}}
+</style>

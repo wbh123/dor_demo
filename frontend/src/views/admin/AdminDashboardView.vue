@@ -2,6 +2,7 @@
 import { onMounted, reactive, ref } from 'vue'
 import { api } from '../../api/client'
 import type { DataObject, ListSuccessResponse, ObjectSuccessResponse } from '../../api/types'
+import { countryLabel, countryOptions } from '../../utils/countries'
 import { useI18n } from '../../i18n'
 
 const dashboard = ref<DataObject>({})
@@ -13,6 +14,8 @@ const welcomeMessages = reactive<Record<string, string>>({
   'zh-CN': '',
   'en-US': '',
 })
+const countryMessages = reactive<Record<string, string>>({})
+const newCountryCode = ref('US')
 const welcomeVersion = ref(0)
 const welcomeUpdatedAt = ref('')
 const welcomeUpdatedBy = ref('')
@@ -51,6 +54,8 @@ async function loadWelcomeSetting() {
     const messages = (data.messages ?? {}) as Record<string, string>
     welcomeMessages['zh-CN'] = String(messages['zh-CN'] ?? data.message ?? '')
     welcomeMessages['en-US'] = String(messages['en-US'] ?? '')
+    Object.keys(countryMessages).forEach((key) => delete countryMessages[key])
+    Object.assign(countryMessages, (data.countryMessages ?? {}) as Record<string, string>)
     welcomeVersion.value = Number(data.version ?? 0)
     welcomeUpdatedAt.value = String(data.updated_at ?? '')
     welcomeUpdatedBy.value = String(data.updated_by_name ?? '')
@@ -74,12 +79,14 @@ async function saveWelcomeSetting() {
   try {
     const response = await api.put<ObjectSuccessResponse>(
       '/api/v1/admin/settings/student-welcome',
-      { messages: normalized, expectedVersion: welcomeVersion.value },
+      { messages: normalized, countryMessages: { ...countryMessages }, expectedVersion: welcomeVersion.value },
     )
     const data = (response.data.data ?? {}) as DataObject
     const messages = (data.messages ?? normalized) as Record<string, string>
     welcomeMessages['zh-CN'] = String(messages['zh-CN'] ?? normalized['zh-CN'])
     welcomeMessages['en-US'] = String(messages['en-US'] ?? normalized['en-US'])
+    Object.keys(countryMessages).forEach((key) => delete countryMessages[key])
+    Object.assign(countryMessages, (data.countryMessages ?? countryMessages) as Record<string, string>)
     welcomeVersion.value = Number(data.version ?? welcomeVersion.value + 1)
     welcomeUpdatedAt.value = String(data.updated_at ?? '')
     welcomeUpdatedBy.value = String(data.updated_by_name ?? '')
@@ -89,6 +96,17 @@ async function saveWelcomeSetting() {
   } finally {
     welcomeSaving.value = false
   }
+}
+
+
+function addCountryWelcome() {
+  const code = newCountryCode.value.trim().toUpperCase()
+  if (!code || countryMessages[code] !== undefined) return
+  countryMessages[code] = ''
+}
+
+function removeCountryWelcome(code: string) {
+  delete countryMessages[code]
 }
 
 const stats = [
@@ -127,7 +145,7 @@ const stats = [
           <div>
             <span class="eyebrow">{{ subtitle('首次登录欢迎', 'FIRST LOGIN WELCOME') }}</span>
             <h3>新生欢迎语</h3>
-            <p>学生激活账号后首次登录时，系统按照当前语言显示对应欢迎语。</p>
+            <p>可按学生国籍设置专属欢迎语；未配置该国家/地区时自动显示英文欢迎语。</p>
           </div>
         </div>
         <div class="multilingual-welcome-grid">
@@ -154,6 +172,7 @@ const stats = [
             />
           </label>
         </div>
+        <section class="country-welcome-section"><div class="section-head split-title"><div><strong>按国家/地区设置欢迎语</strong><p>国籍匹配优先于界面语言，未匹配时回退英文。</p></div><div class="button-row"><select v-model="newCountryCode" class="input"><option v-for="country in countryOptions" :key="country.code" :value="country.code">{{ country.name }}</option></select><button class="button secondary" @click="addCountryWelcome">添加</button></div></div><div v-if="Object.keys(countryMessages).length" class="country-welcome-list"><label v-for="(_, code) in countryMessages" :key="code"><span>{{ countryLabel(code) }}</span><textarea v-model="countryMessages[code]" class="input" rows="3" maxlength="1000" :placeholder="`请输入${countryLabel(code)}学生的欢迎语`" /><button class="text-button danger-text" type="button" @click="removeCountryWelcome(String(code))">删除该国家欢迎语</button></label></div><p v-else class="empty-state">尚未设置国家专属欢迎语。</p></section>
         <div class="welcome-setting-meta">
           <span v-if="welcomeUpdatedAt">最后修改：{{ welcomeUpdatedAt }}</span>
           <span v-if="welcomeUpdatedBy">修改人：{{ welcomeUpdatedBy }}</span>
@@ -202,3 +221,10 @@ const stats = [
     </template>
   </div>
 </template>
+
+<style scoped>
+.country-welcome-section { margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--border); }
+.country-welcome-list { display: grid; grid-template-columns: repeat(auto-fit,minmax(300px,1fr)); gap: 12px; }
+.country-welcome-list label { display: grid; gap: 7px; padding: 14px; border: 1px solid var(--border); border-radius: 13px; }
+.danger-text { color: #b91c1c; justify-self: start; }
+</style>

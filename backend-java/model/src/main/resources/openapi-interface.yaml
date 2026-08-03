@@ -90,6 +90,22 @@ paths:
   /api/v1/admin/batches/{batchId}/assignments.csv:
     $ref: 'admin/openapi-admin.yaml#/paths/~1api~1v1~1admin~1batches~1{batchId}~1assignments.csv'
 
+  /api/v1/admin/import/students:
+    $ref: 'admin/openapi-import-policy.yaml#/paths/~1api~1v1~1admin~1import~1students'
+  /api/v1/admin/import/rooms:
+    $ref: 'admin/openapi-import-policy.yaml#/paths/~1api~1v1~1admin~1import~1rooms'
+  /api/v1/admin/import/students/template:
+    $ref: 'admin/openapi-import-policy.yaml#/paths/~1api~1v1~1admin~1import~1students~1template'
+  /api/v1/admin/import/rooms/template:
+    $ref: 'admin/openapi-import-policy.yaml#/paths/~1api~1v1~1admin~1import~1rooms~1template'
+  /api/v1/admin/settings/selection-policy:
+    $ref: 'admin/openapi-import-policy.yaml#/paths/~1api~1v1~1admin~1settings~1selection-policy'
+  /api/v1/student/preferences:
+    $ref: 'student/openapi-preference-policy.yaml#/paths/~1api~1v1~1student~1preferences'
+  /api/v1/student/batches/{batchId}/selection-readiness:
+    $ref: 'student/openapi-preference-policy.yaml#/paths/~1api~1v1~1student~1batches~1{batchId}~1selection-readiness'
+  /api/v1/student/batches/{batchId}/assignment/cancel:
+    $ref: 'student/openapi-preference-policy.yaml#/paths/~1api~1v1~1student~1batches~1{batchId}~1assignment~1cancel'
   /api/v1/student/profile:
     $ref: 'student/openapi-student.yaml#/paths/~1api~1v1~1student~1profile'
   /api/v1/student/notifications:

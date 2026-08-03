@@ -25,6 +25,12 @@ const router = createRouter({
           meta: { role: 'STUDENT' },
         },
         {
+          path: 'student/preferences',
+          name: 'student-preferences',
+          component: () => import('../views/student/QuestionnaireView.vue'),
+          meta: { role: 'STUDENT' },
+        },
+        {
           path: 'student/batches/:batchId/questionnaire',
           name: 'questionnaire',
           component: () => import('../views/student/QuestionnaireView.vue'),

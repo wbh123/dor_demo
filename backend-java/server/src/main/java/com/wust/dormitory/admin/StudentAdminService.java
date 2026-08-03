@@ -68,7 +68,7 @@ public class StudentAdminService {
         List<Map<String, Object>> items = jdbc.queryForList("""
                 SELECT s.id, s.student_number, s.student_name, s.gender,
                        s.nationality_code, s.student_category,
-                       s.enrollment_source, s.phone_number, s.major_id,
+                       s.enrollment_source, s.phone_number, s.degree_level, s.grade_year, s.major_id,
                        m.major_code, m.major_name, u.account_status,
                        EXISTS(
                            SELECT 1 FROM room_assignment ra
@@ -95,10 +95,10 @@ public class StudentAdminService {
                     INSERT INTO student
                     (student_number, student_name, gender, major_id,
                      nationality_code, student_category, enrollment_source,
-                     phone_number)
+                     phone_number, degree_level, grade_year)
                     VALUES (:number, :name, :gender, :majorId,
                             :nationalityCode, :studentCategory,
-                            :enrollmentSource, :phoneNumber)
+                            :enrollmentSource, :phoneNumber, :degreeLevel, :gradeYear)
                     """, parameters(command), studentKey, new String[]{"id"});
             long studentId = studentKey.getKey().longValue();
             jdbc.update("""
@@ -133,7 +133,9 @@ public class StudentAdminService {
                     nationality_code=:nationalityCode,
                     student_category=:studentCategory,
                     enrollment_source=:enrollmentSource,
-                    phone_number=:phoneNumber
+                    phone_number=:phoneNumber,
+                    degree_level=:degreeLevel,
+                    grade_year=:gradeYear
                 WHERE id=:id
                 """, update);
         jdbc.update("""
@@ -204,7 +206,9 @@ public class StudentAdminService {
                 .addValue("nationalityCode", command.nationalityCode())
                 .addValue("studentCategory", command.studentCategory())
                 .addValue("enrollmentSource", command.enrollmentSource())
-                .addValue("phoneNumber", command.phoneNumber());
+                .addValue("phoneNumber", command.phoneNumber())
+                .addValue("degreeLevel", command.degreeLevel())
+                .addValue("gradeYear", command.gradeYear());
     }
 
     private void validate(StudentCommand command) {
@@ -230,6 +234,15 @@ public class StudentAdminService {
         if (command.phoneNumber() != null
                 && !command.phoneNumber().matches("^\\+?[0-9][0-9 -]{5,30}$")) {
             throw new BusinessException("PHONE_NUMBER_INVALID", "手机号码格式不正确");
+        }
+        if (command.degreeLevel() != null
+                && !List.of("UNDERGRADUATE", "MASTER", "DOCTOR", "MASTER_DOCTOR")
+                .contains(command.degreeLevel())) {
+            throw new BusinessException("DEGREE_LEVEL_INVALID", "培养层次不合法");
+        }
+        if (command.gradeYear() != null
+                && (command.gradeYear() < 2000 || command.gradeYear() > 2100)) {
+            throw new BusinessException("GRADE_YEAR_INVALID", "年级必须为2000至2100之间的年份");
         }
     }
 
@@ -264,7 +277,9 @@ public class StudentAdminService {
             String nationalityCode,
             String studentCategory,
             String enrollmentSource,
-            String phoneNumber) {
+            String phoneNumber,
+            String degreeLevel,
+            Integer gradeYear) {
 
         public StudentCommand withEnrollmentSource(String value) {
             return new StudentCommand(
@@ -275,7 +290,9 @@ public class StudentAdminService {
                     nationalityCode,
                     studentCategory,
                     value,
-                    phoneNumber);
+                    phoneNumber,
+                    degreeLevel,
+                    gradeYear);
         }
     }
 }

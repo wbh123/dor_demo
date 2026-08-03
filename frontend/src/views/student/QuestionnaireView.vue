@@ -12,7 +12,8 @@ interface PreferenceChoice {
 
 const route = useRoute()
 const router = useRouter()
-const batchId = Number(route.params.batchId)
+const batchId = Number(route.params.batchId || 0)
+const globalMode = computed(() => !batchId)
 const batch = ref<DataObject>({})
 const questions = ref<DataObject[]>([])
 const answers = reactive<Record<string, unknown>>({})
@@ -34,7 +35,7 @@ const answeredCount = computed(() =>
     return value !== undefined && value !== null && value !== ''
   }).length,
 )
-const canSave = computed(() => ['PUBLISHED', 'OPEN'].includes(String(batch.value.batch_status)))
+const canSave = computed(() => globalMode.value || ['PUBLISHED', 'OPEN'].includes(String(batch.value.batch_status)))
 
 onMounted(load)
 
@@ -43,24 +44,24 @@ async function load() {
   error.value = ''
   try {
     const response = await api.get<ObjectSuccessResponse>(
-      `/api/v1/student/batches/${batchId}/questionnaire`,
+      globalMode.value ? '/api/v1/student/preferences' : `/api/v1/student/batches/${batchId}/questionnaire`,
     )
     const data = (response.data.data ?? {}) as DataObject
     batch.value = (data.batch ?? {}) as DataObject
     questions.value = (data.questions ?? []) as DataObject[]
-    const saved = (data.answers ?? []) as DataObject[]
+    const directAnswers = (data.profileAnswers ?? (globalMode.value ? data.answers : {})) as Record<string, unknown>
+    for (const question of questions.value) {
+      const code = String(question.question_code)
+      if (directAnswers[code] !== undefined) answers[code] = normalizeSavedAnswer(question, directAnswers[code])
+    }
+    const saved = Array.isArray(data.answers) ? data.answers as DataObject[] : []
     const questionById = new Map(questions.value.map((question) => [Number(question.id), question]))
     for (const answer of saved) {
       const question = questionById.get(Number(answer.question_id))
       if (!question) continue
       let parsed: unknown
-      try {
-        parsed = typeof answer.answer_json === 'string'
-          ? JSON.parse(answer.answer_json)
-          : answer.answer_json
-      } catch {
-        parsed = answer.answer_json
-      }
+      try { parsed = typeof answer.answer_json === 'string' ? JSON.parse(answer.answer_json) : answer.answer_json }
+      catch { parsed = answer.answer_json }
       answers[String(question.question_code)] = normalizeSavedAnswer(question, parsed)
     }
   } catch (reason) {
@@ -89,12 +90,12 @@ async function submit() {
       const value = answerPayload(question)
       if (value !== undefined && value !== null && value !== '') payload[code] = value
     }
-    await api.post(`/api/v1/student/batches/${batchId}/questionnaire`, payload)
-    message.value = '个人偏好已保存，室友匹配结果已更新。'
+    if (globalMode.value) await api.put('/api/v1/student/preferences', payload)
+    else await api.post(`/api/v1/student/batches/${batchId}/questionnaire`, payload)
+    message.value = '个人偏好已保存，后续批次会自动使用这份偏好。'
     window.setTimeout(() => {
-      void router.push(String(batch.value.batch_status) === 'OPEN'
-        ? `/student/batches/${batchId}/rooms`
-        : '/student')
+      void router.push(!globalMode.value && String(batch.value.batch_status) === 'OPEN'
+        ? `/student/batches/${batchId}/rooms` : '/student')
     }, 600)
   } catch (reason) {
     error.value = reason instanceof Error ? reason.message : '提交失败'
@@ -169,7 +170,7 @@ function choices(question: DataObject): PreferenceChoice[] {
     question,
     [1, 2, 3, 4, 5].map((value) => [
       value,
-      ['非常低', '较低', '适中', '较高', '非常高'][value - 1],
+      ['几乎从不/完全不接受', '较少/较不敏感', '一般', '较多/比较在意', '几乎每天/非常在意'][value - 1],
     ]),
   )
 }
@@ -206,13 +207,8 @@ function normalizeSavedAnswer(question: DataObject, value: unknown) {
   return matched?.token ?? ''
 }
 
-function questionMin(question: DataObject) {
-  return String(question.question_code) === 'WINTER_HEATING_TEMPERATURE' ? 16 : 20
-}
-
-function questionMax(question: DataObject) {
-  return String(question.question_code) === 'WINTER_HEATING_TEMPERATURE' ? 28 : 32
-}
+function questionMin(_question: DataObject) { return 16 }
+function questionMax(_question: DataObject) { return 30 }
 </script>
 
 <template>
@@ -221,7 +217,7 @@ function questionMax(question: DataObject) {
       <div>
         <span class="eyebrow">PERSONAL PREFERENCES</span>
         <h2>个人偏好</h2>
-        <p>这些信息只用于寻找相处习惯更接近的室友，不用于评价个人品质。</p>
+        <p>{{ globalMode ? '即使当前没有开放批次，也可以提前设置；后续选寝将自动使用。' : '这些信息只用于寻找相处习惯更接近的室友，不用于评价个人品质。' }}</p>
       </div>
       <span class="progress-pill">{{ answeredCount }}/{{ visibleQuestions.length }}</span>
     </div>
@@ -249,6 +245,7 @@ function questionMax(question: DataObject) {
             :disabled="!canSave"
             :required="isRequired(question)"
           />
+          <small v-if="question.question_type === 'TIME'" class="question-hint">请使用24小时制，例如23:30。</small>
           <label v-else-if="question.question_type === 'INTEGER'" class="temperature-input">
             <input
               v-model.number="answers[String(question.question_code)]"

@@ -13,6 +13,7 @@ const error = ref('')
 const message = ref('')
 const loading = ref(true)
 const submitting = ref(false)
+const assigned = ref(false)
 const showStartSelectionConfirm = ref<DataObject | null>(null)
 const showLeaveConfirm = ref<DataObject | null>(null)
 const removeCandidate = ref<{ team: DataObject; member: DataObject } | null>(null)
@@ -22,7 +23,7 @@ const { t, subtitle, translateError } = useI18n()
 const currentTeam = computed(() => teams.value[0] ?? null)
 const currentMembers = computed(() => ((currentTeam.value?.members ?? []) as DataObject[]))
 const canInvite = computed(() => {
-  if (!currentTeam.value) return true
+  if (!currentTeam.value || assigned.value) return false
   return currentTeam.value.member_role === 'LEADER'
     && currentTeam.value.team_status === 'FORMING'
     && currentMembers.value.length < 5
@@ -34,16 +35,35 @@ async function load() {
   loading.value = true
   error.value = ''
   try {
-    const [teamResponse, invitationResponse] = await Promise.all([
+    const [teamResponse, invitationResponse, residencyResponse] = await Promise.all([
       api.get<ListSuccessResponse>('/api/v1/student/teams'),
       api.get<ListSuccessResponse>('/api/v1/student/team-invitations'),
+      api.get<ObjectSuccessResponse>('/api/v1/student/residency'),
     ])
     teams.value = (teamResponse.data.data ?? []) as DataObject[]
-    invitations.value = (invitationResponse.data.data ?? []) as DataObject[]
+    assigned.value = Boolean((residencyResponse.data.data as DataObject | undefined)?.resident)
+    invitations.value = assigned.value ? [] : (invitationResponse.data.data ?? []) as DataObject[]
   } catch (reason) {
     error.value = translateError(reason)
   } finally {
     loading.value = false
+  }
+}
+
+
+async function createTeam() {
+  if (submitting.value || assigned.value) return
+  submitting.value = true
+  error.value = ''
+  message.value = ''
+  try {
+    await api.post('/api/v1/student/teams')
+    message.value = '队伍已创建，现在可以邀请队友。'
+    await load()
+  } catch (reason) {
+    error.value = translateError(reason)
+  } finally {
+    submitting.value = false
   }
 }
 
@@ -198,7 +218,7 @@ function memberRoleText(role: unknown) {
     <p v-if="error" class="alert error">{{ error }}</p>
     <p v-if="message" class="alert success">{{ message }}</p>
 
-    <section v-if="invitations.length" class="panel team-invitation-panel">
+    <section v-if="!assigned && invitations.length" class="panel team-invitation-panel">
       <div class="section-head">
         <div>
           <span class="eyebrow">{{ subtitle('待处理邀请', 'INVITATIONS') }}</span>
@@ -222,6 +242,8 @@ function memberRoleText(role: unknown) {
         </article>
       </div>
     </section>
+
+    <section v-if="!assigned && !currentTeam" class="panel compact-team-invite-panel"><div class="section-head"><div><span class="eyebrow">CREATE TEAM</span><h3>先创建队伍</h3><p>请先创建处于组队中的队伍，再邀请队友。</p></div></div><button class="button primary" :disabled="submitting" @click="createTeam">{{ submitting ? '正在创建…' : '创建队伍' }}</button></section>
 
     <section v-if="canInvite" class="panel compact-team-invite-panel">
       <div class="section-head">
@@ -252,9 +274,8 @@ function memberRoleText(role: unknown) {
     </section>
 
     <p v-if="loading" class="panel empty-state">正在加载小组成员…</p>
-    <p v-else-if="teams.length === 0" class="panel empty-state">
-      你还没有加入小组，可以直接邀请一名队友开始组队。
-    </p>
+    <p v-else-if="assigned" class="panel empty-state">你已经确定住宿结果，不能再邀请、接受邀请或参与组队。</p>
+    <p v-else-if="teams.length === 0" class="panel empty-state">请先创建处于组队中的队伍。</p>
 
     <div v-else class="team-grid refined-team-grid">
       <article v-for="team in teams" :key="String(team.id)" class="panel team-card refined-team-card">

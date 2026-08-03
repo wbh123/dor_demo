@@ -7,6 +7,7 @@ import type {
   ListSuccessResponse,
   ObjectSuccessResponse,
 } from '../../api/types'
+import { bedTypeLabel } from '../../utils/bedLabels'
 
 const batches = ref<DataObject[]>([])
 const assignments = ref<DataObject[]>([])
@@ -152,7 +153,7 @@ function methodText(value: unknown) {
               </td>
               <td>{{ item.major_code }} · {{ item.major_name }}</td>
               <td>{{ item.building_name }} {{ item.room_number }}</td>
-              <td>{{ item.bed_code }} · {{ item.bed_type }}</td>
+              <td>{{ item.bed_code }} · {{ bedTypeLabel(item.bed_type) }}</td>
               <td><span class="status-chip compact">{{ methodText(item.assignment_method) }}</span></td>
               <td>{{ ((item.availableBeds ?? []) as DataObject[]).length }}个</td>
               <td>
@@ -184,7 +185,7 @@ function methodText(value: unknown) {
           <span>目标床位</span>
           <select v-model.number="adjustment.newBedId" class="input" required>
             <option v-for="bed in targetBeds" :key="String(bed.bed_id)" :value="Number(bed.bed_id)">
-              {{ bed.display_name }} · {{ bed.bed_type }}
+              {{ bed.display_name }} · {{ bedTypeLabel(bed.bed_type) }}
             </option>
           </select>
         </label>

@@ -3,6 +3,8 @@ import { computed, onMounted, ref } from 'vue'
 import { api } from '../../api/client'
 import type { DataObject, ListSuccessResponse, ObjectSuccessResponse } from '../../api/types'
 import { useI18n } from '../../i18n'
+import { useFeatureAccess } from '../../composables/useFeatureAccess'
+import { bedTypeLabel } from '../../utils/bedLabels'
 
 const profile = ref<DataObject>({})
 const currentActivity = ref<DataObject | null>(null)
@@ -18,6 +20,7 @@ const showPhoneDialog = ref(false)
 const phoneDraft = ref('')
 const error = ref('')
 const phoneError = ref('')
+const { hasFeature } = useFeatureAccess()
 
 const {
   locale,
@@ -31,10 +34,9 @@ const {
 
 const questions = computed(() => (questionnaire.value.questions ?? []) as DataObject[])
 const savedAnswers = computed(() => (questionnaire.value.answers ?? []) as DataObject[])
-const questionnaireStarted = computed(() => Boolean(currentActivity.value?.questionnaire_started))
-const canEditQuestionnaire = computed(() =>
-  ['PUBLISHED', 'OPEN', 'PAUSED'].includes(String(currentActivity.value?.batch_status)),
-)
+const questionnaireStarted = computed(() => answerSummary.value.length > 0 || Boolean(currentActivity.value?.questionnaire_started))
+const canEditQuestionnaire = computed(() => true)
+const profileInsightEnabled = computed(() => hasFeature('P2_STUDENT_PROFILE_INSIGHT'))
 const canSelectRoom = computed(() => String(currentActivity.value?.batch_status) === 'OPEN')
 const assigned = computed(() => Boolean(assignmentResult.value.assigned))
 const assignment = computed(() => (assignmentResult.value.assignment ?? {}) as DataObject)
@@ -141,14 +143,12 @@ async function load() {
     const activities = (activityResponse.data.data ?? []) as DataObject[]
     currentActivity.value = chooseCurrentActivity(activities)
 
+    const requests: Promise<unknown>[] = [loadGlobalPreferences()]
     if (currentActivity.value) {
       const id = activityId(currentActivity.value)
-      const requests: Promise<unknown>[] = [loadAssignment(id)]
-      if (['PUBLISHED', 'OPEN', 'PAUSED'].includes(String(currentActivity.value.batch_status))) {
-        requests.push(loadQuestionnaire(id))
-      }
-      await Promise.all(requests)
+      requests.push(loadAssignment(id))
     }
+    await Promise.all(requests)
   } catch (reason) {
     error.value = translateError(reason)
   } finally {
@@ -156,8 +156,8 @@ async function load() {
   }
 }
 
-async function loadQuestionnaire(id: number) {
-  const response = await api.get<ObjectSuccessResponse>(`/api/v1/student/batches/${id}/questionnaire`)
+async function loadGlobalPreferences() {
+  const response = await api.get<ObjectSuccessResponse>('/api/v1/student/preferences')
   questionnaire.value = (response.data.data ?? {}) as DataObject
 }
 
@@ -342,13 +342,7 @@ function displayAnswer(question: DataObject, value: unknown) {
   return String(value ?? local('未填写', 'Not provided'))
 }
 
-function bedTypeText(value: unknown) {
-  return {
-    LOFT_BED_DESK: local('上床下桌', 'Loft bed with desk'),
-    BUNK_UPPER: local('上下铺上铺', 'Upper bunk'),
-    BUNK_LOWER: local('上下铺下铺', 'Lower bunk'),
-  }[String(value)] ?? String(value ?? '')
-}
+function bedTypeText(value: unknown) { return bedTypeLabel(value) }
 </script>
 
 <template>
@@ -420,14 +414,13 @@ function bedTypeText(value: unknown) {
           <p>完整展示你的已保存偏好，并形成便于理解的宿舍生活画像。</p>
         </div>
         <RouterLink
-          v-if="currentActivityId && canEditQuestionnaire"
+          v-if="canEditQuestionnaire"
           class="button secondary"
-          :to="`/student/batches/${currentActivityId}/questionnaire`"
+          to="/student/preferences"
         >{{ questionnaireStarted ? '修改个人偏好' : '填写个人偏好' }}</RouterLink>
       </div>
 
-      <p v-if="!currentActivity" class="empty-state">当前没有需要参与的选寝活动。</p>
-      <p v-else-if="answerSummary.length === 0" class="empty-state">尚未填写个人偏好。</p>
+      <p v-if="answerSummary.length === 0" class="empty-state">尚未填写个人偏好。即使当前没有开放批次，也可以提前完成偏好设置。</p>
       <div v-else class="personal-preference-content">
         <div class="personal-preference-table-column">
           <dl class="personal-preference-list">
@@ -439,7 +432,7 @@ function bedTypeText(value: unknown) {
         </div>
 
         <aside class="personal-preference-side-column">
-          <div class="preference-profile-overview personal-preference-profile-panel">
+          <div v-if="profileInsightEnabled" class="preference-profile-overview personal-preference-profile-panel">
             <div>
               <span class="profile-caption">{{ local('用户画像概述', 'Profile overview') }}</span>
               <h3>{{ preferenceProfileSummary }}</h3>
@@ -474,7 +467,7 @@ function bedTypeText(value: unknown) {
       <p>床位在确认前只会短暂保留，最终确认后会立即显示住宿结果。</p>
     </section>
 
-    <div v-if="homeInvitation" class="modal-overlay home-invitation-overlay" role="presentation">
+    <div v-if="homeInvitation && !assigned" class="modal-overlay home-invitation-overlay" role="presentation">
       <section class="modal-card home-invitation-dialog" role="dialog" aria-modal="true">
         <span class="eyebrow">{{ subtitle('组队邀请', 'TEAM INVITATION') }}</span>
         <h2>{{ t('team.invitation.title') }}</h2>
@@ -513,3 +506,8 @@ function bedTypeText(value: unknown) {
     </div>
   </div>
 </template>
+
+<style scoped>
+.compact-home-top-card { min-height: 150px; padding-top: 18px; padding-bottom: 18px; }
+.personal-preference-card { margin-top: -2px; }
+</style>

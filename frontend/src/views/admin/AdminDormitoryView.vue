@@ -3,7 +3,7 @@ import { onMounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import RoomLayoutEditor from '../../components/admin/RoomLayoutEditor.vue'
 import { api } from '../../api/client'
-import type { DataObject, ListSuccessResponse } from '../../api/types'
+import type { DataObject, ListSuccessResponse, ObjectSuccessResponse } from '../../api/types'
 
 interface RoomEditForm {
   capacity: number
@@ -36,6 +36,8 @@ const layoutRoom = ref<DataObject | null>(null)
 const loadingRooms = ref(false)
 const error = ref('')
 const message = ref('')
+const importFile = ref<File | null>(null)
+const importing = ref(false)
 const editForm = reactive<RoomEditForm>({
   capacity: 4,
   gender: 'F',
@@ -73,6 +75,50 @@ async function loadRooms() {
     error.value = reason instanceof Error ? reason.message : '房间列表加载失败'
   } finally {
     loadingRooms.value = false
+  }
+}
+
+
+function chooseImportFile(event: Event) {
+  importFile.value = (event.target as HTMLInputElement).files?.[0] ?? null
+}
+
+async function importRooms() {
+  if (!importFile.value || importing.value) return
+  importing.value = true
+  error.value = ''
+  message.value = ''
+  try {
+    const form = new FormData()
+    form.append('file', importFile.value)
+    const response = await api.post<ObjectSuccessResponse>('/api/v1/admin/import/rooms', form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+    const result = (response.data.data ?? {}) as DataObject
+    message.value = `宿舍导入完成：成功${Number(result.successCount ?? result.success ?? 0)}条，跳过${Number(result.skippedCount ?? result.failed ?? 0)}条。`
+    importFile.value = null
+    await Promise.all([loadBuildings(), loadRooms()])
+  } catch (reason) {
+    error.value = reason instanceof Error ? reason.message : '宿舍导入失败'
+  } finally {
+    importing.value = false
+  }
+}
+
+async function downloadRoomTemplate(format: 'xlsx' | 'csv') {
+  try {
+    const response = await api.get('/api/v1/admin/import/rooms/template', {
+      params: { format },
+      responseType: 'blob',
+    })
+    const url = URL.createObjectURL(response.data)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = `宿舍导入模板.${format}`
+    anchor.click()
+    URL.revokeObjectURL(url)
+  } catch (reason) {
+    error.value = reason instanceof Error ? reason.message : '模板下载失败'
   }
 }
 
@@ -147,11 +193,13 @@ function bedMappingText(room: DataObject) {
         <h2>宿舍、房间与床位</h2>
         <p>图形化维护性别、国内生/国际生属性、运行状态、容量和床位布局。存在未确认床位的在住学生时，该寝室不能开放选床模式。</p>
       </div>
-      <button class="button secondary" type="button" @click="router.push('/admin/residencies')">在住与床位确认</button>
+      <div class="button-row wrap"><button class="button ghost" @click="downloadRoomTemplate('xlsx')">下载Excel模板</button><button class="button ghost" @click="downloadRoomTemplate('csv')">下载CSV模板</button><button class="button secondary" type="button" @click="router.push('/admin/residencies')">在住与床位确认</button></div>
     </div>
 
     <p v-if="error" class="alert error">{{ error }}</p>
     <p v-if="message" class="alert success">{{ message }}</p>
+
+    <section class="panel dormitory-import-panel"><div><span class="eyebrow">ROOM IMPORT</span><h3>批量导入宿舍</h3><p>支持 Excel 或 CSV。可批量创建楼栋、楼层和房间；已有在住数据的房间不会被危险覆盖。</p></div><div class="button-row wrap"><input class="input" type="file" accept=".xlsx,.xls,.csv,text/csv" @change="chooseImportFile" /><button class="button primary" :disabled="!importFile || importing" @click="importRooms">{{ importing ? '正在导入…' : '导入宿舍' }}</button></div></section>
 
     <div class="stat-grid compact-grid">
       <article v-for="building in buildings" :key="String(building.id)" class="panel building-card">
@@ -213,11 +261,12 @@ function bedMappingText(room: DataObject) {
 </template>
 
 <style scoped>
+.dormitory-import-panel { display:flex; justify-content:space-between; align-items:center; gap:18px; }
 .dormitory-title { display:flex; justify-content:space-between; align-items:flex-start; gap:16px; }
 .warning { color:#b45309; font-weight:700; }
 .field-label { display:block; margin-bottom:7px; }
 .scope-segments { display:grid; grid-template-columns:repeat(3,1fr); padding:4px; border:1px solid var(--border); border-radius:12px; background:var(--surface-soft); }
 .scope-segments button { border:0; border-radius:9px; padding:10px 8px; background:transparent; color:var(--text-muted); }
 .scope-segments button.active { background:var(--primary); color:white; }
-@media(max-width:720px){.dormitory-title{flex-direction:column}.scope-segments{grid-template-columns:1fr}}
+@media(max-width:720px){.dormitory-title,.dormitory-import-panel{flex-direction:column}.scope-segments{grid-template-columns:1fr}}
 </style>

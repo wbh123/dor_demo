@@ -135,7 +135,7 @@ def validate_batch_scope(errors: list[str]) -> None:
         errors,
     )
     require(
-        "配置参与范围" in view and "保存范围并继续发布" in view,
+        "配置参与范围" in view and "保存并继续发布" in view,
         "administrator batch page does not provide the scope-first publication flow",
         errors,
     )
@@ -279,9 +279,8 @@ def validate_layout_and_selection_regressions(errors: list[str]) -> None:
     )
     require(
         "invitationContext" in team_guard
-        and "active_batch_student_lock" in team_guard
-        and "leaderFormingTeam" not in team_guard,
-        "first teammate invitation still requires a pre-existing forming team",
+        and "active_batch_student_lock" in team_guard,
+        "team invitation category guard no longer resolves the active batch context",
         errors,
     )
 
@@ -366,6 +365,156 @@ def validate_security_configuration(errors: list[str]) -> None:
     )
 
 
+
+def validate_comprehensive_enhancements(errors: list[str]) -> None:
+    tsconfig = read("frontend/tsconfig.app.json")
+    browser_config = read("frontend/tsconfig.browser.json")
+    data_view = read("frontend/src/views/admin/AdminDataView.vue")
+    dormitory_view = read("frontend/src/views/admin/AdminDormitoryView.vue")
+    dashboard_view = read("frontend/src/views/admin/AdminDashboardView.vue")
+    batch_view = read("frontend/src/views/admin/AdminBatchView.vue")
+    matching_view = read("frontend/src/views/admin/AdminMatchingView.vue")
+    room_list = read("frontend/src/views/student/RoomListView.vue")
+    room_detail = read("frontend/src/views/student/RoomDetailView.vue")
+    home_view = read("frontend/src/views/student/StudentHomeView.vue")
+    questionnaire_view = read("frontend/src/views/student/QuestionnaireView.vue")
+    team_view = read("frontend/src/views/student/TeamView.vue")
+    assignment_view = read("frontend/src/views/student/AssignmentView.vue")
+    shell = read("frontend/src/layouts/AppShell.vue")
+    student_service = read("backend-java/server/src/main/java/com/wust/dormitory/admin/StudentAdminService.java")
+    spreadsheet_controller = read("backend-java/server/src/main/java/com/wust/dormitory/admin/AdminSpreadsheetController.java")
+    welcome_service = read("backend-java/server/src/main/java/com/wust/dormitory/auth/StudentWelcomeService.java")
+    preference_service = read("backend-java/server/src/main/java/com/wust/dormitory/student/StudentPreferenceService.java")
+    policy_service = read("backend-java/server/src/main/java/com/wust/dormitory/selection/SelectionPolicyService.java")
+    team_service = read("backend-java/server/src/main/java/com/wust/dormitory/student/TeamService.java")
+    matching_service = read("backend-java/server/src/main/java/com/wust/dormitory/matching/MatchingService.java")
+    feature_codes = read("backend-java/server/src/main/java/com/wust/dormitory/subscription/FeatureCodes.java")
+
+    require(
+        '"extends": "./tsconfig.browser.json"' in tsconfig
+        and '"moduleResolution": "Bundler"' in browser_config,
+        "frontend tsconfig still depends on an editor-unresolvable package preset",
+        errors,
+    )
+    require(
+        "匹配度" in room_list and "score-ring-with-label" in room_list,
+        "room cards do not explain the matching score",
+        errors,
+    )
+    require(
+        "countryOptions" in data_view and "countryLabel" in data_view
+        and "nationality_code" in student_service,
+        "student nationality is not selected and displayed by country or region name",
+        errors,
+    )
+    require(
+        "/api/v1/admin/import/students" in data_view
+        and "/api/v1/admin/import/rooms" in dormitory_view
+        and "学生导入模板" in spreadsheet_controller
+        and "宿舍导入模板" in spreadsheet_controller,
+        "student or dormitory spreadsheet import and templates are incomplete",
+        errors,
+    )
+    require(
+        "countryMessages" in dashboard_view
+        and "configuration.countryMessages().get(countryCode)" in welcome_service
+        and 'configuration.messages().get("en-US")' in welcome_service,
+        "country-specific welcome messages or English fallback are missing",
+        errors,
+    )
+    for token in (
+        "studentGenderFilter", "studentCategoryFilter", "studentDegreeFilter",
+        "studentMajorFilter", "studentGradeFilter", "roomBuildingFilter", "roomFloorFilter",
+        "scope-sticky-header",
+    ):
+        require(token in batch_view, f"batch scope filter or sticky save is missing: {token}", errors)
+    require(
+        "degree_level" in student_service and "grade_year" in student_service,
+        "nullable degree level and grade year are not persisted for students",
+        errors,
+    )
+    require(
+        "/api/v1/student/preferences" in questionnaire_view
+        and "即使当前没有开放批次" in home_view
+        and "student_preference_profile" in preference_service,
+        "students cannot maintain preferences outside an active batch",
+        errors,
+    )
+    require(
+        "24小时制" in questionnaire_view and "24小时制" in batch_view,
+        "time inputs do not explain the 24-hour format",
+        errors,
+    )
+    require(
+        ":min=\"questionMin(question)\"" in questionnaire_view
+        and ":max=\"questionMax(question)\"" in questionnaire_view
+        and "temperature < 16 || temperature > 30" in matching_service,
+        "air-conditioner temperature is not constrained to 16 through 30 degrees",
+        errors,
+    )
+    require(
+        "可以直接点击三维图像中的床位" in room_detail
+        and "已切换到" not in room_detail
+        and "enlarged-countdown" in room_detail,
+        "bed selection interaction hints or countdown presentation regressed",
+        errors,
+    )
+    require(
+        "bedTypeLabel" in assignment_view
+        and "bedTypeLabel" in read("frontend/src/views/admin/AdminResidencyView.vue")
+        and "bedTypeLabel" in read("frontend/src/views/admin/AdminAssignmentView.vue"),
+        "user-facing bed type names are not consistently applied",
+        errors,
+    )
+    require(
+        "compact-home-top-card" in home_view,
+        "student home top cards were not compacted",
+        errors,
+    )
+    require(
+        "TEAM_ASSIGNED_FORBIDDEN" in team_service
+        and "请先创建处于组队中的队伍" in team_service
+        and "请先创建处于组队中的队伍" in team_view,
+        "assigned-student team restrictions or invitation guidance are missing",
+        errors,
+    )
+    require(
+        "ALLOW_SELECTION_WITHOUT_QUESTIONNAIRE" in policy_service
+        and "ALLOW_STUDENT_RESELECT" in policy_service
+        and "allowWithoutQuestionnaire" in matching_view
+        and "allowStudentReselect" in matching_view,
+        "administrator questionnaire-bypass or reselect policy is incomplete",
+        errors,
+    )
+    require(
+        "missingPreferenceCount" in room_list
+        and "conflictReasons" in room_list
+        and "仅剩上下铺" in read("backend-java/server/src/main/java/com/wust/dormitory/student/StudentRoomRecommendationService.java")
+        and "仅剩上床下桌" in read("backend-java/server/src/main/java/com/wust/dormitory/student/StudentRoomRecommendationService.java"),
+        "roommate preference and remaining-bed warnings are incomplete",
+        errors,
+    )
+    for code in (
+        "P2_STUDENT_PROFILE_INSIGHT", "P2_ROOM_RECOMMENDATION",
+        "P2_QUESTIONNAIRE_BYPASS_CONTROL", "P2_STUDENT_RESELECT_CONTROL",
+    ):
+        require(code in feature_codes, f"missing system-admin feature code: {code}", errors)
+    require(
+        "weight-manual" in matching_view and "权重控制说明" in matching_view,
+        "matching weight guidance is missing",
+        errors,
+    )
+    require(
+        "account-card-without-avatar" in shell and "padding" in shell,
+        "sidebar account card padding was not increased",
+        errors,
+    )
+    require(
+        not (ROOT / ".github/workflows/export-source-snapshot.yml").exists(),
+        "temporary source export workflow must not enter the public baseline",
+        errors,
+    )
+
 def validate_test_inventory(errors: list[str]) -> int:
     tests = sorted((ROOT / "backend-java/server/src/test/java").rglob("*Test.java"))
     expected = {
@@ -381,6 +530,9 @@ def validate_test_inventory(errors: list[str]) -> int:
         "BatchLifecycleServiceTest.java",
         "RoomLayoutServiceTest.java",
         "ResidencyServiceTest.java",
+        "SpreadsheetSupportTest.java",
+        "CountryRegionCatalogTest.java",
+        "MatchingServiceTest.java",
     }
     names = {path.name for path in tests}
     for name in sorted(expected):
@@ -398,6 +550,7 @@ def main() -> int:
     validate_layout_and_selection_regressions(errors)
     validate_frontend(errors)
     validate_security_configuration(errors)
+    validate_comprehensive_enhancements(errors)
     test_count = validate_test_inventory(errors)
 
     if errors:

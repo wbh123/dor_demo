@@ -1,0 +1,42 @@
+openapi: 3.0.3
+info: { title: Student preference and selection policy, version: 1.0.0 }
+paths:
+  /api/v1/student/preferences:
+    get:
+      tags: [StudentPreferencePolicy]
+      operationId: getGlobalPreferences
+      security: [{ bearerAuth: [] }]
+      responses: { '200': { $ref: '#/components/responses/ObjectSuccess' } }
+    put:
+      tags: [StudentPreferencePolicy]
+      operationId: updateGlobalPreferences
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, additionalProperties: true } } }
+      responses: { '200': { $ref: '#/components/responses/ObjectSuccess' } }
+  /api/v1/student/batches/{batchId}/selection-readiness:
+    get:
+      tags: [StudentPreferencePolicy]
+      operationId: getSelectionReadiness
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/BatchId' }]
+      responses: { '200': { $ref: '#/components/responses/ObjectSuccess' } }
+  /api/v1/student/batches/{batchId}/assignment/cancel:
+    post:
+      tags: [StudentPreferencePolicy]
+      operationId: cancelStudentAssignment
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/BatchId' }]
+      responses: { '200': { $ref: '#/components/responses/ObjectSuccess' } }
+components:
+  parameters:
+    BatchId: { name: batchId, in: path, required: true, schema: { type: integer, format: int64 } }
+  responses:
+    ObjectSuccess:
+      description: success
+      content:
+        application/json:
+          schema: { $ref: '../common-response/openapi-common-response.yaml#/components/schemas/ObjectSuccessResponse' }
+  securitySchemes:
+    bearerAuth: { type: http, scheme: bearer, bearerFormat: Token }

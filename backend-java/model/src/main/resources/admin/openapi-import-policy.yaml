@@ -1,0 +1,76 @@
+openapi: 3.0.3
+info: { title: Admin import and selection policy, version: 1.0.0 }
+paths:
+  /api/v1/admin/import/students:
+    post:
+      tags: [AdminImportPolicy]
+      operationId: importStudentsFile
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties: { file: { type: string, format: binary } }
+      responses: { '200': { $ref: '#/components/responses/ObjectSuccess' } }
+  /api/v1/admin/import/rooms:
+    post:
+      tags: [AdminImportPolicy]
+      operationId: importRoomsFile
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties: { file: { type: string, format: binary } }
+      responses: { '200': { $ref: '#/components/responses/ObjectSuccess' } }
+  /api/v1/admin/import/students/template:
+    get:
+      tags: [AdminImportPolicy]
+      operationId: downloadStudentImportTemplate
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: format, in: query, schema: { type: string, enum: [xlsx, csv], default: xlsx } }]
+      responses: { '200': { description: template, content: { application/octet-stream: { schema: { type: string, format: binary } } } } }
+  /api/v1/admin/import/rooms/template:
+    get:
+      tags: [AdminImportPolicy]
+      operationId: downloadRoomImportTemplate
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: format, in: query, schema: { type: string, enum: [xlsx, csv], default: xlsx } }]
+      responses: { '200': { description: template, content: { application/octet-stream: { schema: { type: string, format: binary } } } } }
+  /api/v1/admin/settings/selection-policy:
+    get:
+      tags: [AdminImportPolicy]
+      operationId: getSelectionPolicy
+      security: [{ bearerAuth: [] }]
+      responses: { '200': { $ref: '#/components/responses/ObjectSuccess' } }
+    put:
+      tags: [AdminImportPolicy]
+      operationId: updateSelectionPolicy
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [allowWithoutQuestionnaire, allowStudentReselect, reason]
+              properties:
+                allowWithoutQuestionnaire: { type: boolean }
+                allowStudentReselect: { type: boolean }
+                reason: { type: string, minLength: 1, maxLength: 500 }
+      responses: { '200': { $ref: '#/components/responses/ObjectSuccess' } }
+components:
+  responses:
+    ObjectSuccess:
+      description: success
+      content:
+        application/json:
+          schema: { $ref: '../common-response/openapi-common-response.yaml#/components/schemas/ObjectSuccessResponse' }
+  securitySchemes:
+    bearerAuth: { type: http, scheme: bearer, bearerFormat: Token }
