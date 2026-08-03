@@ -44,6 +44,8 @@ def validate_openapi(errors: list[str]) -> int:
         "/api/v1/auth/login",
         "/api/v1/auth/activate",
         "/api/v1/admin/batches",
+        "/api/v1/admin/batches/{batchId}/scope",
+        "/api/v1/admin/batches/{batchId}/room-preflight",
         "/api/v1/student/profile",
         "/api/v1/student/batches/{batchId}/questionnaire",
         "/api/v1/student/batches/{batchId}/beds/{bedId}/hold",
@@ -53,7 +55,7 @@ def validate_openapi(errors: list[str]) -> int:
     }
     for path in sorted(critical_paths):
         require(path in paths, f"missing critical OpenAPI path: {path}", errors)
-    require(len(paths) >= 80, f"OpenAPI path count unexpectedly low: {len(paths)}", errors)
+    require(len(paths) >= 82, f"OpenAPI path count unexpectedly low: {len(paths)}", errors)
     return len(paths)
 
 
@@ -88,6 +90,125 @@ def validate_fixed_questionnaire(errors: list[str]) -> None:
     )
 
 
+def validate_batch_scope(errors: list[str]) -> None:
+    service = read(
+        "backend-java/server/src/main/java/com/wust/dormitory/admin/BatchScopeService.java"
+    )
+    lifecycle = read(
+        "backend-java/server/src/main/java/com/wust/dormitory/admin/BatchLifecycleService.java"
+    )
+    controller = read(
+        "backend-java/server/src/main/java/com/wust/dormitory/admin/BatchScopeController.java"
+    )
+    view = read("frontend/src/views/admin/AdminBatchView.vue")
+
+    require(
+        "batch_student_eligibility" in service and "batch_room_scope" in service,
+        "batch scope service does not persist exact student and room scope",
+        errors,
+    )
+    require(
+        "DELETE FROM batch_building_scope" in service
+        and "DELETE FROM batch_bed_scope" in service,
+        "batch scope update does not replace legacy broad scope",
+        errors,
+    )
+    require(
+        "BATCH_STUDENT_SCOPE_REQUIRED" in service
+        and "BATCH_ROOM_SCOPE_REQUIRED" in service,
+        "batch scope readiness errors are missing",
+        errors,
+    )
+    require(
+        "batchScopeService.requireReady(batchId)" in lifecycle,
+        "batch publication does not validate selected students and rooms before preflight",
+        errors,
+    )
+    require(
+        "implements BatchScopeApi" in controller,
+        "batch scope OpenAPI controller is missing",
+        errors,
+    )
+    require(
+        "/scope`" in view or "/scope'" in view or "/scope\"" in view,
+        "administrator batch page does not call the batch scope endpoint",
+        errors,
+    )
+    require(
+        "配置参与范围" in view and "保存范围并继续发布" in view,
+        "administrator batch page does not provide the scope-first publication flow",
+        errors,
+    )
+    require(
+        "准备范围" not in view,
+        "legacy all-student/all-building preparation action remains visible",
+        errors,
+    )
+
+
+def validate_business_feature_projection(errors: list[str]) -> None:
+    auth_contract = read("backend-java/model/src/main/resources/auth/openapi-auth.yaml")
+    auth_controller = read(
+        "backend-java/server/src/main/java/com/wust/dormitory/auth/AuthController.java"
+    )
+    auth_store = read("frontend/src/stores/auth.ts")
+    batch_view = read("frontend/src/views/admin/AdminBatchView.vue")
+    platform_features = read("frontend/src/views/platform/PlatformFeaturesView.vue")
+
+    require(
+        "required: [userId, username, displayName, userType, features]" in auth_contract,
+        "current user contract does not require effective feature projection",
+        errors,
+    )
+    require(
+        "data.setFeatures(featureAccessService.currentFeatures()" in auth_controller,
+        "authentication responses do not include effective features",
+        errors,
+    )
+    require(
+        "applyBusinessEntitlements" in auth_store and "current?.features ?? []" in auth_store,
+        "frontend session does not apply effective features after login or restore",
+        errors,
+    )
+    require(
+        "P2_BED_SELECTION_MODE" in batch_view and "bedModeAuthorized" in batch_view,
+        "school administrator batch page is not guarded by the bed-selection entitlement",
+        errors,
+    )
+    require(
+        "bedSelectionFeature" in platform_features
+        and "P2_BED_SELECTION_MODE" in platform_features
+        and "核心模式开关" in platform_features,
+        "platform administrator does not have a dedicated bed-selection mode switch",
+        errors,
+    )
+
+
+def validate_overlay_style(errors: list[str]) -> None:
+    main = read("frontend/src/main.ts")
+    overlay = read("frontend/src/overlay-refinement.css")
+
+    require(
+        "./overlay-refinement.css" in main,
+        "shared overlay style is not loaded after feature styles",
+        errors,
+    )
+    for selector in (
+        ".modal-overlay",
+        ".welcome-overlay",
+        ".dialog-backdrop",
+        "[class$='-overlay']",
+        "[class$='-backdrop']",
+    ):
+        require(selector in overlay, f"shared overlay style misses selector: {selector}", errors)
+    require(
+        "backdrop-filter: blur(8px)" in overlay
+        and "background: rgba(12, 24, 48, 0.62)" in overlay,
+        "shared overlay background does not match the dormitory editor visual layer",
+        errors,
+    )
+
+
 def validate_frontend(errors: list[str]) -> None:
     shell = read("frontend/src/layouts/AppShell.vue")
     login = read("frontend/src/views/LoginView.vue")
@@ -106,12 +227,12 @@ def validate_frontend(errors: list[str]) -> None:
         "login page does not use configurable institution display name",
         errors,
     )
-    require(
-        "showBuiltinQuestionnaireNotice" in shell
-        and "BUILT-IN PREFERENCE QUESTIONNAIRE" in shell,
-        "administrator batch page does not expose the fixed-questionnaire notice",
-        errors,
-    )
+    for forbidden in (
+        "showBuiltinQuestionnaireNotice",
+        "BUILT-IN PREFERENCE QUESTIONNAIRE",
+        "学生个人偏好问卷：系统内置固定问卷",
+    ):
+        require(forbidden not in shell, f"removed questionnaire notice returned: {forbidden}", errors)
     require(
         "loadEnv" in vite_config and re.search(r"envDir:\s*['\"]\.\.['\"]", vite_config),
         "Vite does not load the repository-root environment file",
@@ -133,14 +254,8 @@ def validate_frontend(errors: list[str]) -> None:
     ):
         require(variable in env_example, f"missing public environment variable: {variable}", errors)
 
-    has_admin_batches_path = re.search(
-        r"path:\s*['\"]admin/batches['\"]",
-        router,
-    )
-    has_admin_batches_name = re.search(
-        r"name:\s*['\"]admin-batches['\"]",
-        router,
-    )
+    has_admin_batches_path = re.search(r"path:\s*['\"]admin/batches['\"]", router)
+    has_admin_batches_name = re.search(r"name:\s*['\"]admin-batches['\"]", router)
     require(
         bool(has_admin_batches_path and has_admin_batches_name),
         "administrator batch route is missing or renamed",
@@ -175,17 +290,18 @@ def validate_security_configuration(errors: list[str]) -> None:
 
 
 def validate_test_inventory(errors: list[str]) -> int:
-    tests = sorted(
-        (ROOT / "backend-java/server/src/test/java").rglob("*Test.java")
-    )
+    tests = sorted((ROOT / "backend-java/server/src/test/java").rglob("*Test.java"))
     expected = {
         "AuthTokenSerializationTest.java",
+        "AuthControllerFeatureProjectionTest.java",
         "BedScopeGuardTest.java",
         "BatchCreationServiceTest.java",
         "BatchSelectionModeGuardTest.java",
         "TeamCategoryGuardTest.java",
         "BedSelectionEligibilityGuardTest.java",
         "SecurityConfigTest.java",
+        "BatchScopeServiceTest.java",
+        "BatchLifecycleServiceTest.java",
     }
     names = {path.name for path in tests}
     for name in sorted(expected):
@@ -197,6 +313,9 @@ def main() -> int:
     errors: list[str] = []
     path_count = validate_openapi(errors)
     validate_fixed_questionnaire(errors)
+    validate_batch_scope(errors)
+    validate_business_feature_projection(errors)
+    validate_overlay_style(errors)
     validate_frontend(errors)
     validate_security_configuration(errors)
     test_count = validate_test_inventory(errors)

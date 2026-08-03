@@ -1,6 +1,7 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 import { api, TOKEN_KEY } from '../api/client'
+import { applyBusinessEntitlements } from '../composables/useFeatureAccess'
 import type {
   ActivateRequest,
   CurrentUserData,
@@ -29,7 +30,7 @@ export const useAuthStore = defineStore('auth', () => {
       const data = response.data.data
       if (!data?.accessToken || !data.user) throw new Error('登录响应不完整')
       token.value = data.accessToken
-      user.value = data.user
+      setUser(data.user)
       localStorage.setItem(TOKEN_KEY, data.accessToken)
     } finally {
       loading.value = false
@@ -49,7 +50,7 @@ export const useAuthStore = defineStore('auth', () => {
     if (!token.value) return
     try {
       const response = await api.get<CurrentUserSuccessResponse>('/api/v1/auth/me')
-      user.value = response.data.data ?? null
+      setUser(response.data.data ?? null)
     } catch {
       clear()
     }
@@ -76,9 +77,14 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  function setUser(current: CurrentUserData | null) {
+    user.value = current
+    applyBusinessEntitlements({ features: current?.features ?? [] })
+  }
+
   function clear() {
     token.value = null
-    user.value = null
+    setUser(null)
     localStorage.removeItem(TOKEN_KEY)
   }
 

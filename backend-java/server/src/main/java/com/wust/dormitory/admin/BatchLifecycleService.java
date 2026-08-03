@@ -22,6 +22,7 @@ public class BatchLifecycleService {
 
     private final NamedParameterJdbcTemplate jdbc;
     private final AdminService adminService;
+    private final BatchScopeService batchScopeService;
     private final BatchRoomLockService roomLockService;
     private final FeatureAccessService featureAccessService;
     private final EntitlementSnapshotService entitlementSnapshotService;
@@ -29,11 +30,13 @@ public class BatchLifecycleService {
     public BatchLifecycleService(
             NamedParameterJdbcTemplate jdbc,
             AdminService adminService,
+            BatchScopeService batchScopeService,
             BatchRoomLockService roomLockService,
             FeatureAccessService featureAccessService,
             EntitlementSnapshotService entitlementSnapshotService) {
         this.jdbc = jdbc;
         this.adminService = adminService;
+        this.batchScopeService = batchScopeService;
         this.roomLockService = roomLockService;
         this.featureAccessService = featureAccessService;
         this.entitlementSnapshotService = entitlementSnapshotService;
@@ -52,6 +55,7 @@ public class BatchLifecycleService {
             if ("BED".equals(String.valueOf(current.get("selection_mode")))) {
                 featureAccessService.require(FeatureCodes.P2_BED_SELECTION_MODE);
             }
+            batchScopeService.requireReady(batchId);
             roomLockService.requirePublishable(batchId);
             acquireStudentLocks(batchId);
             roomLockService.acquire(batchId);
