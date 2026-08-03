@@ -1,0 +1,22 @@
+name: Export source snapshot
+
+on:
+  push:
+    branches:
+      - feature/comprehensive-student-selection-enhancements-v3
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Pack source
+        run: tar --exclude=.git -czf /tmp/dor-demo-source.tar.gz .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dor-demo-source
+          path: /tmp/dor-demo-source.tar.gz
+          retention-days: 1
