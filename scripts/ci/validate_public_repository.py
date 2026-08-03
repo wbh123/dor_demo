@@ -20,7 +20,7 @@ FORBIDDEN_NAMES = {
     "compose.yml", "compose.yaml",
 }
 FORBIDDEN_TEXT = (
-    "武汉科技大学", "武科大", "黄家湖",
+    "武汉科技大学", "武科大", "黄家湖", "城安智序",
     "WUHAN UNIVERSITY OF SCIENCE AND TECHNOLOGY",
 )
 HIGH_CONFIDENCE_SECRETS = (
