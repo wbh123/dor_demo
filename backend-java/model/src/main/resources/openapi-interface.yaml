@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: 示例大学学生宿舍智能选择系统接口
-  description: 第一阶段核心闭环、第二阶段质量运营与系统服务管理能力OpenAPI契约
+  description: 学生宿舍智能选择、业务管理与系统服务管理接口契约
   version: 2.9.0
 servers:
   - url: http://localhost:8080
@@ -35,8 +35,6 @@ paths:
     $ref: 'admin/openapi-student-account.yaml#/paths/~1api~1v1~1admin~1students~1{studentId}~1reset-password'
   /api/v1/admin/students/{studentId}/reset-state:
     $ref: 'admin/openapi-student-account.yaml#/paths/~1api~1v1~1admin~1students~1{studentId}~1reset-state'
-  /api/v1/admin/transfer-students:
-    $ref: 'admin/openapi-residency-transfer.yaml#/paths/~1api~1v1~1admin~1transfer-students'
   /api/v1/admin/students/{studentId}/direct-assignment:
     $ref: 'admin/openapi-residency-transfer.yaml#/paths/~1api~1v1~1admin~1students~1{studentId}~1direct-assignment'
   /api/v1/admin/batches/{batchId}/students/{studentId}/capacity-preview:
