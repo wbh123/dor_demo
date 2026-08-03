@@ -22,6 +22,14 @@ class NavicatDatabaseIntegrityTest(unittest.TestCase):
         self.assertIn("batch_rule_template", migration)
         self.assertIn("LEFT JOIN app_user", migration)
 
+    def test_v18_restores_required_business_reference_data(self):
+        migration = read(MIGRATION_DIR / "V18__seed_required_business_reference_data.sql")
+        self.assertIn("SYSTEM-PREFERENCE-V1", migration)
+        self.assertIn("questionnaire_question", migration)
+        self.assertIn("questionnaire_option", migration)
+        self.assertIn("SYSTEM_DEFAULT", migration)
+        self.assertIn("matching_weight_scheme", migration)
+
     def test_thousand_student_cleanup_preserves_system_settings(self):
         base = read(DATA_BASE)
         self.assertIn("'system_setting'", base)
@@ -38,14 +46,17 @@ class NavicatDatabaseIntegrityTest(unittest.TestCase):
         self.assertIn("DELETE FROM service_quota_alert", generator)
         self.assertIn("STUDENT_WELCOME_MESSAGE", generator)
 
-    def test_navicat_schema_contains_v17_and_integrity_check(self):
+    def test_navicat_schema_contains_v18_and_integrity_check(self):
         migrations = sorted((NAVICAT_DIR / "01_数据库架构").glob("[0-9][0-9]_V*.sql"))
-        self.assertEqual(17, len(migrations))
+        self.assertEqual(18, len(migrations))
         self.assertTrue(
             (NAVICAT_DIR / "01_数据库架构/17_V17__restore_required_system_configuration.sql").exists()
         )
+        self.assertTrue(
+            (NAVICAT_DIR / "01_数据库架构/18_V18__seed_required_business_reference_data.sql").exists()
+        )
         baseline = read(NAVICAT_DIR / "01_数据库架构/99_写入Flyway基线.sql")
-        self.assertIn("'17'", baseline)
+        self.assertIn("'18'", baseline)
         self.assertTrue((NAVICAT_DIR / "04_数据库完整性检查/00_修复并检查数据库完整性.sql").exists())
 
     def test_navicat_test_data_packages_restore_required_configuration(self):
@@ -68,7 +79,10 @@ class NavicatDatabaseIntegrityTest(unittest.TestCase):
             "PRIMARY_SERVICE",
             "SYSTEM_DEFAULT",
             "flyway_schema_history",
-            "version='17'",
+            "version='18'",
+            "questionnaire_option",
+            "缺少已发布的个人偏好问卷",
+            "缺少已启用的匹配权重方案",
             "information_schema.tables",
             "information_schema.columns",
             "information_schema.statistics",
@@ -91,6 +105,7 @@ class NavicatDatabaseIntegrityTest(unittest.TestCase):
         self.assertIn("02_恢复必需系统配置.sql", readme)
         self.assertIn("wust_dormitory", readme)
         self.assertIn("DB_INTEGRITY_OK", readme)
+        self.assertIn("V18", readme)
 
 
 if __name__ == "__main__":
