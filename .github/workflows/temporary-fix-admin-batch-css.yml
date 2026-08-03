@@ -1,0 +1,35 @@
+name: Temporary Admin Batch CSS Fix
+
+on:
+  push:
+    branches:
+      - fix/batch-scope-publish-flow
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: fix/batch-scope-publish-flow
+      - name: Fix malformed grid declaration
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('frontend/src/views/admin/AdminBatchView.vue')
+          text = path.read_text(encoding='utf-8')
+          old = 'grid-template-columns:repeat(auto-fit,minmax(210px,1fr);gap:10px'
+          new = 'grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px'
+          if old not in text:
+              raise SystemExit('expected malformed declaration not found')
+          path.write_text(text.replace(old, new, 1), encoding='utf-8')
+          PY
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add frontend/src/views/admin/AdminBatchView.vue
+          git commit -m "fix: 修正批次页面网格样式"
+          git push origin HEAD:fix/batch-scope-publish-flow
