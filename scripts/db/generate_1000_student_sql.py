@@ -53,18 +53,21 @@ def materialize(entry: Path, base: str, database_name: str) -> str:
         f"USE `{database_name}`;\n"
         "SET @database_name = DATABASE();\n\n"
     )
-    return banner + content.replace(
-        SOURCE_LINE,
+    inlined_base = (
         "-- BEGIN INLINED COMMON BASE\n"
         + base.rstrip()
-        + "\n-- END INLINED COMMON BASE",
+        + "\n-- END INLINED COMMON BASE\n\n"
+        + "-- 配额告警是由当前业务数据派生的状态，数据重置后重新计算。\n"
+        + "DELETE FROM service_quota_alert;"
     )
+    return banner + content.replace(SOURCE_LINE, inlined_base)
 
 
 def validate(sql: str, scenario: str, database_name: str) -> None:
     required = [
         f"USE `{database_name}`;",
         "CALL clear_1000_test_data();",
+        "DELETE FROM service_quota_alert;",
         "WHILE i<=1000",
         "WHILE building_index<=6",
         "DOMESTIC_ONLY",
