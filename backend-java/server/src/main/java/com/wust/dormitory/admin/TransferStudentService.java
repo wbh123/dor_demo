@@ -43,7 +43,9 @@ public class TransferStudentService {
                         normalized.nationalityCode(),
                         normalized.studentCategory(),
                         "TRANSFER_MANUAL",
-                        normalized.phoneNumber()),
+                        normalized.phoneNumber(),
+                        null,
+                        null),
                 operator);
 
         Map<String, Object> actionResult;
