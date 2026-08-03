@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { platformApi } from '../../platform/api'
+import { platformApi, type FeatureEntitlement } from '../../platform/api'
 
 const subscription = ref<Record<string, unknown>>({})
 const quotas = ref<Record<string, unknown>>({})
-const features = ref<Record<string, unknown>[]>([])
+const features = ref<FeatureEntitlement[]>([])
 const error = ref('')
 const loading = ref(true)
 const responseTimeMs = ref(0)
@@ -12,7 +12,7 @@ const updatedAt = ref('')
 const online = ref(window.navigator.onLine)
 
 const usage = computed(() => Array.isArray(quotas.value.usage) ? quotas.value.usage as Record<string, unknown>[] : [])
-const enabledFeatureCount = computed(() => features.value.filter((item) => Boolean(item.effectiveEnabled ?? item.enabled)).length)
+const enabledFeatureCount = computed(() => features.value.filter((item) => item.effectiveEnabled).length)
 const warningCount = computed(() => usage.value.filter((item) => Number(item.ratio ?? 0) >= .8).length)
 const averageUsage = computed(() => {
   if (!usage.value.length) return 0
