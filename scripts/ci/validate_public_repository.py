@@ -20,7 +20,7 @@ FORBIDDEN_NAMES = {
     "compose.yml", "compose.yaml",
 }
 FORBIDDEN_TEXT = (
-    "武汉科技大学", "武科大", "黄家湖", "城安智序",
+    "武汉科技大学", "武科大", "黄家湖", "城安智序", "vicp.fun",
     "WUHAN UNIVERSITY OF SCIENCE AND TECHNOLOGY",
 )
 HIGH_CONFIDENCE_SECRETS = (
@@ -33,7 +33,7 @@ REQUIRED_FILES = (
     "README.md", "AGENTS.md", "SECURITY.md", ".env.example",
     ".github/workflows/public-ci.yml", "backend-java/pom.xml",
     "backend-java/model/src/main/resources/openapi-interface.yaml",
-    "frontend/package.json",
+    "frontend/package.json", "frontend/vite.config.ts",
     "scripts/ci/validate_system_contracts.py",
     "scripts/ci/run_policy.sh",
     "scripts/ci/run_contracts.sh",
@@ -102,7 +102,7 @@ def main() -> int:
             continue
         for marker in FORBIDDEN_TEXT:
             if marker in text:
-                errors.append(f"real institution marker in {rel.as_posix()}: {marker}")
+                errors.append(f"forbidden internal marker in {rel.as_posix()}: {marker}")
         for pattern in HIGH_CONFIDENCE_SECRETS:
             if pattern.search(text):
                 errors.append(f"high-confidence secret in {rel.as_posix()}")
