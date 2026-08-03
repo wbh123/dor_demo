@@ -5,6 +5,7 @@ import com.wust.dormitory.security.CurrentUser;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
+import org.springframework.jdbc.core.namedparam.SqlParameterSource;
 
 import java.util.List;
 import java.util.Map;
@@ -12,6 +13,7 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -89,13 +91,14 @@ class BedSelectionEligibilityGuardTest {
         when(policy.batch(20L)).thenReturn(Map.of(
                 "selection_mode", "BED",
                 "separate_student_categories", 1));
-        when(jdbc.queryForList(anyString(), anyMap()))
+        when(jdbc.queryForList(anyString(), any(SqlParameterSource.class)))
                 .thenReturn(List.of(Map.of(
                         "id", 30L,
                         "batch_id", 20L,
                         "leader_student_id", 10L,
                         "team_status", "LOCKED",
-                        "member_count", 2)))
+                        "member_count", 2)));
+        when(jdbc.queryForList(anyString(), anyMap()))
                 .thenReturn(List.of(
                         Map.of("student_id", 10L, "gender", "FEMALE", "student_category", "DOMESTIC"),
                         Map.of("student_id", 11L, "gender", "FEMALE", "student_category", "DOMESTIC")));
