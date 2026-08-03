@@ -1,0 +1,178 @@
+openapi: 3.0.3
+info:
+  title: 宿舍换寝接口
+  version: 1.0.0
+paths:
+  /api/v1/student/room-change/policy:
+    get:
+      tags: [RoomChange]
+      operationId: getRoomChangePolicy
+      summary: 查询当前换寝策略
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { $ref: '#/components/responses/ObjectSuccess' }
+  /api/v1/student/room-change/candidates:
+    get:
+      tags: [RoomChange]
+      operationId: listRoomChangeCandidates
+      summary: 查询当前学生可申请换入的寝室
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { $ref: '#/components/responses/ListSuccess' }
+        '409': { $ref: '#/components/responses/ErrorResponse' }
+  /api/v1/student/room-change/requests:
+    get:
+      tags: [RoomChange]
+      operationId: listMyRoomChangeRequests
+      summary: 查询本人换寝申请历史
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { $ref: '#/components/responses/ListSuccess' }
+    post:
+      tags: [RoomChange]
+      operationId: submitRoomChangeRequest
+      summary: 提交换寝申请或执行自由换寝
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RoomChangeSubmitRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/ObjectSuccess' }
+        '400': { $ref: '#/components/responses/ErrorResponse' }
+        '409': { $ref: '#/components/responses/ErrorResponse' }
+  /api/v1/student/room-change/requests/{requestId}/cancel:
+    post:
+      tags: [RoomChange]
+      operationId: cancelMyRoomChangeRequest
+      summary: 取消本人待审核换寝申请
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/RequestIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RoomChangeReviewRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/ObjectSuccess' }
+        '404': { $ref: '#/components/responses/ErrorResponse' }
+        '409': { $ref: '#/components/responses/ErrorResponse' }
+  /api/v1/admin/room-change/settings:
+    get:
+      tags: [RoomChange]
+      operationId: getRoomChangeSettings
+      summary: 查询换寝策略设置
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { $ref: '#/components/responses/ObjectSuccess' }
+    put:
+      tags: [RoomChange]
+      operationId: updateRoomChangeSettings
+      summary: 设置禁止换寝、自由换寝或审批换寝
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RoomChangeSettingsRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/ObjectSuccess' }
+        '400': { $ref: '#/components/responses/ErrorResponse' }
+  /api/v1/admin/room-change/requests:
+    get:
+      tags: [RoomChange]
+      operationId: listRoomChangeRequests
+      summary: 查询换寝申请与执行历史
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string, enum: [ALL, PENDING, APPROVED, REJECTED, EXECUTED, CANCELLED, FAILED] }
+        - name: keyword
+          in: query
+          schema: { type: string, maxLength: 128 }
+      responses:
+        '200': { $ref: '#/components/responses/ListSuccess' }
+  /api/v1/admin/room-change/requests/{requestId}/approve:
+    post:
+      tags: [RoomChange]
+      operationId: approveRoomChangeRequest
+      summary: 批准并执行换寝申请
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/RequestIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RoomChangeReviewRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/ObjectSuccess' }
+        '404': { $ref: '#/components/responses/ErrorResponse' }
+        '409': { $ref: '#/components/responses/ErrorResponse' }
+  /api/v1/admin/room-change/requests/{requestId}/reject:
+    post:
+      tags: [RoomChange]
+      operationId: rejectRoomChangeRequest
+      summary: 驳回换寝申请
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/RequestIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RoomChangeReviewRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/ObjectSuccess' }
+        '404': { $ref: '#/components/responses/ErrorResponse' }
+        '409': { $ref: '#/components/responses/ErrorResponse' }
+components:
+  parameters:
+    RequestIdPath:
+      name: requestId
+      in: path
+      required: true
+      schema: { type: integer, format: int64, minimum: 1 }
+  responses:
+    ObjectSuccess:
+      description: 操作成功
+      content:
+        application/json:
+          schema: { $ref: '../common-response/openapi-common-response.yaml#/components/schemas/ObjectSuccessResponse' }
+    ListSuccess:
+      description: 查询成功
+      content:
+        application/json:
+          schema: { $ref: '../common-response/openapi-common-response.yaml#/components/schemas/ListSuccessResponse' }
+    ErrorResponse:
+      description: 业务错误
+      content:
+        application/json:
+          schema: { $ref: '../common-response/openapi-common-response.yaml#/components/schemas/ErrorResponse' }
+  schemas:
+    RoomChangeSubmitRequest:
+      type: object
+      required: [targetRoomId, reason]
+      properties:
+        targetRoomId: { type: integer, format: int64, minimum: 1 }
+        targetBedId: { type: integer, format: int64, minimum: 1, nullable: true }
+        reason: { type: string, minLength: 1, maxLength: 500 }
+    RoomChangeSettingsRequest:
+      type: object
+      required: [mode, reason]
+      properties:
+        mode: { type: string, enum: [DISABLED, FREE, APPROVAL_REQUIRED] }
+        reason: { type: string, minLength: 1, maxLength: 500 }
+    RoomChangeReviewRequest:
+      type: object
+      required: [reason]
+      properties:
+        reason: { type: string, minLength: 1, maxLength: 500 }
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: Token
