@@ -1,0 +1,166 @@
+openapi: 3.0.3
+info:
+  title: Wust Dormitory Select 匹配权重管理接口
+  version: 1.0.0
+paths:
+  /api/v1/admin/matching-weight-schemes:
+    get:
+      tags: [Admin]
+      operationId: listMatchingWeightSchemes
+      summary: 查询匹配权重方案及修订
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: '../common-response/openapi-common-response.yaml#/components/schemas/ListSuccessResponse'
+    post:
+      tags: [Admin]
+      operationId: createMatchingWeightScheme
+      summary: 创建匹配权重方案首个修订
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MatchingWeightSchemeCreateRequest'
+      responses:
+        '200':
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                $ref: '../common-response/openapi-common-response.yaml#/components/schemas/ObjectSuccessResponse'
+        '400':
+          description: 配置校验失败
+          content:
+            application/json:
+              schema:
+                $ref: '../common-response/openapi-common-response.yaml#/components/schemas/ErrorResponse'
+        '409':
+          description: 方案编码冲突
+          content:
+            application/json:
+              schema:
+                $ref: '../common-response/openapi-common-response.yaml#/components/schemas/ErrorResponse'
+
+  /api/v1/admin/matching-weight-schemes/{schemeId}/revisions:
+    post:
+      tags: [Admin]
+      operationId: createMatchingWeightSchemeRevision
+      summary: 基于已有方案创建不可变新修订
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: schemeId
+          in: path
+          required: true
+          schema: { type: integer, format: int64, minimum: 1 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MatchingWeightSchemeRevisionRequest'
+      responses:
+        '200':
+          description: 新修订创建成功
+          content:
+            application/json:
+              schema:
+                $ref: '../common-response/openapi-common-response.yaml#/components/schemas/ObjectSuccessResponse'
+        '400':
+          description: 配置校验失败
+          content:
+            application/json:
+              schema:
+                $ref: '../common-response/openapi-common-response.yaml#/components/schemas/ErrorResponse'
+        '404':
+          description: 原方案不存在
+          content:
+            application/json:
+              schema:
+                $ref: '../common-response/openapi-common-response.yaml#/components/schemas/ErrorResponse'
+        '409':
+          description: 原方案版本已变化
+          content:
+            application/json:
+              schema:
+                $ref: '../common-response/openapi-common-response.yaml#/components/schemas/ErrorResponse'
+
+components:
+  schemas:
+    MatchingWeightSchemeCreateRequest:
+      type: object
+      required: [schemeCode, schemeName, algorithmVersion, weights, conflictRules, activate, reason]
+      properties:
+        schemeCode:
+          type: string
+          minLength: 2
+          maxLength: 32
+          pattern: '^[A-Z0-9][A-Z0-9_-]*$'
+        schemeName:
+          type: string
+          minLength: 2
+          maxLength: 128
+        algorithmVersion:
+          type: string
+          minLength: 2
+          maxLength: 32
+        weights:
+          type: object
+          additionalProperties:
+            type: number
+            format: double
+        conflictRules:
+          type: object
+          additionalProperties:
+            type: number
+            format: double
+        activate:
+          type: boolean
+        reason:
+          type: string
+          minLength: 2
+          maxLength: 500
+
+    MatchingWeightSchemeRevisionRequest:
+      type: object
+      required: [schemeName, algorithmVersion, weights, conflictRules, activate, expectedVersion, reason]
+      properties:
+        schemeName:
+          type: string
+          minLength: 2
+          maxLength: 128
+        algorithmVersion:
+          type: string
+          minLength: 2
+          maxLength: 32
+        weights:
+          type: object
+          additionalProperties:
+            type: number
+            format: double
+        conflictRules:
+          type: object
+          additionalProperties:
+            type: number
+            format: double
+        activate:
+          type: boolean
+        expectedVersion:
+          type: integer
+          format: int32
+          minimum: 0
+        reason:
+          type: string
+          minLength: 2
+          maxLength: 500
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: Token

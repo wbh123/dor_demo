@@ -1,0 +1,42 @@
+server:
+  port: ${WUST_DORMITORY_SERVER_PORT:8080}
+
+spring:
+  config:
+    import: optional:file:./.env[.properties]
+  application:
+    name: WustDormitorySelect
+  datasource:
+    username: ${WUST_DORMITORY_DB_USER}
+    password: ${WUST_DORMITORY_DB_PASSWORD}
+    url: jdbc:mysql://${WUST_DORMITORY_DB_HOST:localhost}:${WUST_DORMITORY_DB_PORT:3306}/${WUST_DORMITORY_DB_NAME:wust_dormitory}?useUnicode=true&characterEncoding=utf8&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  flyway:
+    enabled: false
+  data:
+    redis:
+      host: ${WUST_DORMITORY_REDIS_HOST:localhost}
+      port: ${WUST_DORMITORY_REDIS_PORT:6379}
+      password: ${WUST_DORMITORY_REDIS_PASSWORD:}
+      database: 0
+      connect-timeout: 3s
+      timeout: 3s
+
+platform:
+  institution-name: ${WUST_DORMITORY_INSTITUTION_NAME:示例大学}
+  campus-name: ${WUST_DORMITORY_CAMPUS_NAME:示例校区}
+
+mybatis:
+  mapper-locations: classpath*:com/wust/dormitory/mappers/**/*.xml
+  configuration:
+    map-underscore-to-camel-case: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true

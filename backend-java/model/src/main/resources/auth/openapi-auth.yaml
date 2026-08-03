@@ -1,0 +1,171 @@
+openapi: 3.0.3
+info:
+  title: Wust Dormitory Select 认证接口
+  version: 1.2.0
+paths:
+  /api/v1/auth/login:
+    post:
+      tags: [Auth]
+      operationId: login
+      summary: 用户登录
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LoginRequest' }
+      responses:
+        '200':
+          description: 登录成功
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LoginSuccessResponse' }
+        '400': { $ref: '#/components/responses/ErrorResponse' }
+        '401': { $ref: '#/components/responses/ErrorResponse' }
+
+  /api/v1/auth/activate:
+    post:
+      tags: [Auth]
+      operationId: activate
+      summary: 激活学生账号
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ActivateRequest' }
+      responses:
+        '200':
+          description: 激活成功
+          content:
+            application/json:
+              schema:
+                $ref: '../common-response/openapi-common-response.yaml#/components/schemas/VoidSuccessResponse'
+        '400': { $ref: '#/components/responses/ErrorResponse' }
+        '409': { $ref: '#/components/responses/ErrorResponse' }
+
+  /api/v1/auth/logout:
+    post:
+      tags: [Auth]
+      operationId: logout
+      summary: 退出登录
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: 退出成功
+          content:
+            application/json:
+              schema:
+                $ref: '../common-response/openapi-common-response.yaml#/components/schemas/VoidSuccessResponse'
+        '401': { $ref: '#/components/responses/ErrorResponse' }
+
+  /api/v1/auth/me:
+    get:
+      tags: [Auth]
+      operationId: getCurrentUser
+      summary: 获取当前登录用户
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: 当前用户
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CurrentUserSuccessResponse' }
+        '401': { $ref: '#/components/responses/ErrorResponse' }
+
+components:
+  responses:
+    ErrorResponse:
+      description: 业务错误
+      content:
+        application/json:
+          schema:
+            $ref: '../common-response/openapi-common-response.yaml#/components/schemas/ErrorResponse'
+
+  schemas:
+    LoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username: { type: string, minLength: 1, maxLength: 64 }
+        password: { type: string, minLength: 8, maxLength: 72 }
+
+    ActivateRequest:
+      type: object
+      required: [studentNumber, studentName, password]
+      properties:
+        studentNumber: { type: string, pattern: '^\d{12}$' }
+        studentName: { type: string, minLength: 1, maxLength: 128 }
+        password: { type: string, minLength: 8, maxLength: 72 }
+
+    WelcomeData:
+      type: object
+      required: [required, title, messages]
+      properties:
+        required:
+          type: boolean
+        title:
+          type: string
+        messages:
+          type: object
+          additionalProperties:
+            type: string
+        message:
+          type: string
+          description: 兼容旧客户端的中文欢迎语
+
+    CurrentUserData:
+      type: object
+      required: [userId, username, displayName, userType]
+      properties:
+        userId: { type: integer, format: int64 }
+        studentId:
+          type: integer
+          format: int64
+          nullable: true
+        username: { type: string }
+        displayName: { type: string }
+        userType: { type: string }
+        welcome:
+          allOf:
+            - $ref: '#/components/schemas/WelcomeData'
+          nullable: true
+
+    LoginData:
+      type: object
+      required: [accessToken, tokenType, expiresInSeconds, user]
+      properties:
+        accessToken: { type: string }
+        tokenType:
+          type: string
+          example: Bearer
+        expiresInSeconds: { type: integer, format: int64 }
+        user: { $ref: '#/components/schemas/CurrentUserData' }
+
+    LoginSuccessResponse:
+      allOf:
+        - $ref: '../common-response/openapi-common-response.yaml#/components/schemas/ApiResponseMetadata'
+        - type: object
+          required: [data]
+          properties:
+            data: { $ref: '#/components/schemas/LoginData' }
+            error:
+              type: object
+              nullable: true
+
+    CurrentUserSuccessResponse:
+      allOf:
+        - $ref: '../common-response/openapi-common-response.yaml#/components/schemas/ApiResponseMetadata'
+        - type: object
+          required: [data]
+          properties:
+            data: { $ref: '#/components/schemas/CurrentUserData' }
+            error:
+              type: object
+              nullable: true
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: Token

@@ -1,0 +1,29 @@
+# AGENTS.md
+
+本文件适用于仓库中的开发人员、智能体和自动化工具。
+
+## 公开仓库定位
+
+本仓库仅用于脱敏源码开发和 GitHub Actions 验证。完整数据库结构、内部文档、部署配置和实施记录只允许保存在私有仓库。
+
+## 强制要求
+
+1. 可以保留 Java 包名、模块名、`WUST_DORMITORY_*` 环境变量前缀和 `wust_dormitory` 数据库名等技术性标识。
+2. 不得出现真实学校、校区、学院、宿舍、人员、账号、地址、域名或生产环境信息。
+3. 展示性机构信息统一使用 `.env.example` 中的虚构值或环境变量，不得硬编码真实名称。
+4. 不得提交 `docs/`、数据库迁移、SQL 脚本、数据字典、实体关系图、数据库备份和真实测试数据。
+5. 不得提交 Docker Compose、Kubernetes、Nginx、服务器部署、生产运维和内部发布脚本。
+6. 不得提交 `.env`、令牌、密码、私钥、证书和真实连接字符串。
+7. 新功能必须包含可在公开仓库独立运行的测试；涉及数据库结构的测试应使用接口替身、内存模型或最小模拟对象。
+8. 修改后必须通过公开内容扫描、后端构建和前端构建。
+
+## 提交前检查
+
+```bash
+python scripts/ci/validate_public_repository.py .
+mvn -f backend-java/pom.xml --batch-mode --no-transfer-progress clean verify
+npm ci --prefix frontend --no-audit --no-fund
+npm run --prefix frontend build
+```
+
+任何需要数据库迁移、部署说明或完整业务文档的内容，在公开仓库验证完成后迁移到私有仓库补充。

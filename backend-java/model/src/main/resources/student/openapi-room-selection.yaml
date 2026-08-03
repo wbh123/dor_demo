@@ -1,0 +1,102 @@
+openapi: 3.0.3
+info:
+  title: Wust Dormitory Select 选寝室与在住接口
+  version: 1.0.0
+paths:
+  /api/v1/student/batches/{batchId}/rooms/{roomId}/select:
+    post:
+      tags: [Student]
+      operationId: selectRoom
+      summary: ROOM模式个人选择寝室，不分配具体床位
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/BatchIdPath'
+        - $ref: '#/components/parameters/RoomIdPath'
+      responses:
+        '200': { $ref: '#/components/responses/ObjectSuccess' }
+        '400': { $ref: '#/components/responses/ErrorResponse' }
+        '409': { $ref: '#/components/responses/ErrorResponse' }
+
+  /api/v1/student/batches/{batchId}/teams/{teamId}/rooms/{roomId}/select:
+    post:
+      tags: [Student]
+      operationId: selectTeamRoom
+      summary: ROOM模式队伍整体选择同一寝室
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/BatchIdPath'
+        - $ref: '#/components/parameters/TeamIdPath'
+        - $ref: '#/components/parameters/RoomIdPath'
+      responses:
+        '200': { $ref: '#/components/responses/ObjectSuccess' }
+        '400': { $ref: '#/components/responses/ErrorResponse' }
+        '409': { $ref: '#/components/responses/ErrorResponse' }
+
+  /api/v1/student/residency:
+    get:
+      tags: [Student]
+      operationId: getMyResidency
+      summary: 查询当前跨批次在住信息与床位确认状态
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { $ref: '#/components/responses/ObjectSuccess' }
+
+  /api/v1/student/residency/bed-confirmation:
+    post:
+      tags: [Student]
+      operationId: confirmMyActualBed
+      summary: ROOM模式入住后确认实际床位
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/StudentBedConfirmationRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/ObjectSuccess' }
+        '400': { $ref: '#/components/responses/ErrorResponse' }
+        '404': { $ref: '#/components/responses/ErrorResponse' }
+        '409': { $ref: '#/components/responses/ErrorResponse' }
+
+components:
+  parameters:
+    BatchIdPath:
+      name: batchId
+      in: path
+      required: true
+      schema: { type: integer, format: int64 }
+    RoomIdPath:
+      name: roomId
+      in: path
+      required: true
+      schema: { type: integer, format: int64 }
+    TeamIdPath:
+      name: teamId
+      in: path
+      required: true
+      schema: { type: integer, format: int64 }
+
+  responses:
+    ObjectSuccess:
+      description: 操作成功
+      content:
+        application/json:
+          schema: { $ref: '../common-response/openapi-common-response.yaml#/components/schemas/ObjectSuccessResponse' }
+    ErrorResponse:
+      description: 业务错误
+      content:
+        application/json:
+          schema: { $ref: '../common-response/openapi-common-response.yaml#/components/schemas/ErrorResponse' }
+
+  schemas:
+    StudentBedConfirmationRequest:
+      type: object
+      required: [bedId]
+      properties:
+        bedId: { type: integer, format: int64, minimum: 1 }
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: Token

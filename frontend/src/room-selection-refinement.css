@@ -1,0 +1,324 @@
+/* 选床页第二轮布局与提示优化 */
+.room-detail-page {
+  gap: 10px;
+}
+
+.room-detail-heading {
+  margin-bottom: 0;
+  padding-block: 2px;
+}
+
+.room-detail-heading h2 {
+  margin: 3px 0 4px;
+}
+
+.room-detail-heading p {
+  margin: 0;
+}
+
+.compact-alert {
+  margin: 0;
+  padding-block: 10px;
+}
+
+.compact-room-layout-panel {
+  padding: 16px;
+}
+
+.room-layout-meta-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.compact-bed-selection-toolbar {
+  grid-template-columns: minmax(240px, 0.72fr) minmax(500px, 1.28fr);
+  gap: 10px;
+  margin: 9px 0 10px;
+}
+
+.compact-bed-selection-toolbar .bed-select-field,
+.compact-bed-selection-toolbar .selected-bed-summary,
+.selection-hold-card {
+  min-height: 112px;
+  padding: 10px 13px;
+  border-radius: 13px;
+}
+
+.compact-bed-selection-toolbar .bed-select-field {
+  grid-template-columns: 1fr;
+  align-content: center;
+  gap: 8px;
+}
+
+.compact-bed-selection-toolbar .bed-select-control {
+  min-height: 40px;
+}
+
+.selection-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  align-items: stretch;
+}
+
+.selection-overview-grid .selected-bed-summary {
+  height: 100%;
+}
+
+.selection-hold-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: auto auto;
+  gap: 9px 10px;
+  align-content: space-between;
+  border: 1px solid #dce4ef;
+  background: #f7f9fc;
+}
+
+.selection-hold-card.active {
+  border-color: #8db5f1;
+  background: #eef5ff;
+  box-shadow: inset 0 0 0 1px rgba(55, 118, 220, 0.08);
+}
+
+.selection-hold-status {
+  min-width: 0;
+}
+
+.selection-hold-status span,
+.selection-hold-status strong {
+  display: block;
+}
+
+.selection-hold-status span {
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.selection-hold-status strong {
+  margin-top: 4px;
+  color: #263d5d;
+  font-size: 0.92rem;
+}
+
+.compact-countdown {
+  align-self: center;
+  min-width: 58px;
+  font-size: 1.45rem;
+  text-align: right;
+}
+
+.compact-countdown small {
+  margin-left: 3px;
+  font-size: 0.68rem;
+}
+
+.selection-hold-actions {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.selection-hold-actions .button {
+  min-height: 36px;
+  padding: 8px 9px;
+  font-size: 0.78rem;
+}
+
+.selection-hold-actions .button:disabled {
+  opacity: 0.46;
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+.room-detail-page .three-bed-scene-mount {
+  height: clamp(360px, calc(100vh - 385px), 550px);
+  min-height: 360px;
+}
+
+.room-detail-page .three-scene-orientation {
+  bottom: 9px;
+}
+
+.compact-scene-legend {
+  margin-top: 8px;
+}
+
+.selection-toast {
+  position: fixed;
+  top: 22px;
+  left: 50%;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: min(520px, calc(100vw - 32px));
+  padding: 12px 18px;
+  border: 1px solid #84d8b9;
+  border-radius: 14px;
+  color: #075d43;
+  background: rgba(235, 255, 248, 0.98);
+  box-shadow: 0 18px 45px rgba(14, 91, 66, 0.22);
+  transform: translateX(-50%);
+  font-weight: 700;
+  backdrop-filter: blur(10px);
+}
+
+.selection-toast-icon {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  color: #fff;
+  background: #13a875;
+}
+
+.toast-enter-active,
+.toast-leave-active {
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+
+.toast-enter-from,
+.toast-leave-to {
+  opacity: 0;
+  transform: translate(-50%, -12px);
+}
+
+.team-member-list {
+  display: grid;
+  gap: 8px;
+  margin: 14px 0;
+}
+
+.team-member-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--soft);
+}
+
+.team-member-identity {
+  min-width: 0;
+}
+
+.team-member-identity strong,
+.team-member-identity span {
+  display: block;
+}
+
+.team-member-identity span {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.team-invite-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: end;
+}
+
+.team-invite-panel label {
+  display: grid;
+  gap: 6px;
+}
+
+@media (max-width: 1100px) {
+  .compact-bed-selection-toolbar {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 900px) {
+  .compact-bed-selection-toolbar .bed-select-field {
+    grid-template-columns: 1fr;
+  }
+
+  .room-detail-page .three-bed-scene-mount {
+    height: clamp(390px, 62vh, 540px);
+  }
+}
+
+@media (max-width: 640px) {
+  .room-detail-page {
+    gap: 8px;
+  }
+
+  .room-detail-heading {
+    align-items: flex-start;
+  }
+
+  .room-detail-heading .button {
+    min-height: 38px;
+    padding: 8px 11px;
+  }
+
+  .compact-room-layout-panel {
+    padding: 11px;
+  }
+
+  .room-layout-meta-row {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .compact-bed-selection-toolbar {
+    margin: 7px 0 8px;
+  }
+
+  .selection-overview-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .compact-bed-selection-toolbar .bed-select-field,
+  .compact-bed-selection-toolbar .selected-bed-summary,
+  .selection-hold-card {
+    min-height: 0;
+    padding: 10px;
+  }
+
+  .room-detail-page .three-bed-scene-mount {
+    height: min(105vw, 470px);
+    min-height: 350px;
+  }
+
+  .selection-toast {
+    top: 12px;
+    width: calc(100vw - 24px);
+    padding: 11px 13px;
+    border-radius: 12px;
+    font-size: 0.88rem;
+  }
+
+  .team-invite-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .team-invite-panel .button {
+    width: 100%;
+  }
+
+  .team-member-item {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 6px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toast-enter-active,
+  .toast-leave-active {
+    transition: none;
+  }
+}

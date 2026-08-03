@@ -1,0 +1,352 @@
+/* 组队、国际学生资料、语言切换与首页布局优化 */
+
+.language-switcher {
+  display: grid;
+  gap: 6px;
+}
+
+.language-switcher > span {
+  color: rgba(226, 234, 248, 0.72);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.language-switcher .input {
+  min-height: 38px;
+  border-color: rgba(255, 255, 255, 0.18);
+  color: #eef4ff;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.language-switcher .input option {
+  color: #1b2d48;
+  background: #ffffff;
+}
+
+.nav-svg-icon {
+  width: 19px;
+  height: 19px;
+  flex: 0 0 19px;
+  fill: currentColor;
+}
+
+.account-card-without-avatar {
+  grid-template-columns: 1fr !important;
+  padding: 10px 0;
+}
+
+.account-card-without-avatar > div {
+  min-width: 0;
+}
+
+.compact-home-top-card {
+  position: relative;
+  min-height: 184px;
+  height: 100%;
+  padding: 22px 24px;
+}
+
+.welcome-card.compact-home-top-card {
+  align-items: center;
+}
+
+.home-corner-badge {
+  position: absolute;
+  top: 16px;
+  right: 18px;
+  padding: 6px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.32);
+  border-radius: 999px;
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.14);
+  font-size: 12px;
+  font-weight: 750;
+  backdrop-filter: blur(6px);
+}
+
+.student-profile-inline-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px 12px;
+  align-items: center;
+  margin-top: 10px;
+  color: rgba(255, 255, 255, 0.84);
+  font-size: 12px;
+}
+
+.nationality-chip {
+  padding: 4px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 999px;
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.12);
+  font-weight: 700;
+}
+
+.text-button {
+  padding: 0;
+  border: 0;
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.light-text-button {
+  color: #ffffff;
+}
+
+.assignment-summary.compact-home-top-card {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  align-content: stretch;
+}
+
+.assignment-summary.compact-home-top-card > p {
+  margin: 8px 0;
+}
+
+.compact-home-card-action {
+  justify-self: start;
+  align-self: end;
+}
+
+.student-notification-panel {
+  padding: 18px 22px;
+}
+
+.student-notification-panel .section-head {
+  margin-bottom: 10px;
+}
+
+.student-notification-list {
+  display: grid;
+  gap: 9px;
+}
+
+.student-notification-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: center;
+  padding: 12px 14px;
+  border: 1px solid #dce5f2;
+  border-radius: 14px;
+  background: #f8fbff;
+}
+
+.student-notification-item p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.home-invitation-overlay {
+  z-index: 1900;
+}
+
+.home-invitation-dialog {
+  width: min(520px, calc(100vw - 28px));
+  padding: 30px;
+  border: 1px solid #d8e3f2;
+  background: #ffffff;
+}
+
+.home-invitation-dialog > p {
+  color: var(--muted);
+  line-height: 1.7;
+}
+
+.invitation-student-summary {
+  display: grid;
+  gap: 3px;
+  margin: 18px 0;
+  padding: 14px 16px;
+  border: 1px solid #dbe6f4;
+  border-radius: 14px;
+  background: #f5f9ff;
+}
+
+.invitation-student-summary span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.invitation-dialog-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.phone-editor-dialog,
+.confirmation-dialog {
+  width: min(480px, calc(100vw - 28px));
+  background: #ffffff;
+}
+
+.team-page-refined {
+  max-width: 1280px;
+  margin-inline: auto;
+}
+
+.team-page-heading {
+  margin-bottom: 4px;
+}
+
+.compact-team-invite-panel,
+.team-invitation-panel {
+  padding: 20px 22px;
+}
+
+.refined-team-grid {
+  grid-template-columns: 1fr;
+}
+
+.refined-team-card {
+  display: grid;
+  gap: 16px;
+  padding: 22px;
+}
+
+.team-member-slot-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+  width: 100%;
+}
+
+.team-member-slot-card {
+  position: relative;
+  display: grid;
+  grid-template-rows: auto 1fr auto auto;
+  gap: 8px;
+  align-content: stretch;
+  aspect-ratio: 1 / 0.94;
+  min-width: 0;
+  padding: 15px;
+  border: 1px solid #d8e2ef;
+  border-radius: 17px;
+  background: linear-gradient(145deg, #ffffff, #f3f7fc);
+  box-shadow: 0 8px 20px rgba(31, 57, 91, 0.08);
+}
+
+.team-member-slot-card.pending {
+  border-style: dashed;
+  border-color: #d5b66a;
+  background: #fffaf0;
+}
+
+.team-member-slot-card.empty {
+  place-items: center;
+  grid-template-rows: auto auto auto;
+  color: #8795aa;
+  border-style: dashed;
+  background: #fafcff;
+  text-align: center;
+}
+
+.team-member-slot-index {
+  position: absolute;
+  top: 10px;
+  right: 11px;
+  color: #91a0b5;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.team-member-slot-card .team-member-identity {
+  align-self: center;
+  min-width: 0;
+}
+
+.team-member-slot-card .team-member-identity strong,
+.team-member-slot-card .team-member-identity span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.team-member-slot-card .team-member-identity strong {
+  font-size: 16px;
+}
+
+.team-member-slot-card .team-member-identity span {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.team-member-slot-status {
+  display: grid;
+  gap: 3px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.team-member-slot-status b {
+  color: #315c93;
+}
+
+.team-member-remove-button {
+  width: 100%;
+  padding: 7px 9px;
+  border: 1px solid #efd2d2;
+  border-radius: 10px;
+  color: #a33d3d;
+  background: #fff7f7;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.empty-team-slot-plus {
+  font-size: 28px;
+  font-weight: 300;
+}
+
+.team-selection-actions {
+  justify-content: flex-end;
+}
+
+.button.danger {
+  border-color: #c84747;
+  color: #ffffff;
+  background: #c84747;
+}
+
+@media (max-width: 1050px) {
+  .team-member-slot-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .compact-home-top-card {
+    min-height: auto;
+  }
+
+  .team-member-slot-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .invitation-dialog-actions {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 460px) {
+  .team-member-slot-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .team-member-slot-card {
+    aspect-ratio: auto;
+    min-height: 170px;
+  }
+
+  .student-notification-item {
+    grid-template-columns: 1fr;
+  }
+}

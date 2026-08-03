@@ -1,0 +1,16 @@
+Need.md
+scripts/*/__pycache__
+.venv-local-ci/
+local-ci-logs/
+# 本地运行配置
+.env
+.env.*
+!.env.example
+
+# Docker 持久化数据
+data/
+
+# 编辑器与系统文件
+.idea/
+.vscode/
+.DS_Store

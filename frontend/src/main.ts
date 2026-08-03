@@ -1,0 +1,21 @@
+import { createApp } from 'vue'
+import App from './App.vue'
+import router from './router'
+import { pinia } from './stores'
+import { useI18n } from './i18n'
+import './style.css'
+import './ux-refinement.css'
+import './room-selection-refinement.css'
+import './phase2-room-layout.css'
+import './room-scene-geometry-fix.css'
+import './matching-operations.css'
+import './student-experience.css'
+import './batch-copy.css'
+import './batch-rule-template.css'
+import './team-i18n-refinement.css'
+import './admin-i18n-refinement.css'
+import './admin-layout-canvas-refinement.css'
+import './admin-operations-refinement.css'
+
+createApp(App).use(pinia).use(router).mount('#app')
+useI18n().installDomI18n()

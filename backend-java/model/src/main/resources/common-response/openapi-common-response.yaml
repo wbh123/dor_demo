@@ -1,0 +1,87 @@
+openapi: 3.0.3
+info:
+  title: Wust Dormitory Select 通用响应
+  version: 1.0.0
+paths: {}
+components:
+  schemas:
+    ApiResponseMetadata:
+      type: object
+      required:
+        - success
+        - requestId
+        - timestamp
+      properties:
+        success:
+          type: boolean
+        requestId:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+
+    ErrorDetail:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+
+    ObjectSuccessResponse:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseMetadata'
+        - type: object
+          required:
+            - data
+          properties:
+            data:
+              type: object
+              additionalProperties: true
+            error:
+              type: object
+              nullable: true
+
+    ListSuccessResponse:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseMetadata'
+        - type: object
+          required:
+            - data
+          properties:
+            data:
+              type: array
+              items:
+                type: object
+                additionalProperties: true
+            error:
+              type: object
+              nullable: true
+
+    VoidSuccessResponse:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseMetadata'
+        - type: object
+          properties:
+            data:
+              type: object
+              nullable: true
+            error:
+              type: object
+              nullable: true
+
+    ErrorResponse:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseMetadata'
+        - type: object
+          required:
+            - error
+          properties:
+            data:
+              type: object
+              nullable: true
+            error:
+              $ref: '#/components/schemas/ErrorDetail'
