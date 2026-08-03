@@ -30,7 +30,8 @@ public class TeamFormationService {
         jdbc.update("INSERT INTO selection_team (batch_id,team_code,team_name,leader_student_id,team_status) VALUES (:batchId,:code,:name,:studentId,'FORMING')",new MapSqlParameterSource().addValue("batchId",batchId).addValue("code",code).addValue("name",code).addValue("studentId",user.studentId()),key,new String[]{"id"});
         long teamId=key.getKey().longValue();
         jdbc.update("INSERT INTO selection_team_member (team_id,batch_id,student_id,member_role,member_status,joined_at) VALUES (:teamId,:batchId,:studentId,'LEADER','JOINED',CURRENT_TIMESTAMP(3))",Map.of("teamId",teamId,"batchId",batchId,"studentId",user.studentId()));
-        auditService.success(user,"TEAM_CREATE_INTERNAL","SELECTION_TEAM",teamId,null,null,Map.of("batchId",batchId));
+        auditService.success(user,"TEAM_CREATE_INTERNAL","SELECTION_TEAM",teamId,
+                "学生创建组队中的队伍",Map.of(),Map.of("batchId",batchId));
         return Map.of("id",teamId,"batch_id",batchId,"team_status","FORMING","member_role","LEADER");
     }
     long currentBatchId(long studentId) {
