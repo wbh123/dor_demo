@@ -25,6 +25,8 @@ const categoryFilter = ref('')
 const error = ref('')
 const message = ref('')
 const editingStudentId = ref<number | null>(null)
+const editingStudent = ref<DataObject | null>(null)
+const savingStudent = ref(false)
 const resetting = ref(false)
 const resetTarget = ref<DataObject | null>(null)
 const resetMode = ref<'password' | 'state'>('password')
@@ -95,31 +97,36 @@ function setStudentCategory(category: StudentForm['studentCategory']) {
   else if (studentForm.nationalityCode === 'CN') studentForm.nationalityCode = 'US'
 }
 
-async function saveStudent() {
-  error.value = ''; message.value = ''
-  try {
-    const payload = {
-      ...studentForm,
-      enrollmentSource: 'ADMIN_MANUAL',
-      nationalityCode: String(studentForm.nationalityCode || 'CN').trim().toUpperCase(),
-      phoneNumber: String(studentForm.phoneNumber || '').trim() || undefined,
-      degreeLevel: studentForm.degreeLevel || undefined,
-      gradeYear: studentForm.gradeYear || undefined,
-    }
-    if (editingStudentId.value) {
-      await api.put(`/api/v1/admin/students/${editingStudentId.value}`, payload)
-      message.value = '学生资料已更新。'
-    } else {
-      await api.post('/api/v1/admin/students', payload)
-      message.value = '学生已录入，账号处于待激活状态。'
-    }
-    resetStudentForm()
-    await load()
-  } catch (reason) { error.value = translateError(reason) }
+function studentPayload() {
+  return {
+    ...studentForm,
+    enrollmentSource: 'ADMIN_MANUAL',
+    nationalityCode: String(studentForm.nationalityCode || 'CN').trim().toUpperCase(),
+    phoneNumber: String(studentForm.phoneNumber || '').trim() || undefined,
+    degreeLevel: studentForm.degreeLevel || undefined,
+    gradeYear: studentForm.gradeYear || undefined,
+  }
 }
 
-function editStudent(student: DataObject) {
-  editingStudentId.value = Number(student.id)
+async function saveStudent() {
+  if (savingStudent.value) return
+  savingStudent.value = true; error.value = ''; message.value = ''
+  try {
+    if (editingStudentId.value) {
+      await api.put(`/api/v1/admin/students/${editingStudentId.value}`, studentPayload())
+      message.value = '学生资料已更新。'
+      closeStudentEdit()
+    } else {
+      await api.post('/api/v1/admin/students', studentPayload())
+      message.value = '学生已录入，账号处于待激活状态。'
+      resetStudentForm()
+    }
+    await load()
+  } catch (reason) { error.value = translateError(reason) }
+  finally { savingStudent.value = false }
+}
+
+function fillStudentForm(student: DataObject) {
   studentForm.studentNumber = String(student.student_number)
   studentForm.studentName = String(student.student_name)
   studentForm.gender = String(student.gender) as StudentForm['gender']
@@ -129,11 +136,24 @@ function editStudent(student: DataObject) {
   studentForm.phoneNumber = String(student.phone_number ?? '')
   studentForm.degreeLevel = String(student.degree_level ?? '') as StudentForm['degreeLevel']
   studentForm.gradeYear = student.grade_year ? Number(student.grade_year) : null
-  window.scrollTo({ top: 0, behavior: 'smooth' })
+}
+
+function editStudent(student: DataObject) {
+  editingStudentId.value = Number(student.id)
+  editingStudent.value = student
+  fillStudentForm(student)
+  error.value = ''
+  message.value = ''
+}
+
+function closeStudentEdit() {
+  if (savingStudent.value) return
+  editingStudentId.value = null
+  editingStudent.value = null
+  resetStudentForm()
 }
 
 function resetStudentForm() {
-  editingStudentId.value = null
   studentForm.studentNumber = ''
   studentForm.studentName = ''
   studentForm.gender = 'M'
@@ -199,7 +219,7 @@ async function submitReset() {
         confirmStudentNumber: resetForm.confirmStudentNumber.trim(),
         reason: resetForm.reason.trim(),
       })
-      message.value = `${resetTarget.value.student_name}的账号及选寝状态已完全重置。`
+      message.value = `${resetTarget.value.student_name}的账号、在住与选寝状态已完全重置。`
     }
     resetTarget.value = null
     await load()
@@ -219,7 +239,7 @@ function sourceText(value: unknown) {
 <template>
   <div class="content-column">
     <div class="page-title data-title">
-      <div><span class="eyebrow">{{ subtitle('基础数据', 'MASTER DATA') }}</span><h2>专业与学生</h2><p>统一维护专业目录和学生资料，支持单个录入、编辑及批量导入。</p></div>
+      <div><span class="eyebrow">{{ subtitle('基础数据', 'MASTER DATA') }}</span><h2>专业与学生</h2><p>统一维护专业目录和学生资料，支持单个录入、遮罩编辑及批量导入。</p></div>
       <div class="button-row wrap"><button class="button secondary" @click="downloadStudentTemplate('xlsx')">下载Excel模板</button><button class="button ghost" @click="downloadStudentTemplate('csv')">下载CSV模板</button></div>
     </div>
 
@@ -239,7 +259,7 @@ function sourceText(value: unknown) {
       </section>
 
       <section class="panel master-data-card">
-        <div class="section-head split-title"><div><span class="eyebrow">学生资料</span><h3>{{ editingStudentId ? '编辑学生资料' : '录入学生' }}</h3><p>所有学生使用同一录入流程，不再区分不同录入类型。</p></div><button v-if="editingStudentId" class="button ghost small" @click="resetStudentForm">取消编辑</button></div>
+        <div class="section-head"><div><span class="eyebrow">学生资料</span><h3>录入学生</h3><p>新增学生在此录入；修改已有学生时使用居中遮罩表单。</p></div></div>
         <form class="form-grid student-admin-form" @submit.prevent="saveStudent">
           <input v-model.trim="studentForm.studentNumber" class="input" required pattern="\d{12}" maxlength="12" placeholder="12位学号" />
           <input v-model.trim="studentForm.studentName" class="input" required maxlength="128" placeholder="姓名" />
@@ -250,7 +270,7 @@ function sourceText(value: unknown) {
           <select v-model="studentForm.nationalityCode" class="input" :disabled="studentForm.studentCategory === 'DOMESTIC'"><option v-for="country in selectableCountries" :key="country.code" :value="country.code">{{ country.name }}</option></select>
           <input v-model.trim="studentForm.phoneNumber" class="input" maxlength="32" placeholder="手机号码，可留空" />
           <div class="segmented-control span-2"><button type="button" :class="{ active: studentForm.studentCategory === 'DOMESTIC' }" @click="setStudentCategory('DOMESTIC')">国内生</button><button type="button" :class="{ active: studentForm.studentCategory === 'INTERNATIONAL' }" @click="setStudentCategory('INTERNATIONAL')">国际生</button></div>
-          <button class="button primary span-2">{{ editingStudentId ? '保存修改' : '录入学生' }}</button>
+          <button class="button primary span-2" :disabled="savingStudent">{{ savingStudent ? '正在录入…' : '录入学生' }}</button>
         </form>
       </section>
     </div>
@@ -260,7 +280,9 @@ function sourceText(value: unknown) {
       <div class="table-wrap"><table><thead><tr><th>学生</th><th>专业与年级</th><th>类别</th><th>联系方式</th><th>录入方式</th><th>操作</th></tr></thead><tbody><tr v-for="student in students" :key="String(student.id)"><td><strong>{{ student.student_name }}</strong><small>{{ student.student_number }}</small></td><td>{{ student.major_name }}<small>{{ degreeText(student.degree_level) }} · {{ student.grade_year || '年级未填写' }}</small></td><td>{{ categoryText(student.student_category) }}<small>{{ countryLabel(String(student.nationality_code ?? 'CN')) }}</small></td><td>{{ student.phone_number || '未填写' }}</td><td>{{ sourceText(student.enrollment_source) }}</td><td><div class="button-row"><button class="button ghost small" @click="editStudent(student)">编辑</button><button class="button ghost small" @click="openReset(student, 'password')">重置密码</button><button class="button ghost small danger-text" @click="openReset(student, 'state')">完全重置</button></div></td></tr></tbody></table></div>
     </section>
 
-    <div v-if="resetTarget" class="modal-overlay student-reset-overlay" @click.self="closeReset"><section class="modal-card student-reset-dialog" role="dialog" aria-modal="true"><header class="section-head split-title"><div><span class="eyebrow">学生账号重置</span><h3>{{ resetMode === 'password' ? '重置学生密码' : '完全重置学生状态' }}</h3><p>{{ resetTarget.student_name }} · {{ resetTarget.student_number }}</p></div><button class="button ghost small" :disabled="resetting" @click="closeReset">关闭</button></header><div class="student-reset-warning" :class="{ danger: resetMode === 'state' }"><strong>{{ resetMode === 'password' ? '仅重置登录信息' : '不可恢复的完整重置' }}</strong><p v-if="resetMode === 'password'">清除密码和登录令牌，不影响寝室、个人偏好、组队及批次资格。</p><p v-else>清除密码、分配结果、寝室记录、个人偏好、组队关系、通知和批次资格，使学生恢复到待激活状态。</p></div><form class="form-stack" @submit.prevent="submitReset"><label v-if="resetMode === 'state'"><span>输入学号确认</span><input v-model.trim="resetForm.confirmStudentNumber" class="input" required pattern="\d{12}" maxlength="12" :placeholder="String(resetTarget.student_number)" /></label><label><span>操作原因</span><textarea v-model.trim="resetForm.reason" class="input" required maxlength="500" rows="3" /></label><div class="button-row"><button class="button ghost" type="button" @click="closeReset">取消</button><button class="button" :class="resetMode === 'state' ? 'danger' : 'primary'" :disabled="resetting">确认</button></div></form></section></div>
+    <div v-if="editingStudentId" class="modal-overlay student-edit-overlay" @click.self="closeStudentEdit"><section class="modal-card student-edit-dialog" role="dialog" aria-modal="true" aria-labelledby="student-edit-title"><header class="section-head split-title"><div><span class="eyebrow">学生资料修改</span><h3 id="student-edit-title">编辑 {{ editingStudent?.student_name }}</h3><p>{{ editingStudent?.student_number }}</p></div><button class="button ghost small" :disabled="savingStudent" @click="closeStudentEdit">关闭</button></header><form class="form-grid student-admin-form" @submit.prevent="saveStudent"><input v-model.trim="studentForm.studentNumber" class="input" required pattern="\d{12}" maxlength="12" placeholder="12位学号" /><input v-model.trim="studentForm.studentName" class="input" required maxlength="128" placeholder="姓名" /><select v-model="studentForm.gender" class="input" required><option value="M">男生</option><option value="F">女生</option></select><select v-model.number="studentForm.majorId" class="input" required><option v-for="major in majors.filter((item) => item.enabled)" :key="String(major.id)" :value="Number(major.id)">{{ major.major_code }} · {{ major.major_name }}</option></select><select v-model="studentForm.degreeLevel" class="input"><option value="">培养层次可留空</option><option value="UNDERGRADUATE">本科生</option><option value="MASTER">硕士生</option><option value="DOCTOR">博士生</option><option value="MASTER_DOCTOR">硕博生</option></select><input v-model.number="studentForm.gradeYear" class="input" type="number" min="2000" max="2100" placeholder="年级，可留空" /><select v-model="studentForm.nationalityCode" class="input" :disabled="studentForm.studentCategory === 'DOMESTIC'"><option v-for="country in selectableCountries" :key="country.code" :value="country.code">{{ country.name }}</option></select><input v-model.trim="studentForm.phoneNumber" class="input" maxlength="32" placeholder="手机号码，可留空" /><div class="segmented-control span-2"><button type="button" :class="{ active: studentForm.studentCategory === 'DOMESTIC' }" @click="setStudentCategory('DOMESTIC')">国内生</button><button type="button" :class="{ active: studentForm.studentCategory === 'INTERNATIONAL' }" @click="setStudentCategory('INTERNATIONAL')">国际生</button></div><div class="button-row span-2 edit-actions"><button class="button ghost" type="button" :disabled="savingStudent" @click="closeStudentEdit">取消</button><button class="button primary" :disabled="savingStudent">{{ savingStudent ? '正在保存…' : '保存修改' }}</button></div></form></section></div>
+
+    <div v-if="resetTarget" class="modal-overlay student-reset-overlay" @click.self="closeReset"><section class="modal-card student-reset-dialog" role="dialog" aria-modal="true"><header class="section-head split-title"><div><span class="eyebrow">学生账号重置</span><h3>{{ resetMode === 'password' ? '重置学生密码' : '完全重置学生状态' }}</h3><p>{{ resetTarget.student_name }} · {{ resetTarget.student_number }}</p></div><button class="button ghost small" :disabled="resetting" @click="closeReset">关闭</button></header><div class="student-reset-warning" :class="{ danger: resetMode === 'state' }"><strong>{{ resetMode === 'password' ? '仅重置登录信息' : '不可恢复的完整重置' }}</strong><p v-if="resetMode === 'password'">清除密码和登录令牌，不影响寝室、个人偏好、组队及批次资格。</p><p v-else>结束当前在住，清除临时占用、密码、分配结果、个人偏好、组队关系、通知和批次资格，使学生恢复到待激活状态。</p></div><form class="form-stack" @submit.prevent="submitReset"><label v-if="resetMode === 'state'"><span>输入学号确认</span><input v-model.trim="resetForm.confirmStudentNumber" class="input" required pattern="\d{12}" maxlength="12" :placeholder="String(resetTarget.student_number)" /></label><label><span>操作原因</span><textarea v-model.trim="resetForm.reason" class="input" required maxlength="500" rows="3" /></label><div class="button-row"><button class="button ghost" type="button" @click="closeReset">取消</button><button class="button" :class="resetMode === 'state' ? 'danger' : 'primary'" :disabled="resetting">确认</button></div></form></section></div>
   </div>
 </template>
 
@@ -277,6 +299,9 @@ function sourceText(value: unknown) {
 .segmented-control button.active { color: #1e4e9f; background: #fff; box-shadow: 0 4px 12px rgba(26,50,90,.1); font-weight: 700; }
 .student-filter-row { display: grid; grid-template-columns: minmax(220px, 1fr) 180px auto; gap: 10px; }
 .danger-text { color: var(--danger); }
+.student-edit-overlay { z-index: 1260; padding: 30px; background: rgba(9,23,48,.78); backdrop-filter: blur(7px); }
+.student-edit-dialog { width: min(760px, calc(100vw - 60px)); padding: 26px; border-radius: 26px; background: var(--panel, #fff); }
+.edit-actions { justify-content: flex-end; }
 @media (max-width: 900px) { .data-title, .import-panel { display: grid; } .import-actions { min-width: 0; } .master-data-card { height: auto; max-height: none; } .major-scroll-list { max-height: 380px; } }
-@media (max-width: 680px) { .student-admin-form, .student-filter-row { grid-template-columns: 1fr; } .student-admin-form .span-2 { grid-column: auto; } .import-actions { display: grid; } }
+@media (max-width: 680px) { .student-admin-form, .student-filter-row { grid-template-columns: 1fr; } .student-admin-form .span-2 { grid-column: auto; } .import-actions { display: grid; } .student-edit-overlay { padding: 10px; }.student-edit-dialog { width: 100%; padding: 18px; border-radius: 22px; } }
 </style>

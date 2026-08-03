@@ -1,0 +1,56 @@
+openapi: 3.0.3
+info:
+  title: 宿舍运营与运行健康接口
+  version: 1.0.0
+paths:
+  /api/v1/admin/operations/overview:
+    get:
+      tags: [Operations]
+      operationId: getOperationsOverview
+      summary: 查询床位利用、未选学生和人工调整统计
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { $ref: '#/components/responses/ObjectSuccess' }
+  /api/v1/admin/operations/health:
+    get:
+      tags: [Operations]
+      operationId: getOperationsHealth
+      summary: 查询数据库、Redis、活动批次和慢查询候选状态
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { $ref: '#/components/responses/ObjectSuccess' }
+  /api/v1/admin/batches/{batchId}/allocation/optimized-preview:
+    get:
+      tags: [Operations]
+      operationId: previewOptimizedAllocation
+      summary: 对统一分配候选结果计算匹配与公平性指标
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: batchId
+          in: path
+          required: true
+          schema: { type: integer, format: int64, minimum: 1 }
+        - name: randomSeed
+          in: query
+          required: false
+          schema: { type: integer, format: int64, default: 2026 }
+      responses:
+        '200': { $ref: '#/components/responses/ObjectSuccess' }
+        '404': { $ref: '#/components/responses/ErrorResponse' }
+components:
+  responses:
+    ObjectSuccess:
+      description: 查询成功
+      content:
+        application/json:
+          schema: { $ref: '../common-response/openapi-common-response.yaml#/components/schemas/ObjectSuccessResponse' }
+    ErrorResponse:
+      description: 业务错误
+      content:
+        application/json:
+          schema: { $ref: '../common-response/openapi-common-response.yaml#/components/schemas/ErrorResponse' }
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: Token

@@ -2,8 +2,11 @@ package com.wust.dormitory.admin;
 
 import com.wust.dormitory.audit.AuditService;
 import com.wust.dormitory.common.error.BusinessException;
+import com.wust.dormitory.residency.ResidencyService;
+import com.wust.dormitory.roomchange.RoomChangeService;
 import com.wust.dormitory.security.AuthTokenService;
 import com.wust.dormitory.security.CurrentUser;
+import com.wust.dormitory.selection.BedHoldResetService;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -18,14 +21,23 @@ public class StudentAccountAdminService {
     private final NamedParameterJdbcTemplate jdbc;
     private final AuditService auditService;
     private final AuthTokenService authTokenService;
+    private final BedHoldResetService bedHoldResetService;
+    private final ResidencyService residencyService;
+    private final RoomChangeService roomChangeService;
 
     public StudentAccountAdminService(
             NamedParameterJdbcTemplate jdbc,
             AuditService auditService,
-            AuthTokenService authTokenService) {
+            AuthTokenService authTokenService,
+            BedHoldResetService bedHoldResetService,
+            ResidencyService residencyService,
+            RoomChangeService roomChangeService) {
         this.jdbc = jdbc;
         this.auditService = auditService;
         this.authTokenService = authTokenService;
+        this.bedHoldResetService = bedHoldResetService;
+        this.residencyService = residencyService;
+        this.roomChangeService = roomChangeService;
     }
 
     @Transactional
@@ -75,6 +87,27 @@ public class StudentAccountAdminService {
         long userId = number(before.get("user_id"));
         Map<String, Integer> deleted = new LinkedHashMap<>();
 
+        List<Long> activeTeamIds = activeTeamIds(studentId);
+        deleted.put("releasedRedisHolds", bedHoldResetService.releaseAllForStudent(studentId, activeTeamIds));
+        deleted.put("cancelledRoomChanges", roomChangeService.cancelActiveRoomChanges(
+                studentId,
+                "管理员完全重置学生：" + reason.trim(),
+                operator));
+
+        List<Long> activeResidencyIds = jdbc.queryForList("""
+                SELECT id
+                FROM room_assignment
+                WHERE student_id=:studentId AND assignment_status='ACTIVE'
+                FOR UPDATE
+                """, Map.of("studentId", studentId), Long.class);
+        for (Long residencyId : activeResidencyIds) {
+            residencyService.end(
+                    residencyId,
+                    "管理员完全重置学生：" + reason.trim(),
+                    operator);
+        }
+        deleted.put("endedResidencies", activeResidencyIds.size());
+
         deleted.put("allocationResults", delete(
                 "DELETE FROM allocation_run_result WHERE student_id=:studentId",
                 studentId));
@@ -90,21 +123,6 @@ public class StudentAccountAdminService {
         deleted.put("studentFeatures", delete(
                 "DELETE FROM student_feature WHERE student_id=:studentId",
                 studentId));
-
-        List<Long> activeTeamIds = jdbc.queryForList("""
-                SELECT DISTINCT team.id
-                FROM selection_team team
-                LEFT JOIN selection_team_member member
-                  ON member.team_id=team.id
-                 AND member.student_id=:studentId
-                 AND member.member_status IN ('INVITED','JOINED','LOCKED')
-                WHERE team.team_status IN ('FORMING','LOCKED','SELECTING')
-                  AND (
-                    team.leader_student_id=:studentId
-                    OR member.student_id IS NOT NULL
-                  )
-                FOR UPDATE
-                """, Map.of("studentId", studentId), Long.class);
 
         int generatedNotifications = 0;
         int cancelledInvitations = 0;
@@ -184,7 +202,7 @@ public class StudentAccountAdminService {
         result.put("accountStatus", "PENDING");
         result.put("deleted", deleted);
         result.put("revokedTokens", revokedTokens);
-        result.put("message", "学生账号与全部选寝状态已重置为待激活");
+        result.put("message", "学生账号、长期在住、临时占用与全部选寝状态已重置为待激活");
         auditService.success(
                 operator,
                 "STUDENT_STATE_RESET",
@@ -194,6 +212,23 @@ public class StudentAccountAdminService {
                 before,
                 result);
         return result;
+    }
+
+    private List<Long> activeTeamIds(long studentId) {
+        return jdbc.queryForList("""
+                SELECT DISTINCT team.id
+                FROM selection_team team
+                LEFT JOIN selection_team_member member
+                  ON member.team_id=team.id
+                 AND member.student_id=:studentId
+                 AND member.member_status IN ('INVITED','JOINED','LOCKED')
+                WHERE team.team_status IN ('FORMING','LOCKED','SELECTING')
+                  AND (
+                    team.leader_student_id=:studentId
+                    OR member.student_id IS NOT NULL
+                  )
+                FOR UPDATE
+                """, Map.of("studentId", studentId), Long.class);
     }
 
     private void resetAccount(long userId) {
