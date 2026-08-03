@@ -9,7 +9,7 @@
     <packaging>pom</packaging>
 
     <name>Wust Dormitory Select 固定构建父物料清单</name>
-    <description>从城安智序工程构建基线固化的可复现构建副本</description>
+    <description>用于公开构建的可复现固定依赖基线</description>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
