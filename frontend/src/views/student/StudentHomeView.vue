@@ -156,14 +156,8 @@ async function load() {
   }
 }
 
-
 async function loadGlobalPreferences() {
   const response = await api.get<ObjectSuccessResponse>('/api/v1/student/preferences')
-  questionnaire.value = (response.data.data ?? {}) as DataObject
-}
-
-async function loadQuestionnaire(id: number) {
-  const response = await api.get<ObjectSuccessResponse>(`/api/v1/student/batches/${id}/questionnaire`)
   questionnaire.value = (response.data.data ?? {}) as DataObject
 }
 
