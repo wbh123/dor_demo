@@ -20,6 +20,8 @@ import java.util.Map;
 
 @Service
 public class BatchCreationService {
+    private static final String BUILTIN_QUESTIONNAIRE_CODE = "SYSTEM-PREFERENCE-V1";
+
     private final NamedParameterJdbcTemplate jdbc;
     private final BatchRuleTemplateService batchRuleTemplateService;
     private final FeatureAccessService featureAccessService;
@@ -45,11 +47,13 @@ public class BatchCreationService {
         }
 
         Map<String, Object> questionnaire = one("""
-                SELECT id FROM questionnaire_version
-                WHERE version_status='PUBLISHED'
-                ORDER BY published_at DESC, id DESC
+                SELECT id
+                FROM questionnaire_version
+                WHERE version_code='SYSTEM-PREFERENCE-V1'
                 LIMIT 1
-                """, Map.of(), "QUESTIONNAIRE_REQUIRED", "请先发布个人偏好版本");
+                """, Map.of(),
+                "BUILTIN_QUESTIONNAIRE_MISSING",
+                "系统内置个人偏好问卷不可用");
         Map<String, Object> scheme = one("""
                 SELECT id FROM matching_weight_scheme
                 WHERE enabled=1
@@ -115,6 +119,8 @@ public class BatchCreationService {
         result.put("batchStatus", "DRAFT");
         result.put("selectionMode", normalized.selectionMode());
         result.put("separateStudentCategories", normalized.separateStudentCategories());
+        result.put("questionnaireType", "BUILTIN_FIXED");
+        result.put("questionnaireCode", BUILTIN_QUESTIONNAIRE_CODE);
         result.put("ruleTemplateId", snapshot.id());
         result.put("ruleTemplateCode", snapshot.code());
         result.put("ruleTemplateRevision", snapshot.revision());
@@ -132,7 +138,7 @@ public class BatchCreationService {
                 "BATCH_CREATE",
                 "SELECTION_BATCH",
                 batchId,
-                "使用批次规则模板创建草稿批次",
+                "使用系统内置固定问卷和批次规则模板创建草稿批次",
                 null,
                 result);
         return result;
