@@ -11,15 +11,11 @@ const router = useRouter()
 const welcomeError = ref('')
 const institutionName = String(import.meta.env.VITE_INSTITUTION_NAME || '示例大学')
 const productName = `${institutionName}选寝`
+const operatorName = String(import.meta.env.VITE_OPERATOR_NAME || '运营单位信息待填写')
+const icpRecord = String(import.meta.env.VITE_ICP_RECORD || 'ICP备案信息待填写')
 const {
-  locale,
-  localeOptions,
-  t,
-  subtitle,
-  setLocale,
-  applyNationalityLocale,
-  welcomeMessage,
-  translateError,
+  locale, localeOptions, t, subtitle, setLocale,
+  applyNationalityLocale, welcomeMessage, translateError,
 } = useI18n()
 
 const icons = {
@@ -34,22 +30,18 @@ const icons = {
   team: 'M16 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM7 12a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Zm9 2c-3.31 0-6 1.79-6 4v3h12v-3c0-2.21-2.69-4-6-4ZM7 14c-2.76 0-5 1.57-5 3.5V21h6v-3c0-1.4.53-2.69 1.45-3.76A8.4 8.4 0 0 0 7 14Z',
 }
 
-const links = computed(() =>
-  auth.isAdmin
-    ? [
-        { to: '/admin', label: '工作台', icon: icons.dashboard },
-        { to: '/admin/data', label: '专业与学生', icon: icons.students },
-        { to: '/admin/dormitories', label: '宿舍资源', icon: icons.dormitory },
-        { to: '/admin/matching', label: '匹配规则', icon: icons.matching },
-        { to: '/admin/rule-templates', label: '批次规则', icon: icons.rules },
-        { to: '/admin/batches', label: '选寝批次', icon: icons.calendar },
-        { to: '/admin/assignments', label: '分配与调整', icon: icons.assignment },
-      ]
-    : [
-        { to: '/student', label: '选寝首页', icon: icons.home },
-        { to: '/student/teams', label: '我的队伍', icon: icons.team },
-      ],
-)
+const links = computed(() => auth.isAdmin ? [
+  { to: '/admin', label: '工作台', icon: icons.dashboard },
+  { to: '/admin/data', label: '专业与学生', icon: icons.students },
+  { to: '/admin/dormitories', label: '宿舍资源', icon: icons.dormitory },
+  { to: '/admin/matching', label: '匹配规则', icon: icons.matching },
+  { to: '/admin/rule-templates', label: '批次规则', icon: icons.rules },
+  { to: '/admin/batches', label: '选寝批次', icon: icons.calendar },
+  { to: '/admin/assignments', label: '分配与调整', icon: icons.assignment },
+] : [
+  { to: '/student', label: '选寝首页', icon: icons.home },
+  { to: '/student/teams', label: '我的队伍', icon: icons.team },
+])
 
 const welcomeText = computed(() => {
   const welcome = auth.user?.welcome as (DataObject & { messages?: Record<string, string> }) | undefined
@@ -60,105 +52,55 @@ onMounted(async () => {
   if (!auth.isStudent) return
   try {
     const response = await api.get<ObjectSuccessResponse>('/api/v1/student/profile')
-    const profile = (response.data.data ?? {}) as DataObject
-    applyNationalityLocale(profile.nationality_code)
+    applyNationalityLocale(((response.data.data ?? {}) as DataObject).nationality_code)
   } catch {
     // 资料页会再次加载，语言自动判断失败不阻断系统使用。
   }
 })
 
-function changeLocale(event: Event) {
-  setLocale((event.target as HTMLSelectElement).value as LocaleCode)
-}
-
+function changeLocale(event: Event) { setLocale((event.target as HTMLSelectElement).value as LocaleCode) }
 async function acknowledgeWelcome() {
   welcomeError.value = ''
-  try {
-    await auth.acknowledgeWelcome()
-  } catch (reason) {
-    welcomeError.value = translateError(reason)
-  }
+  try { await auth.acknowledgeWelcome() }
+  catch (reason) { welcomeError.value = translateError(reason) }
 }
-
-async function logout() {
-  await auth.logout()
-  await router.replace('/login')
-}
+async function logout() { await auth.logout(); await router.replace('/login') }
 </script>
 
 <template>
-  <div class="app-shell">
-    <aside class="sidebar">
-      <div class="brand">
-        <span class="brand-mark">W</span>
-        <div>
-          <strong>{{ productName }}</strong>
-          <small>宿舍智能选择系统</small>
-        </div>
+  <div class="app-shell fixed-navigation-shell">
+    <aside class="sidebar fixed-sidebar">
+      <div class="brand school-brand">
+        <img class="school-brand-logo" src="/logo-title-right.png" :alt="`${institutionName}校徽`" />
+        <div class="school-brand-fallback"><strong>{{ productName }}</strong><small>宿舍智能选择系统</small></div>
       </div>
 
       <nav class="nav-list">
-        <RouterLink v-for="link in links" :key="link.to" :to="link.to" class="nav-item">
-          <svg class="nav-icon nav-svg-icon" viewBox="0 0 24 24" aria-hidden="true">
-            <path :d="link.icon" />
-          </svg>
-          <span>{{ link.label }}</span>
-        </RouterLink>
+        <RouterLink v-for="link in links" :key="link.to" :to="link.to" class="nav-item"><svg class="nav-icon nav-svg-icon" viewBox="0 0 24 24" aria-hidden="true"><path :d="link.icon" /></svg><span>{{ link.label }}</span></RouterLink>
       </nav>
 
       <div class="sidebar-foot">
-        <label class="language-switcher">
-          <span>{{ t('language.label') }}</span>
-          <select class="input" :value="locale" @change="changeLocale">
-            <option v-for="option in localeOptions" :key="option.value" :value="option.value">
-              {{ option.label }}
-            </option>
-          </select>
-        </label>
-        <div class="user-card account-card-without-avatar">
-          <div>
-            <strong>{{ auth.user?.displayName }}</strong>
-            <small>{{ auth.isAdmin ? '业务管理员' : auth.user?.username }}</small>
-          </div>
-        </div>
+        <label class="language-switcher"><span>{{ t('language.label') }}</span><select class="input" :value="locale" @change="changeLocale"><option v-for="option in localeOptions" :key="option.value" :value="option.value">{{ option.label }}</option></select></label>
+        <div class="user-card account-card-without-avatar"><div><strong>{{ auth.user?.displayName }}</strong><small>{{ auth.isAdmin ? '业务管理员' : auth.user?.username }}</small></div></div>
         <button class="button ghost full" @click="logout">退出登录</button>
+        <footer class="sidebar-compliance"><span>{{ operatorName }}</span><span>{{ icpRecord }}</span></footer>
       </div>
     </aside>
 
-    <main class="main-content" :class="{ 'student-main-content': auth.isStudent }">
-      <header v-if="auth.isAdmin" class="topbar">
-        <div>
-          <span class="eyebrow">{{ subtitle(productName, 'DORMITORY SELECT') }}</span>
-          <h1>管理控制台</h1>
-        </div>
-      </header>
-      <section class="page-container" :class="{ 'student-page-container': auth.isStudent }">
-        <RouterView />
-      </section>
+    <main class="main-content fixed-sidebar-content" :class="{ 'student-main-content': auth.isStudent }">
+      <header v-if="auth.isAdmin" class="topbar"><div><span class="eyebrow">{{ subtitle(productName, 'DORMITORY SELECT') }}</span><h1>管理控制台</h1></div></header>
+      <section class="page-container" :class="{ 'student-page-container': auth.isStudent }"><RouterView /></section>
     </main>
 
     <Transition name="welcome-pop">
       <div v-if="auth.welcomeRequired" class="welcome-overlay" role="presentation">
-        <section
-          class="welcome-dialog"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="student-welcome-title"
-        >
-          <div class="welcome-glow welcome-glow-one" />
-          <div class="welcome-glow welcome-glow-two" />
-          <div class="welcome-symbol" aria-hidden="true">W</div>
+        <section class="welcome-dialog" role="dialog" aria-modal="true" aria-labelledby="student-welcome-title">
+          <div class="welcome-glow welcome-glow-one" /><div class="welcome-glow welcome-glow-two" />
+          <img class="welcome-school-logo" src="/logo-only.png" alt="" aria-hidden="true" />
           <span class="eyebrow">{{ subtitle('欢迎来到校园', 'WELCOME TO CAMPUS') }}</span>
-          <h2 id="student-welcome-title">{{ t('welcome.title') }}</h2>
-          <p>{{ welcomeText }}</p>
+          <h2 id="student-welcome-title">{{ t('welcome.title') }}</h2><p>{{ welcomeText }}</p>
           <p v-if="welcomeError" class="alert error">{{ welcomeError }}</p>
-          <button
-            class="button primary welcome-start-button"
-            :disabled="auth.welcomeAcknowledging"
-            @click="acknowledgeWelcome"
-          >
-            {{ auth.welcomeAcknowledging ? '正在进入…' : t('welcome.start') }}
-          </button>
+          <button class="button primary welcome-start-button" :disabled="auth.welcomeAcknowledging" @click="acknowledgeWelcome">{{ auth.welcomeAcknowledging ? '正在进入…' : t('welcome.start') }}</button>
         </section>
       </div>
     </Transition>
@@ -166,8 +108,19 @@ async function logout() {
 </template>
 
 <style scoped>
+.fixed-navigation-shell { display: block; min-height: 100vh; }
+.fixed-sidebar { position: fixed; inset: 0 auto 0 0; width: 260px; height: 100vh; overflow-y: auto; z-index: 30; }
+.fixed-sidebar-content { min-height: 100vh; margin-left: 260px; }
+.school-brand { min-height: 58px; }
+.school-brand-logo { width: 100%; max-height: 58px; object-fit: contain; object-position: left center; }
+.school-brand-fallback { display: none; }
 .account-card-without-avatar { padding: 14px 16px; }
 .account-card-without-avatar > div { min-width: 0; }
-.account-card-without-avatar strong,
-.account-card-without-avatar small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.account-card-without-avatar strong, .account-card-without-avatar small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sidebar-compliance { display: grid; gap: 4px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,.12); color: #91a8d5; font-size: .66rem; line-height: 1.45; }
+.welcome-school-logo { width: 72px; height: 72px; object-fit: contain; margin: 0 auto 12px; }
+@media (max-width: 820px) {
+  .fixed-sidebar { position: static; width: auto; height: auto; overflow: visible; }
+  .fixed-sidebar-content { margin-left: 0; }
+}
 </style>
