@@ -2,7 +2,7 @@ openapi: 3.0.3
 info:
   title: 示例大学学生宿舍智能选择系统接口
   description: 第一阶段核心闭环、第二阶段质量运营与系统服务管理能力OpenAPI契约
-  version: 2.8.0
+  version: 2.9.0
 servers:
   - url: http://localhost:8080
 paths:
@@ -67,6 +67,8 @@ paths:
     $ref: 'admin/openapi-batch-rule-template.yaml#/paths/~1api~1v1~1admin~1batch-rule-templates~1{templateId}~1revisions'
   /api/v1/admin/batches:
     $ref: 'admin/openapi-batch-selection.yaml#/paths/~1api~1v1~1admin~1batches'
+  /api/v1/admin/batches/{batchId}/scope:
+    $ref: 'admin/openapi-batch-selection.yaml#/paths/~1api~1v1~1admin~1batches~1{batchId}~1scope'
   /api/v1/admin/batches/{batchId}/room-preflight:
     $ref: 'admin/openapi-batch-selection.yaml#/paths/~1api~1v1~1admin~1batches~1{batchId}~1room-preflight'
   /api/v1/admin/batches/{batchId}/copy:
