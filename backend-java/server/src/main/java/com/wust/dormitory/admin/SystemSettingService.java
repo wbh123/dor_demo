@@ -21,8 +21,8 @@ public class SystemSettingService {
     private static final String STUDENT_WELCOME_MESSAGE = "STUDENT_WELCOME_MESSAGE";
     private static final int MAX_STORED_VALUE_LENGTH = 1000;
     private static final Map<String, String> DEFAULT_MESSAGES = Map.of(
-            "zh-CN", "欢迎使用武汉科技大学学生宿舍智能选择系统。请先完成个人偏好，再选择合适的宿舍与床位。",
-            "en-US", "Welcome to the Wuhan University of Science and Technology dormitory selection system. Complete your personal preferences first, then choose a suitable room and bed.");
+            "zh-CN", "欢迎使用武汉科技大学学生宿舍智能选择系统。请先完成个人偏好，再选择合适的宿舍或床位。",
+            "en-US", "Welcome to the Wuhan University of Science and Technology dormitory selection system. Complete your personal preferences first, then choose a suitable room or bed.");
 
     private final NamedParameterJdbcTemplate jdbc;
     private final AuditService auditService;
@@ -37,7 +37,9 @@ public class SystemSettingService {
         this.objectMapper = objectMapper;
     }
 
+    @Transactional
     public Map<String, Object> studentWelcome() {
+        ensureStudentWelcomeSetting();
         return one();
     }
 
@@ -46,6 +48,7 @@ public class SystemSettingService {
             Map<String, String> messages,
             int expectedVersion,
             CurrentUser operator) {
+        ensureStudentWelcomeSetting();
         Map<String, String> normalized = normalize(messages);
         String serializedMessages = json(normalized);
         if (serializedMessages.length() > MAX_STORED_VALUE_LENGTH) {
@@ -118,6 +121,20 @@ public class SystemSettingService {
             fallback.put("zh-CN", rawValue.trim());
             return fallback;
         }
+    }
+
+    private void ensureStudentWelcomeSetting() {
+        String defaultValue = json(DEFAULT_MESSAGES);
+        jdbc.update("""
+                INSERT INTO system_setting
+                (setting_key, setting_value, version, updated_by)
+                SELECT :settingKey, :settingValue, 0, NULL
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM system_setting WHERE setting_key=:settingKey
+                )
+                """, new MapSqlParameterSource()
+                .addValue("settingKey", STUDENT_WELCOME_MESSAGE)
+                .addValue("settingValue", defaultValue));
     }
 
     private Map<String, String> normalize(Map<String, String> messages) {
