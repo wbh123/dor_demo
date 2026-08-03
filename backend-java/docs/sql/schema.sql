@@ -1,17 +1,12 @@
 -- ============================================================
 -- 武汉科技大学学生宿舍智能选择系统
+-- Schema version: V1-V16
 -- 数据库架构安装入口：Flyway V1～V16
 --
 -- 生成方式：python scripts/db/build_frozen_baseline.py
--- 正式Flyway版本迁移是数据库结构的唯一事实来源。
--- 本文件使用MySQL客户端SOURCE命令按版本顺序执行全部正式迁移，
--- 从而避免复制型schema.sql在新增迁移后长期未更新。
---
--- 必须从仓库根目录执行，例如：
---   mysql --binary-mode=1 -u<user> -p <database> < backend-java/docs/sql/schema.sql
---
--- 注意：SOURCE是MySQL客户端命令，本文件不能作为JDBC单条SQL执行。
--- 生产升级仍应优先使用Flyway，不应重复导入本文件。
+-- 正式 Flyway 版本迁移是数据库结构的唯一事实来源。
+-- 本文件使用 MySQL 客户端 SOURCE 命令按版本顺序执行全部正式迁移。
+-- Navicat 请使用 backend-java/docs/sql/navicat 目录中的脚本。
 -- ============================================================
 
 SET NAMES utf8mb4;
