@@ -90,7 +90,10 @@ def validate_fixed_questionnaire(errors: list[str]) -> None:
 
 def validate_frontend(errors: list[str]) -> None:
     shell = read("frontend/src/layouts/AppShell.vue")
+    login = read("frontend/src/views/LoginView.vue")
     router = read("frontend/src/router/index.ts")
+    vite_config = read("frontend/vite.config.ts")
+    env_example = read(".env.example")
     package_json = read("frontend/package.json")
 
     require(
@@ -99,11 +102,36 @@ def validate_frontend(errors: list[str]) -> None:
         errors,
     )
     require(
+        "VITE_INSTITUTION_NAME" in login,
+        "login page does not use configurable institution display name",
+        errors,
+    )
+    require(
         "showBuiltinQuestionnaireNotice" in shell
         and "BUILT-IN PREFERENCE QUESTIONNAIRE" in shell,
         "administrator batch page does not expose the fixed-questionnaire notice",
         errors,
     )
+    require(
+        "loadEnv" in vite_config and re.search(r"envDir:\s*['\"]\.\.['\"]", vite_config),
+        "Vite does not load the repository-root environment file",
+        errors,
+    )
+    require(
+        "VITE_DEV_SERVER_PORT" in vite_config
+        and "VITE_BACKEND_PROXY_TARGET" in vite_config
+        and "VITE_ALLOWED_HOSTS" in vite_config,
+        "Vite development settings are not fully environment-driven",
+        errors,
+    )
+    for variable in (
+        "VITE_INSTITUTION_NAME",
+        "VITE_DEV_SERVER_PORT",
+        "VITE_BACKEND_PROXY_TARGET",
+        "VITE_ALLOWED_HOSTS",
+    ):
+        require(variable in env_example, f"missing public environment variable: {variable}", errors)
+
     has_admin_batches_path = re.search(
         r"path:\s*['\"]admin/batches['\"]",
         router,
