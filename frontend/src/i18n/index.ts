@@ -222,7 +222,7 @@ const subtitleTranslations: Record<string, string> = {
   'OPERATIONS OVERVIEW': '运行概览',
   'FIRST LOGIN WELCOME': '首次登录欢迎',
   'MATCHING OPERATIONS': '匹配规则',
-  'WUST DORMITORY SELECT': '武科大选寝',
+  'WUST DORMITORY SELECT': '高校选寝',
   'SELECTION OPERATIONS': '选寝批次与统一分配',
   'ALLOCATION PREVIEW': '统一分配预演',
   'FAILED STUDENTS': '未分配学生',

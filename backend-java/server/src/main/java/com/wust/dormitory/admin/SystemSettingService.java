@@ -21,7 +21,7 @@ public class SystemSettingService {
     private static final String STUDENT_WELCOME_MESSAGE = "STUDENT_WELCOME_MESSAGE";
     private static final int MAX_STORED_VALUE_LENGTH = 1000;
     private static final Map<String, String> DEFAULT_MESSAGES = Map.of(
-            "zh-CN", "欢迎使用武汉科技大学学生宿舍智能选择系统。请先完成个人偏好，再选择合适的宿舍或床位。",
+            "zh-CN", "欢迎使用示例大学学生宿舍智能选择系统。请先完成个人偏好，再选择合适的宿舍或床位。",
             "en-US", "Welcome to the Wuhan University of Science and Technology dormitory selection system. Complete your personal preferences first, then choose a suitable room or bed.");
 
     private final NamedParameterJdbcTemplate jdbc;

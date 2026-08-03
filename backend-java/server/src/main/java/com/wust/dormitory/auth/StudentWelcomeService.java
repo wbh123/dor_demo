@@ -18,7 +18,7 @@ import java.util.Map;
 public class StudentWelcomeService {
     static final String STUDENT_WELCOME_MESSAGE = "STUDENT_WELCOME_MESSAGE";
     private static final Map<String, String> DEFAULT_MESSAGES = Map.of(
-            "zh-CN", "欢迎加入武汉科技大学宿舍智能选择系统。请先完善个人偏好，再选择合适的宿舍与床位。",
+            "zh-CN", "欢迎加入示例大学宿舍智能选择系统。请先完善个人偏好，再选择合适的宿舍与床位。",
             "en-US", "Welcome to the Wuhan University of Science and Technology dormitory selection system. Complete your personal preferences first, then choose a suitable room and bed.");
 
     private final NamedParameterJdbcTemplate jdbc;

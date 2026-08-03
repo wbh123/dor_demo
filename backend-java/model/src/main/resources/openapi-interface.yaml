@@ -1,6 +1,6 @@
 openapi: 3.0.3
 info:
-  title: 武汉科技大学学生宿舍智能选择系统接口
+  title: 示例大学学生宿舍智能选择系统接口
   description: 第一阶段核心闭环、第二阶段质量运营与系统服务管理能力OpenAPI契约
   version: 2.8.0
 servers:

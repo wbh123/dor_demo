@@ -90,7 +90,7 @@ async function logout() {
       <div class="brand">
         <span class="brand-mark">W</span>
         <div>
-          <strong>武科大选寝</strong>
+          <strong>高校选寝</strong>
           <small>宿舍智能选择系统</small>
         </div>
       </div>
@@ -126,7 +126,7 @@ async function logout() {
     <main class="main-content" :class="{ 'student-main-content': auth.isStudent }">
       <header v-if="auth.isAdmin" class="topbar">
         <div>
-          <span class="eyebrow">{{ subtitle('武科大选寝', 'WUST DORMITORY SELECT') }}</span>
+          <span class="eyebrow">{{ subtitle('高校选寝', 'WUST DORMITORY SELECT') }}</span>
           <h1>管理控制台</h1>
         </div>
       </header>
