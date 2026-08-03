@@ -1,24 +1,8 @@
 openapi: 3.0.3
 info:
-  title: Wust Dormitory Select 转学生与在住管理接口
+  title: Wust Dormitory Select 在住管理接口
   version: 1.0.0
 paths:
-  /api/v1/admin/transfer-students:
-    post:
-      tags: [Admin]
-      operationId: onboardTransferStudent
-      summary: 手工录入转学生并可选直接分配或加入批次
-      security: [{ bearerAuth: [] }]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: '#/components/schemas/TransferStudentOnboardingRequest' }
-      responses:
-        '200': { $ref: '#/components/responses/ObjectSuccess' }
-        '400': { $ref: '#/components/responses/ErrorResponse' }
-        '409': { $ref: '#/components/responses/ErrorResponse' }
-
   /api/v1/admin/students/{studentId}/direct-assignment:
     post:
       tags: [Admin]
@@ -158,32 +142,6 @@ components:
           schema: { $ref: '../common-response/openapi-common-response.yaml#/components/schemas/ErrorResponse' }
 
   schemas:
-    TransferStudentOnboardingRequest:
-      type: object
-      required:
-        [studentNumber, studentName, gender, majorId, nationalityCode,
-         studentCategory, action, reason]
-      properties:
-        studentNumber: { type: string, pattern: '^\d{12}$' }
-        studentName: { type: string, minLength: 1, maxLength: 128 }
-        gender: { type: string, enum: [M, F] }
-        majorId: { type: integer, format: int64, minimum: 1 }
-        nationalityCode: { type: string, pattern: '^[A-Z]{2}$' }
-        studentCategory: { type: string, enum: [DOMESTIC, INTERNATIONAL] }
-        phoneNumber:
-          type: string
-          nullable: true
-          maxLength: 32
-          pattern: '^\+?[0-9][0-9 -]{5,30}$'
-        action:
-          type: string
-          enum: [PROFILE_ONLY, DIRECT_ASSIGNMENT, ADD_TO_BATCH]
-        directAssignment:
-          $ref: '#/components/schemas/DirectResidencyAssignmentRequest'
-        batchEnrollment:
-          $ref: '#/components/schemas/TransferBatchEnrollment'
-        reason: { type: string, minLength: 1, maxLength: 500 }
-
     DirectResidencyAssignmentRequest:
       type: object
       required: [roomId, reason]
@@ -191,12 +149,6 @@ components:
         roomId: { type: integer, format: int64, minimum: 1 }
         bedId: { type: integer, format: int64, minimum: 1, nullable: true }
         reason: { type: string, minLength: 1, maxLength: 500 }
-
-    TransferBatchEnrollment:
-      type: object
-      required: [batchId]
-      properties:
-        batchId: { type: integer, format: int64, minimum: 1 }
 
     BatchEnrollmentRequest:
       type: object

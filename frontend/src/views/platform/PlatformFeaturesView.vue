@@ -1,14 +1,9 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import {
-  platformApi,
-  type FeatureEntitlement,
-  type FeatureStateChange,
-  type FeatureTargetState,
-} from '../../platform/api'
+import { platformApi, type FeatureEntitlement, type FeatureTargetState } from '../../platform/api'
 
-interface FeatureGroup {
-  phase: FeatureEntitlement['phase']
+interface PermissionGroup {
+  permissionClass: string
   module: string
   features: FeatureEntitlement[]
 }
@@ -17,614 +12,147 @@ const features = ref<FeatureEntitlement[]>([])
 const loading = ref(false)
 const error = ref('')
 const success = ref('')
-const savingCodes = ref<Set<string>>(new Set())
-
 const searchText = ref('')
-const phaseFilter = ref('ALL')
+const classFilter = ref('ALL')
 const scopeFilter = ref('ALL')
 const stateFilter = ref('ALL')
-const includeFuture = ref(false)
-
-const batchMode = ref(false)
-const draftStates = ref<Record<string, FeatureTargetState>>({})
-const batchReason = ref('')
-
-const confirmVisible = ref(false)
+const includeOptional = ref(true)
+const savingCodes = ref<Set<string>>(new Set())
 const confirmFeature = ref<FeatureEntitlement | null>(null)
 const confirmTarget = ref<FeatureTargetState>('ENABLED')
 const confirmReason = ref('')
-const confirmSaving = ref(false)
 
-const phaseLabels: Record<FeatureEntitlement['phase'], string> = {
-  PHASE1: '第一阶段基础功能',
-  PHASE2: '第二阶段增强功能',
-  PHASE3: '第三阶段规划功能',
-}
-
-const scopeLabels: Record<FeatureEntitlement['scope'], string> = {
-  ADMIN: '管理端',
-  STUDENT: '学生端',
-  SHARED: '管理端与学生端',
-}
-
-const riskLabels: Record<FeatureEntitlement['riskLevel'], string> = {
-  LOW: '低风险',
-  MEDIUM: '中风险',
-  HIGH: '高风险',
-}
-
-const sourceLabels: Record<FeatureEntitlement['source'], string> = {
-  PLAN_ENABLED: '套餐默认开启',
-  PLAN_DISABLED: '套餐默认关闭',
-  OVERRIDE_GRANT: '单独增补',
-  OVERRIDE_REVOKE: '单独移除',
-}
-
+const bedSelectionFeature = computed(() => features.value.find((feature) => feature.featureCode === 'P2_BED_SELECTION_MODE') ?? null)
 const filteredFeatures = computed(() => {
   const keyword = searchText.value.trim().toLowerCase()
   return features.value.filter((feature) => {
-    if (keyword && !`${feature.featureName} ${feature.featureCode}`.toLowerCase().includes(keyword)) return false
-    if (phaseFilter.value !== 'ALL' && feature.phase !== phaseFilter.value) return false
+    if (keyword && !feature.featureName.toLowerCase().includes(keyword)) return false
+    if (classFilter.value !== 'ALL' && permissionClass(feature) !== classFilter.value) return false
     if (scopeFilter.value !== 'ALL' && feature.scope !== scopeFilter.value) return false
-    if (stateFilter.value === 'ENABLED' && !displayEnabled(feature)) return false
-    if (stateFilter.value === 'DISABLED' && displayEnabled(feature)) return false
-    if (stateFilter.value === 'OVERRIDDEN' && !feature.overrideType) return false
-    if (stateFilter.value === 'PLAN' && feature.overrideType) return false
-    if (stateFilter.value === 'FUTURE' && feature.enabledInProgram) return false
+    if (stateFilter.value === 'ENABLED' && !feature.effectiveEnabled) return false
+    if (stateFilter.value === 'DISABLED' && feature.effectiveEnabled) return false
+    if (!includeOptional.value && permissionClass(feature) === 'C') return false
     return true
   })
 })
-
-const groups = computed<FeatureGroup[]>(() => {
-  const result = new Map<string, FeatureGroup>()
+const groups = computed<PermissionGroup[]>(() => {
+  const result = new Map<string, PermissionGroup>()
   for (const feature of filteredFeatures.value) {
+    const permission = permissionClass(feature)
     const module = moduleName(feature)
-    const key = `${feature.phase}:${module}`
-    const group = result.get(key) ?? { phase: feature.phase, module, features: [] }
+    const key = `${permission}:${module}`
+    const group = result.get(key) ?? { permissionClass: permission, module, features: [] }
     group.features.push(feature)
     result.set(key, group)
   }
-  return [...result.values()].sort((a, b) => {
-    const phaseCompare = a.phase.localeCompare(b.phase)
-    if (phaseCompare !== 0) return phaseCompare
-    return (a.features[0]?.sortOrder ?? 0) - (b.features[0]?.sortOrder ?? 0)
-  })
+  return [...result.values()].sort((a, b) => a.permissionClass.localeCompare(b.permissionClass) || a.module.localeCompare(b.module))
 })
-
-const enabledCount = computed(() => features.value.filter(displayEnabled).length)
-const overriddenCount = computed(() => features.value.filter((feature) => Boolean(feature.overrideType)).length)
-const futureCount = computed(() => features.value.filter((feature) => !feature.enabledInProgram).length)
-const bedSelectionFeature = computed(() =>
-  features.value.find((feature) => feature.featureCode === 'P2_BED_SELECTION_MODE') ?? null,
-)
-
-const batchChanges = computed<FeatureStateChange[]>(() => features.value
-  .filter((feature) => feature.enabledInProgram)
-  .map((feature) => ({
-    featureCode: feature.featureCode,
-    targetState: draftStates.value[feature.featureCode] ?? sourceTarget(feature),
-  }))
-  .filter((change) => change.targetState !== sourceTarget(findFeature(change.featureCode)))
-)
-
-const batchSummary = computed(() => ({
-  enabled: batchChanges.value.filter((change) => change.targetState === 'ENABLED').length,
-  disabled: batchChanges.value.filter((change) => change.targetState === 'DISABLED').length,
-  inherited: batchChanges.value.filter((change) => change.targetState === 'INHERIT').length,
+const enabledCount = computed(() => features.value.filter((feature) => feature.effectiveEnabled).length)
+const classCounts = computed(() => ({
+  A: features.value.filter((feature) => permissionClass(feature) === 'A').length,
+  B: features.value.filter((feature) => permissionClass(feature) === 'B').length,
+  C: features.value.filter((feature) => permissionClass(feature) === 'C').length,
 }))
 
-async function load(): Promise<void> {
-  loading.value = true
-  error.value = ''
-  try {
-    features.value = await platformApi.featureEntitlements(includeFuture.value)
-    if (batchMode.value) initializeDrafts()
-  } catch (cause) {
-    showError(cause, '功能授权加载失败')
-  } finally {
-    loading.value = false
-  }
+onMounted(load)
+
+async function load() {
+  loading.value = true; error.value = ''
+  try { features.value = await platformApi.featureEntitlements(true) }
+  catch (cause) { error.value = cause instanceof Error ? cause.message : '功能授权加载失败' }
+  finally { loading.value = false }
 }
 
-function showError(cause: unknown, fallback: string): void {
-  error.value = cause instanceof Error ? cause.message : fallback
-  success.value = ''
+function permissionClass(feature: FeatureEntitlement) {
+  if (!feature.enabledInProgram) return 'C'
+  return ({ PHASE1: 'A', PHASE2: 'B', PHASE3: 'C' } as Record<string,string>)[feature.phase] ?? 'C'
 }
-
-function findFeature(featureCode: string): FeatureEntitlement {
-  const feature = features.value.find((item) => item.featureCode === featureCode)
-  if (!feature) throw new Error(`功能不存在：${featureCode}`)
-  return feature
+function permissionTitle(value: string) { return `${value}类权限` }
+function permissionDescription(value: string) {
+  return value === 'A' ? '系统日常运行所需的基础业务能力' : value === 'B' ? '用于提升效率和体验的增强能力' : '可按需要启用的可选能力'
 }
-
-function replaceFeature(updated: FeatureEntitlement): void {
-  features.value = features.value.map((feature) => feature.featureCode === updated.featureCode ? updated : feature)
-}
-
-function sourceTarget(feature: FeatureEntitlement): FeatureTargetState {
-  if (feature.source === 'OVERRIDE_GRANT') return 'ENABLED'
-  if (feature.source === 'OVERRIDE_REVOKE') return 'DISABLED'
-  return 'INHERIT'
-}
-
-function effectiveForTarget(feature: FeatureEntitlement, target: FeatureTargetState): boolean {
-  if (target === 'INHERIT') return feature.planEnabled
-  return target === 'ENABLED'
-}
-
-function displayEnabled(feature: FeatureEntitlement): boolean {
-  if (!batchMode.value) return feature.effectiveEnabled
-  const target = draftStates.value[feature.featureCode] ?? sourceTarget(feature)
-  return effectiveForTarget(feature, target)
-}
-
-function isChanged(feature: FeatureEntitlement): boolean {
-  if (!batchMode.value) return false
-  return (draftStates.value[feature.featureCode] ?? sourceTarget(feature)) !== sourceTarget(feature)
-}
-
-function moduleName(feature: FeatureEntitlement): string {
+function scopeText(value: FeatureEntitlement['scope']) { return value === 'ADMIN' ? '管理端' : value === 'STUDENT' ? '学生端' : '管理端与学生端' }
+function moduleName(feature: FeatureEntitlement) {
   const code = feature.featureCode
-  if (/(IDENTITY|STUDENT_CONTACT)/.test(code)) return '用户与身份'
-  if (/(DORMITORY|ROOM_LAYOUT|BED_)/.test(code)) return '宿舍与床位'
+  if (/(IDENTITY|STUDENT_CONTACT|IMPORT_STUDENT)/.test(code)) return '学生与身份'
+  if (/(DORMITORY|ROOM_LAYOUT|BED_|IMPORT_ROOM)/.test(code)) return '宿舍与床位'
   if (/(BATCH|RULE_TEMPLATE)/.test(code)) return '批次与规则'
   if (/(PREFERENCE|MATCHING|RECOMMENDATION)/.test(code)) return '偏好与匹配'
   if (/(SELF_SELECTION|THREE_DIMENSIONAL)/.test(code)) return '学生选寝'
   if (/TEAM_/.test(code)) return '组队功能'
-  if (/(ALLOCATION|ASSIGNMENT|FAIRNESS)/.test(code)) return '分配与公平性'
-  if (/(WELCOME|MULTILINGUAL|NOTIFICATION|MOBILE)/.test(code)) return '学生体验与通知'
-  if (/IMPORT_/.test(code)) return '导入与数据质量'
-  if (/(AUDIT|STATISTICS|EXCEPTION|HISTORICAL|TREND|REPORT)/.test(code)) return '统计与审计'
-  if (/(CONCURRENT|REDIS|PRESSURE|SLOW_QUERY|HEALTH)/.test(code)) return '性能与恢复'
+  if (/(ALLOCATION|ASSIGNMENT|FAIRNESS)/.test(code)) return '分配管理'
+  if (/(WELCOME|MULTILINGUAL|NOTIFICATION|MOBILE)/.test(code)) return '学生体验'
+  if (/(AUDIT|STATISTICS|EXCEPTION|REPORT)/.test(code)) return '统计与审计'
+  if (/(CONCURRENT|REDIS|PRESSURE|SLOW_QUERY|HEALTH)/.test(code)) return '运行保障'
   if (/ROOM_CHANGE/.test(code)) return '换寝管理'
   if (/WAITLIST/.test(code)) return '候补补位'
-  if (/(BACKUP|RESTORE|DISASTER|RECOVERY)/.test(code)) return '备份与灾难恢复'
-  return '其他功能'
+  if (/(BACKUP|RESTORE|DISASTER|RECOVERY)/.test(code)) return '备份恢复'
+  return '其他业务'
 }
-
-function enterBatchMode(): void {
-  batchMode.value = true
-  batchReason.value = ''
-  initializeDrafts()
-  success.value = ''
-}
-
-function initializeDrafts(): void {
-  draftStates.value = Object.fromEntries(features.value.map((feature) => [feature.featureCode, sourceTarget(feature)]))
-}
-
-function cancelBatchMode(): void {
-  batchMode.value = false
-  batchReason.value = ''
-  draftStates.value = {}
-}
-
-function toggleFeature(feature: FeatureEntitlement): void {
-  if (!feature.enabledInProgram || isSaving(feature.featureCode)) return
-  const target: FeatureTargetState = displayEnabled(feature) ? 'DISABLED' : 'ENABLED'
-  if (batchMode.value) {
-    draftStates.value = { ...draftStates.value, [feature.featureCode]: target }
-    return
-  }
-  openConfirmation(feature, target)
-}
-
-function restoreDefault(feature: FeatureEntitlement): void {
-  if (!feature.enabledInProgram || isSaving(feature.featureCode)) return
-  if (batchMode.value) {
-    draftStates.value = { ...draftStates.value, [feature.featureCode]: 'INHERIT' }
-    return
-  }
-  openConfirmation(feature, 'INHERIT')
-}
-
-function openConfirmation(feature: FeatureEntitlement, target: FeatureTargetState): void {
+function isSaving(feature: FeatureEntitlement) { return savingCodes.value.has(feature.featureCode) }
+function openChange(feature: FeatureEntitlement, target?: FeatureTargetState) {
+  if (!feature.enabledInProgram) return
   confirmFeature.value = feature
-  confirmTarget.value = target
+  confirmTarget.value = target ?? (feature.effectiveEnabled ? 'DISABLED' : 'ENABLED')
   confirmReason.value = ''
-  confirmVisible.value = true
-  error.value = ''
+  error.value = ''; success.value = ''
 }
-
-function closeConfirmation(): void {
-  if (confirmSaving.value) return
-  confirmVisible.value = false
-  confirmFeature.value = null
-  confirmReason.value = ''
-}
-
-async function confirmSingleChange(): Promise<void> {
+async function saveChange() {
   const feature = confirmFeature.value
   if (!feature || !confirmReason.value.trim()) return
-  confirmSaving.value = true
-  markSaving(feature.featureCode, true)
+  const next = new Set(savingCodes.value); next.add(feature.featureCode); savingCodes.value = next
   try {
     const updated = await platformApi.setFeatureState(feature.featureCode, confirmTarget.value, confirmReason.value.trim())
-    replaceFeature(updated)
-    success.value = `${feature.featureName}已更新为${targetLabel(confirmTarget.value, feature)}`
-    error.value = ''
-    closeConfirmationAfterSave()
-  } catch (cause) {
-    showError(cause, '功能授权修改失败')
-  } finally {
-    confirmSaving.value = false
-    markSaving(feature.featureCode, false)
-  }
+    features.value = features.value.map((item) => item.featureCode === updated.featureCode ? updated : item)
+    success.value = `${feature.featureName}已${updated.effectiveEnabled ? '开启' : '关闭'}。`
+    confirmFeature.value = null; confirmReason.value = ''
+  } catch (cause) { error.value = cause instanceof Error ? cause.message : '功能授权修改失败' }
+  finally { const done = new Set(savingCodes.value); done.delete(feature.featureCode); savingCodes.value = done }
 }
-
-function closeConfirmationAfterSave(): void {
-  confirmVisible.value = false
-  confirmFeature.value = null
+async function restoreDefault(feature: FeatureEntitlement) {
+  confirmFeature.value = feature
+  confirmTarget.value = 'INHERIT'
   confirmReason.value = ''
 }
-
-function applyGroup(group: FeatureGroup, target: FeatureTargetState): void {
-  if (!batchMode.value) enterBatchMode()
-  const next = { ...draftStates.value }
-  for (const feature of group.features) {
-    if (feature.enabledInProgram) next[feature.featureCode] = target
-  }
-  draftStates.value = next
-}
-
-async function saveBatch(): Promise<void> {
-  if (!batchReason.value.trim() || batchChanges.value.length === 0) return
-  const changedCodes = batchChanges.value.map((change) => change.featureCode)
-  changedCodes.forEach((code) => markSaving(code, true))
-  try {
-    const updated = await platformApi.setFeatureStates(batchChanges.value, batchReason.value.trim())
-    updated.forEach(replaceFeature)
-    success.value = `已在同一事务中保存 ${updated.length} 项功能授权变更`
-    error.value = ''
-    cancelBatchMode()
-  } catch (cause) {
-    showError(cause, '批量功能授权保存失败，所有变更均未生效')
-  } finally {
-    changedCodes.forEach((code) => markSaving(code, false))
-  }
-}
-
-function markSaving(featureCode: string, saving: boolean): void {
-  const next = new Set(savingCodes.value)
-  if (saving) next.add(featureCode)
-  else next.delete(featureCode)
-  savingCodes.value = next
-}
-
-function isSaving(featureCode: string): boolean {
-  return savingCodes.value.has(featureCode)
-}
-
-function targetLabel(target: FeatureTargetState, feature: FeatureEntitlement): string {
-  if (target === 'ENABLED') return '开启'
-  if (target === 'DISABLED') return '关闭'
-  return feature.planEnabled ? '套餐默认开启' : '套餐默认关闭'
-}
-
-function clearFilters(): void {
-  searchText.value = ''
-  phaseFilter.value = 'ALL'
-  scopeFilter.value = 'ALL'
-  stateFilter.value = 'ALL'
-}
-
-onMounted(() => void load())
 </script>
 
 <template>
   <section class="feature-page">
-    <header class="page-header">
-      <div>
-        <p class="eyebrow">系统服务管理</p>
-        <h1>功能授权</h1>
-        <p class="subtitle">通过滑动开关控制单项功能。普通模式立即生效，批量模式统一预览并一次保存。</p>
-      </div>
-      <div class="header-actions">
-        <button v-if="!batchMode" class="primary-button" type="button" @click="enterBatchMode">批量编辑</button>
-        <button class="secondary-button" type="button" :disabled="loading" @click="load">刷新</button>
-      </div>
-    </header>
+    <header class="page-heading"><div><p class="eyebrow">系统服务管理</p><h1>功能授权</h1><p>按A、B、C三类权限管理当前学校可使用的业务功能，页面不展示内部功能编号。</p></div><button type="button" :disabled="loading" @click="load">{{ loading ? '正在刷新…' : '刷新授权' }}</button></header>
+    <p v-if="error" class="notice error">{{ error }}</p><p v-if="success" class="notice success">{{ success }}</p>
 
-    <div class="summary-grid">
-      <article class="summary-card"><span>已加载功能</span><strong>{{ features.length }}</strong></article>
-      <article class="summary-card"><span>当前开启</span><strong>{{ enabledCount }}</strong></article>
-      <article class="summary-card"><span>单独覆盖</span><strong>{{ overriddenCount }}</strong></article>
-      <article class="summary-card"><span>未来规划</span><strong>{{ futureCount }}</strong></article>
-    </div>
+    <div class="summary-grid"><article><span>已开启功能</span><strong>{{ enabledCount }}</strong><small>当前学校可使用</small></article><article><span>A类权限</span><strong>{{ classCounts.A }}</strong><small>基础业务能力</small></article><article><span>B类权限</span><strong>{{ classCounts.B }}</strong><small>增强业务能力</small></article><article><span>C类权限</span><strong>{{ classCounts.C }}</strong><small>可选业务能力</small></article></div>
 
-    <section
-      v-if="bedSelectionFeature"
-      class="bed-mode-control panel"
-      :class="{ enabled: displayEnabled(bedSelectionFeature) }"
-    >
-      <div>
-        <p class="eyebrow">核心模式开关</p>
-        <h2>学生选择具体床位</h2>
-        <p>开启后，学校管理员可以创建“选择床位”批次；关闭后只能创建“选择寝室”批次。</p>
-        <small>功能代码：{{ bedSelectionFeature.featureCode }} · 当前来源：{{ sourceLabels[bedSelectionFeature.source] }}</small>
-      </div>
-      <div class="bed-mode-state">
-        <strong>{{ displayEnabled(bedSelectionFeature) ? '已开启' : '已关闭' }}</strong>
-        <button
-          class="switch bed-mode-switch"
-          :class="{ checked: displayEnabled(bedSelectionFeature), loading: isSaving(bedSelectionFeature.featureCode) }"
-          type="button"
-          role="switch"
-          :aria-checked="displayEnabled(bedSelectionFeature)"
-          :aria-label="`${displayEnabled(bedSelectionFeature) ? '关闭' : '开启'}学生选择具体床位模式`"
-          :disabled="!bedSelectionFeature.enabledInProgram || isSaving(bedSelectionFeature.featureCode)"
-          @click="toggleFeature(bedSelectionFeature)"
-        >
-          <span class="switch-thumb" />
-        </button>
-      </div>
+    <section v-if="bedSelectionFeature" class="core-control panel" :class="{ enabled: bedSelectionFeature.effectiveEnabled }">
+      <div><p class="eyebrow">核心模式开关</p><h2>学生选择具体床位</h2><p>开启后，管理员可以让学生直接选择床位；关闭后，学生只选择寝室，床位由入住成员协商。</p></div>
+      <div><strong>{{ bedSelectionFeature.effectiveEnabled ? '已开启' : '已关闭' }}</strong><button type="button" role="switch" :aria-checked="bedSelectionFeature.effectiveEnabled" :disabled="isSaving(bedSelectionFeature)" @click="openChange(bedSelectionFeature)"><i /></button></div>
     </section>
 
-    <section v-else-if="!loading" class="bed-mode-control missing panel">
-      <div>
-        <p class="eyebrow">核心模式开关</p>
-        <h2>学生选择具体床位</h2>
-        <p>当前数据库缺少选床模式功能定义，请使用最新一键重置数据库脚本后刷新。</p>
-      </div>
+    <section class="panel toolbar">
+      <label class="search"><span>搜索功能</span><input v-model.trim="searchText" type="search" placeholder="输入业务功能名称" /></label>
+      <label><span>权限类别</span><select v-model="classFilter"><option value="ALL">全部类别</option><option value="A">A类权限</option><option value="B">B类权限</option><option value="C">C类权限</option></select></label>
+      <label><span>使用端</span><select v-model="scopeFilter"><option value="ALL">全部</option><option value="ADMIN">管理端</option><option value="STUDENT">学生端</option><option value="SHARED">管理端与学生端</option></select></label>
+      <label><span>当前状态</span><select v-model="stateFilter"><option value="ALL">全部状态</option><option value="ENABLED">已开启</option><option value="DISABLED">已关闭</option></select></label>
+      <label class="optional-check"><input v-model="includeOptional" type="checkbox" /><span>显示C类可选功能</span></label>
     </section>
 
-    <div class="toolbar panel">
-      <label class="search-box">
-        <span>搜索</span>
-        <input v-model.trim="searchText" type="search" placeholder="输入功能名称或功能代码" />
-      </label>
-      <label>
-        <span>阶段</span>
-        <select v-model="phaseFilter">
-          <option value="ALL">全部阶段</option>
-          <option value="PHASE1">第一阶段</option>
-          <option value="PHASE2">第二阶段</option>
-          <option value="PHASE3">第三阶段</option>
-        </select>
-      </label>
-      <label>
-        <span>使用范围</span>
-        <select v-model="scopeFilter">
-          <option value="ALL">全部范围</option>
-          <option value="ADMIN">管理端</option>
-          <option value="STUDENT">学生端</option>
-          <option value="SHARED">管理端与学生端</option>
-        </select>
-      </label>
-      <label>
-        <span>授权状态</span>
-        <select v-model="stateFilter">
-          <option value="ALL">全部状态</option>
-          <option value="ENABLED">当前开启</option>
-          <option value="DISABLED">当前关闭</option>
-          <option value="OVERRIDDEN">单独覆盖</option>
-          <option value="PLAN">沿用套餐</option>
-          <option value="FUTURE">未来功能</option>
-        </select>
-      </label>
-      <label class="future-toggle">
-        <input v-model="includeFuture" type="checkbox" @change="load" />
-        <span>显示未来功能</span>
-      </label>
-      <button class="text-button" type="button" @click="clearFilters">清除筛选</button>
-    </div>
-
-    <p v-if="error" class="message error-message">{{ error }}</p>
-    <p v-if="success" class="message success-message">{{ success }}</p>
-
-    <div v-if="loading" class="empty-state panel">正在加载功能授权…</div>
-    <div v-else-if="groups.length === 0" class="empty-state panel">没有符合当前筛选条件的功能。</div>
-
-    <div v-else class="group-list">
-      <section v-for="group in groups" :key="`${group.phase}-${group.module}`" class="feature-group panel">
-        <header class="group-header">
-          <div>
-            <span class="phase-badge">{{ phaseLabels[group.phase] }}</span>
-            <h2>{{ group.module }}</h2>
-            <p>{{ group.features.length }} 项功能</p>
-          </div>
-          <div class="group-actions">
-            <button type="button" @click="applyGroup(group, 'ENABLED')">全部开启</button>
-            <button type="button" @click="applyGroup(group, 'DISABLED')">全部关闭</button>
-            <button type="button" @click="applyGroup(group, 'INHERIT')">恢复套餐默认</button>
-          </div>
-        </header>
-
-        <div class="feature-grid">
-          <article
-            v-for="feature in group.features"
-            :key="feature.featureCode"
-            class="feature-card"
-            :class="{
-              disabled: !feature.enabledInProgram,
-              changed: isChanged(feature),
-              enabled: displayEnabled(feature),
-            }"
-          >
-            <div class="feature-main">
-              <div class="feature-title-row">
-                <div>
-                  <h3>{{ feature.featureName }}</h3>
-                  <code>{{ feature.featureCode }}</code>
-                </div>
-                <button
-                  class="switch"
-                  :class="{ checked: displayEnabled(feature), loading: isSaving(feature.featureCode) }"
-                  type="button"
-                  role="switch"
-                  :aria-checked="displayEnabled(feature)"
-                  :aria-label="`${displayEnabled(feature) ? '关闭' : '开启'}${feature.featureName}`"
-                  :disabled="!feature.enabledInProgram || isSaving(feature.featureCode)"
-                  @click="toggleFeature(feature)"
-                >
-                  <span class="switch-thumb" />
-                </button>
-              </div>
-
-              <div class="tag-row">
-                <span class="tag">{{ scopeLabels[feature.scope] }}</span>
-                <span class="tag" :class="`risk-${feature.riskLevel.toLowerCase()}`">{{ riskLabels[feature.riskLevel] }}</span>
-                <span class="tag source-tag" :class="feature.source.toLowerCase()">{{ sourceLabels[feature.source] }}</span>
-                <span v-if="!feature.enabledInProgram" class="tag future-tag">尚未实现</span>
-                <span v-if="isChanged(feature)" class="tag changed-tag">待保存</span>
-              </div>
-
-              <p class="state-description">
-                当前状态：<strong>{{ displayEnabled(feature) ? '已开启' : '已关闭' }}</strong>
-                · 套餐默认：{{ feature.planEnabled ? '开启' : '关闭' }}
-              </p>
-            </div>
-
-            <footer class="feature-footer">
-              <span v-if="feature.lastChangedAt">最近覆盖：{{ new Date(feature.lastChangedAt).toLocaleString() }}</span>
-              <span v-else>当前未设置单独覆盖</span>
-              <button
-                type="button"
-                class="restore-button"
-                :disabled="!feature.enabledInProgram || (!feature.overrideType && !isChanged(feature))"
-                @click="restoreDefault(feature)"
-              >恢复套餐默认</button>
-            </footer>
+    <div class="permission-groups">
+      <section v-for="group in groups" :key="`${group.permissionClass}-${group.module}`" class="panel permission-group">
+        <header><div><span class="class-badge" :class="`class-${group.permissionClass}`">{{ permissionTitle(group.permissionClass) }}</span><h2>{{ group.module }}</h2><p>{{ permissionDescription(group.permissionClass) }}</p></div><span>{{ group.features.filter((item) => item.effectiveEnabled).length }} / {{ group.features.length }} 已开启</span></header>
+        <div class="feature-list">
+          <article v-for="feature in group.features" :key="feature.featureCode" :class="{ disabled: !feature.effectiveEnabled, unavailable: !feature.enabledInProgram }">
+            <div class="feature-info"><div><strong>{{ feature.featureName }}</strong><span>{{ scopeText(feature.scope) }}</span></div><p v-if="!feature.enabledInProgram">当前版本尚未提供此可选功能。</p><p v-else>{{ feature.effectiveEnabled ? '当前学校可以使用此功能。' : '当前学校暂未开启此功能。' }}</p><small v-if="feature.overrideType">本功能已单独调整，不再完全跟随套餐默认设置。</small></div>
+            <div class="feature-actions"><button v-if="feature.overrideType && feature.enabledInProgram" class="restore" type="button" @click="restoreDefault(feature)">恢复套餐设置</button><button v-if="feature.enabledInProgram" class="switch" :class="{ checked: feature.effectiveEnabled }" type="button" role="switch" :aria-checked="feature.effectiveEnabled" :disabled="isSaving(feature)" @click="openChange(feature)"><i /></button><span v-else>暂不可用</span></div>
           </article>
         </div>
       </section>
+      <p v-if="!groups.length" class="panel empty">没有符合条件的功能。</p>
     </div>
 
-    <div v-if="batchMode" class="batch-bar">
-      <div class="batch-summary">
-        <strong>批量编辑模式</strong>
-        <span>开启 {{ batchSummary.enabled }} 项</span>
-        <span>关闭 {{ batchSummary.disabled }} 项</span>
-        <span>恢复默认 {{ batchSummary.inherited }} 项</span>
-      </div>
-      <input v-model.trim="batchReason" type="text" maxlength="500" placeholder="填写本次批量调整原因（必填）" />
-      <button type="button" class="secondary-button" @click="cancelBatchMode">取消</button>
-      <button
-        type="button"
-        class="primary-button"
-        :disabled="batchChanges.length === 0 || !batchReason"
-        @click="saveBatch"
-      >保存 {{ batchChanges.length }} 项变更</button>
-    </div>
-
-    <div v-if="confirmVisible && confirmFeature" class="dialog-backdrop" @click.self="closeConfirmation">
-      <section class="dialog" role="dialog" aria-modal="true" aria-labelledby="feature-change-title">
-        <p class="eyebrow">单项授权确认</p>
-        <h2 id="feature-change-title">{{ confirmFeature.featureName }}</h2>
-        <p>将调整为：<strong>{{ targetLabel(confirmTarget, confirmFeature) }}</strong></p>
-        <p class="dialog-help">该变更确认后立即生效，并记录到平台审计。</p>
-        <label>
-          <span>变更原因</span>
-          <textarea v-model.trim="confirmReason" maxlength="500" rows="4" placeholder="例如：本次合同增补开放三维选床功能" autofocus />
-        </label>
-        <div class="dialog-actions">
-          <button type="button" class="secondary-button" :disabled="confirmSaving" @click="closeConfirmation">取消</button>
-          <button type="button" class="primary-button" :disabled="!confirmReason || confirmSaving" @click="confirmSingleChange">
-            {{ confirmSaving ? '保存中…' : '确认并立即生效' }}
-          </button>
-        </div>
-      </section>
-    </div>
+    <div v-if="confirmFeature" class="modal-backdrop" @click.self="confirmFeature = null"><section class="dialog"><span class="class-badge" :class="`class-${permissionClass(confirmFeature)}`">{{ permissionTitle(permissionClass(confirmFeature)) }}</span><h2>{{ confirmTarget === 'INHERIT' ? '恢复套餐默认设置' : confirmTarget === 'ENABLED' ? '开启功能' : '关闭功能' }}</h2><p>功能：{{ confirmFeature.featureName }}</p><p>{{ confirmTarget === 'INHERIT' ? '恢复后将由当前套餐决定是否开启。' : confirmTarget === 'ENABLED' ? '保存后当前学校即可使用此功能。' : '保存后当前学校将不能继续使用此功能。' }}</p><label><span>变更原因</span><textarea v-model.trim="confirmReason" rows="4" maxlength="500" placeholder="说明为什么需要本次调整" /></label><div><button class="secondary" type="button" @click="confirmFeature = null">取消</button><button type="button" :disabled="!confirmReason.trim()" @click="saveChange">确认保存</button></div></section></div>
   </section>
 </template>
 
 <style scoped>
-.feature-page { padding-bottom: 110px; }
-.page-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; margin-bottom: 20px; }
-.eyebrow { margin: 0 0 4px; color: #2563eb; font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
-h1 { margin: 0; font-size: 30px; color: #0f172a; }
-.subtitle { margin: 8px 0 0; color: #64748b; }
-.header-actions, .group-actions, .dialog-actions { display: flex; gap: 10px; flex-wrap: wrap; }
-.panel { background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; box-shadow: 0 6px 18px rgba(15, 23, 42, .05); }
-.summary-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-bottom: 16px; }
-.summary-card { padding: 18px; background: linear-gradient(145deg, #fff, #f8fafc); border: 1px solid #e2e8f0; border-radius: 14px; }
-.summary-card span { display: block; color: #64748b; font-size: 13px; }
-.summary-card strong { display: block; margin-top: 6px; color: #0f172a; font-size: 28px; }
-.bed-mode-control { display: flex; justify-content: space-between; align-items: center; gap: 24px; padding: 22px; margin-bottom: 16px; border-color: #cbd5e1; background: linear-gradient(135deg, #fff, #f8fafc); }
-.bed-mode-control.enabled { border-color: #86efac; background: linear-gradient(135deg, #f0fdf4, #fff); box-shadow: 0 12px 30px rgba(22, 163, 74, .09); }
-.bed-mode-control.missing { border-color: #fca5a5; background: #fff7f7; }
-.bed-mode-control h2 { margin: 4px 0 8px; color: #0f172a; font-size: 21px; }
-.bed-mode-control p { max-width: 760px; margin: 0; color: #475569; }
-.bed-mode-control small { display: block; margin-top: 9px; color: #64748b; }
-.bed-mode-state { display: flex; align-items: center; gap: 14px; flex: 0 0 auto; }
-.bed-mode-state strong { color: #0f172a; font-size: 15px; }
-.bed-mode-switch { transform: scale(1.16); transform-origin: center; }
-.toolbar { display: grid; grid-template-columns: minmax(220px, 2fr) repeat(3, minmax(140px, 1fr)) auto auto; gap: 12px; align-items: end; padding: 16px; margin-bottom: 16px; }
-.toolbar label { display: grid; gap: 6px; color: #475569; font-size: 12px; font-weight: 700; }
-input, select, textarea { width: 100%; box-sizing: border-box; border: 1px solid #cbd5e1; border-radius: 9px; padding: 10px 11px; background: #fff; color: #0f172a; font: inherit; }
-input:focus, select:focus, textarea:focus { outline: 3px solid rgba(37, 99, 235, .14); border-color: #2563eb; }
-.future-toggle { display: flex !important; grid-auto-flow: column; align-items: center; gap: 8px !important; padding-bottom: 10px; white-space: nowrap; }
-.future-toggle input { width: 16px; height: 16px; }
-button { font: inherit; cursor: pointer; }
-button:disabled { cursor: not-allowed; opacity: .55; }
-.primary-button, .secondary-button, .text-button, .group-actions button, .restore-button { border-radius: 9px; padding: 9px 14px; font-weight: 700; }
-.primary-button { border: 1px solid #2563eb; background: #2563eb; color: #fff; }
-.secondary-button { border: 1px solid #cbd5e1; background: #fff; color: #334155; }
-.text-button { border: 0; background: transparent; color: #2563eb; }
-.message { padding: 12px 14px; border-radius: 10px; margin: 12px 0; }
-.error-message { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
-.success-message { background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; }
-.empty-state { padding: 44px; text-align: center; color: #64748b; }
-.group-list { display: grid; gap: 16px; }
-.feature-group { overflow: hidden; }
-.group-header { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 18px 20px; border-bottom: 1px solid #e2e8f0; background: #f8fafc; }
-.group-header h2 { margin: 7px 0 2px; color: #0f172a; font-size: 19px; }
-.group-header p { margin: 0; color: #64748b; font-size: 13px; }
-.phase-badge { color: #1d4ed8; font-size: 12px; font-weight: 800; }
-.group-actions button { border: 1px solid #cbd5e1; background: #fff; color: #334155; padding: 7px 10px; font-size: 12px; }
-.feature-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; padding: 16px; }
-.feature-card { display: flex; flex-direction: column; min-height: 190px; border: 1px solid #e2e8f0; border-radius: 14px; background: #fff; transition: border-color .2s, box-shadow .2s, transform .2s; }
-.feature-card:hover { border-color: #bfdbfe; box-shadow: 0 8px 20px rgba(37, 99, 235, .08); transform: translateY(-1px); }
-.feature-card.enabled { border-left: 4px solid #22c55e; }
-.feature-card.changed { outline: 2px solid #f59e0b; outline-offset: -2px; }
-.feature-card.disabled { background: #f8fafc; opacity: .72; }
-.feature-main { flex: 1; padding: 16px; }
-.feature-title-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; }
-.feature-title-row h3 { margin: 0 0 5px; color: #0f172a; font-size: 16px; }
-code { color: #64748b; font-size: 11px; word-break: break-all; }
-.switch { position: relative; flex: 0 0 auto; width: 48px; height: 27px; border: 0; border-radius: 999px; padding: 0; background: #cbd5e1; transition: background .2s; }
-.switch.checked { background: #22c55e; }
-.switch.loading { animation: pulse 1s infinite; }
-.switch-thumb { position: absolute; top: 3px; left: 3px; width: 21px; height: 21px; border-radius: 50%; background: #fff; box-shadow: 0 2px 5px rgba(15, 23, 42, .25); transition: transform .2s; }
-.switch.checked .switch-thumb { transform: translateX(21px); }
-.tag-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
-.tag { display: inline-flex; align-items: center; border-radius: 999px; padding: 4px 8px; background: #f1f5f9; color: #475569; font-size: 11px; font-weight: 700; }
-.risk-medium { background: #fffbeb; color: #b45309; }
-.risk-high { background: #fef2f2; color: #b91c1c; }
-.override_grant { background: #ecfdf5; color: #047857; }
-.override_revoke { background: #fff1f2; color: #be123c; }
-.future-tag { background: #f1f5f9; color: #64748b; }
-.changed-tag { background: #fff7ed; color: #c2410c; }
-.state-description { margin: 14px 0 0; color: #64748b; font-size: 13px; }
-.state-description strong { color: #0f172a; }
-.feature-footer { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 11px 14px; border-top: 1px solid #e2e8f0; color: #64748b; font-size: 11px; }
-.restore-button { flex: 0 0 auto; border: 0; background: transparent; color: #2563eb; padding: 5px; font-size: 11px; }
-.batch-bar { position: fixed; z-index: 30; left: 270px; right: 30px; bottom: 20px; display: grid; grid-template-columns: auto minmax(220px, 1fr) auto auto; align-items: center; gap: 12px; padding: 14px 16px; border: 1px solid #bfdbfe; border-radius: 14px; background: rgba(255, 255, 255, .97); box-shadow: 0 18px 45px rgba(15, 23, 42, .2); backdrop-filter: blur(10px); }
-.batch-summary { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; color: #475569; font-size: 12px; }
-.batch-summary strong { width: 100%; color: #0f172a; font-size: 14px; }
-.dialog-backdrop { position: fixed; z-index: 60; inset: 0; display: grid; place-items: center; padding: 20px; background: rgba(15, 23, 42, .55); }
-.dialog { width: min(520px, 100%); padding: 24px; border-radius: 16px; background: #fff; box-shadow: 0 24px 70px rgba(15, 23, 42, .35); }
-.dialog h2 { margin: 0 0 10px; color: #0f172a; }
-.dialog p { color: #475569; }
-.dialog-help { font-size: 13px; }
-.dialog label { display: grid; gap: 7px; margin-top: 16px; color: #334155; font-size: 13px; font-weight: 700; }
-.dialog-actions { justify-content: flex-end; margin-top: 18px; }
-@keyframes pulse { 50% { opacity: .55; } }
-@media (max-width: 1100px) {
-  .toolbar { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .feature-grid { grid-template-columns: 1fr; }
-  .batch-bar { left: 20px; grid-template-columns: 1fr 1fr; }
-}
-@media (max-width: 700px) {
-  .page-header, .group-header { align-items: stretch; flex-direction: column; }
-  .bed-mode-control { align-items: flex-start; flex-direction: column; }
-  .summary-grid, .toolbar { grid-template-columns: 1fr 1fr; }
-  .search-box { grid-column: 1 / -1; }
-  .feature-grid { padding: 10px; }
-  .feature-footer { align-items: flex-start; flex-direction: column; }
-  .batch-bar { left: 10px; right: 10px; bottom: 10px; grid-template-columns: 1fr; }
-}
-@media (max-width: 480px) {
-  .summary-grid, .toolbar { grid-template-columns: 1fr; }
-}
+.feature-page{display:grid;gap:22px}.page-heading{display:flex;justify-content:space-between;align-items:flex-start;gap:20px}.page-heading h1{margin:0 0 8px}.page-heading p{margin:0;color:#69758b}.page-heading>button,.dialog>div button{padding:10px 15px;border:0;border-radius:10px;color:#fff;background:#1d5dd8;cursor:pointer}.summary-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}.summary-grid article,.panel{padding:20px;border:1px solid #dde4ef;border-radius:18px;background:#fff;box-shadow:0 12px 28px rgba(22,43,82,.06)}.summary-grid span,.summary-grid small{display:block;color:#69758b;font-size:.76rem}.summary-grid strong{display:block;margin:10px 0 6px;font-size:1.8rem}.core-control{display:flex;justify-content:space-between;align-items:center;gap:20px;border-color:#cfdaf0;background:linear-gradient(135deg,#f7faff,#edf3ff)}.core-control.enabled{border-color:#b9e2d5;background:linear-gradient(135deg,#f4fcf9,#e8f8f2)}.core-control h2{margin:0 0 6px}.core-control p{margin:0;color:#69758b}.core-control>div:last-child{display:flex;align-items:center;gap:12px}.core-control button,.switch{width:50px;height:28px;padding:3px;border:0;border-radius:999px;background:#c7d0df;cursor:pointer}.core-control.enabled button,.switch.checked{background:#1d5dd8}.core-control button i,.switch i{display:block;width:22px;height:22px;border-radius:50%;background:#fff;transition:.18s}.core-control.enabled button i,.switch.checked i{transform:translateX(22px)}.toolbar{display:grid;grid-template-columns:minmax(240px,1fr) repeat(3,180px);gap:12px;align-items:end}.toolbar label{display:grid;gap:7px}.toolbar label>span{color:#526078;font-size:.75rem;font-weight:700}.toolbar input,.toolbar select{width:100%;padding:10px 11px;border:1px solid #d7dfeb;border-radius:10px;background:#fff}.optional-check{grid-column:1/-1;display:flex!important;align-items:center;gap:8px!important}.optional-check input{width:17px;height:17px}.permission-groups{display:grid;gap:18px}.permission-group>header{display:flex;justify-content:space-between;align-items:flex-start;gap:18px;margin-bottom:16px}.permission-group header h2{margin:9px 0 4px;font-size:1.1rem}.permission-group header p,.permission-group header>span{margin:0;color:#69758b;font-size:.75rem}.class-badge{display:inline-flex;padding:5px 9px;border-radius:999px;font-size:.68rem;font-weight:800}.class-A{color:#17664f;background:#e8f8f2}.class-B{color:#315c9e;background:#edf3ff}.class-C{color:#7a5116;background:#fff5df}.feature-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:11px}.feature-list article{display:flex;justify-content:space-between;gap:14px;padding:15px;border:1px solid #e2e8f1;border-radius:13px;background:#fbfcfe}.feature-list article.disabled{background:#f8f9fb}.feature-list article.unavailable{opacity:.72}.feature-info>div{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.feature-info>div span{padding:3px 7px;border-radius:999px;color:#526078;background:#eef2f7;font-size:.65rem}.feature-info p,.feature-info small{display:block;margin:6px 0 0;color:#69758b;font-size:.72rem}.feature-actions{display:flex;align-items:center;gap:8px}.feature-actions .restore{padding:7px 9px;border:1px solid #d7dfeb;border-radius:8px;color:#526078;background:#fff;cursor:pointer;font-size:.68rem}.feature-actions>span{color:#69758b;font-size:.7rem}.modal-backdrop{position:fixed;inset:0;z-index:100;display:grid;place-items:center;padding:20px;background:rgba(12,24,48,.68);backdrop-filter:blur(8px)}.dialog{width:min(520px,100%);padding:24px;border-radius:18px;background:#fff;box-shadow:0 28px 70px rgba(0,0,0,.25)}.dialog h2{margin:13px 0 8px}.dialog p{color:#69758b}.dialog label{display:grid;gap:7px}.dialog label span{color:#526078;font-size:.76rem;font-weight:700}.dialog textarea{width:100%;padding:11px 12px;border:1px solid #d7dfeb;border-radius:10px}.dialog>div{display:flex;justify-content:flex-end;gap:10px;margin-top:16px}.dialog>div .secondary{color:#315c9e;background:#edf3ff}.notice{margin:0;padding:12px 14px;border-radius:10px}.notice.error{color:#9b2838;background:#fff0f2}.notice.success{color:#17664f;background:#edf9f5}.empty{text-align:center;color:#69758b}.eyebrow{margin:0 0 7px;color:#64789c;font-size:.68rem;font-weight:700;letter-spacing:.14em}@media(max-width:1000px){.summary-grid{grid-template-columns:repeat(2,1fr)}.toolbar{grid-template-columns:1fr 1fr}}@media(max-width:680px){.page-heading,.core-control,.permission-group>header{display:grid}.summary-grid,.toolbar{grid-template-columns:1fr}.feature-list{grid-template-columns:1fr}}
 </style>

@@ -23,7 +23,6 @@ import com.wust.dormitory.model.dto.RoomBedLayoutItem;
 import com.wust.dormitory.model.dto.RoomBedLayoutRequest;
 import com.wust.dormitory.model.dto.RoomRequest;
 import com.wust.dormitory.model.dto.StudentRequest;
-import com.wust.dormitory.model.dto.TransferStudentOnboardingRequest;
 import com.wust.dormitory.model.dto.VoidSuccessResponse;
 import com.wust.dormitory.residency.BatchCapacityService;
 import com.wust.dormitory.residency.BatchRoomLockService;
@@ -48,7 +47,6 @@ import java.util.Map;
 public class AdminController implements AdminApi {
     private final AdminService adminService;
     private final StudentAdminService studentAdminService;
-    private final TransferStudentService transferStudentService;
     private final ResidencyService residencyService;
     private final BatchCapacityService batchCapacityService;
     private final BatchRoomLockService batchRoomLockService;
@@ -66,7 +64,6 @@ public class AdminController implements AdminApi {
     public AdminController(
             AdminService adminService,
             StudentAdminService studentAdminService,
-            TransferStudentService transferStudentService,
             ResidencyService residencyService,
             BatchCapacityService batchCapacityService,
             BatchRoomLockService batchRoomLockService,
@@ -82,7 +79,6 @@ public class AdminController implements AdminApi {
             AssignmentExportService exportService) {
         this.adminService = adminService;
         this.studentAdminService = studentAdminService;
-        this.transferStudentService = transferStudentService;
         this.residencyService = residencyService;
         this.batchCapacityService = batchCapacityService;
         this.batchRoomLockService = batchRoomLockService;
@@ -164,34 +160,6 @@ public class AdminController implements AdminApi {
                 .toList();
         return ResponseEntity.ok(ResponseFactory.object(
                 studentAdminService.importStudents(commands, SecurityUsers.requireAdmin())));
-    }
-
-    @Override
-    public ResponseEntity<ObjectSuccessResponse> onboardTransferStudent(
-            TransferStudentOnboardingRequest request) {
-        TransferStudentService.DirectAssignment direct = request.getDirectAssignment() == null
-                ? null
-                : new TransferStudentService.DirectAssignment(
-                        request.getDirectAssignment().getRoomId(),
-                        request.getDirectAssignment().getBedId(),
-                        request.getDirectAssignment().getReason());
-        Long batchId = request.getBatchEnrollment() == null
-                ? null
-                : request.getBatchEnrollment().getBatchId();
-        TransferStudentService.OnboardCommand command = new TransferStudentService.OnboardCommand(
-                request.getStudentNumber(),
-                request.getStudentName(),
-                request.getGender().getValue(),
-                request.getMajorId(),
-                request.getNationalityCode(),
-                request.getStudentCategory().getValue(),
-                request.getPhoneNumber(),
-                request.getAction().getValue(),
-                direct,
-                batchId,
-                request.getReason());
-        return ResponseEntity.ok(ResponseFactory.object(
-                transferStudentService.onboard(command, SecurityUsers.requireAdmin())));
     }
 
     @Override
