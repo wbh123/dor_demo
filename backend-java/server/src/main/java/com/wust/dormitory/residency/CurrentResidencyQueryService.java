@@ -23,7 +23,7 @@ public class CurrentResidencyQueryService {
                        ra.assigned_at, ra.bed_confirmed_at,
                        r.room_number, r.capacity, r.gender_restriction,
                        r.resident_scope, r.operational_status,
-                       f.floor_number, db.id AS building_id, db.building_code,
+                       f.floor_number, db.id AS building_id,
                        db.building_name,
                        b.bed_code, b.bed_type,
                        (ra.bed_id IS NOT NULL) AS bed_confirmed
@@ -33,6 +33,8 @@ public class CurrentResidencyQueryService {
                 JOIN dormitory_building db ON db.id=f.building_id
                 LEFT JOIN bed b ON b.id=ra.bed_id
                 WHERE ra.student_id=:studentId AND ra.assignment_status='ACTIVE'
+                ORDER BY ra.assigned_at DESC, ra.id DESC
+                LIMIT 1
                 """, Map.of("studentId", studentId));
         if (rows.isEmpty()) {
             return Map.of("resident", false);
@@ -48,8 +50,9 @@ public class CurrentResidencyQueryService {
         if (!Boolean.TRUE.equals(current.get("resident"))) {
             return Map.of("assigned", false);
         }
-        return Map.of(
-                "assigned", true,
-                "assignment", current.get("residency"));
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("assigned", true);
+        result.put("assignment", current.get("residency"));
+        return result;
     }
 }
