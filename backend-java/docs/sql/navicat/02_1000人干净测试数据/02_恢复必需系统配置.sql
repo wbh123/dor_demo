@@ -2,6 +2,9 @@
 USE `wust_dormitory`;
 SET NAMES utf8mb4;
 
+-- 配额告警是由当前业务数据推导的状态，重置数据后必须清空并重新计算。
+DELETE FROM service_quota_alert;
+
 INSERT INTO system_setting
 (setting_key,setting_value,version,updated_by)
 SELECT
@@ -34,4 +37,5 @@ WHERE template.created_by IS NOT NULL AND user_record.id IS NULL;
 SELECT DATABASE() AS current_database,
        (SELECT COUNT(*) FROM system_setting
         WHERE setting_key='STUDENT_WELCOME_MESSAGE') AS welcome_setting_count,
+       (SELECT COUNT(*) FROM service_quota_alert) AS quota_alert_count,
        'SYSTEM_CONFIGURATION_READY' AS status;
