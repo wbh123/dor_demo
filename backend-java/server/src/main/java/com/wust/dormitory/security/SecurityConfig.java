@@ -3,6 +3,7 @@ package com.wust.dormitory.security;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wust.dormitory.common.response.ResponseFactory;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.MediaType;
@@ -17,10 +18,14 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import java.util.Arrays;
 import java.util.List;
 
 @Configuration
 public class SecurityConfig {
+    private static final List<String> LOCAL_ORIGIN_PATTERNS =
+            List.of("http://localhost:*", "http://127.0.0.1:*");
+
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http, BearerTokenFilter tokenFilter,
                                             ObjectMapper objectMapper) throws Exception {
@@ -61,9 +66,10 @@ public class SecurityConfig {
     }
 
     @Bean
-    CorsConfigurationSource corsConfigurationSource() {
+    CorsConfigurationSource corsConfigurationSource(
+            @Value("${WUST_DORMITORY_CORS_ALLOWED_ORIGIN_PATTERNS:}") String configuredOriginPatterns) {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOriginPatterns(List.of("http://localhost:*", "http://127.0.0.1:*", "https://*.vicp.fun"));
+        configuration.setAllowedOriginPatterns(parseOriginPatterns(configuredOriginPatterns));
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-Request-Id", "Last-Event-ID"));
         configuration.setExposedHeaders(List.of("X-Request-Id"));
@@ -71,5 +77,14 @@ public class SecurityConfig {
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
         return source;
+    }
+
+    static List<String> parseOriginPatterns(String value) {
+        List<String> configured = Arrays.stream(String.valueOf(value).split(","))
+                .map(String::trim)
+                .filter(item -> !item.isEmpty())
+                .distinct()
+                .toList();
+        return configured.isEmpty() ? LOCAL_ORIGIN_PATTERNS : configured;
     }
 }
