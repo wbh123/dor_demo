@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -25,9 +26,20 @@ class RequiredReferenceDataTest(unittest.TestCase):
             "BED_PREFERENCE",
             "SYSTEM_DEFAULT",
             "matching_weight_scheme",
-            "WHERE NOT EXISTS",
         ):
             self.assertIn(token, source)
+
+        normalized = re.sub(r"\s+", " ", source)
+        idempotent_patterns = (
+            r"INSERT INTO questionnaire_version .*? NOT EXISTS \( .*? version_code='SYSTEM-PREFERENCE-V1'",
+            r"INSERT INTO questionnaire_question .*? NOT EXISTS \( .*? existing\.questionnaire_version_id=@system_questionnaire_id",
+            r"INSERT INTO questionnaire_option .*? NOT EXISTS \( .*? existing\.question_id=question\.id",
+            r"INSERT INTO matching_weight_scheme .*? NOT EXISTS \( .*? scheme_code='SYSTEM_DEFAULT'",
+        )
+        for pattern in idempotent_patterns:
+            self.assertRegex(normalized, pattern)
+
+        self.assertGreaterEqual(source.count("NOT EXISTS ("), 4)
         self.assertIn("SELECT COUNT(*) FROM questionnaire_version WHERE version_status='PUBLISHED'", source)
         self.assertIn("SELECT COUNT(*) FROM matching_weight_scheme WHERE enabled=1", source)
 
