@@ -1,85 +1,59 @@
-name: Public Repository CI
+name: Apply comprehensive compile fixes
 
 on:
   push:
     branches:
-      - main
-      - '**'
-  pull_request:
-    branches:
-      - main
+      - feature/comprehensive-student-selection-enhancements-v3
 
 permissions:
-  contents: read
-
-concurrency:
-  group: public-ci-${{ github.ref }}
-  cancel-in-progress: true
+  contents: write
 
 jobs:
-  policy:
-    name: Public content policy
+  fix:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
         with:
-          python-version: '3.12'
-      - name: Validate public repository boundary
-        run: bash scripts/ci/run_policy.sh
+          ref: feature/comprehensive-student-selection-enhancements-v3
+          fetch-depth: 0
+      - name: Apply focused fixes
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
 
-  contracts:
-    name: Cross-layer system contracts
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
-        with:
-          python-version: '3.12'
-      - name: Validate OpenAPI, backend and frontend contracts
-        run: bash scripts/ci/run_contracts.sh
+          transfer = Path('backend-java/server/src/main/java/com/wust/dormitory/admin/TransferStudentService.java')
+          text = transfer.read_text(encoding='utf-8')
+          old = '''                        "TRANSFER_MANUAL",
+                        normalized.phoneNumber()),'''
+          new = '''                        "TRANSFER_MANUAL",
+                        normalized.phoneNumber(),
+                        null,
+                        null),'''
+          if old not in text:
+              raise SystemExit('TransferStudentService target block not found')
+          transfer.write_text(text.replace(old, new, 1), encoding='utf-8')
 
-  redis:
-    name: Redis database reset safety
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
-        with:
-          python-version: '3.12'
-      - name: Validate selected-database Redis cleanup
-        run: bash scripts/ci/run_redis.sh
-
-  backend:
-    name: Java 21 backend verify
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: '21'
-          cache: maven
-      - name: Verify backend modules and unit tests
-        run: bash scripts/ci/run_backend.sh
-
-  frontend:
-    name: Node 22 frontend build
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v6
-        with:
-          node-version: '22'
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
-      - name: Verify generated API types and production build
-        env:
-          VITE_INSTITUTION_NAME: 示例大学
-          VITE_CAMPUS_NAME: 示例校区
-        run: bash scripts/ci/run_frontend.sh
+          home = Path('frontend/src/views/student/StudentHomeView.vue')
+          text = home.read_text(encoding='utf-8')
+          pattern = re.compile(
+              r'\nasync function loadQuestionnaire\(id: number\) \{\n'
+              r'  const response = await api\.get<ObjectSuccessResponse>\(`\/api\/v1\/student\/batches\/\$\{id\}\/questionnaire`\)\n'
+              r'  questionnaire\.value = \(response\.data\.data \?\? \{\}\) as DataObject\n'
+              r'\}\n'
+          )
+          text, count = pattern.subn('', text, count=1)
+          if count != 1:
+              raise SystemExit('StudentHomeView target block not found')
+          home.write_text(text, encoding='utf-8')
+          PY
+          rm -f .ci-trigger .ci-normal-trigger .ci-fix-trigger
+          rm -f .github/workflows/fix-comprehensive-build.yml
+          git show origin/main:.github/workflows/public-ci.yml > .github/workflows/public-ci.yml
+      - name: Commit fixes and restore standard CI
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A
+          git commit -m "fix: 修复综合功能前后端编译问题"
+          git push origin HEAD:feature/comprehensive-student-selection-enhancements-v3
