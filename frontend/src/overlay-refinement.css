@@ -1,0 +1,30 @@
+/* 统一弹窗与向导遮罩：与宿舍编辑器保持同一视觉层级。 */
+:where(
+  .modal-overlay,
+  .welcome-overlay,
+  .dialog-backdrop,
+  [class$='-overlay'],
+  [class*='-overlay '],
+  [class$='-backdrop'],
+  [class*='-backdrop ']
+) {
+  background: rgba(12, 24, 48, 0.62) !important;
+  -webkit-backdrop-filter: blur(8px) saturate(0.9) !important;
+  backdrop-filter: blur(8px) saturate(0.9) !important;
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  :where(
+    .modal-overlay,
+    .welcome-overlay,
+    .dialog-backdrop,
+    [class$='-overlay'],
+    [class*='-overlay '],
+    [class$='-backdrop'],
+    [class*='-backdrop ']
+  ) {
+    background: rgba(12, 24, 48, 0.82) !important;
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+  }
+}
