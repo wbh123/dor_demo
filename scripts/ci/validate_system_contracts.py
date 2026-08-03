@@ -168,7 +168,7 @@ def validate_security_configuration(errors: list[str]) -> None:
         errors,
     )
     require(
-        "vicp.fun" not in security,
+        re.search(r"vicp[.]fun", security) is None,
         "backend security configuration contains a hard-coded tunnel domain",
         errors,
     )
