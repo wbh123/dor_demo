@@ -19,7 +19,7 @@ public class TeamCategoryGuard {
     }
 
     public void requireInvitationAllowed(String inviteeStudentNumber, CurrentUser leader) {
-        Map<String, Object> context = leaderFormingTeam(leader.studentId());
+        Map<String, Object> context = invitationContext(leader.studentId());
         Map<String, Object> invitee = one("""
                 SELECT s.id, s.student_category
                 FROM student s
@@ -74,8 +74,8 @@ public class TeamCategoryGuard {
         }
     }
 
-    private Map<String, Object> leaderFormingTeam(long leaderStudentId) {
-        return one("""
+    private Map<String, Object> invitationContext(long leaderStudentId) {
+        List<Map<String, Object>> formingTeams = jdbc.queryForList("""
                 SELECT t.id, t.batch_id, sb.separate_student_categories,
                        s.student_category
                 FROM selection_team t
@@ -85,9 +85,28 @@ public class TeamCategoryGuard {
                   AND t.team_status='FORMING'
                 ORDER BY t.created_at DESC
                 LIMIT 1
+                """, Map.of("leaderStudentId", leaderStudentId));
+        if (!formingTeams.isEmpty()) {
+            return formingTeams.getFirst();
+        }
+        return one("""
+                SELECT sb.id AS batch_id, sb.separate_student_categories,
+                       s.student_category
+                FROM active_batch_student_lock active_lock
+                JOIN selection_batch sb ON sb.id=active_lock.batch_id
+                JOIN batch_student_eligibility eligibility
+                  ON eligibility.batch_id=sb.id
+                 AND eligibility.student_id=active_lock.student_id
+                JOIN student s ON s.id=active_lock.student_id
+                WHERE active_lock.student_id=:leaderStudentId
+                  AND eligibility.eligibility_status='ELIGIBLE'
+                  AND sb.allow_team=1
+                  AND sb.batch_status IN ('PUBLISHED','OPEN')
+                ORDER BY sb.start_at DESC, sb.id DESC
+                LIMIT 1
                 """, Map.of("leaderStudentId", leaderStudentId),
-                "TEAM_NOT_FORMING",
-                "请先创建处于组队中的队伍");
+                "TEAM_BATCH_NOT_FOUND",
+                "当前没有可用于组队的选寝批次");
     }
 
     private Map<String, Object> one(
