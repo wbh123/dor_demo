@@ -1,6 +1,6 @@
 -- ============================================================================
 -- 1000人干净测试数据
--- 前置：数据库已通过 backend-java/docs/sql/schema.sql 初始化到V16。
+-- 前置：数据库已通过最新数据库架构初始化到V17。
 -- 执行目录：backend-java/docs/sql/test-data
 -- 命令：mysql -u<user> -p <database> < 1000_students_clean.sql
 --
@@ -11,6 +11,9 @@
 -- - 无批次、无组队、无在住记录、无床位分配、无通知与个人偏好结果。
 -- ============================================================================
 SOURCE 1000_students_base.sql;
+
+-- 配额告警是由当前业务数据派生的状态，重置后必须重新计算。
+DELETE FROM service_quota_alert;
 
 DROP PROCEDURE IF EXISTS assert_clean_1000_data;
 DELIMITER $$
@@ -33,6 +36,12 @@ BEGIN
     IF (SELECT COUNT(*) FROM student WHERE student_category='INTERNATIONAL') <> 150 THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='国际生数量不是150';
     END IF;
+    IF (SELECT COUNT(*) FROM system_setting WHERE setting_key='STUDENT_WELCOME_MESSAGE') <> 1 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='学生欢迎语配置缺失或重复';
+    END IF;
+    IF (SELECT COUNT(*) FROM service_quota_alert) <> 0 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='干净数据不应保留历史配额告警';
+    END IF;
 END$$
 DELIMITER ;
 CALL assert_clean_1000_data();
@@ -46,4 +55,5 @@ SELECT 'CLEAN_1000_READY' AS status,
        (SELECT COUNT(*) FROM room) AS rooms,
        (SELECT COUNT(*) FROM bed) AS beds,
        (SELECT SUM(capacity) FROM room) AS total_capacity,
-       (SELECT COUNT(*) FROM room_assignment) AS active_residencies;
+       (SELECT COUNT(*) FROM room_assignment) AS active_residencies,
+       (SELECT COUNT(*) FROM system_setting WHERE setting_key='STUDENT_WELCOME_MESSAGE') AS welcome_settings;
