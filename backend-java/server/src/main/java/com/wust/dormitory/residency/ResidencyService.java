@@ -42,7 +42,7 @@ public class ResidencyService {
                        ra.assigned_at, ra.bed_confirmed_at,
                        r.room_number, r.capacity, r.gender_restriction,
                        r.resident_scope, r.operational_status,
-                       f.floor_number, db.building_id, db.building_code,
+                       f.floor_number, db.id AS building_id, db.building_code,
                        db.building_name,
                        b.bed_code, b.bed_type,
                        (ra.bed_id IS NOT NULL) AS bed_confirmed
@@ -84,7 +84,7 @@ public class ResidencyService {
                        s.student_number, s.student_name, s.gender,
                        s.student_category, s.enrollment_source,
                        ra.room_id, r.room_number, r.resident_scope,
-                       f.floor_number, db.building_id, db.building_name,
+                       f.floor_number, db.id AS building_id, db.building_name,
                        ra.bed_id, b.bed_code, b.bed_type,
                        ra.source_selection_mode, ra.assignment_method,
                        ra.assigned_at, ra.bed_confirmed_at,
