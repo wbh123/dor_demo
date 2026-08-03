@@ -9,6 +9,14 @@ import java.util.Optional;
 @Component
 public class FeatureRouteCatalog {
     private final List<RouteRule> rules = List.of(
+            rule("/api/v1/admin/room-change/requests/", "/approve", FeatureCodes.P3_ROOM_CHANGE_APPROVE, AccessMode.START_NEW),
+            rule("/api/v1/admin/room-change/requests/", "/reject", FeatureCodes.P3_ROOM_CHANGE_REJECT, AccessMode.START_NEW),
+            rule("/api/v1/admin/room-change/settings", null, FeatureCodes.P3_ROOM_CHANGE_REVIEW, AccessMode.START_NEW),
+            rule("/api/v1/admin/room-change/requests", null, FeatureCodes.P3_ROOM_CHANGE_REVIEW, AccessMode.READ_EXISTING),
+            rule("/api/v1/student/room-change", null, FeatureCodes.P3_ROOM_CHANGE_REQUEST, AccessMode.START_NEW),
+            rule("/api/v1/admin/operations/overview", null, FeatureCodes.P2_OPERATION_STATISTICS, AccessMode.READ_EXISTING),
+            rule("/api/v1/admin/operations/health", null, FeatureCodes.P2_OPERATION_HEALTH_VIEW, AccessMode.READ_EXISTING),
+            rule("/api/v1/admin/batches/", "/allocation/optimized-preview", FeatureCodes.P2_FAIRNESS_METRIC_VIEW, AccessMode.READ_EXISTING),
             rule("/api/v1/admin/room-layout", null, FeatureCodes.P2_ROOM_LAYOUT_UPDATE, AccessMode.START_NEW),
             rule("/api/v1/admin/rooms/", "/layout", FeatureCodes.P2_ROOM_LAYOUT_UPDATE, AccessMode.START_NEW),
             rule("/api/v1/admin/rooms/", "/beds", FeatureCodes.P2_BED_TYPE_UPDATE, AccessMode.START_NEW),
@@ -24,7 +32,6 @@ public class FeatureRouteCatalog {
             rule("/api/v1/student/team/leave", null, FeatureCodes.P2_TEAM_MEMBER_LEAVE, AccessMode.CONTINUE_EXISTING_BATCH),
             rule("/api/v1/student/team/invitations/", null, FeatureCodes.P2_TEAM_INVITATION_CANCEL, AccessMode.CONTINUE_EXISTING_BATCH),
             rule("/api/v1/student/three-dimensional", null, FeatureCodes.P2_THREE_DIMENSIONAL_SELECTION, AccessMode.CONTINUE_EXISTING_BATCH),
-
             rule("/api/v1/admin/students", null, FeatureCodes.P1_IDENTITY_BASIC, AccessMode.START_NEW),
             rule("/api/v1/admin/majors", null, FeatureCodes.P1_IDENTITY_BASIC, AccessMode.START_NEW),
             rule("/api/v1/admin/import", null, FeatureCodes.P1_IDENTITY_BASIC, AccessMode.START_NEW),
@@ -39,7 +46,6 @@ public class FeatureRouteCatalog {
             rule("/api/v1/admin/assignments", null, FeatureCodes.P1_ASSIGNMENT_MANAGEMENT, AccessMode.READ_EXISTING),
             rule("/api/v1/admin/audit", null, FeatureCodes.P1_BASIC_EXPORT_AUDIT, AccessMode.READ_EXISTING),
             rule("/api/v1/admin/export", null, FeatureCodes.P1_BASIC_EXPORT_AUDIT, AccessMode.READ_EXISTING),
-
             rule("/api/v1/student/preferences", null, FeatureCodes.P1_PREFERENCE_BASIC, AccessMode.CONTINUE_EXISTING_BATCH),
             rule("/api/v1/student/recommend", null, FeatureCodes.P1_RANDOM_RECOMMENDATION, AccessMode.CONTINUE_EXISTING_BATCH),
             rule("/api/v1/student/team", null, FeatureCodes.P1_TEAM_SELECTION, AccessMode.CONTINUE_EXISTING_BATCH),
@@ -49,24 +55,8 @@ public class FeatureRouteCatalog {
             rule("/api/v1/realtime", null, FeatureCodes.P1_REALTIME_STATUS, AccessMode.CONTINUE_EXISTING_BATCH)
     );
 
-    public Optional<RouteRule> resolve(String method, String uri) {
-        return rules.stream().filter(rule -> rule.matches(method, uri)).findFirst();
-    }
-
-    public List<RouteRule> all() {
-        return rules;
-    }
-
-    private static RouteRule rule(String prefix, String contains, String featureCode, AccessMode mode) {
-        return new RouteRule(prefix, contains, featureCode, mode, null);
-    }
-
-    public record RouteRule(String prefix, String contains, String featureCode,
-                            AccessMode accessMode, HttpMethod method) {
-        boolean matches(String requestMethod, String uri) {
-            return uri.startsWith(prefix)
-                    && (contains == null || uri.contains(contains))
-                    && (method == null || method.matches(requestMethod));
-        }
-    }
+    public Optional<RouteRule> resolve(String method, String uri) { return rules.stream().filter(rule -> rule.matches(method, uri)).findFirst(); }
+    public List<RouteRule> all() { return rules; }
+    private static RouteRule rule(String prefix,String contains,String featureCode,AccessMode mode){return new RouteRule(prefix,contains,featureCode,mode,null);}
+    public record RouteRule(String prefix,String contains,String featureCode,AccessMode accessMode,HttpMethod method){boolean matches(String requestMethod,String uri){return uri.startsWith(prefix)&&(contains==null||uri.contains(contains))&&(method==null||method.matches(requestMethod));}}
 }
