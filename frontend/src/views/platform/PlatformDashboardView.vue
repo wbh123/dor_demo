@@ -9,6 +9,7 @@ const error = ref('')
 const loading = ref(true)
 const responseTimeMs = ref(0)
 const updatedAt = ref('')
+const online = ref(window.navigator.onLine)
 
 const usage = computed(() => Array.isArray(quotas.value.usage) ? quotas.value.usage as Record<string, unknown>[] : [])
 const enabledFeatureCount = computed(() => features.value.filter((item) => Boolean(item.effectiveEnabled ?? item.enabled)).length)
@@ -19,7 +20,15 @@ const averageUsage = computed(() => {
 })
 const serviceHealthy = computed(() => String(subscription.value.serviceStatus ?? '') === 'ACTIVE' && !Boolean(subscription.value.emergencyStop))
 
-onMounted(load)
+onMounted(() => {
+  window.addEventListener('online', updateOnlineState)
+  window.addEventListener('offline', updateOnlineState)
+  void load()
+})
+
+function updateOnlineState() {
+  online.value = window.navigator.onLine
+}
 
 async function load() {
   loading.value = true; error.value = ''
@@ -66,7 +75,7 @@ function quotaName(code: unknown) {
 
       <section class="panel monitor-card">
         <div class="section-title"><div><h2>访问性能</h2><p>从当前管理端发起请求的实际响应情况。</p></div></div>
-        <dl><div><dt>本次加载耗时</dt><dd>{{ responseTimeMs }}毫秒</dd></div><div><dt>网络状态</dt><dd>{{ navigator.onLine ? '已连接' : '已断开' }}</dd></div><div><dt>配额预警</dt><dd>{{ warningCount }}项</dd></div><div><dt>最后更新</dt><dd>{{ updatedAt || '-' }}</dd></div></dl>
+        <dl><div><dt>本次加载耗时</dt><dd>{{ responseTimeMs }}毫秒</dd></div><div><dt>网络状态</dt><dd>{{ online ? '已连接' : '已断开' }}</dd></div><div><dt>配额预警</dt><dd>{{ warningCount }}项</dd></div><div><dt>最后更新</dt><dd>{{ updatedAt || '-' }}</dd></div></dl>
       </section>
 
       <section class="panel quick-actions">
