@@ -177,11 +177,11 @@ function missingPreferenceCount(room: DataObject) { return Number(room.missingPr
     </section>
 
     <p v-if="loading" class="panel empty-state">正在计算候选宿舍…</p><p v-else-if="filteredRooms.length===0" class="panel empty-state">当前没有符合筛选条件的房间。</p>
-    <div v-else class="room-grid compact-room-grid">
-      <article v-for="room in filteredRooms" :key="String(room.id)" class="panel room-card">
+    <div v-else class="room-grid compact-room-grid" :class="{ 'room-grid-room-mode': isRoomMode }">
+      <article v-for="room in filteredRooms" :key="String(room.id)" class="panel room-card" :class="{ 'room-card-compact': isRoomMode }">
         <div class="room-card-head"><div><span class="eyebrow">{{ room.building_name }}</span><h3>{{ room.room_number }}室</h3></div><span v-if="recommendationEnabled" class="score-ring score-ring-with-label"><small>匹配度</small><strong>{{ Number(room.matchScore).toFixed(0) }}分</strong></span></div>
         <div class="room-facts"><span>{{ roomType(room.room_type) }}</span><span>剩余{{ room.availableCount }}{{ isRoomMode?'个名额':'张床位' }}</span><span>{{ room.floor_number }}层</span></div>
-        <div class="roommate-summary"><div class="roommate-summary-head"><strong>当前在住与偏好</strong><span>{{ roommateCount(room)>0?`已有${roommateCount(room)}人`:'当前空房' }}</span></div><div v-if="missingPreferenceCount(room)>0" class="tag-row"><span class="tag warning">{{ missingPreferenceCount(room) }}名同学未填写偏好</span></div><div v-if="recommendationEnabled && recommendationReasons(room).length" class="tag-row"><span v-for="tag in recommendationReasons(room)" :key="tag" class="tag positive">{{ tag }}</span></div><div v-if="conflictReasons(room).length" class="tag-row"><span v-for="tag in conflictReasons(room)" :key="tag" class="tag warning">{{ tag }}</span></div><p v-if="isRoomMode" class="roommate-empty">{{ room.selectionHint }}</p></div>
+        <div class="roommate-summary"><div class="roommate-summary-head"><strong>当前在住与偏好</strong><span>{{ roommateCount(room)>0?`已有${roommateCount(room)}人`:'当前空房' }}</span></div><div v-if="missingPreferenceCount(room)>0" class="tag-row"><span class="tag warning">{{ missingPreferenceCount(room) }}名同学未填写偏好</span></div><div v-if="recommendationEnabled && recommendationReasons(room).length" class="tag-row"><span v-for="tag in recommendationReasons(room)" :key="tag" class="tag positive">{{ tag }}</span></div><div v-if="conflictReasons(room).length" class="tag-row"><span v-for="tag in conflictReasons(room)" :key="tag" class="tag warning">{{ tag }}</span></div></div>
         <button class="button primary full" :disabled="selectingRoomId===Number(room.id)" @click="openRoom(room)">{{ selectingRoomId===Number(room.id)?'正在确认…':isRoomMode?(isTeamMode?'队伍选择此寝室':'选择此寝室'):(isTeamMode?'选择队伍床位':'查看床位布局') }}</button>
       </article>
     </div>
@@ -200,6 +200,10 @@ function missingPreferenceCount(room: DataObject) { return Number(room.missingPr
 .score-ring-with-label { display: grid; place-items: center; min-width: 78px; min-height: 78px; padding: 7px; text-align: center; line-height: 1.1; }
 .score-ring-with-label small { display: block; font-size: 11px; font-weight: 600; opacity: .76; }
 .score-ring-with-label strong { display: block; margin-top: 3px; font-size: 17px; }
+.room-grid-room-mode { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+.room-card-compact { padding: 16px; gap: 12px; }
+.room-card-compact .score-ring-with-label { min-width: 66px; min-height: 66px; }
+.room-card-compact .roommate-summary { padding: 10px; }
 .preference-warning-dialog { width: min(520px, calc(100vw - 32px)); padding: 24px; }
 .room-selection-overlay { z-index: 1250; padding: 30px; background: rgba(9, 23, 48, 0.78) !important; backdrop-filter: blur(7px) !important; }
 .room-selection-dialog { width: min(680px, calc(100vw - 60px)); padding: 24px; border: 1px solid var(--line); border-radius: 26px; background: var(--panel, #fff); }
