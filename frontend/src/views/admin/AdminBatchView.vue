@@ -16,6 +16,16 @@ const preflightBatch = ref<DataObject | null>(null)
 const copyDialog = ref(false)
 const copying = ref(false)
 const copySource = ref<DataObject | null>(null)
+const scopeDialog = ref(false)
+const scopeLoading = ref(false)
+const scopeSaving = ref(false)
+const scopeBatch = ref<DataObject | null>(null)
+const scopeData = ref<DataObject | null>(null)
+const selectedStudentIds = ref<number[]>([])
+const selectedRoomIds = ref<number[]>([])
+const studentFilter = ref('')
+const roomFilter = ref('')
+const publishAfterScope = ref(false)
 
 const form = reactive({
   batchCode: '', batchName: '', startAt: '', endAt: '', ruleTemplateId: 0,
@@ -34,6 +44,27 @@ const preflightRooms = computed(() => (roomPreflight.value?.rooms ?? []) as Data
 const preflightBlockers = computed(() => (roomPreflight.value?.blockers ?? []) as DataObject[])
 const allocationSummary = computed(() => (allocationPreview.value?.summary ?? {}) as DataObject)
 const unassignedStudents = computed(() => (allocationPreview.value?.unassigned ?? []) as DataObject[])
+const scopeStudents = computed(() => (scopeData.value?.students ?? []) as DataObject[])
+const scopeRooms = computed(() => (scopeData.value?.rooms ?? []) as DataObject[])
+const filteredStudents = computed(() => {
+  const keyword = studentFilter.value.trim().toLowerCase()
+  if (!keyword) return scopeStudents.value
+  return scopeStudents.value.filter((student) => [
+    student.student_number,
+    student.student_name,
+    student.major_name,
+  ].some((value) => String(value ?? '').toLowerCase().includes(keyword)))
+})
+const filteredRooms = computed(() => {
+  const keyword = roomFilter.value.trim().toLowerCase()
+  if (!keyword) return scopeRooms.value
+  return scopeRooms.value.filter((room) => [
+    room.building_code,
+    room.building_name,
+    room.room_number,
+    room.floor_number,
+  ].some((value) => String(value ?? '').toLowerCase().includes(keyword)))
+})
 
 onMounted(load)
 
@@ -72,17 +103,99 @@ async function createBatch() {
       selectionMode: form.selectionMode,
       separateStudentCategories: form.separateStudentCategories,
     })
-    message.value = `批次已创建为草稿，模式为${modeText(form.selectionMode)}。`
+    message.value = `批次已创建为草稿，模式为${modeText(form.selectionMode)}。请配置参与学生与宿舍范围。`
     form.batchCode = ''; form.batchName = ''
     await load()
   } catch (reason) { error.value = reason instanceof Error ? reason.message : '批次创建失败' }
 }
 
-async function prepare(batch: DataObject) {
-  await run(async () => {
-    await api.post(`/api/v1/admin/batches/${Number(batch.id)}/prepare`)
-    message.value = '学生资格和可选宿舍范围已准备。'
-  })
+async function openScope(batch: DataObject, continuePublish = false) {
+  scopeDialog.value = true
+  scopeLoading.value = true
+  scopeBatch.value = batch
+  scopeData.value = null
+  selectedStudentIds.value = []
+  selectedRoomIds.value = []
+  studentFilter.value = ''
+  roomFilter.value = ''
+  publishAfterScope.value = continuePublish
+  error.value = ''
+  try {
+    const response = await api.get<ObjectSuccessResponse>(`/api/v1/admin/batches/${Number(batch.id)}/scope`)
+    const data = (response.data.data ?? {}) as DataObject
+    scopeData.value = data
+    selectedStudentIds.value = ((data.students ?? []) as DataObject[])
+      .filter((student) => Boolean(student.selected))
+      .map((student) => Number(student.id))
+    selectedRoomIds.value = ((data.rooms ?? []) as DataObject[])
+      .filter((room) => Boolean(room.selected) && Boolean(room.selectable))
+      .map((room) => Number(room.id))
+  } catch (reason) {
+    error.value = reason instanceof Error ? reason.message : '批次范围加载失败'
+    scopeDialog.value = false
+  } finally {
+    scopeLoading.value = false
+  }
+}
+
+function closeScope() {
+  if (scopeSaving.value) return
+  scopeDialog.value = false
+  scopeBatch.value = null
+  scopeData.value = null
+  publishAfterScope.value = false
+}
+
+function toggleStudent(id: number) {
+  selectedStudentIds.value = toggleId(selectedStudentIds.value, id)
+}
+
+function toggleRoom(id: number) {
+  selectedRoomIds.value = toggleId(selectedRoomIds.value, id)
+}
+
+function selectAllStudents() {
+  selectedStudentIds.value = filteredStudents.value.map((student) => Number(student.id))
+}
+
+function selectAllRooms() {
+  selectedRoomIds.value = filteredRooms.value
+    .filter((room) => Boolean(room.selectable))
+    .map((room) => Number(room.id))
+}
+
+function toggleId(values: number[], id: number) {
+  return values.includes(id) ? values.filter((value) => value !== id) : [...values, id]
+}
+
+async function saveScope() {
+  if (!scopeBatch.value) return
+  if (publishAfterScope.value && selectedStudentIds.value.length === 0) {
+    error.value = '发布前至少选择一名参与学生。'
+    return
+  }
+  if (publishAfterScope.value && selectedRoomIds.value.length === 0) {
+    error.value = '发布前至少选择一间可选宿舍。'
+    return
+  }
+  const batch = scopeBatch.value
+  const continuePublish = publishAfterScope.value
+  scopeSaving.value = true
+  error.value = ''
+  try {
+    await api.put(`/api/v1/admin/batches/${Number(batch.id)}/scope`, {
+      studentIds: selectedStudentIds.value,
+      roomIds: selectedRoomIds.value,
+    })
+    message.value = `已保存${selectedStudentIds.value.length}名学生和${selectedRoomIds.value.length}间宿舍。`
+    closeScope()
+    await load()
+    if (continuePublish) await publishBatch(batch)
+  } catch (reason) {
+    error.value = reason instanceof Error ? reason.message : '批次范围保存失败'
+  } finally {
+    scopeSaving.value = false
+  }
 }
 
 async function preflight(batch: DataObject) {
@@ -93,13 +206,33 @@ async function preflight(batch: DataObject) {
   } catch (reason) { error.value = reason instanceof Error ? reason.message : '发布预检失败' }
 }
 
-async function changeStatus(batch: DataObject, target: string) {
-  if (target === 'PUBLISHED') {
-    await preflight(batch)
-    if (!Boolean(roomPreflight.value?.publishable)) {
-      error.value = '发布前检查未通过，请先处理阻断寝室。'
+async function publishBatch(batch: DataObject) {
+  error.value = ''
+  try {
+    const response = await api.get<ObjectSuccessResponse>(`/api/v1/admin/batches/${Number(batch.id)}/room-preflight`)
+    roomPreflight.value = (response.data.data ?? {}) as DataObject
+    preflightBatch.value = batch
+    if (!Boolean(roomPreflight.value.publishable)) {
+      error.value = Number(roomPreflight.value.roomCount ?? 0) === 0
+        ? '当前批次尚未选择宿舍，请重新配置参与范围。'
+        : '发布前检查未通过，请处理阻断宿舍后重试。'
       return
     }
+    await run(async () => {
+      await api.post(`/api/v1/admin/batches/${Number(batch.id)}/status/PUBLISHED`)
+      message.value = '批次已发布。'
+      roomPreflight.value = null
+      preflightBatch.value = null
+    })
+  } catch (reason) {
+    error.value = reason instanceof Error ? reason.message : '批次发布失败'
+  }
+}
+
+async function changeStatus(batch: DataObject, target: string) {
+  if (target === 'PUBLISHED') {
+    await openScope(batch, true)
+    return
   }
   await run(async () => {
     await api.post(`/api/v1/admin/batches/${Number(batch.id)}/status/${target}`)
@@ -167,7 +300,7 @@ function issueText(room: DataObject) { const issues=(room.issues??[]) as DataObj
 
 <template>
   <div class="content-column">
-    <div class="page-title"><span class="eyebrow">SELECTION OPERATIONS</span><h2>选寝批次与统一分配</h2><p>批次可选择“只选寝室”或“选择具体床位”。同一寝室不能同时属于两个活动批次；选床模式会阻止包含未确认实际床位住户的寝室发布。</p></div>
+    <div class="page-title"><span class="eyebrow">SELECTION OPERATIONS</span><h2>选寝批次与统一分配</h2><p>创建草稿后先选择参与学生与可选宿舍，再执行发布预检。选床模式会阻止包含未确认实际床位住户的宿舍发布。</p></div>
     <p v-if="error" class="alert error">{{ error }}</p><p v-if="message" class="alert success">{{ message }}</p>
 
     <section class="panel">
@@ -193,16 +326,32 @@ function issueText(room: DataObject) { const issues=(room.issues??[]) as DataObj
       <div class="section-head"><div><span class="eyebrow">BATCH LIST</span><h3>批次管理</h3></div></div>
       <div class="batch-list">
         <article v-for="batch in batches" :key="String(batch.id)" class="batch-card">
-          <header><div><div class="badge-row"><span class="status-chip compact">{{ statusText(batch.batch_status) }}</span><span class="status-chip compact mode">{{ modeText(batch.selection_mode) }}</span><span v-if="batch.separate_student_categories" class="status-chip compact category">国内/国际隔离</span></div><h3>{{ batch.batch_name }}</h3><p>{{ batch.batch_code }}</p></div><div class="batch-counts"><strong>{{ batch.eligible_count ?? 0 }}</strong><span>可参与学生</span></div></header>
-          <div class="batch-facts"><span>寝室结果 {{ batch.room_assigned_count ?? 0 }}</span><span>床位结果 {{ batch.bed_assigned_count ?? batch.assigned_count ?? 0 }}</span><span>活动锁定寝室 {{ batch.locked_room_count ?? 0 }}</span><span v-if="Number(batch.unconfirmed_bed_resident_count ?? 0)>0" class="warn">{{ batch.unconfirmed_bed_resident_count }}人待确认床位</span></div>
-          <div class="button-row wrap"><button v-if="batch.batch_status==='DRAFT'" class="button secondary small" @click="prepare(batch)">准备范围</button><button class="button ghost small" @click="preflight(batch)">房间预检</button><button class="button ghost small" @click="openCopy(batch)">复制配置</button><button v-for="target in nextActions(batch.batch_status)" :key="target" class="button small" :class="target==='CANCELLED'?'danger':'primary'" @click="changeStatus(batch,target)">{{ actionText(target) }}</button><button v-if="['CLOSED','ALLOCATING'].includes(String(batch.batch_status))" class="button secondary small" @click="previewAllocation(batch)">统一分配预演</button><button class="button ghost small" @click="download(batch)">导出结果</button></div>
+          <header><div><div class="badge-row"><span class="status-chip compact">{{ statusText(batch.batch_status) }}</span><span class="status-chip compact mode">{{ modeText(batch.selection_mode) }}</span><span v-if="batch.separate_student_categories" class="status-chip compact category">国内/国际隔离</span></div><h3>{{ batch.batch_name }}</h3><p>{{ batch.batch_code }}</p></div><div class="batch-counts"><strong>{{ batch.eligible_count ?? 0 }}</strong><span>已选参与学生</span></div></header>
+          <div class="batch-facts"><span>寝室结果 {{ batch.room_assigned_count ?? 0 }}</span><span>床位结果 {{ batch.bed_assigned_count ?? batch.assigned_count ?? 0 }}</span><span>活动锁定宿舍 {{ batch.locked_room_count ?? 0 }}</span><span v-if="Number(batch.unconfirmed_bed_resident_count ?? 0)>0" class="warn">{{ batch.unconfirmed_bed_resident_count }}人待确认床位</span></div>
+          <div class="button-row wrap"><button v-if="batch.batch_status==='DRAFT'" class="button secondary small" @click="openScope(batch)">配置参与范围</button><button class="button ghost small" @click="preflight(batch)">宿舍预检</button><button class="button ghost small" @click="openCopy(batch)">复制配置</button><button v-for="target in nextActions(batch.batch_status)" :key="target" class="button small" :class="target==='CANCELLED'?'danger':'primary'" @click="changeStatus(batch,target)">{{ actionText(target) }}</button><button v-if="['CLOSED','ALLOCATING'].includes(String(batch.batch_status))" class="button secondary small" @click="previewAllocation(batch)">统一分配预演</button><button class="button ghost small" @click="download(batch)">导出结果</button></div>
         </article>
       </div>
     </section>
 
+    <div v-if="scopeDialog" class="modal-overlay" @click.self="closeScope">
+      <section class="modal-card scope-dialog">
+        <header class="section-head split-title"><div><span class="eyebrow">BATCH SCOPE</span><h3>{{ scopeBatch?.batch_name }} · 参与范围</h3><p>选择本批次允许参与的学生和宿舍，保存后才可发布。</p></div><button class="button ghost small" :disabled="scopeSaving" @click="closeScope">关闭</button></header>
+        <p v-if="scopeLoading" class="empty-state">正在加载学生与宿舍…</p>
+        <template v-else>
+          <div class="scope-summary"><article><span>已选学生</span><strong>{{ selectedStudentIds.length }}</strong></article><article><span>已选宿舍</span><strong>{{ selectedRoomIds.length }}</strong></article></div>
+          <div class="scope-grid">
+            <section class="scope-column"><header><div><strong>参与学生</strong><small>按学号、姓名或专业筛选</small></div><div class="button-row"><button class="button ghost small" @click="selectAllStudents">全选当前结果</button><button class="button ghost small" @click="selectedStudentIds=[]">清空</button></div></header><input v-model.trim="studentFilter" class="input" placeholder="搜索学号、姓名或专业" /><div class="scope-options"><label v-for="student in filteredStudents" :key="String(student.id)" class="scope-option"><input type="checkbox" :checked="selectedStudentIds.includes(Number(student.id))" @change="toggleStudent(Number(student.id))" /><div><strong>{{ student.student_number }} · {{ student.student_name }}</strong><span>{{ student.major_name }} · {{ student.gender==='M'?'男':'女' }} · {{ student.student_category==='INTERNATIONAL'?'国际生':'国内生' }}</span></div></label></div></section>
+            <section class="scope-column"><header><div><strong>可选宿舍</strong><small>停用或维护中的宿舍不可选择</small></div><div class="button-row"><button class="button ghost small" @click="selectAllRooms">全选当前可用</button><button class="button ghost small" @click="selectedRoomIds=[]">清空</button></div></header><input v-model.trim="roomFilter" class="input" placeholder="搜索楼栋、楼层或房间号" /><div class="scope-options"><label v-for="room in filteredRooms" :key="String(room.id)" class="scope-option" :class="{ disabled: !room.selectable }"><input type="checkbox" :disabled="!room.selectable" :checked="selectedRoomIds.includes(Number(room.id))" @change="toggleRoom(Number(room.id))" /><div><strong>{{ room.building_name }} {{ room.room_number }}</strong><span>{{ room.floor_number }}层 · 容量{{ room.capacity }} · {{ room.gender_restriction==='M'?'男寝':'女寝' }} · {{ room.operational_status }}</span></div></label></div></section>
+          </div>
+          <div class="scope-footer"><span v-if="publishAfterScope">保存后将自动执行宿舍预检并发布。</span><span v-else>草稿阶段可以反复调整范围。</span><button class="button primary" :disabled="scopeSaving" @click="saveScope">{{ scopeSaving?'保存中…':publishAfterScope?'保存范围并继续发布':'保存参与范围' }}</button></div>
+        </template>
+      </section>
+    </div>
+
     <div v-if="preflightBatch && roomPreflight" class="modal-overlay" @click.self="preflightBatch=null;roomPreflight=null">
-      <section class="modal-card preflight-dialog"><header class="section-head split-title"><div><span class="eyebrow">ROOM PREFLIGHT</span><h3>{{ preflightBatch.batch_name }} · 房间发布预检</h3><p>可用容量{{ roomPreflight.availableCapacity }}，涉及{{ roomPreflight.roomCount }}间寝室。</p></div><button class="button ghost small" @click="preflightBatch=null;roomPreflight=null">关闭</button></header>
-        <div class="preflight-summary" :class="{ pass: roomPreflight.publishable }"><strong>{{ roomPreflight.publishable ? '检查通过，可以发布' : `存在${preflightBlockers.length}间阻断寝室` }}</strong><span>同一寝室活动互斥；选床模式要求现实床位映射完整。</span></div>
+      <section class="modal-card preflight-dialog"><header class="section-head split-title"><div><span class="eyebrow">ROOM PREFLIGHT</span><h3>{{ preflightBatch.batch_name }} · 宿舍发布预检</h3><p>可用容量{{ roomPreflight.availableCapacity }}，涉及{{ roomPreflight.roomCount }}间宿舍。</p></div><button class="button ghost small" @click="preflightBatch=null;roomPreflight=null">关闭</button></header>
+        <div class="preflight-summary" :class="{ pass: roomPreflight.publishable }"><strong>{{ roomPreflight.publishable ? '检查通过，可以发布' : Number(roomPreflight.roomCount??0)===0 ? '尚未选择任何宿舍' : `存在${preflightBlockers.length}间阻断宿舍` }}</strong><span>{{ Number(roomPreflight.roomCount??0)===0 ? '返回参与范围选择至少一间可用宿舍。' : '同一宿舍活动互斥；选床模式要求现实床位映射完整。' }}</span></div>
+        <div v-if="Number(roomPreflight.roomCount??0)===0 && preflightBatch.batch_status==='DRAFT'" class="button-row preflight-action"><button class="button primary" @click="preflightBatch=null;roomPreflight=null;openScope(preflightBatch as DataObject)">配置参与范围</button></div>
         <div class="preflight-room-grid"><article v-for="room in preflightRooms" :key="String(room.id)" :class="{ blocker: ((room.issues??[]) as unknown[]).length>0 }"><strong>{{ room.building_name }} {{ room.room_number }}</strong><span>在住{{ room.activeResidents }} · 剩余{{ room.remainingCapacity }}</span><small v-if="((room.issues??[]) as unknown[]).length">{{ issueText(room) }}</small><small v-else>符合发布条件</small></article></div>
       </section>
     </div>
@@ -214,5 +363,5 @@ function issueText(room: DataObject) { const issues=(room.issues??[]) as DataObj
 </template>
 
 <style scoped>
-.batch-create-form{display:grid;gap:18px}.mode-card-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}.mode-card{display:grid;gap:8px;padding:20px;border:1px solid var(--border);border-radius:16px;background:var(--surface);text-align:left;color:inherit}.mode-card span,.mode-card small{color:var(--text-muted)}.mode-card.selected{border-color:var(--primary);box-shadow:0 0 0 3px color-mix(in srgb,var(--primary) 14%,transparent)}.mode-card.disabled{opacity:.55}.separation-switch{display:flex;align-items:center;gap:14px;padding:16px;border:1px solid var(--border);border-radius:14px;background:var(--surface-soft)}.separation-switch>button{position:relative;width:50px;height:28px;border:0;border-radius:999px;background:#cbd5e1;flex:0 0 auto}.separation-switch>button span{position:absolute;left:3px;top:3px;width:22px;height:22px;border-radius:50%;background:white;transition:.2s}.separation-switch>button.checked{background:var(--primary)}.separation-switch>button.checked span{transform:translateX(22px)}.separation-switch p{margin:4px 0 0;color:var(--text-muted)}.rule-summary{display:grid;gap:6px;padding:12px;border-radius:12px;background:var(--surface-soft)}.batch-list{display:grid;gap:14px}.batch-card{padding:18px;border:1px solid var(--border);border-radius:16px;background:var(--surface)}.batch-card header{display:flex;justify-content:space-between;gap:16px}.batch-card h3{margin:8px 0 3px}.batch-card p{margin:0;color:var(--text-muted)}.badge-row,.batch-facts{display:flex;gap:8px;flex-wrap:wrap}.status-chip.mode{background:#eff6ff;color:#1d4ed8}.status-chip.category{background:#f5f3ff;color:#6d28d9}.batch-counts{text-align:right}.batch-counts strong{display:block;font-size:26px}.batch-counts span,.batch-facts{color:var(--text-muted);font-size:13px}.batch-facts{margin:14px 0}.batch-facts .warn{color:#b45309;font-weight:700}.preflight-dialog,.allocation-dialog{width:min(980px,calc(100vw - 32px));max-height:calc(100vh - 32px);overflow:auto;padding:24px}.preflight-summary{display:grid;gap:5px;padding:15px;border-radius:13px;background:#fef2f2;color:#991b1b}.preflight-summary.pass{background:#f0fdf4;color:#166534}.preflight-room-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px;margin-top:14px}.preflight-room-grid article{display:grid;gap:5px;padding:14px;border:1px solid var(--border);border-radius:12px}.preflight-room-grid article.blocker{border-color:#fecaca;background:#fff7f7}.preflight-room-grid span,.preflight-room-grid small{color:var(--text-muted)}.copy-dialog{width:min(720px,calc(100vw - 32px));padding:24px}.allocation-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:14px 0}.allocation-stats article{padding:14px;background:var(--surface-soft);border-radius:12px}.allocation-stats strong{display:block;font-size:24px}@media(max-width:720px){.mode-card-grid,.allocation-stats{grid-template-columns:1fr}.batch-card header{flex-direction:column}.batch-counts{text-align:left}}
+.batch-create-form{display:grid;gap:18px}.mode-card-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}.mode-card{display:grid;gap:8px;padding:20px;border:1px solid var(--border);border-radius:16px;background:var(--surface);text-align:left;color:inherit}.mode-card span,.mode-card small{color:var(--text-muted)}.mode-card.selected{border-color:var(--primary);box-shadow:0 0 0 3px color-mix(in srgb,var(--primary) 14%,transparent)}.mode-card.disabled{opacity:.55}.separation-switch{display:flex;align-items:center;gap:14px;padding:16px;border:1px solid var(--border);border-radius:14px;background:var(--surface-soft)}.separation-switch>button{position:relative;width:50px;height:28px;border:0;border-radius:999px;background:#cbd5e1;flex:0 0 auto}.separation-switch>button span{position:absolute;left:3px;top:3px;width:22px;height:22px;border-radius:50%;background:white;transition:.2s}.separation-switch>button.checked{background:var(--primary)}.separation-switch>button.checked span{transform:translateX(22px)}.separation-switch p{margin:4px 0 0;color:var(--text-muted)}.rule-summary{display:grid;gap:6px;padding:12px;border-radius:12px;background:var(--surface-soft)}.batch-list{display:grid;gap:14px}.batch-card{padding:18px;border:1px solid var(--border);border-radius:16px;background:var(--surface)}.batch-card header{display:flex;justify-content:space-between;gap:16px}.batch-card h3{margin:8px 0 3px}.batch-card p{margin:0;color:var(--text-muted)}.badge-row,.batch-facts{display:flex;gap:8px;flex-wrap:wrap}.status-chip.mode{background:#eff6ff;color:#1d4ed8}.status-chip.category{background:#f5f3ff;color:#6d28d9}.batch-counts{text-align:right}.batch-counts strong{display:block;font-size:26px}.batch-counts span,.batch-facts{color:var(--text-muted);font-size:13px}.batch-facts{margin:14px 0}.batch-facts .warn{color:#b45309;font-weight:700}.scope-dialog{width:min(1180px,calc(100vw - 32px));max-height:calc(100vh - 32px);overflow:auto;padding:24px}.scope-summary{display:grid;grid-template-columns:repeat(2,minmax(0,180px));gap:12px;margin-bottom:14px}.scope-summary article{padding:14px;border-radius:12px;background:var(--surface-soft)}.scope-summary strong{display:block;font-size:24px}.scope-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}.scope-column{display:grid;gap:12px;min-width:0}.scope-column>header{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.scope-column>header small{display:block;color:var(--text-muted);margin-top:4px}.scope-options{display:grid;gap:8px;max-height:440px;overflow:auto;padding-right:4px}.scope-option{display:flex;gap:10px;align-items:flex-start;padding:11px;border:1px solid var(--border);border-radius:11px;background:var(--surface)}.scope-option input{margin-top:4px}.scope-option div{display:grid;gap:3px}.scope-option span{color:var(--text-muted);font-size:12px}.scope-option.disabled{opacity:.55;background:var(--surface-soft)}.scope-footer{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-top:18px;padding-top:16px;border-top:1px solid var(--border);color:var(--text-muted)}.preflight-dialog,.allocation-dialog{width:min(980px,calc(100vw - 32px));max-height:calc(100vh - 32px);overflow:auto;padding:24px}.preflight-summary{display:grid;gap:5px;padding:15px;border-radius:13px;background:#fef2f2;color:#991b1b}.preflight-summary.pass{background:#f0fdf4;color:#166534}.preflight-action{margin-top:12px}.preflight-room-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px;margin-top:14px}.preflight-room-grid article{display:grid;gap:5px;padding:14px;border:1px solid var(--border);border-radius:12px}.preflight-room-grid article.blocker{border-color:#fecaca;background:#fff7f7}.preflight-room-grid span,.preflight-room-grid small{color:var(--text-muted)}.copy-dialog{width:min(720px,calc(100vw - 32px));padding:24px}.allocation-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:14px 0}.allocation-stats article{padding:14px;background:var(--surface-soft);border-radius:12px}.allocation-stats strong{display:block;font-size:24px}@media(max-width:900px){.scope-grid{grid-template-columns:1fr}.scope-options{max-height:320px}}@media(max-width:720px){.mode-card-grid,.allocation-stats,.scope-summary{grid-template-columns:1fr}.batch-card header,.scope-footer,.scope-column>header{flex-direction:column}.batch-counts{text-align:left}}
 </style>
