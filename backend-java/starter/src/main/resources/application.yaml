@@ -12,20 +12,19 @@ spring:
     url: jdbc:mysql://${WUST_DORMITORY_DB_HOST:localhost}:${WUST_DORMITORY_DB_PORT:3306}/${WUST_DORMITORY_DB_NAME:wust_dormitory}?useUnicode=true&characterEncoding=utf8&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai
     driver-class-name: com.mysql.cj.jdbc.Driver
   flyway:
-    enabled: true
-    locations: ${WUST_DORMITORY_FLYWAY_LOCATIONS:classpath:db/migration}
-    validate-on-migrate: true
-    baseline-on-migrate: false
-    clean-disabled: true
-    table: flyway_schema_history
+    enabled: false
   data:
     redis:
       host: ${WUST_DORMITORY_REDIS_HOST:localhost}
       port: ${WUST_DORMITORY_REDIS_PORT:6379}
-      password: ${WUST_DORMITORY_REDIS_PASSWORD}
+      password: ${WUST_DORMITORY_REDIS_PASSWORD:}
       database: 0
       connect-timeout: 3s
       timeout: 3s
+
+platform:
+  institution-name: ${WUST_DORMITORY_INSTITUTION_NAME:示例大学}
+  campus-name: ${WUST_DORMITORY_CAMPUS_NAME:示例校区}
 
 mybatis:
   mapper-locations: classpath*:com/wust/dormitory/mappers/**/*.xml

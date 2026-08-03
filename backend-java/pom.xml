@@ -15,8 +15,8 @@
     <artifactId>WustDormitorySelect</artifactId>
     <version>1.0.0-SNAPSHOT</version>
     <packaging>pom</packaging>
-    <name>Wust Dormitory Select Server</name>
-    <description>武汉科技大学学生宿舍智能选择系统服务端</description>
+    <name>University Dormitory Selection Platform</name>
+    <description>高校宿舍智能选择平台服务端</description>
 
     <modules>
         <module>client</module>

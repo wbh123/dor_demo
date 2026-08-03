@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import type { ActivateRequest, LoginRequest } from '../api/types'
 
+const institutionName = import.meta.env.VITE_INSTITUTION_NAME || '示例大学'
 const auth = useAuthStore()
 const router = useRouter()
 const mode = ref<'login' | 'activate'>('login')
@@ -46,7 +47,7 @@ async function submitActivate() {
   <div class="login-page">
     <section class="login-hero">
       <div class="hero-copy">
-        <span class="eyebrow light">WUHAN UNIVERSITY OF SCIENCE AND TECHNOLOGY</span>
+        <span class="eyebrow light">{{ institutionName }}</span>
         <h1>让宿舍选择<br />更公平，也更合拍</h1>
         <p>基于明确规则和个人偏好的宿舍智能选择系统。每一次占用、分配和调整都有记录。</p>
       </div>
@@ -60,9 +61,9 @@ async function submitActivate() {
     <section class="login-panel">
       <div class="login-card">
         <div class="brand login-brand">
-          <span class="brand-mark">W</span>
+          <span class="brand-mark">{{ institutionName.slice(0, 1) }}</span>
           <div>
-            <strong>武科大选寝</strong>
+            <strong>{{ institutionName }}选寝</strong>
             <small>宿舍智能选择系统</small>
           </div>
         </div>
@@ -106,7 +107,7 @@ async function submitActivate() {
 
         <p v-if="error" class="alert error">{{ error }}</p>
         <p v-if="message" class="alert success">{{ message }}</p>
-        <p class="login-tip">测试管理员账号仅用于本地开发环境，正式部署前必须删除。</p>
+        <p class="login-tip">测试账号仅用于本地开发环境，正式部署前必须删除。</p>
       </div>
     </section>
   </div>
