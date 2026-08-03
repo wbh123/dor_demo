@@ -41,6 +41,18 @@ jobs:
       - name: Validate OpenAPI, backend and frontend contracts
         run: bash scripts/ci/run_contracts.sh
 
+  redis:
+    name: Redis database reset safety
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Validate selected-database Redis cleanup
+        run: bash scripts/ci/run_redis.sh
+
   backend:
     name: Java 21 backend verify
     runs-on: ubuntu-latest
