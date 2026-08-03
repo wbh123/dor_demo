@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: Wust Dormitory Select 认证接口
-  version: 1.2.0
+  version: 1.3.0
 paths:
   /api/v1/auth/login:
     post:
@@ -63,7 +63,7 @@ paths:
     get:
       tags: [Auth]
       operationId: getCurrentUser
-      summary: 获取当前登录用户
+      summary: 获取当前登录用户及当前学校功能授权
       security: [{ bearerAuth: [] }]
       responses:
         '200':
@@ -116,7 +116,7 @@ components:
 
     CurrentUserData:
       type: object
-      required: [userId, username, displayName, userType]
+      required: [userId, username, displayName, userType, features]
       properties:
         userId: { type: integer, format: int64 }
         studentId:
@@ -126,6 +126,10 @@ components:
         username: { type: string }
         displayName: { type: string }
         userType: { type: string }
+        features:
+          type: array
+          description: 当前学校订阅、套餐及单独覆盖共同计算出的有效功能代码
+          items: { type: string }
         welcome:
           allOf:
             - $ref: '#/components/schemas/WelcomeData'
