@@ -129,10 +129,6 @@ function physicalBedCount(room: DataObject | null) {
 function enabledBedCount(room: DataObject | null) {
   return Number(room?.enabled_bed_count ?? 0)
 }
-function unavailableBedCount(room: DataObject | null) {
-  const explicit = Number(room?.disabled_bed_count ?? 0) + Number(room?.maintenance_bed_count ?? 0)
-  return explicit > 0 ? explicit : Math.max(0, physicalBedCount(room) - enabledBedCount(room))
-}
 function roomLabel(room: DataObject) { return `${String(room.building_name)} ${String(room.room_number)}` }
 function roomType(value: unknown) { return ROOM_TYPE_LABELS[String(value)] ?? value }
 function statusText(value: unknown) { return { ENABLED: '启用', DISABLED: '禁用', MAINTENANCE: '维护' }[String(value)] ?? value }

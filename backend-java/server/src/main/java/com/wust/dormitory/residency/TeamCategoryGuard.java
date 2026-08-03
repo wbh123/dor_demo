@@ -29,7 +29,8 @@ public class TeamCategoryGuard {
                   AND e.eligibility_status='ELIGIBLE'
                 """, new MapSqlParameterSource()
                 .addValue("batchId", context.get("batch_id"))
-                .addValue("studentNumber", inviteeStudentNumber),
+                .addValue("studentNumber", inviteeStudentNumber)
+                .getValues(),
                 "INVITEE_NOT_ELIGIBLE",
                 "被邀请学生不存在或没有当前批次资格");
         boolean separate = ((Number) context.get("separate_student_categories")).intValue() == 1;
@@ -51,7 +52,8 @@ public class TeamCategoryGuard {
                 WHERE t.id=:teamId AND t.leader_student_id=:leaderStudentId
                 """, new MapSqlParameterSource()
                 .addValue("teamId", teamId)
-                .addValue("leaderStudentId", leader.studentId()),
+                .addValue("leaderStudentId", leader.studentId())
+                .getValues(),
                 "TEAM_NOT_FOUND",
                 "队伍不存在或你不是队长");
         if (((Number) team.get("separate_student_categories")).intValue() != 1) {

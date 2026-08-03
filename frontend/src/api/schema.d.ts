@@ -237,6 +237,125 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/transfer-students": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 手工录入转学生并可选直接分配或加入批次 */
+        post: operations["onboardTransferStudent"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/students/{studentId}/direct-assignment": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 将已有学生直接分配到寝室或具体床位 */
+        post: operations["directlyAssignStudent"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/batches/{batchId}/students/{studentId}/capacity-preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 检查学生加入现有批次后的可选宿舍容量 */
+        get: operations["previewStudentBatchCapacity"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/batches/{batchId}/students/{studentId}/enroll": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 通过容量预检后将学生加入现有批次 */
+        post: operations["enrollStudentIntoBatch"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/residencies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 图形化在住与床位确认页面的数据源 */
+        get: operations["listResidencies"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/residencies/{residencyId}/bed": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** 管理员为在住学生确认或调整实际床位 */
+        put: operations["confirmResidencyBedByAdmin"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/residencies/{residencyId}/end": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 办理退宿或结束错误在住记录 */
+        post: operations["endResidency"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/buildings": {
         parameters: {
             query?: never;
@@ -336,6 +455,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/batch-rule-templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 查询批次规则模板及修订 */
+        get: operations["listBatchRuleTemplates"];
+        put?: never;
+        /** 创建批次规则模板首个修订 */
+        post: operations["createBatchRuleTemplate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/batch-rule-templates/{templateId}/revisions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 基于已有模板创建不可变新修订 */
+        post: operations["createBatchRuleTemplateRevision"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/batches": {
         parameters: {
             query?: never;
@@ -346,6 +500,23 @@ export interface paths {
         get: operations["listBatches"];
         put?: never;
         post: operations["createBatch"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/batches/{batchId}/room-preflight": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 发布前检查房间互斥、类别、容量和床位可识别性 */
+        get: operations["previewBatchRoomAvailability"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -611,6 +782,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/student/batches/{batchId}/rooms/{roomId}/select": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** ROOM模式个人选择寝室，不分配具体床位 */
+        post: operations["selectRoom"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/student/batches/{batchId}/personal-selection/prepare": {
         parameters: {
             query?: never;
@@ -805,6 +993,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/student/batches/{batchId}/teams/{teamId}/rooms/{roomId}/select": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** ROOM模式队伍整体选择同一寝室 */
+        post: operations["selectTeamRoom"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/student/batches/{batchId}/teams/{teamId}/hold": {
         parameters: {
             query?: never;
@@ -853,6 +1058,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/student/residency": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 查询当前跨批次在住信息与床位确认状态 */
+        get: operations["getMyResidency"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/student/residency/bed-confirmation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** ROOM模式入住后确认实际床位 */
+        post: operations["confirmMyActualBed"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/realtime/batches/{batchId}/rooms/{roomId}": {
         parameters: {
             query?: never;
@@ -865,6 +1104,310 @@ export interface paths {
          * @description 建立服务器发送事件长连接，页面离开时客户端主动关闭。
          */
         get: operations["subscribeRoomEvents"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["platformLogin"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getPlatformCurrentUser"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["changePlatformPassword"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/plans": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listSubscriptionPlans"];
+        put?: never;
+        post: operations["createSubscriptionPlan"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/plans/revisions/{revisionId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getSubscriptionPlanRevision"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/plans/revisions/{sourceRevisionId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["createSubscriptionPlanRevision"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/subscription": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getCurrentServiceSubscription"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/subscription/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listServiceSubscriptionHistory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/subscription/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["previewServiceSubscriptionChange"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/subscription/plan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["changeServiceSubscriptionPlan"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/subscription/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["changeServiceSubscriptionStatus"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/features": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listFeatureCatalog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/features/entitlements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listFeatureEntitlements"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/features/{featureCode}/state": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["setFeatureEntitlementState"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/features/batch-state": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["setFeatureEntitlementStates"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/feature-overrides": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listFeatureOverrides"];
+        put?: never;
+        post: operations["createFeatureOverride"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/quotas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getQuotaSummary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/quota-overrides": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["createQuotaOverride"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/audit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listPlatformAuditLogs"];
         put?: never;
         post?: never;
         delete?: never;
@@ -971,7 +1514,14 @@ export interface components {
             majorId: number;
             /** @default CN */
             nationalityCode: string;
-            phoneNumber?: string;
+            /** @enum {string} */
+            studentCategory: "DOMESTIC" | "INTERNATIONAL";
+            /**
+             * @default ADMIN_MANUAL
+             * @enum {string}
+             */
+            enrollmentSource: "INITIAL_IMPORT" | "TRANSFER_MANUAL" | "ADMIN_MANUAL" | "BATCH_IMPORT";
+            phoneNumber?: string | null;
         };
         StudentPasswordResetRequest: {
             reason: string;
@@ -980,9 +1530,50 @@ export interface components {
             confirmStudentNumber: string;
             reason: string;
         };
+        DirectResidencyAssignmentRequest: {
+            /** Format: int64 */
+            roomId: number;
+            /** Format: int64 */
+            bedId?: number | null;
+            reason: string;
+        };
+        TransferBatchEnrollment: {
+            /** Format: int64 */
+            batchId: number;
+        };
+        TransferStudentOnboardingRequest: {
+            studentNumber: string;
+            studentName: string;
+            /** @enum {string} */
+            gender: "M" | "F";
+            /** Format: int64 */
+            majorId: number;
+            nationalityCode: string;
+            /** @enum {string} */
+            studentCategory: "DOMESTIC" | "INTERNATIONAL";
+            phoneNumber?: string | null;
+            /** @enum {string} */
+            action: "PROFILE_ONLY" | "DIRECT_ASSIGNMENT" | "ADD_TO_BATCH";
+            directAssignment?: components["schemas"]["DirectResidencyAssignmentRequest"];
+            batchEnrollment?: components["schemas"]["TransferBatchEnrollment"];
+            reason: string;
+        };
+        BatchEnrollmentRequest: {
+            reason: string;
+        };
+        AdminBedConfirmationRequest: {
+            /** Format: int64 */
+            bedId: number;
+            reason: string;
+        };
+        ResidencyEndRequest: {
+            reason: string;
+        };
         RoomRequest: {
             capacity: number;
             gender: string;
+            /** @enum {string} */
+            residentScope: "DOMESTIC_ONLY" | "INTERNATIONAL_ONLY" | "MIXED";
             operationalStatus: string;
             remark?: string;
             reason: string;
@@ -1035,6 +1626,47 @@ export interface components {
             expectedVersion: number;
             reason: string;
         };
+        BatchRuleTemplateCreateRequest: {
+            ruleCode: string;
+            ruleName: string;
+            /** Format: int32 */
+            holdDurationSeconds: number;
+            /** Format: int32 */
+            holdRenewalLimit: number;
+            allowTeam: boolean;
+            /** Format: int32 */
+            teamMinSize: number;
+            /** Format: int32 */
+            teamMaxSize: number;
+            allowStudentRandom: boolean;
+            /** @enum {string} */
+            unselectedStrategy: "NONE" | "ADMIN_ALLOCATION";
+            ruleVersion: string;
+            enabled: boolean;
+            makeDefault: boolean;
+            changeReason: string;
+        };
+        BatchRuleTemplateRevisionRequest: {
+            ruleName: string;
+            /** Format: int32 */
+            holdDurationSeconds: number;
+            /** Format: int32 */
+            holdRenewalLimit: number;
+            allowTeam: boolean;
+            /** Format: int32 */
+            teamMinSize: number;
+            /** Format: int32 */
+            teamMaxSize: number;
+            allowStudentRandom: boolean;
+            /** @enum {string} */
+            unselectedStrategy: "NONE" | "ADMIN_ALLOCATION";
+            ruleVersion: string;
+            enabled: boolean;
+            makeDefault: boolean;
+            /** Format: int32 */
+            expectedVersion: number;
+            changeReason: string;
+        };
         BatchRequest: {
             batchCode: string;
             batchName: string;
@@ -1042,10 +1674,18 @@ export interface components {
             startAt: string;
             /** Format: date-time */
             endAt: string;
-            holdDurationSeconds: number;
-            allowTeam: boolean;
-            teamMaxSize: number;
-            allowStudentRandom: boolean;
+            /**
+             * @description ROOM仅选择寝室；BED选择具体床位
+             * @enum {string}
+             */
+            selectionMode: "ROOM" | "BED";
+            /** @description 开启后国内生和国际生只能进入各自专用宿舍 */
+            separateStudentCategories: boolean;
+            /**
+             * Format: int64
+             * @description 精确批次规则模板修订；为空时使用当前默认模板
+             */
+            ruleTemplateId?: number;
         };
         BatchCopyRequest: {
             batchCode: string;
@@ -1084,6 +1724,144 @@ export interface components {
         };
         TeamConfirmRequest: components["schemas"]["TeamBedsRequest"] & {
             token: string;
+        };
+        StudentBedConfirmationRequest: {
+            /** Format: int64 */
+            bedId: number;
+        };
+        PlatformLoginRequest: {
+            username: string;
+            password: string;
+        };
+        PlatformLoginResponse: {
+            accessToken: string;
+            /** Format: int64 */
+            expiresInSeconds: number;
+            user: {
+                /** Format: int64 */
+                userId: number;
+                username: string;
+                displayName: string;
+                /** @enum {string} */
+                userType: "SYSTEM_ADMIN";
+                passwordChangeRequired: boolean;
+            };
+        };
+        PlatformPasswordChangeRequest: {
+            currentPassword: string;
+            newPassword: string;
+        };
+        PlanCreateRequest: {
+            planCode: string;
+            planName: string;
+            revisionName: string;
+            description?: string;
+            features: string[];
+            quotas: {
+                [key: string]: number;
+            };
+            reason: string;
+        };
+        PlanRevisionCreateRequest: {
+            revisionName: string;
+            description?: string;
+            features: string[];
+            quotas: {
+                [key: string]: number;
+            };
+            reason: string;
+        };
+        CurrentSubscription: {
+            /** Format: int64 */
+            revisionId?: number;
+            /** Format: int64 */
+            subscriptionId?: number;
+            revision?: number;
+            /** Format: int64 */
+            planRevisionId?: number;
+            planCode?: string;
+            planName?: string;
+            planRevision?: number;
+            /** @enum {string} */
+            subscriptionType?: "TRIAL" | "FIXED_TERM" | "LONG_TERM";
+            /** @enum {string} */
+            serviceStatus?: "TRIAL" | "ACTIVE" | "SUSPENDED" | "EXPIRED" | "TERMINATED";
+            contractNumber?: string | null;
+            /** Format: date-time */
+            startAt?: string;
+            /** Format: date-time */
+            endAt?: string | null;
+            emergencyStopped?: boolean;
+        };
+        SubscriptionPlanChangeRequest: {
+            /** Format: int64 */
+            planRevisionId: number;
+            /** @enum {string} */
+            direction: "UPGRADE" | "DOWNGRADE";
+            contractNumber?: string;
+            reason: string;
+        };
+        SubscriptionStatusRequest: {
+            /** @enum {string} */
+            action: "SUSPEND" | "RESUME" | "TERMINATE" | "EMERGENCY_STOP" | "EMERGENCY_RESUME";
+            reason: string;
+        };
+        FeatureEntitlement: {
+            featureCode: string;
+            featureName: string;
+            /** @enum {string} */
+            phase: "PHASE1" | "PHASE2" | "PHASE3";
+            /** @enum {string} */
+            scope: "ADMIN" | "STUDENT" | "SHARED";
+            /** @enum {string} */
+            granularity: "MODULE" | "OPERATION";
+            actionType: string;
+            /** @enum {string} */
+            riskLevel: "LOW" | "MEDIUM" | "HIGH";
+            enabledInProgram: boolean;
+            sortOrder: number;
+            planEnabled: boolean;
+            effectiveEnabled: boolean;
+            /** @enum {string|null} */
+            overrideType?: "GRANT" | "REVOKE" | null;
+            /** @enum {string} */
+            source: "PLAN_ENABLED" | "PLAN_DISABLED" | "OVERRIDE_GRANT" | "OVERRIDE_REVOKE";
+            /** Format: date-time */
+            lastChangedAt?: string | null;
+        };
+        /** @enum {string} */
+        FeatureTargetState: "ENABLED" | "DISABLED" | "INHERIT";
+        FeatureStateRequest: {
+            targetState: components["schemas"]["FeatureTargetState"];
+            reason: string;
+        };
+        FeatureStateChange: {
+            featureCode: string;
+            targetState: components["schemas"]["FeatureTargetState"];
+        };
+        BatchFeatureStateRequest: {
+            changes: components["schemas"]["FeatureStateChange"][];
+            reason: string;
+        };
+        FeatureOverrideRequest: {
+            featureCode: string;
+            /** @enum {string} */
+            overrideType: "GRANT" | "REVOKE";
+            /** Format: date-time */
+            effectiveFrom?: string;
+            /** Format: date-time */
+            effectiveUntil?: string | null;
+            reason: string;
+        };
+        QuotaOverrideRequest: {
+            quotaCode: string;
+            /** Format: int64 */
+            quotaValue: number;
+            /** Format: date-time */
+            effectiveFrom?: string;
+            /** Format: date-time */
+            effectiveUntil?: string | null;
+            reason: string;
         };
     };
     responses: {
@@ -1127,12 +1905,13 @@ export interface components {
     parameters: {
         IdPath: number;
         StudentIdPath: number;
-        RoomIdPath: number;
+        "parameters-StudentIdPath": number;
         BatchIdPath: number;
+        ResidencyIdPath: number;
+        RoomIdPath: number;
         NotificationIdPath: number;
         BedIdPath: number;
         TeamIdPath: number;
-        "parameters-StudentIdPath": number;
     };
     requestBodies: never;
     headers: never;
@@ -1377,6 +2156,8 @@ export interface operations {
                 keyword?: string;
                 gender?: string;
                 majorId?: number;
+                studentCategory?: "DOMESTIC" | "INTERNATIONAL";
+                enrollmentSource?: "INITIAL_IMPORT" | "TRANSFER_MANUAL" | "ADMIN_MANUAL" | "BATCH_IMPORT";
                 page?: number;
                 size?: number;
             };
@@ -1481,6 +2262,140 @@ export interface operations {
         responses: {
             200: components["responses"]["ObjectSuccess"];
             400: components["responses"]["ErrorResponse"];
+            404: components["responses"]["ErrorResponse"];
+            409: components["responses"]["ErrorResponse"];
+        };
+    };
+    onboardTransferStudent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TransferStudentOnboardingRequest"];
+            };
+        };
+        responses: {
+            200: components["responses"]["ObjectSuccess"];
+            400: components["responses"]["ErrorResponse"];
+            409: components["responses"]["ErrorResponse"];
+        };
+    };
+    directlyAssignStudent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                studentId: components["parameters"]["parameters-StudentIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DirectResidencyAssignmentRequest"];
+            };
+        };
+        responses: {
+            200: components["responses"]["ObjectSuccess"];
+            400: components["responses"]["ErrorResponse"];
+            404: components["responses"]["ErrorResponse"];
+            409: components["responses"]["ErrorResponse"];
+        };
+    };
+    previewStudentBatchCapacity: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                batchId: components["parameters"]["BatchIdPath"];
+                studentId: components["parameters"]["parameters-StudentIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["ObjectSuccess"];
+            404: components["responses"]["ErrorResponse"];
+        };
+    };
+    enrollStudentIntoBatch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                batchId: components["parameters"]["BatchIdPath"];
+                studentId: components["parameters"]["parameters-StudentIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BatchEnrollmentRequest"];
+            };
+        };
+        responses: {
+            200: components["responses"]["ObjectSuccess"];
+            400: components["responses"]["ErrorResponse"];
+            404: components["responses"]["ErrorResponse"];
+            409: components["responses"]["ErrorResponse"];
+        };
+    };
+    listResidencies: {
+        parameters: {
+            query?: {
+                roomId?: number;
+                keyword?: string;
+                bedMappingStatus?: "ALL" | "CONFIRMED" | "UNCONFIRMED";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["ObjectSuccess"];
+        };
+    };
+    confirmResidencyBedByAdmin: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                residencyId: components["parameters"]["ResidencyIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminBedConfirmationRequest"];
+            };
+        };
+        responses: {
+            200: components["responses"]["ObjectSuccess"];
+            400: components["responses"]["ErrorResponse"];
+            404: components["responses"]["ErrorResponse"];
+            409: components["responses"]["ErrorResponse"];
+        };
+    };
+    endResidency: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                residencyId: components["parameters"]["ResidencyIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResidencyEndRequest"];
+            };
+        };
+        responses: {
+            200: components["responses"]["ObjectSuccess"];
             404: components["responses"]["ErrorResponse"];
             409: components["responses"]["ErrorResponse"];
         };
@@ -1683,6 +2598,121 @@ export interface operations {
             };
         };
     };
+    listBatchRuleTemplates: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 查询成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListSuccessResponse"];
+                };
+            };
+        };
+    };
+    createBatchRuleTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BatchRuleTemplateCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description 创建成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ObjectSuccessResponse"];
+                };
+            };
+            /** @description 参数校验失败 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 模板编码冲突 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    createBatchRuleTemplateRevision: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                templateId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BatchRuleTemplateRevisionRequest"];
+            };
+        };
+        responses: {
+            /** @description 新修订创建成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ObjectSuccessResponse"];
+                };
+            };
+            /** @description 参数校验失败 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 原模板不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 模板版本冲突 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     listBatches: {
         parameters: {
             query?: never;
@@ -1710,6 +2740,22 @@ export interface operations {
         responses: {
             200: components["responses"]["ObjectSuccess"];
             400: components["responses"]["ErrorResponse"];
+            409: components["responses"]["ErrorResponse"];
+        };
+    };
+    previewBatchRoomAvailability: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                batchId: components["parameters"]["BatchIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["ObjectSuccess"];
+            404: components["responses"]["ErrorResponse"];
         };
     };
     copyBatch: {
@@ -2055,6 +3101,23 @@ export interface operations {
             403: components["responses"]["ErrorResponse"];
         };
     };
+    selectRoom: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                batchId: components["parameters"]["BatchIdPath"];
+                roomId: components["parameters"]["RoomIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["ObjectSuccess"];
+            400: components["responses"]["ErrorResponse"];
+            409: components["responses"]["ErrorResponse"];
+        };
+    };
     preparePersonalSelection: {
         parameters: {
             query?: never;
@@ -2259,6 +3322,24 @@ export interface operations {
             409: components["responses"]["ErrorResponse"];
         };
     };
+    selectTeamRoom: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                batchId: components["parameters"]["BatchIdPath"];
+                teamId: components["parameters"]["TeamIdPath"];
+                roomId: components["parameters"]["RoomIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["ObjectSuccess"];
+            400: components["responses"]["ErrorResponse"];
+            409: components["responses"]["ErrorResponse"];
+        };
+    };
     holdTeamBeds: {
         parameters: {
             query?: never;
@@ -2335,6 +3416,37 @@ export interface operations {
             409: components["responses"]["ErrorResponse"];
         };
     };
+    getMyResidency: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["ObjectSuccess"];
+        };
+    };
+    confirmMyActualBed: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StudentBedConfirmationRequest"];
+            };
+        };
+        responses: {
+            200: components["responses"]["ObjectSuccess"];
+            400: components["responses"]["ErrorResponse"];
+            404: components["responses"]["ErrorResponse"];
+            409: components["responses"]["ErrorResponse"];
+        };
+    };
     subscribeRoomEvents: {
         parameters: {
             query?: never;
@@ -2360,6 +3472,446 @@ export interface operations {
             };
             401: components["responses"]["ErrorResponse"];
             403: components["responses"]["ErrorResponse"];
+        };
+    };
+    platformLogin: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlatformLoginRequest"];
+            };
+        };
+        responses: {
+            /** @description 登录成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlatformLoginResponse"];
+                };
+            };
+        };
+    };
+    getPlatformCurrentUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 当前系统管理员 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    changePlatformPassword: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlatformPasswordChangeRequest"];
+            };
+        };
+        responses: {
+            /** @description 密码修改成功，需要重新登录 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    listSubscriptionPlans: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 套餐列表 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    createSubscriptionPlan: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlanCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description 套餐创建成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    getSubscriptionPlanRevision: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                revisionId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 套餐修订 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    createSubscriptionPlanRevision: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sourceRevisionId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlanRevisionCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description 套餐修订创建成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    getCurrentServiceSubscription: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 当前订阅 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CurrentSubscription"];
+                };
+            };
+        };
+    };
+    listServiceSubscriptionHistory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 订阅修订历史 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    previewServiceSubscriptionChange: {
+        parameters: {
+            query: {
+                targetPlanRevisionId: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 订阅切换影响预览 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    changeServiceSubscriptionPlan: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SubscriptionPlanChangeRequest"];
+            };
+        };
+        responses: {
+            /** @description 升级或降级成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    changeServiceSubscriptionStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SubscriptionStatusRequest"];
+            };
+        };
+        responses: {
+            /** @description 状态修改成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    listFeatureCatalog: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 固化功能目录 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    listFeatureEntitlements: {
+        parameters: {
+            query?: {
+                includeFuture?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 套餐默认、覆盖来源与最终授权状态 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeatureEntitlement"][];
+                };
+            };
+        };
+    };
+    setFeatureEntitlementState: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                featureCode: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FeatureStateRequest"];
+            };
+        };
+        responses: {
+            /** @description 单项授权状态已更新 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeatureEntitlement"];
+                };
+            };
+        };
+    };
+    setFeatureEntitlementStates: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BatchFeatureStateRequest"];
+            };
+        };
+        responses: {
+            /** @description 批量授权状态已在同一事务中更新 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeatureEntitlement"][];
+                };
+            };
+        };
+    };
+    listFeatureOverrides: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 功能覆盖列表 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    createFeatureOverride: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FeatureOverrideRequest"];
+            };
+        };
+        responses: {
+            /** @description 功能覆盖创建成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    getQuotaSummary: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 配额目录、覆盖、有效值和使用率 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    createQuotaOverride: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QuotaOverrideRequest"];
+            };
+        };
+        responses: {
+            /** @description 配额覆盖创建成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    listPlatformAuditLogs: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 平台审计列表 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
 }

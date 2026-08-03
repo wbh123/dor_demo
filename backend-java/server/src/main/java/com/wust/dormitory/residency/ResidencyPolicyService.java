@@ -247,7 +247,8 @@ public class ResidencyPolicyService {
                 FOR UPDATE
                 """, new MapSqlParameterSource()
                 .addValue("bedId", bedId)
-                .addValue("roomId", roomId),
+                .addValue("roomId", roomId)
+                .getValues(),
                 "BED_NOT_IN_ROOM", "床位不属于当前寝室");
         if (!"ENABLED".equals(String.valueOf(bed.get("operational_status")))) {
             throw new BusinessException("BED_NOT_AVAILABLE", "床位当前不可用");
