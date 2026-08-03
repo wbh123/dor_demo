@@ -47,6 +47,10 @@ const MIN_Z = -3.5
 const MAX_Z = 3.5
 const SNAP = 0.25
 const MAX_CAPACITY = 8
+const HORIZONTAL_UNIT_WIDTH = 310
+const HORIZONTAL_UNIT_HEIGHT = 176
+const VERTICAL_UNIT_WIDTH = 206
+const VERTICAL_UNIT_HEIGHT = 276
 
 const { t, subtitle, translateError } = useI18n()
 const stage = ref<HTMLDivElement | null>(null)
@@ -163,10 +167,25 @@ function stopDrag() {
 
 function updateFromPointer(key: string, event: PointerEvent) {
   if (!stage.value) return
+  const unit = layoutUnits.value.find((item) => item.key === key)
+  if (!unit) return
   const rect = stage.value.getBoundingClientRect()
-  const x = MIN_X + ((event.clientX - rect.left) / rect.width) * (MAX_X - MIN_X)
-  const z = MIN_Z + ((event.clientY - rect.top) / rect.height) * (MAX_Z - MIN_Z)
+  const dimensions = unitDimensions(unit.rotation)
+  const xRatio = clampRatio(
+    (event.clientX - rect.left) / rect.width,
+    dimensions.width / (2 * rect.width),
+  )
+  const zRatio = clampRatio(
+    (event.clientY - rect.top) / rect.height,
+    dimensions.height / (2 * rect.height),
+  )
+  const x = MIN_X + xRatio * (MAX_X - MIN_X)
+  const z = MIN_Z + zRatio * (MAX_Z - MIN_Z)
   updateUnit(key, snapCoordinate(x, MIN_X, MAX_X), snapCoordinate(z, MIN_Z, MAX_Z))
+}
+
+function clampRatio(value: number, margin: number) {
+  return Math.min(1 - margin, Math.max(margin, value))
 }
 
 function snapCoordinate(value: number, minimum: number, maximum: number) {
@@ -189,8 +208,34 @@ function updateUnit(key: string, x: number, z: number, rotation?: number) {
 }
 
 function cycleRotation(unit: LayoutUnit) {
-  updateUnit(unit.key, unit.x, unit.z, (unit.rotation + 90) % 360)
-  message.value = `${unit.label} 已顺时针旋转90°，保存后生效。`
+  const nextRotation = (unit.rotation + 90) % 360
+  const nextPosition = clampUnitPosition(unit.x, unit.z, nextRotation)
+  updateUnit(unit.key, nextPosition.x, nextPosition.z, nextRotation)
+  message.value = `${unit.label} 已顺时针旋转90°。床具外框方向和保存数据已更新，文字与按钮保持正向。`
+}
+
+function clampUnitPosition(x: number, z: number, rotation: number) {
+  if (!stage.value) return { x, z }
+  const rect = stage.value.getBoundingClientRect()
+  const dimensions = unitDimensions(rotation)
+  const xRatio = (x - MIN_X) / (MAX_X - MIN_X)
+  const zRatio = (z - MIN_Z) / (MAX_Z - MIN_Z)
+  const clampedX = clampRatio(xRatio, dimensions.width / (2 * rect.width))
+  const clampedZ = clampRatio(zRatio, dimensions.height / (2 * rect.height))
+  return {
+    x: snapCoordinate(MIN_X + clampedX * (MAX_X - MIN_X), MIN_X, MAX_X),
+    z: snapCoordinate(MIN_Z + clampedZ * (MAX_Z - MIN_Z), MIN_Z, MAX_Z),
+  }
+}
+
+function isQuarterTurn(rotation: number) {
+  return Math.abs(rotation % 180) === 90
+}
+
+function unitDimensions(rotation: number) {
+  return isQuarterTurn(rotation)
+    ? { width: VERTICAL_UNIT_WIDTH, height: VERTICAL_UNIT_HEIGHT }
+    : { width: HORIZONTAL_UNIT_WIDTH, height: HORIZONTAL_UNIT_HEIGHT }
 }
 
 function setUnitType(unit: LayoutUnit, value: 'LOFT_BED_DESK' | 'BUNK') {
@@ -230,7 +275,7 @@ function restoreDefaultLayout() {
     }
   })
   error.value = ''
-  message.value = '已恢复默认布局预览，点击保存后生效。'
+  message.value = '已恢复标准2×2横向床具布局预览，点击保存后生效。'
 }
 
 function defaultPlacement(bed: LayoutBed) {
@@ -244,10 +289,13 @@ function defaultPlacement(bed: LayoutBed) {
 }
 
 function unitStyle(unit: LayoutUnit) {
+  const dimensions = unitDimensions(unit.rotation)
   return {
     left: `${((unit.x - MIN_X) / (MAX_X - MIN_X)) * 100}%`,
     top: `${((unit.z - MIN_Z) / (MAX_Z - MIN_Z)) * 100}%`,
-    transform: `translate(-50%, -50%) rotate(${unit.rotation}deg)`,
+    width: `${dimensions.width}px`,
+    height: `${dimensions.height}px`,
+    transform: 'translate(-50%, -50%)',
   }
 }
 
@@ -317,7 +365,7 @@ async function save() {
         <div>
           <span class="eyebrow">{{ subtitle('床具布局', 'ROOM LAYOUT') }}</span>
           <h3 id="layout-title">{{ roomLabel }}床位布局</h3>
-          <p>拖动床具调整位置，在床具卡片内切换类型或顺时针旋转。所有更改在点击保存后统一校验。</p>
+          <p>默认采用标准2×2横向床具布局。旋转只改变床具外框方向和保存数据，文字与按钮始终保持正向。</p>
         </div>
         <button class="button ghost" type="button" @click="emit('close')">关闭</button>
       </div>
@@ -358,39 +406,43 @@ async function save() {
             class="layout-bed-unit"
             :class="{
               bunk: unit.unitType === 'BUNK',
+              vertical: isQuarterTurn(unit.rotation),
               dragging: dragKey === unit.key,
               occupied: unit.occupied,
             }"
             :style="unitStyle(unit)"
             @pointerdown.prevent="startDrag(unit, $event)"
           >
-            <div class="layout-bed-drag-handle">
-              <strong>{{ unit.label }}</strong>
-              <small>{{ unit.occupied ? '非空床位·类型锁定' : '拖动调整位置' }}</small>
-            </div>
-            <div class="layout-bed-type-actions" role="group" :aria-label="`${unit.label}床具类型`">
+            <div class="layout-bed-surface" aria-hidden="true" />
+            <div class="layout-bed-content">
+              <div class="layout-bed-drag-handle">
+                <strong>{{ unit.label }}</strong>
+                <small>{{ unit.occupied ? '非空床位·类型锁定' : `拖动调整位置 · ${unit.rotation}°` }}</small>
+              </div>
+              <div class="layout-bed-type-actions" role="group" :aria-label="`${unit.label}床具类型`">
+                <button
+                  type="button"
+                  :class="{ active: unit.unitType === 'LOFT_BED_DESK' }"
+                  :disabled="saving || unit.occupied || unit.originalType === 'BUNK'"
+                  @pointerdown.stop
+                  @click.stop="setUnitType(unit, 'LOFT_BED_DESK')"
+                >上床下桌</button>
+                <button
+                  type="button"
+                  :class="{ active: unit.unitType === 'BUNK' }"
+                  :disabled="saving || unit.occupied"
+                  @pointerdown.stop
+                  @click.stop="setUnitType(unit, 'BUNK')"
+                >上下铺</button>
+              </div>
               <button
+                class="layout-bed-rotate-button"
                 type="button"
-                :class="{ active: unit.unitType === 'LOFT_BED_DESK' }"
-                :disabled="saving || unit.occupied || unit.originalType === 'BUNK'"
+                :disabled="saving"
                 @pointerdown.stop
-                @click.stop="setUnitType(unit, 'LOFT_BED_DESK')"
-              >上床下桌</button>
-              <button
-                type="button"
-                :class="{ active: unit.unitType === 'BUNK' }"
-                :disabled="saving || unit.occupied"
-                @pointerdown.stop
-                @click.stop="setUnitType(unit, 'BUNK')"
-              >上下铺</button>
+                @click.stop="cycleRotation(unit)"
+              >顺时针旋转90°</button>
             </div>
-            <button
-              class="layout-bed-rotate-button"
-              type="button"
-              :disabled="saving"
-              @pointerdown.stop
-              @click.stop="cycleRotation(unit)"
-            >顺时针旋转90°</button>
           </article>
         </div>
 
@@ -409,7 +461,7 @@ async function save() {
         </label>
 
         <div class="button-row room-layout-actions">
-          <button class="button ghost" type="button" @click="restoreDefaultLayout">恢复默认布局</button>
+          <button class="button ghost" type="button" @click="restoreDefaultLayout">恢复标准2×2布局</button>
           <button class="button ghost" type="button" @click="emit('close')">取消</button>
           <button class="button primary" type="button" :disabled="saving" @click="save">
             {{ saving ? '正在保存…' : '保存类型与布局' }}
