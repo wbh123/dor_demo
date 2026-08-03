@@ -146,6 +146,69 @@ def validate_batch_scope(errors: list[str]) -> None:
     )
 
 
+def validate_business_feature_projection(errors: list[str]) -> None:
+    auth_contract = read("backend-java/model/src/main/resources/auth/openapi-auth.yaml")
+    auth_controller = read(
+        "backend-java/server/src/main/java/com/wust/dormitory/auth/AuthController.java"
+    )
+    auth_store = read("frontend/src/stores/auth.ts")
+    batch_view = read("frontend/src/views/admin/AdminBatchView.vue")
+    platform_features = read("frontend/src/views/platform/PlatformFeaturesView.vue")
+
+    require(
+        "required: [userId, username, displayName, userType, features]" in auth_contract,
+        "current user contract does not require effective feature projection",
+        errors,
+    )
+    require(
+        "data.setFeatures(featureAccessService.currentFeatures()" in auth_controller,
+        "authentication responses do not include effective features",
+        errors,
+    )
+    require(
+        "applyBusinessEntitlements" in auth_store and "current?.features ?? []" in auth_store,
+        "frontend session does not apply effective features after login or restore",
+        errors,
+    )
+    require(
+        "P2_BED_SELECTION_MODE" in batch_view and "bedModeAuthorized" in batch_view,
+        "school administrator batch page is not guarded by the bed-selection entitlement",
+        errors,
+    )
+    require(
+        "bedSelectionFeature" in platform_features
+        and "P2_BED_SELECTION_MODE" in platform_features
+        and "核心模式开关" in platform_features,
+        "platform administrator does not have a dedicated bed-selection mode switch",
+        errors,
+    )
+
+
+def validate_overlay_style(errors: list[str]) -> None:
+    main = read("frontend/src/main.ts")
+    overlay = read("frontend/src/overlay-refinement.css")
+
+    require(
+        "./overlay-refinement.css" in main,
+        "shared overlay style is not loaded after feature styles",
+        errors,
+    )
+    for selector in (
+        ".modal-overlay",
+        ".welcome-overlay",
+        ".dialog-backdrop",
+        "[class$='-overlay']",
+        "[class$='-backdrop']",
+    ):
+        require(selector in overlay, f"shared overlay style misses selector: {selector}", errors)
+    require(
+        "backdrop-filter: blur(8px)" in overlay
+        and "background: rgba(12, 24, 48, 0.62)" in overlay,
+        "shared overlay background does not match the dormitory editor visual layer",
+        errors,
+    )
+
+
 def validate_frontend(errors: list[str]) -> None:
     shell = read("frontend/src/layouts/AppShell.vue")
     login = read("frontend/src/views/LoginView.vue")
@@ -230,6 +293,7 @@ def validate_test_inventory(errors: list[str]) -> int:
     tests = sorted((ROOT / "backend-java/server/src/test/java").rglob("*Test.java"))
     expected = {
         "AuthTokenSerializationTest.java",
+        "AuthControllerFeatureProjectionTest.java",
         "BedScopeGuardTest.java",
         "BatchCreationServiceTest.java",
         "BatchSelectionModeGuardTest.java",
@@ -250,6 +314,8 @@ def main() -> int:
     path_count = validate_openapi(errors)
     validate_fixed_questionnaire(errors)
     validate_batch_scope(errors)
+    validate_business_feature_projection(errors)
+    validate_overlay_style(errors)
     validate_frontend(errors)
     validate_security_configuration(errors)
     test_count = validate_test_inventory(errors)
