@@ -1,14 +1,14 @@
 -- ============================================================================
--- V16 千人测试公共基础：1000名学生、260间五人寝、1300张床。
+-- V17 千人测试公共基础：1000名学生、260间五人寝、1300张床。
 -- 仅允许开发/测试数据库执行。
 -- 推荐从 backend-java/docs/sql/test-data 目录执行。
 -- ============================================================================
 SET NAMES utf8mb4;
 SET @database_name = DATABASE();
 
-DROP PROCEDURE IF EXISTS assert_v16_schema;
+DROP PROCEDURE IF EXISTS assert_v17_schema;
 DELIMITER $$
-CREATE PROCEDURE assert_v16_schema()
+CREATE PROCEDURE assert_v17_schema()
 BEGIN
     DECLARE required_columns INT DEFAULT 0;
     SELECT COUNT(*) INTO required_columns
@@ -22,18 +22,25 @@ BEGIN
       );
     IF required_columns <> 8 THEN
         SIGNAL SQLSTATE '45000'
-          SET MESSAGE_TEXT='数据库结构不是V16，请先导入backend-java/docs/sql/schema.sql';
+          SET MESSAGE_TEXT='数据库结构不是V17，请先导入最新Navicat数据库架构';
     END IF;
     IF NOT EXISTS (SELECT 1 FROM app_user WHERE user_type='SYSTEM_ADMIN') THEN
         SIGNAL SQLSTATE '45000'
           SET MESSAGE_TEXT='缺少V13初始化的SYSTEM_ADMIN，请先执行完整结构迁移';
     END IF;
+    IF NOT EXISTS (
+        SELECT 1 FROM feature_catalog
+        WHERE feature_code='P2_BED_SELECTION_MODE' AND enabled_in_program=1
+    ) THEN
+        SIGNAL SQLSTATE '45000'
+          SET MESSAGE_TEXT='缺少选床模式功能目录，请先执行V15及后续迁移';
+    END IF;
 END$$
 DELIMITER ;
-CALL assert_v16_schema();
-DROP PROCEDURE assert_v16_schema;
+CALL assert_v17_schema();
+DROP PROCEDURE assert_v17_schema;
 
--- 清理可变业务表，保留平台套餐、订阅、权限目录、问卷、匹配方案和规则模板。
+-- 清理可变业务表，保留平台套餐、订阅、权限目录、系统设置、问卷、匹配方案和规则模板。
 DROP PROCEDURE IF EXISTS clear_1000_test_data;
 DELIMITER $$
 CREATE PROCEDURE clear_1000_test_data()
@@ -46,7 +53,7 @@ BEGIN
         WHERE table_schema=@database_name
           AND table_type='BASE TABLE'
           AND table_name NOT IN (
-              'flyway_schema_history','app_user',
+              'flyway_schema_history','app_user','system_setting',
               'feature_catalog','quota_catalog',
               'subscription_plan','subscription_plan_revision',
               'plan_revision_feature','plan_revision_quota',
@@ -57,6 +64,26 @@ BEGIN
               'matching_weight_scheme','batch_rule_template'
           );
     DECLARE CONTINUE HANDLER FOR NOT FOUND SET finished=1;
+
+    -- 配置表允许创建人或修改人为空。删除普通管理员前先清理引用，避免关闭外键检查后留下孤儿数据。
+    UPDATE system_setting setting
+    LEFT JOIN app_user user_record ON user_record.id=setting.updated_by
+    SET setting.updated_by=NULL
+    WHERE setting.updated_by IS NOT NULL
+      AND (user_record.id IS NULL OR user_record.user_type<>'SYSTEM_ADMIN');
+
+    UPDATE matching_weight_scheme scheme
+    LEFT JOIN app_user user_record ON user_record.id=scheme.created_by
+    SET scheme.created_by=NULL
+    WHERE scheme.created_by IS NOT NULL
+      AND (user_record.id IS NULL OR user_record.user_type<>'SYSTEM_ADMIN');
+
+    UPDATE batch_rule_template template
+    LEFT JOIN app_user user_record ON user_record.id=template.created_by
+    SET template.created_by=NULL
+    WHERE template.created_by IS NOT NULL
+      AND (user_record.id IS NULL OR user_record.user_type<>'SYSTEM_ADMIN');
+
     SET FOREIGN_KEY_CHECKS=0;
     OPEN table_cursor;
     table_loop: LOOP
@@ -75,6 +102,21 @@ END$$
 DELIMITER ;
 CALL clear_1000_test_data();
 DROP PROCEDURE clear_1000_test_data;
+
+-- 测试数据重置不得移除运行必需配置；若历史脚本已经删除，则在此幂等恢复。
+INSERT INTO system_setting
+(setting_key,setting_value,version,updated_by)
+SELECT
+    'STUDENT_WELCOME_MESSAGE',
+    JSON_OBJECT(
+        'zh-CN','欢迎使用武汉科技大学学生宿舍智能选择系统。请先完成个人偏好，再选择合适的宿舍或床位。',
+        'en-US','Welcome to the Wuhan University of Science and Technology dormitory selection system. Complete your personal preferences first, then choose a suitable room or bed.'
+    ),
+    0,
+    NULL
+WHERE NOT EXISTS (
+    SELECT 1 FROM system_setting WHERE setting_key='STUDENT_WELCOME_MESSAGE'
+);
 
 INSERT INTO app_user
 (student_id,username,password_hash,user_type,account_status,display_name,password_change_required)
@@ -225,6 +267,7 @@ SELECT 'BASE_READY' AS status,
        (SELECT COUNT(*) FROM student) AS students,
        (SELECT COUNT(*) FROM room) AS rooms,
        (SELECT COUNT(*) FROM bed) AS beds,
+       (SELECT COUNT(*) FROM system_setting WHERE setting_key='STUDENT_WELCOME_MESSAGE') AS welcome_settings,
        (SELECT COUNT(*) FROM room WHERE resident_scope='DOMESTIC_ONLY') AS domestic_rooms,
        (SELECT COUNT(*) FROM room WHERE resident_scope='INTERNATIONAL_ONLY') AS international_rooms,
        (SELECT COUNT(*) FROM room WHERE resident_scope='MIXED') AS mixed_rooms;
