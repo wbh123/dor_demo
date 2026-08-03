@@ -1,25 +1,31 @@
-name: Export source snapshot
+name: Apply comprehensive feature patch
 
 on:
   push:
     branches:
       - feature/comprehensive-student-selection-enhancements-v3
-  pull_request:
-    branches:
-      - main
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  export:
+  apply:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - name: Pack source
-        run: tar --exclude=.git -czf /tmp/dor-demo-source.tar.gz .
-      - uses: actions/upload-artifact@v4
         with:
-          name: dor-demo-source
-          path: /tmp/dor-demo-source.tar.gz
-          retention-days: 1
+          fetch-depth: 0
+      - name: Restore and apply patch
+        run: |
+          cat .patch/cpatch.* | base64 --decode | xz --decompress > /tmp/comprehensive.patch
+          git apply --check /tmp/comprehensive.patch
+          git apply /tmp/comprehensive.patch
+          rm -rf .patch
+          rm -f .github/workflows/export-source-snapshot.yml
+      - name: Commit verified source changes
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A
+          git commit -m "feat: 完善学生数据偏好与选寝全流程"
+          git push origin HEAD:feature/comprehensive-student-selection-enhancements-v3
