@@ -19,7 +19,11 @@ jobs:
           fetch-depth: 0
       - name: Apply verified local patch
         run: |
-          cat .patch/cpatch.* | base64 --decode | xz --decompress > /tmp/comprehensive.patch
+          {
+            cat .patch/cpatch.00 .patch/cpatch.01 .patch/cpatch.02 .patch/cpatch.03 .patch/cpatch.04
+            head -c 10000 .patch/cpatch.05
+            cat .patch/cpatch.06
+          } | base64 --decode | xz --decompress > /tmp/comprehensive.patch
           git apply --check /tmp/comprehensive.patch
           git apply /tmp/comprehensive.patch
           rm -rf .patch
