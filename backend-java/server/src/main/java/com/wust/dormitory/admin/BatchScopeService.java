@@ -46,26 +46,26 @@ public class BatchScopeService {
                 SELECT r.id, b.id AS building_id, b.building_code, b.building_name,
                        f.floor_number, r.room_number, r.room_type, r.capacity,
                        r.gender_restriction, r.resident_scope, r.operational_status,
-                       CASE WHEN rs.id IS NOT NULL OR bs.id IS NOT NULL OR scoped_bed.id IS NOT NULL
-                            THEN 1 ELSE 0 END AS selected,
+                       CASE WHEN
+                           EXISTS (
+                               SELECT 1 FROM batch_room_scope rs
+                               WHERE rs.batch_id=:batchId AND rs.room_id=r.id
+                           ) OR EXISTS (
+                               SELECT 1 FROM batch_building_scope bs
+                               WHERE bs.batch_id=:batchId AND bs.building_id=b.id
+                           ) OR EXISTS (
+                               SELECT 1
+                               FROM batch_bed_scope bds
+                               JOIN bed scoped_bed ON scoped_bed.id=bds.bed_id
+                               WHERE bds.batch_id=:batchId AND scoped_bed.room_id=r.id
+                           )
+                           THEN 1 ELSE 0 END AS selected,
                        CASE WHEN b.enabled=1 AND r.operational_status='ENABLED'
                             THEN 1 ELSE 0 END AS selectable
                 FROM room r
                 JOIN dormitory_floor f ON f.id=r.floor_id
                 JOIN dormitory_building b ON b.id=f.building_id
-                LEFT JOIN batch_room_scope rs
-                       ON rs.batch_id=:batchId AND rs.room_id=r.id
-                LEFT JOIN batch_building_scope bs
-                       ON bs.batch_id=:batchId AND bs.building_id=b.id
-                LEFT JOIN batch_bed_scope bds
-                       ON bds.batch_id=:batchId
-                LEFT JOIN bed scoped_bed
-                       ON scoped_bed.id=bds.bed_id AND scoped_bed.room_id=r.id
                 WHERE b.enabled=1
-                GROUP BY r.id, b.id, b.building_code, b.building_name,
-                         f.floor_number, r.room_number, r.room_type, r.capacity,
-                         r.gender_restriction, r.resident_scope, r.operational_status,
-                         rs.id, bs.id, scoped_bed.id, b.enabled
                 ORDER BY b.building_code, f.floor_number, r.room_number
                 """, Map.of("batchId", batchId));
 
@@ -156,15 +156,20 @@ public class BatchScopeService {
                 SELECT COUNT(DISTINCT r.id)
                 FROM room r
                 JOIN dormitory_floor f ON f.id=r.floor_id
-                LEFT JOIN batch_room_scope rs
-                       ON rs.batch_id=:batchId AND rs.room_id=r.id
-                LEFT JOIN batch_building_scope bs
-                       ON bs.batch_id=:batchId AND bs.building_id=f.building_id
-                LEFT JOIN batch_bed_scope bds
-                       ON bds.batch_id=:batchId
-                LEFT JOIN bed scoped_bed
-                       ON scoped_bed.id=bds.bed_id AND scoped_bed.room_id=r.id
-                WHERE rs.id IS NOT NULL OR bs.id IS NOT NULL OR scoped_bed.id IS NOT NULL
+                WHERE EXISTS (
+                          SELECT 1 FROM batch_room_scope rs
+                          WHERE rs.batch_id=:batchId AND rs.room_id=r.id
+                      )
+                   OR EXISTS (
+                          SELECT 1 FROM batch_building_scope bs
+                          WHERE bs.batch_id=:batchId AND bs.building_id=f.building_id
+                      )
+                   OR EXISTS (
+                          SELECT 1
+                          FROM batch_bed_scope bds
+                          JOIN bed scoped_bed ON scoped_bed.id=bds.bed_id
+                          WHERE bds.batch_id=:batchId AND scoped_bed.room_id=r.id
+                      )
                 """, Map.of("batchId", batchId), Integer.class);
         if (studentCount == null || studentCount == 0) {
             throw new BusinessException(
