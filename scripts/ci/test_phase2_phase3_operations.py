@@ -24,11 +24,11 @@ def forbid(source: str, token: str, message: str) -> None:
         raise AssertionError(message)
 
 
-reset_service = read(
-    "backend-java/server/src/main/java/com/wust/dormitory/admin/StudentAccountAdminService.java"
-)
+reset_service = read("backend-java/server/src/main/java/com/wust/dormitory/admin/StudentAccountAdminService.java")
+residency_service = read("backend-java/server/src/main/java/com/wust/dormitory/residency/ResidencyService.java")
 require(reset_service, "room_assignment", "complete reset must handle cross-batch residency")
-require(reset_service, "RESIDENCY_ENDED", "complete reset must preserve residency end history")
+require(reset_service, "residencyService.end", "complete reset must end active residency through the authoritative service")
+require(residency_service, "RESIDENCY_ENDED", "residency end must preserve history")
 require(reset_service, "releaseAllForStudent", "complete reset must clear Redis bed holds")
 require(reset_service, "cancelActiveRoomChanges", "complete reset must cancel active room-change requests")
 
@@ -55,47 +55,22 @@ for token in (
 ):
     require(root_openapi, token, f"missing OpenAPI path: {token}")
 
-room_change_service = read(
-    "backend-java/server/src/main/java/com/wust/dormitory/roomchange/RoomChangeService.java"
-)
+room_change_service = read("backend-java/server/src/main/java/com/wust/dormitory/roomchange/RoomChangeService.java")
 for token in (
-    "DISABLED",
-    "FREE",
-    "APPROVAL_REQUIRED",
-    "PENDING",
-    "APPROVED",
-    "REJECTED",
-    "EXECUTED",
-    "executeRoomChange",
-    "FOR UPDATE",
-    "auditService.success",
+    "DISABLED", "FREE", "APPROVAL_REQUIRED", "PENDING", "APPROVED",
+    "REJECTED", "EXECUTED", "executeRoomChange", "FOR UPDATE", "auditService.success",
 ):
     require(room_change_service, token, f"room-change service missing behavior: {token}")
 
-room_change_controller = read(
-    "backend-java/server/src/main/java/com/wust/dormitory/roomchange/RoomChangeController.java"
-)
+room_change_controller = read("backend-java/server/src/main/java/com/wust/dormitory/roomchange/RoomChangeController.java")
 require(room_change_controller, "implements RoomChangeApi", "room-change controller must implement generated API")
 
-operations_service = read(
-    "backend-java/server/src/main/java/com/wust/dormitory/operations/OperationsService.java"
-)
-for token in (
-    "bedUtilization",
-    "unselectedStudents",
-    "manualAdjustments",
-    "redisAvailable",
-    "slowQueryCandidates",
-    "fairness",
-):
+operations_service = read("backend-java/server/src/main/java/com/wust/dormitory/operations/OperationsService.java")
+for token in ("bedUtilization", "unselectedStudents", "manualAdjustments", "redisAvailable", "slowQueryCandidates", "fairness"):
     require(operations_service, token, f"operations service missing projection: {token}")
 
 router = read("frontend/src/router/index.ts")
-for token in (
-    "student/room-change",
-    "admin/room-change",
-    "admin/operations",
-):
+for token in ("student/room-change", "admin/room-change", "admin/operations"):
     require(router, token, f"missing frontend route: {token}")
 
 shell = read("frontend/src/layouts/AppShell.vue")
