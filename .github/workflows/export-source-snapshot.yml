@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - feature/comprehensive-student-selection-enhancements-v3
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: read
