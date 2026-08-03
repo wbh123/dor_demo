@@ -14,16 +14,25 @@
 4. 不得提交 `docs/`、数据库迁移、SQL 脚本、数据字典、实体关系图、数据库备份和真实测试数据。
 5. 不得提交 Docker Compose、Kubernetes、Nginx、服务器部署、生产运维和内部发布脚本。
 6. 不得提交 `.env`、令牌、密码、私钥、证书和真实连接字符串。
-7. 新功能必须包含可在公开仓库独立运行的测试；涉及数据库结构的测试应使用接口替身、内存模型或最小模拟对象。
-8. 修改后必须通过公开内容扫描、后端构建和前端构建。
+7. 仅允许在 `scripts/ci/` 保存公开脚本；数据库、发布、部署和内部维护脚本不得进入本仓库。
+8. 新功能必须包含可在公开仓库独立运行的测试；涉及数据库结构的测试应使用接口替身、模拟仓储或最小模拟对象。
+9. 修改开放应用程序编程接口、后端业务规则或前端路由时，必须同步更新跨层契约检查。
+10. 从私有仓库同步代码时，只迁移源码、开放应用程序编程接口和可公开测试，不得复制数据库、文档、部署和实施记录。
+11. 修改后必须通过公开内容、跨层契约、Java 21 后端和 Node.js 22 前端四项验证。
 
-## 提交前检查
+## 统一验证入口
 
 ```bash
-python scripts/ci/validate_public_repository.py .
-mvn -f backend-java/pom.xml --batch-mode --no-transfer-progress clean verify
-npm ci --prefix frontend --no-audit --no-fund
-npm run --prefix frontend build
+bash scripts/ci/run_all.sh
 ```
 
-任何需要数据库迁移、部署说明或完整业务文档的内容，在公开仓库验证完成后迁移到私有仓库补充。
+单项定位命令：
+
+```bash
+bash scripts/ci/run_policy.sh
+bash scripts/ci/run_contracts.sh
+bash scripts/ci/run_backend.sh
+bash scripts/ci/run_frontend.sh
+```
+
+任何需要数据库迁移、部署说明或完整业务文档的内容，在公开仓库验证完成后迁移到私有仓库补充，并在私有环境执行数据库与端到端测试。

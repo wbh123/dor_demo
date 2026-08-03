@@ -34,6 +34,12 @@ REQUIRED_FILES = (
     ".github/workflows/public-ci.yml", "backend-java/pom.xml",
     "backend-java/model/src/main/resources/openapi-interface.yaml",
     "frontend/package.json",
+    "scripts/ci/validate_system_contracts.py",
+    "scripts/ci/run_policy.sh",
+    "scripts/ci/run_contracts.sh",
+    "scripts/ci/run_backend.sh",
+    "scripts/ci/run_frontend.sh",
+    "scripts/ci/run_all.sh",
 )
 SKIP_TEXT_SCAN = {Path("scripts/ci/validate_public_repository.py")}
 ALLOWED_MARKDOWN = {
@@ -68,6 +74,7 @@ def main() -> int:
     errors: list[str] = []
     java_count = 0
     vue_count = 0
+    test_count = 0
 
     for required in REQUIRED_FILES:
         if not (ROOT / required).is_file():
@@ -83,6 +90,7 @@ def main() -> int:
             continue
         java_count += int(path.suffix == ".java")
         vue_count += int(path.suffix == ".vue")
+        test_count += int(path.name.endswith("Test.java"))
         if rel in SKIP_TEXT_SCAN:
             continue
         try:
@@ -99,11 +107,18 @@ def main() -> int:
             if pattern.search(text):
                 errors.append(f"high-confidence secret in {rel.as_posix()}")
                 break
+        if path.suffix == ".sh":
+            if not text.startswith("#!/usr/bin/env bash"):
+                errors.append(f"CI shell script lacks portable bash shebang: {rel.as_posix()}")
+            if "set -euo pipefail" not in text:
+                errors.append(f"CI shell script lacks strict mode: {rel.as_posix()}")
 
     if java_count == 0:
         errors.append("no Java source files found")
     if vue_count == 0:
         errors.append("no Vue source files found")
+    if test_count < 6:
+        errors.append(f"core Java regression test count too low: {test_count}")
 
     if errors:
         print("Public repository validation failed:", file=sys.stderr)
@@ -111,7 +126,10 @@ def main() -> int:
             print(f"- {error}", file=sys.stderr)
         return 1
 
-    print(f"Public repository validation passed: {java_count} Java files, {vue_count} Vue files")
+    print(
+        "Public repository validation passed: "
+        f"{java_count} Java files, {vue_count} Vue files, {test_count} test classes"
+    )
     return 0
 
 
