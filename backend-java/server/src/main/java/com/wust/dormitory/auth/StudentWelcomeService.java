@@ -49,16 +49,14 @@ public class StudentWelcomeService {
         Map<String, String> renderedMessages = new LinkedHashMap<>();
         configuration.messages().forEach((locale, message) ->
                 renderedMessages.put(locale, render(message, variables)));
-        Map<String, String> renderedCountryMessages = new LinkedHashMap<>();
-        configuration.countryMessages().forEach((code, message) ->
-                renderedCountryMessages.put(code, render(message, variables)));
 
-        String selected = renderedCountryMessages.get(countryCode);
-        if (selected == null || selected.isBlank()) {
-            selected = "CN".equals(countryCode)
-                    ? renderedMessages.get("zh-CN")
-                    : renderedMessages.get("en-US");
+        String selectedTemplate = configuration.countryMessages().get(countryCode);
+        if (selectedTemplate == null || selectedTemplate.isBlank()) {
+            selectedTemplate = "CN".equals(countryCode)
+                    ? configuration.messages().get("zh-CN")
+                    : configuration.messages().get("en-US");
         }
+        String selected = render(selectedTemplate, variables);
 
         WelcomeData data = new WelcomeData();
         data.setRequired(student.get("welcome_acknowledged_at") == null);
