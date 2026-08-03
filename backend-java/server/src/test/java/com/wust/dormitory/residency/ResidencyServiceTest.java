@@ -57,8 +57,9 @@ class ResidencyServiceTest {
 
         assertThat(result).containsEntry("assigned", true);
         assertThat(result.get("assignment")).isInstanceOf(Map.class);
-        assertThat((Map<?, ?>) result.get("assignment"))
-                .containsEntry("room_number", "301")
-                .containsEntry("bed_id", null);
+        Map<?, ?> assignment = (Map<?, ?>) result.get("assignment");
+        assertThat(assignment.get("room_number")).isEqualTo("301");
+        assertThat(assignment).containsKey("bed_id");
+        assertThat(assignment.get("bed_id")).isNull();
     }
 }
