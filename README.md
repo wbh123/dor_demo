@@ -1,6 +1,6 @@
 # 高校宿舍智能选择平台
 
-本仓库是经过脱敏处理的公开开发仓库，用于功能开发和 GitHub Actions 验证。
+本仓库是经过脱敏处理的公开开发仓库，用于前后端功能开发、自动化测试和 GitHub Actions 验证。
 
 ## 仓库边界
 
@@ -8,7 +8,7 @@
 
 - 前后端业务源码；
 - OpenAPI 契约和生成配置；
-- 单元测试、静态测试与持续集成配置；
+- 单元测试、跨层契约测试与持续集成配置；
 - 不包含真实信息的环境变量示例。
 
 禁止保存：
@@ -22,22 +22,63 @@ Java 包名、`WUST_DORMITORY_*` 环境变量前缀和 `wust_dormitory` 数据�
 
 ## 可替换展示信息
 
-机构和校区展示名称通过 `.env.example` 中的变量集中维护。默认使用虚构值：
+机构和校区展示名称通过 `.env.example` 中的变量集中维护：
 
-```text
-示例大学
-示例校区
+```properties
+WUST_DORMITORY_INSTITUTION_NAME=示例大学
+WUST_DORMITORY_CAMPUS_NAME=示例校区
+VITE_INSTITUTION_NAME=示例大学
+VITE_CAMPUS_NAME=示例校区
 ```
 
-## 持续集成
+前端构建至少读取 `VITE_INSTITUTION_NAME`，未设置时使用虚构默认值。
 
-每次推送和拉取请求均执行：
+## 验证入口
+
+安装 Java 21、Maven、Node.js 22、npm 和 Python 3.12 后，在仓库根目录运行：
 
 ```bash
-python scripts/ci/validate_public_repository.py .
-mvn -f backend-java/pom.xml --batch-mode --no-transfer-progress clean verify
-npm ci --prefix frontend --no-audit --no-fund
-npm run --prefix frontend build
+bash scripts/ci/run_all.sh
 ```
 
-公开仓库测试通过后，功能再迁移到私有仓库，由私有仓库补充数据库迁移、部署配置和完整文档。
+该命令依次执行：
+
+1. `run_policy.sh`：检查敏感信息、数据库文件、内部文档和部署脚本；
+2. `run_contracts.sh`：检查 OpenAPI 引用、关键接口、固定问卷规则、前端路由和测试清单；
+3. `run_backend.sh`：执行 Maven 多模块 `clean verify`，包含代码生成、编译和单元测试；
+4. `run_frontend.sh`：重新生成接口类型，执行 Vue 类型检查和生产构建。
+
+需要单独定位问题时，可以直接运行对应脚本。
+
+## 当前公开测试范围
+
+公开仓库覆盖以下核心链路：
+
+- 登录令牌序列化与鉴权基础行为；
+- 批次创建与系统内置固定个人偏好问卷绑定；
+- 选择寝室、选择床位两种批次模式；
+- 床位范围校验；
+- 国内生与国际生队伍隔离规则；
+- 个人选床和队伍选床资格检查；
+- OpenAPI 到 Java 客户端、Java 服务端和前端类型的生成链路；
+- Vue 前端生产构建。
+
+由于公开仓库禁止保存数据库结构，涉及真实表结构、数据库迁移、初始化数据和完整运行环境的集成测试只在私有仓库执行。公开仓库通过接口替身、模拟仓储和静态跨层契约验证业务规则。
+
+## 开发流程
+
+```text
+公开功能分支
+    ↓
+单元测试与跨层契约测试
+    ↓
+GitHub Actions 四项门禁全部通过
+    ↓
+合并公开仓库
+    ↓
+迁移到私有仓库
+    ↓
+补充数据库迁移、部署配置和完整文档
+    ↓
+执行私有环境数据库与端到端验证
+```
