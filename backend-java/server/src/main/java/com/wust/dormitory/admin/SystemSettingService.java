@@ -124,17 +124,14 @@ public class SystemSettingService {
     }
 
     private void ensureStudentWelcomeSetting() {
-        String defaultValue = json(DEFAULT_MESSAGES);
         jdbc.update("""
                 INSERT INTO system_setting
                 (setting_key, setting_value, version, updated_by)
-                SELECT :settingKey, :settingValue, 0, NULL
-                WHERE NOT EXISTS (
-                    SELECT 1 FROM system_setting WHERE setting_key=:settingKey
-                )
+                VALUES (:settingKey, :settingValue, 0, NULL)
+                ON DUPLICATE KEY UPDATE setting_key=VALUES(setting_key)
                 """, new MapSqlParameterSource()
                 .addValue("settingKey", STUDENT_WELCOME_MESSAGE)
-                .addValue("settingValue", defaultValue));
+                .addValue("settingValue", json(DEFAULT_MESSAGES)));
     }
 
     private Map<String, String> normalize(Map<String, String> messages) {
