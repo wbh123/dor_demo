@@ -40,7 +40,6 @@ public class TeamService {
 
     @Transactional
     public Map<String, Object> inviteTeammate(String studentNumber, CurrentUser user) {
-        requireUnassigned(user.studentId(), "你已经确定寝室或床位，不能继续邀请队友");
         Map<String, Object> batch = currentTeamBatch(user.studentId());
         long batchId = number(batch.get("id"));
         Map<String, Object> team = ensureFormingLeaderTeam(batchId, user);
@@ -60,7 +59,6 @@ public class TeamService {
                 "INVITEE_NOT_ELIGIBLE", "被邀请学生不存在或没有当前选寝资格");
 
         long inviteeId = number(invitee.get("id"));
-        requireUnassigned(inviteeId, "该同学已经确定寝室或床位，不能参与组队");
         if (inviteeId == user.studentId()) {
             throw new BusinessException("TEAM_INVITE_SELF", "不能邀请自己加入小组");
         }
@@ -214,7 +212,6 @@ public class TeamService {
 
     @Transactional
     public void respondInvitation(String token, boolean accepted, CurrentUser user) {
-        if (accepted) requireUnassigned(user.studentId(), "你已经确定寝室或床位，不能接受组队邀请");
         Map<String, Object> invitation = one("""
                 SELECT invitation.id, invitation.team_id, invitation.invitee_student_id,
                        team.batch_id, team.team_status
@@ -561,31 +558,6 @@ public class TeamService {
                 "TEAM_NOT_FOUND", "队伍不存在或你不是有效成员");
     }
 
-
-    @Transactional
-    public Map<String, Object> createFormingTeam(CurrentUser user) {
-        requireUnassigned(user.studentId(), "你已经确定寝室或床位，不能创建队伍");
-        Map<String, Object> batch = currentTeamBatch(user.studentId());
-        long batchId = number(batch.get("id"));
-        int memberships = count("""
-                SELECT COUNT(*) FROM selection_team_member
-                WHERE batch_id=:batchId AND student_id=:studentId AND active_marker=1
-                """, new MapSqlParameterSource().addValue("batchId", batchId).addValue("studentId", user.studentId()));
-        if (memberships > 0) {
-            throw new BusinessException("TEAM_ALREADY_JOINED", "你已经加入当前批次的队伍", HttpStatus.CONFLICT);
-        }
-        return createInternalTeam(batchId, user);
-    }
-
-    private void requireUnassigned(long studentId, String message) {
-        int count = count("""
-                SELECT (
-                    EXISTS(SELECT 1 FROM room_assignment WHERE student_id=:studentId AND assignment_status='ACTIVE')
-                    OR EXISTS(SELECT 1 FROM bed_assignment WHERE student_id=:studentId AND assignment_status='ACTIVE')
-                )
-                """, Map.of("studentId", studentId));
-        if (count > 0) throw new BusinessException("TEAM_ASSIGNED_FORBIDDEN", message, HttpStatus.CONFLICT);
-    }
     private Map<String, Object> currentTeamBatch(long studentId) {
         return one("""
                 SELECT sb.id, sb.team_min_size, sb.team_max_size
@@ -614,7 +586,7 @@ public class TeamService {
                 .addValue("batchId", batchId)
                 .addValue("studentId", user.studentId()));
         if (memberships.isEmpty()) {
-            throw new BusinessException("TEAM_FORMING_REQUIRED", "请先创建处于组队中的队伍", HttpStatus.CONFLICT);
+            return createInternalTeam(batchId, user);
         }
         Map<String, Object> team = memberships.getFirst();
         if (!"LEADER".equals(team.get("member_role"))) {

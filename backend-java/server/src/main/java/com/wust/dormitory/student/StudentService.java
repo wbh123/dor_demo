@@ -37,19 +37,16 @@ public class StudentService {
     private final BedHoldService holdService;
     private final RoomEventHub eventHub;
     private final AuditService auditService;
-    private final StudentPreferenceService preferenceService;
 
     public StudentService(NamedParameterJdbcTemplate jdbc, ObjectMapper objectMapper,
                           MatchingService matchingService, BedHoldService holdService,
-                          RoomEventHub eventHub, AuditService auditService,
-                          StudentPreferenceService preferenceService) {
+                          RoomEventHub eventHub, AuditService auditService) {
         this.jdbc = jdbc;
         this.objectMapper = objectMapper;
         this.matchingService = matchingService;
         this.holdService = holdService;
         this.eventHub = eventHub;
         this.auditService = auditService;
-        this.preferenceService = preferenceService;
     }
 
     public Map<String, Object> profile(CurrentUser user) {
@@ -67,10 +64,8 @@ public class StudentService {
                        sb.start_at, sb.end_at, sb.hold_duration_seconds,
                        sb.allow_team, sb.team_min_size, sb.team_max_size,
                        sb.allow_student_random, e.eligibility_status,
-                       (EXISTS(SELECT 1 FROM questionnaire_answer qa
-                              WHERE qa.batch_id=sb.id AND qa.student_id=:studentId)
-                        OR EXISTS(SELECT 1 FROM student_preference_profile spp
-                              WHERE spp.student_id=:studentId AND spp.completed_at IS NOT NULL)) AS questionnaire_started,
+                       EXISTS(SELECT 1 FROM questionnaire_answer qa
+                              WHERE qa.batch_id=sb.id AND qa.student_id=:studentId) AS questionnaire_started,
                        EXISTS(SELECT 1 FROM bed_assignment ba
                               WHERE ba.batch_id=sb.id AND ba.student_id=:studentId) AS assigned
                 FROM batch_student_eligibility e
@@ -104,10 +99,7 @@ public class StudentService {
                 SELECT question_id, answer_json FROM questionnaire_answer
                 WHERE batch_id=:batchId AND student_id=:studentId
                 """, new MapSqlParameterSource().addValue("batchId", batchId).addValue("studentId", user.studentId()));
-        Map<String, Object> profileAnswers = answers.isEmpty()
-                ? preferenceService.storedAnswers(user.studentId()) : Map.of();
-        return Map.of("batch", batch, "questions", questions, "answers", answers,
-                "profileAnswers", profileAnswers, "preferenceCompleted", preferenceService.completed(user.studentId()));
+        return Map.of("batch", batch, "questions", questions, "answers", answers);
     }
 
     @Transactional
@@ -154,8 +146,6 @@ public class StudentService {
                     calculated_at=VALUES(calculated_at), source_answer_version=source_answer_version+1
                 """, new MapSqlParameterSource().addValue("batchId", batchId)
                 .addValue("studentId", user.studentId()).addValue("feature", featureJson));
-        preferenceService.synchronizeFromBatch(batchId, user.studentId(), answers,
-                matchingService.normalizeAnswers(featureVector));
         auditService.success(user, "QUESTIONNAIRE_SUBMIT", "SELECTION_BATCH", batchId,
                 null, null, Map.of("questionCount", featureVector.size()));
     }
