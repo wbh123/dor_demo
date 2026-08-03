@@ -1,13 +1,12 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRouter } from 'vue-router'
 import { api } from '../api/client'
 import type { DataObject, ObjectSuccessResponse } from '../api/types'
 import { useI18n, type LocaleCode } from '../i18n'
 import { useAuthStore } from '../stores/auth'
 
 const auth = useAuthStore()
-const route = useRoute()
 const router = useRouter()
 const welcomeError = ref('')
 const institutionName = String(import.meta.env.VITE_INSTITUTION_NAME || '示例大学')
@@ -50,10 +49,6 @@ const links = computed(() =>
         { to: '/student', label: '选寝首页', icon: icons.home },
         { to: '/student/teams', label: '我的队伍', icon: icons.team },
       ],
-)
-
-const showBuiltinQuestionnaireNotice = computed(
-  () => auth.isAdmin && route.name === 'admin-batches',
 )
 
 const welcomeText = computed(() => {
@@ -138,13 +133,6 @@ async function logout() {
         </div>
       </header>
       <section class="page-container" :class="{ 'student-page-container': auth.isStudent }">
-        <section v-if="showBuiltinQuestionnaireNotice" class="panel builtin-questionnaire-notice">
-          <div>
-            <span class="eyebrow">BUILT-IN PREFERENCE QUESTIONNAIRE</span>
-            <strong>学生个人偏好问卷：系统内置固定问卷</strong>
-          </div>
-          <p>包含睡眠、卫生、空调、学习、娱乐和床位偏好等既定内容，无需单独发布或配置。</p>
-        </section>
         <RouterView />
       </section>
     </main>
@@ -176,37 +164,3 @@ async function logout() {
     </Transition>
   </div>
 </template>
-
-<style scoped>
-.builtin-questionnaire-notice {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 20px;
-  margin-bottom: 16px;
-  padding: 15px 18px;
-  border-left: 4px solid #2563eb;
-  background: linear-gradient(135deg, #eff6ff, #ffffff);
-}
-
-.builtin-questionnaire-notice strong {
-  display: block;
-  color: #0f172a;
-  font-size: 15px;
-}
-
-.builtin-questionnaire-notice p {
-  max-width: 620px;
-  margin: 0;
-  color: #475569;
-  font-size: 13px;
-  line-height: 1.7;
-}
-
-@media (max-width: 760px) {
-  .builtin-questionnaire-notice {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-}
-</style>
