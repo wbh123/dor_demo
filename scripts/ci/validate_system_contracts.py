@@ -129,6 +129,7 @@ def validate_frontend(errors: list[str]) -> None:
         "VITE_DEV_SERVER_PORT",
         "VITE_BACKEND_PROXY_TARGET",
         "VITE_ALLOWED_HOSTS",
+        "WUST_DORMITORY_CORS_ALLOWED_ORIGIN_PATTERNS",
     ):
         require(variable in env_example, f"missing public environment variable: {variable}", errors)
 
@@ -152,6 +153,27 @@ def validate_frontend(errors: list[str]) -> None:
     )
 
 
+def validate_security_configuration(errors: list[str]) -> None:
+    security = read(
+        "backend-java/server/src/main/java/com/wust/dormitory/security/SecurityConfig.java"
+    )
+    require(
+        "WUST_DORMITORY_CORS_ALLOWED_ORIGIN_PATTERNS" in security,
+        "backend CORS origin patterns are not environment-driven",
+        errors,
+    )
+    require(
+        "parseOriginPatterns" in security,
+        "backend CORS origin parsing is missing",
+        errors,
+    )
+    require(
+        "vicp.fun" not in security,
+        "backend security configuration contains a hard-coded tunnel domain",
+        errors,
+    )
+
+
 def validate_test_inventory(errors: list[str]) -> int:
     tests = sorted(
         (ROOT / "backend-java/server/src/test/java").rglob("*Test.java")
@@ -163,6 +185,7 @@ def validate_test_inventory(errors: list[str]) -> int:
         "BatchSelectionModeGuardTest.java",
         "TeamCategoryGuardTest.java",
         "BedSelectionEligibilityGuardTest.java",
+        "SecurityConfigTest.java",
     }
     names = {path.name for path in tests}
     for name in sorted(expected):
@@ -175,6 +198,7 @@ def main() -> int:
     path_count = validate_openapi(errors)
     validate_fixed_questionnaire(errors)
     validate_frontend(errors)
+    validate_security_configuration(errors)
     test_count = validate_test_inventory(errors)
 
     if errors:
