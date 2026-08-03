@@ -29,20 +29,71 @@
 }
 
 .layout-bed-unit {
-  width: 310px;
-  min-height: 176px;
-  height: auto;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  color: #193f6d;
+  background: transparent;
+  box-shadow: none;
+  cursor: grab;
+  transition: width 0.18s ease, height 0.18s ease;
+}
+
+.layout-bed-surface {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border: 3px solid #4e77ae;
+  border-radius: 26px;
+  background: linear-gradient(145deg, #eaf3ff, #bed7f5);
+  box-shadow: 0 12px 26px rgba(42, 74, 115, 0.27);
+  pointer-events: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.layout-bed-content {
+  position: relative;
+  z-index: 1;
   display: grid;
   grid-template-rows: auto auto auto;
   gap: 9px;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  align-content: center;
   padding: 14px;
-  border-radius: 26px;
-  cursor: grab;
+  overflow: hidden;
 }
 
-.layout-bed-unit.occupied {
+.layout-bed-unit.vertical .layout-bed-content {
+  grid-template-rows: auto auto auto;
+  align-content: center;
+  padding: 16px 13px;
+}
+
+.layout-bed-unit.occupied .layout-bed-surface {
   border-color: #a88c8c;
   background: linear-gradient(145deg, #fff6f6, #eadede);
+}
+
+.layout-bed-unit.bunk {
+  color: #5b327c;
+}
+
+.layout-bed-unit.bunk .layout-bed-surface {
+  border-color: #8d62bd;
+  background: linear-gradient(145deg, #f3eaff, #d7c1ef);
+}
+
+.layout-bed-unit.dragging {
+  z-index: 5;
+  cursor: grabbing;
+}
+
+.layout-bed-unit.dragging .layout-bed-surface {
+  border-color: #1263e6;
+  box-shadow: 0 0 0 5px rgba(18, 99, 230, 0.18), 0 16px 30px rgba(26, 74, 140, 0.34);
 }
 
 .layout-bed-drag-handle {
@@ -68,13 +119,17 @@
   width: 100%;
 }
 
+.layout-bed-unit.vertical .layout-bed-type-actions {
+  grid-template-columns: 1fr;
+}
+
 .layout-bed-type-actions button,
 .layout-bed-rotate-button {
   min-height: 34px;
   border: 1px solid rgba(54, 85, 126, 0.28);
   border-radius: 10px;
   color: #34516f;
-  background: rgba(255, 255, 255, 0.78);
+  background: rgba(255, 255, 255, 0.82);
   font-size: 11px;
   font-weight: 700;
   cursor: pointer;
@@ -123,10 +178,13 @@
     border-radius: 22px;
   }
 
-  .layout-bed-unit {
-    width: 245px;
-    min-height: 150px;
+  .layout-bed-content {
+    gap: 6px;
     padding: 10px;
+  }
+
+  .layout-bed-drag-handle strong {
+    font-size: 15px;
   }
 }
 
@@ -144,15 +202,12 @@
   }
 
   .room-layout-stage {
-    min-height: 330px;
+    min-height: 520px;
   }
 
-  .layout-bed-unit {
-    width: 190px;
-    min-height: 126px;
+  .layout-bed-content {
     gap: 5px;
     padding: 8px;
-    border-radius: 17px;
   }
 
   .layout-bed-drag-handle strong {
