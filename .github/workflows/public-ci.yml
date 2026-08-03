@@ -1,0 +1,99 @@
+name: Public Source CI
+
+on:
+  push:
+    branches:
+      - main
+      - 'feature/**'
+      - 'fix/**'
+      - 'ci/**'
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: public-source-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  policy:
+    name: Public content policy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Test policy validator
+        working-directory: scripts/ci
+        run: python -m unittest test_validate_public_repository.py -v
+      - name: Validate repository boundary
+        run: python scripts/ci/validate_public_repository.py .
+
+  static-tests:
+    name: Public-compatible source tests
+    needs: policy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install test dependencies
+        run: python -m pip install --disable-pip-version-check pyyaml
+      - name: Run infrastructure tests
+        run: python -m unittest scripts/dev/test_infra_config.py -v
+      - name: Run OpenAPI contract tests
+        run: python -m unittest scripts/api/test_openapi_contract.py -v
+      - name: Run backend source tests
+        run: python -m unittest scripts/backend/test_phase1_source.py -v
+      - name: Run frontend source tests
+        run: python -m unittest scripts/frontend/test_frontend_baseline.py -v
+      - name: Run user-experience source tests
+        run: |
+          python -m unittest scripts/ux/test_ux_refinement.py -v
+          python -m unittest scripts/experience/test_student_experience.py -v
+      - name: Run Phase 2 source tests
+        run: |
+          python -m unittest scripts/phase2/test_room_layout.py -v
+          python -m unittest scripts/phase2/test_room_bed_type_and_preference_ui.py -v
+          python -m unittest scripts/phase2/test_team_i18n_layout_refinement.py -v
+          python -m unittest scripts/phase2/test_admin_layout_allocation_student_reset.py -v
+          python -m unittest scripts/phase2/test_matching_operations.py -v
+          python -m unittest scripts/phase2/test_batch_copy.py -v
+
+  backend:
+    name: Generate OpenAPI and verify backend
+    needs: policy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Build and run unit tests
+        run: mvn -f backend-java/pom.xml --batch-mode --no-transfer-progress clean verify
+
+  frontend:
+    name: Generate types and build frontend
+    needs: policy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci --no-audit --no-fund
+      - name: Generate OpenAPI types and build
+        working-directory: frontend
+        run: npm run build
