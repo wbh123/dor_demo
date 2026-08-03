@@ -1,7 +1,7 @@
 -- ============================================================
--- Navicat 全量建库后的 Flyway V16 基线
+-- Navicat 全量建库后的 Flyway V17 基线
 -- 统一数据库：wust_dormitory
--- 后续新增 V17 及更高版本时，应用可继续正常迁移。
+-- 后续新增 V18 及更高版本时，应用可继续正常迁移。
 -- ============================================================
 USE `wust_dormitory`;
 DROP TABLE IF EXISTS flyway_schema_history;
@@ -22,8 +22,8 @@ CREATE TABLE flyway_schema_history (
 INSERT INTO flyway_schema_history
 (installed_rank,version,description,type,script,checksum,installed_by,execution_time,success)
 VALUES
-(1,'16','Navicat full schema baseline','BASELINE','<< Flyway Baseline >>',NULL,
+(1,'17','Navicat full schema baseline','BASELINE','<< Flyway Baseline >>',NULL,
  SUBSTRING_INDEX(CURRENT_USER(),'@',1),0,1);
 SELECT DATABASE() AS current_database,
-       'V16' AS schema_version,
+       'V17' AS schema_version,
        'FLYWAY_BASELINE_READY' AS status;
