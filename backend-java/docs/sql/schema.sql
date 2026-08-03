@@ -1,7 +1,7 @@
 -- ============================================================
 -- 武汉科技大学学生宿舍智能选择系统
--- Schema version: V1-V16
--- 数据库架构安装入口：Flyway V1～V16
+-- Schema version: V1-V17
+-- 数据库架构安装入口：Flyway V1～V17
 --
 -- 生成方式：python scripts/db/build_frozen_baseline.py
 -- 正式 Flyway 版本迁移是数据库结构的唯一事实来源。
@@ -58,3 +58,6 @@ SOURCE backend-java/server/src/main/resources/db/migration/V15__add_batch_select
 
 -- V16: V16__add_residency_student_category_and_transfer_support.sql
 SOURCE backend-java/server/src/main/resources/db/migration/V16__add_residency_student_category_and_transfer_support.sql
+
+-- V17: V17__restore_required_system_configuration.sql
+SOURCE backend-java/server/src/main/resources/db/migration/V17__restore_required_system_configuration.sql
