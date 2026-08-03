@@ -47,7 +47,7 @@ def materialize(entry: Path, base: str, database_name: str) -> str:
         "-- Navicat 独立导入脚本\n"
         f"-- 统一数据库：{database_name}\n"
         "-- 警告：执行前会清空该数据库中的学校业务数据。\n"
-        "-- 平台功能目录、套餐、订阅和唯一系统管理员会保留。\n"
+        "-- 平台功能目录、套餐、订阅、系统设置和唯一系统管理员会保留。\n"
         "-- ============================================================\n\n"
         "SET NAMES utf8mb4;\n"
         f"USE `{database_name}`;\n"
@@ -70,6 +70,10 @@ def validate(sql: str, scenario: str, database_name: str) -> None:
         "DOMESTIC_ONLY",
         "INTERNATIONAL_ONLY",
         "MIXED",
+        "'system_setting'",
+        "STUDENT_WELCOME_MESSAGE",
+        "UPDATE matching_weight_scheme",
+        "UPDATE batch_rule_template",
         "COUNT(*) FROM student",
         "COUNT(*) FROM room",
         "COUNT(*) FROM bed",
