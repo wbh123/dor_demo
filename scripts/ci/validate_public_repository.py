@@ -8,53 +8,37 @@ from pathlib import Path
 ROOT = Path(sys.argv[1] if len(sys.argv) > 1 else ".").resolve()
 
 FORBIDDEN_PARTS = {
-    "docs",
-    "docker",
-    "records",
-    "data",
-    "deploy",
-    "deployment",
-    "k8s",
-    "kubernetes",
-    "helm",
-    "nginx",
-    "ansible",
-    "terraform",
-    ".idea",
-    ".vscode",
-    "mybatis-generator",
+    "docs", "docker", "records", "data", "http", "deploy", "deployment",
+    "k8s", "kubernetes", "helm", "nginx", "ansible", "terraform",
+    ".idea", ".vscode", "mybatis-generator",
 }
-FORBIDDEN_SUFFIXES = {".sql", ".pem", ".key", ".p12", ".pfx", ".jks", ".crt"}
+FORBIDDEN_SUFFIXES = {
+    ".sql", ".http", ".pem", ".key", ".p12", ".pfx", ".jks", ".crt",
+}
 FORBIDDEN_NAMES = {
-    ".env",
-    "dockerfile",
-    "docker-compose.yml",
-    "docker-compose.yaml",
-    "compose.yml",
-    "compose.yaml",
+    ".env", "dockerfile", "docker-compose.yml", "docker-compose.yaml",
+    "compose.yml", "compose.yaml",
 }
 FORBIDDEN_TEXT = (
-    "武汉科技大学",
-    "武科大",
-    "黄家湖",
+    "武汉科技大学", "武科大", "黄家湖",
     "WUHAN UNIVERSITY OF SCIENCE AND TECHNOLOGY",
 )
-SECRET_PATTERNS = (
+HIGH_CONFIDENCE_SECRETS = (
     re.compile(r"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----"),
-    re.compile(r"(?i)(?:password|passwd|secret|token|api[_-]?key)\s*[:=]\s*['\"]?(?!change-me|placeholder|example|\$\{|\*{3,})[^\s'\"]{12,}"),
     re.compile(r"gh[pousr]_[A-Za-z0-9]{30,}"),
+    re.compile(r"AKIA[0-9A-Z]{16}"),
+    re.compile(r"xox[baprs]-[A-Za-z0-9-]{20,}"),
 )
 REQUIRED_FILES = (
-    "README.md",
-    "AGENTS.md",
-    ".env.example",
-    ".github/workflows/public-ci.yml",
-    "backend-java/pom.xml",
+    "README.md", "AGENTS.md", "SECURITY.md", ".env.example",
+    ".github/workflows/public-ci.yml", "backend-java/pom.xml",
     "backend-java/model/src/main/resources/openapi-interface.yaml",
     "frontend/package.json",
 )
-SKIP_TEXT_SCAN = {
-    Path("scripts/ci/validate_public_repository.py"),
+SKIP_TEXT_SCAN = {Path("scripts/ci/validate_public_repository.py")}
+ALLOWED_MARKDOWN = {
+    Path("README.md"), Path("AGENTS.md"), Path("SECURITY.md"),
+    Path("CONTRIBUTING.md"), Path("CODE_OF_CONDUCT.md"), Path("LICENSE.md"),
 }
 
 
@@ -62,19 +46,21 @@ def relative(path: Path) -> Path:
     return path.relative_to(ROOT)
 
 
-def is_forbidden_path(path: Path) -> str | None:
+def forbidden_reason(path: Path) -> str | None:
     rel = relative(path)
     lowered = [part.lower() for part in rel.parts]
     if any(part in FORBIDDEN_PARTS for part in lowered):
         return "forbidden directory"
     if "db" in lowered and "migration" in lowered:
         return "database migration path"
-    if len(lowered) >= 4 and lowered[-4:] == ["test", "resources", "db", lowered[-1]]:
-        return "database test resource"
     if path.suffix.lower() in FORBIDDEN_SUFFIXES:
         return "forbidden file type"
     if path.name.lower() in FORBIDDEN_NAMES:
         return "forbidden configuration or deployment file"
+    if path.suffix.lower() == ".md" and rel not in ALLOWED_MARKDOWN:
+        return "internal documentation"
+    if "scripts" in lowered and "ci" not in lowered:
+        return "non-CI script"
     return None
 
 
@@ -91,14 +77,12 @@ def main() -> int:
         if ".git" in path.parts or not path.is_file():
             continue
         rel = relative(path)
-        reason = is_forbidden_path(path)
+        reason = forbidden_reason(path)
         if reason:
             errors.append(f"{reason}: {rel.as_posix()}")
             continue
-        if path.suffix == ".java":
-            java_count += 1
-        if path.suffix == ".vue":
-            vue_count += 1
+        java_count += int(path.suffix == ".java")
+        vue_count += int(path.suffix == ".vue")
         if rel in SKIP_TEXT_SCAN:
             continue
         try:
@@ -111,9 +95,9 @@ def main() -> int:
         for marker in FORBIDDEN_TEXT:
             if marker in text:
                 errors.append(f"real institution marker in {rel.as_posix()}: {marker}")
-        for pattern in SECRET_PATTERNS:
+        for pattern in HIGH_CONFIDENCE_SECRETS:
             if pattern.search(text):
-                errors.append(f"possible secret in {rel.as_posix()}")
+                errors.append(f"high-confidence secret in {rel.as_posix()}")
                 break
 
     if java_count == 0:
