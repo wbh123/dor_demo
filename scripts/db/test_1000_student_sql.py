@@ -12,14 +12,15 @@ def read(path: Path) -> str:
 
 
 class ThousandStudentSqlTest(unittest.TestCase):
-    def test_latest_schema_installer_contains_v16(self):
+    def test_latest_schema_installer_contains_v17(self):
         schema = read(SQL_DIR / "schema.sql")
-        self.assertIn("Schema version: V1-V16", schema)
+        self.assertIn("Schema version: V1-V17", schema)
         self.assertIn("V15__add_batch_selection_modes.sql", schema)
         self.assertIn("V16__add_residency_student_category_and_transfer_support.sql", schema)
+        self.assertIn("V17__restore_required_system_configuration.sql", schema)
         self.assertLess(
-            schema.index("V15__add_batch_selection_modes.sql"),
             schema.index("V16__add_residency_student_category_and_transfer_support.sql"),
+            schema.index("V17__restore_required_system_configuration.sql"),
         )
 
     def test_common_base_generates_enough_resources_and_students(self):
@@ -61,15 +62,19 @@ class ThousandStudentSqlTest(unittest.TestCase):
         self.assertIn("<>840", realistic)
         self.assertIn("<>160", realistic)
 
-    def test_scripts_do_not_drop_platform_catalogs(self):
+    def test_scripts_preserve_platform_and_system_configuration(self):
         base = read(DATA_DIR / "1000_students_base.sql")
         for table in (
+            "system_setting",
             "feature_catalog",
             "quota_catalog",
             "subscription_plan",
             "service_subscription",
         ):
             self.assertIn(f"'{table}'", base)
+        self.assertIn("STUDENT_WELCOME_MESSAGE", base)
+        self.assertIn("UPDATE matching_weight_scheme", base)
+        self.assertIn("UPDATE batch_rule_template", base)
         self.assertNotIn("DROP DATABASE", base)
 
     def test_navicat_schema_recreates_unified_database(self):
@@ -78,8 +83,12 @@ class ThousandStudentSqlTest(unittest.TestCase):
         self.assertIn("CREATE DATABASE `wust_dormitory`", reset)
         self.assertIn("USE `wust_dormitory`", reset)
         migration_files = sorted((NAVICAT_DIR / "01_数据库架构").glob("[0-9][0-9]_V*.sql"))
-        self.assertEqual(16, len(migration_files))
-        self.assertTrue((NAVICAT_DIR / "01_数据库架构/99_写入Flyway基线.sql").exists())
+        self.assertEqual(17, len(migration_files))
+        self.assertTrue(
+            (NAVICAT_DIR / "01_数据库架构/17_V17__restore_required_system_configuration.sql").exists()
+        )
+        baseline = read(NAVICAT_DIR / "01_数据库架构/99_写入Flyway基线.sql")
+        self.assertIn("'17'", baseline)
 
     def test_navicat_data_packages_select_database_and_clear_business_data(self):
         for folder, filename, ready_token in (
@@ -92,6 +101,18 @@ class ThousandStudentSqlTest(unittest.TestCase):
             self.assertIn("CALL clear_1000_test_data();", data)
             self.assertIn(ready_token, data)
             self.assertNotIn("DROP DATABASE", data)
+
+    def test_navicat_integrity_checker_is_available(self):
+        integrity = read(
+            NAVICAT_DIR / "04_数据库完整性检查/00_修复并检查数据库完整性.sql"
+        )
+        self.assertIn("STUDENT_WELCOME_MESSAGE", integrity)
+        self.assertIn("DB_INTEGRITY_OK", integrity)
+        self.assertIn("information_schema.tables", integrity)
+        self.assertIn("information_schema.columns", integrity)
+        self.assertIn("information_schema.statistics", integrity)
+        self.assertIn("information_schema.referential_constraints", integrity)
+        self.assertIn("SIGNAL SQLSTATE '45000'", integrity)
 
     def test_navicat_generators_use_unified_database(self):
         schema_generator = read(ROOT / "scripts/db/build_frozen_baseline.py")
