@@ -7,6 +7,8 @@ import type { ActivateRequest, LoginRequest } from '../api/types'
 const institutionName = import.meta.env.VITE_INSTITUTION_NAME || '示例大学'
 const operatorName = import.meta.env.VITE_OPERATOR_NAME || '运营单位信息待填写'
 const icpRecord = import.meta.env.VITE_ICP_RECORD || 'ICP备案信息待填写'
+const logoTitleBottom = `${import.meta.env.BASE_URL}logo-title-bottom.png`
+const logoTitleRight = `${import.meta.env.BASE_URL}logo-title-right.png`
 const auth = useAuthStore()
 const router = useRouter()
 const mode = ref<'login' | 'activate'>('login')
@@ -33,13 +35,13 @@ async function submitActivate() {
 <template>
   <div class="login-page">
     <section class="login-hero">
-      <div class="hero-copy"><img class="login-school-logo" src="/logo-title-bottom.png" :alt="`${institutionName}校徽`" /><h1>让宿舍选择<br />更公平，也更合拍</h1><p>基于明确规则和个人偏好的宿舍智能选择系统。每一次占用、分配和调整都有记录。</p></div>
+      <div class="hero-copy"><img class="login-school-logo" :src="logoTitleBottom" :alt="`${institutionName}校徽`" /><h1>让宿舍选择<br />更公平，也更合拍</h1><p>基于明确规则和个人偏好的宿舍智能选择系统。每一次占用、分配和调整都有记录。</p></div>
       <div class="hero-stats"><div><strong>实时</strong><span>房间床位状态</span></div><div><strong>可解释</strong><span>个人偏好匹配</span></div><div><strong>可追溯</strong><span>分配与审计记录</span></div></div>
     </section>
 
     <section class="login-panel">
       <div class="login-card">
-        <div class="brand login-brand school-login-brand"><img src="/logo-title-right.png" :alt="`${institutionName}校徽`" /></div>
+        <div class="brand login-brand school-login-brand"><img :src="logoTitleRight" :alt="`${institutionName}校徽`" /></div>
         <div class="segment"><button :class="{ active: mode === 'login' }" @click="mode = 'login'">登录</button><button :class="{ active: mode === 'activate' }" @click="mode = 'activate'">学生激活</button></div>
 
         <form v-if="mode === 'login'" class="form-stack" @submit.prevent="submitLogin">
