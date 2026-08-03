@@ -8,6 +8,10 @@ import com.wust.dormitory.security.SecurityUsers;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
+
 @RestController
 public class BatchScopeController implements BatchScopeApi {
     private final BatchScopeService batchScopeService;
@@ -29,8 +33,12 @@ public class BatchScopeController implements BatchScopeApi {
         return ResponseEntity.ok(ResponseFactory.object(batchScopeService.update(
                 batchId,
                 new BatchScopeService.UpdateCommand(
-                        request.getStudentIds(),
-                        request.getRoomIds()),
+                        toList(request.getStudentIds()),
+                        toList(request.getRoomIds())),
                 SecurityUsers.requireAdmin())));
+    }
+
+    private List<Long> toList(Set<Long> values) {
+        return values == null ? List.of() : new ArrayList<>(values);
     }
 }
