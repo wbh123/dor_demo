@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -26,7 +27,7 @@ class ResidencyServiceTest {
     }
 
     @Test
-    void currentUsesTheBuildingPrimaryKeyAliasAndReturnsAStableEmptyResult() {
+    void currentUsesStableColumnsAndReturnsAStableEmptyResult() {
         when(jdbc.queryForList(anyString(), anyMap())).thenReturn(List.of());
 
         Map<String, Object> result = service.current(7L);
@@ -36,20 +37,28 @@ class ResidencyServiceTest {
         verify(jdbc).queryForList(sql.capture(), anyMap());
         assertThat(sql.getValue())
                 .contains("db.id AS building_id")
-                .doesNotContain("db.building_id");
+                .contains("ORDER BY ra.assigned_at DESC, ra.id DESC")
+                .contains("LIMIT 1")
+                .doesNotContain("db.building_id")
+                .doesNotContain("db.building_code");
     }
 
     @Test
     void assignmentNormalizesRoomModeToTheExistingAssignmentResponseShape() {
-        when(jdbc.queryForList(anyString(), anyMap())).thenReturn(List.of(Map.of(
-                "residency_id", 9L,
-                "room_number", "301",
-                "building_name", "示例楼栋",
-                "bed_confirmed", false)));
+        Map<String, Object> residency = new LinkedHashMap<>();
+        residency.put("residency_id", 9L);
+        residency.put("room_number", "301");
+        residency.put("building_name", "示例楼栋");
+        residency.put("bed_id", null);
+        residency.put("bed_confirmed", false);
+        when(jdbc.queryForList(anyString(), anyMap())).thenReturn(List.of(residency));
 
         Map<String, Object> result = service.assignment(7L);
 
         assertThat(result).containsEntry("assigned", true);
         assertThat(result.get("assignment")).isInstanceOf(Map.class);
+        assertThat((Map<?, ?>) result.get("assignment"))
+                .containsEntry("room_number", "301")
+                .containsEntry("bed_id", null);
     }
 }
