@@ -175,14 +175,6 @@ paths:
       security: [{ bearerAuth: [] }]
       responses:
         '200': { $ref: '#/components/responses/ListSuccess' }
-    post:
-      tags: [Student]
-      operationId: createFormingTeam
-      summary: 创建处于组队中的队伍
-      security: [{ bearerAuth: [] }]
-      responses:
-        '200': { $ref: '#/components/responses/ObjectSuccess' }
-        '409': { $ref: '#/components/responses/ErrorResponse' }
 
   /api/v1/student/team-invitations:
     get:
