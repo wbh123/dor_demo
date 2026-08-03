@@ -2,7 +2,7 @@ openapi: 3.0.3
 info:
   title: 示例大学学生宿舍智能选择系统接口
   description: 学生宿舍智能选择、业务管理与系统服务管理接口契约
-  version: 2.9.0
+  version: 3.0.0
 servers:
   - url: http://localhost:8080
 paths:
@@ -79,6 +79,8 @@ paths:
     $ref: 'admin/openapi-admin.yaml#/paths/~1api~1v1~1admin~1batches~1{batchId}~1allocation~1preview'
   /api/v1/admin/batches/{batchId}/allocation/commit:
     $ref: 'admin/openapi-admin.yaml#/paths/~1api~1v1~1admin~1batches~1{batchId}~1allocation~1commit'
+  /api/v1/admin/batches/{batchId}/allocation/optimized-preview:
+    $ref: 'operations/openapi-operations.yaml#/paths/~1api~1v1~1admin~1batches~1{batchId}~1allocation~1optimized-preview'
   /api/v1/admin/batches/{batchId}/assignments:
     $ref: 'admin/openapi-assignment-query.yaml#/paths/~1api~1v1~1admin~1batches~1{batchId}~1assignments'
   /api/v1/admin/assignments/{assignmentId}/adjust:
@@ -87,7 +89,6 @@ paths:
     $ref: 'admin/openapi-admin.yaml#/paths/~1api~1v1~1admin~1audit-logs'
   /api/v1/admin/batches/{batchId}/assignments.csv:
     $ref: 'admin/openapi-admin.yaml#/paths/~1api~1v1~1admin~1batches~1{batchId}~1assignments.csv'
-
   /api/v1/admin/import/students:
     $ref: 'admin/openapi-import-policy.yaml#/paths/~1api~1v1~1admin~1import~1students'
   /api/v1/admin/import/rooms:
@@ -98,6 +99,19 @@ paths:
     $ref: 'admin/openapi-import-policy.yaml#/paths/~1api~1v1~1admin~1import~1rooms~1template'
   /api/v1/admin/settings/selection-policy:
     $ref: 'admin/openapi-import-policy.yaml#/paths/~1api~1v1~1admin~1settings~1selection-policy'
+  /api/v1/admin/operations/overview:
+    $ref: 'operations/openapi-operations.yaml#/paths/~1api~1v1~1admin~1operations~1overview'
+  /api/v1/admin/operations/health:
+    $ref: 'operations/openapi-operations.yaml#/paths/~1api~1v1~1admin~1operations~1health'
+  /api/v1/admin/room-change/settings:
+    $ref: 'roomchange/openapi-room-change.yaml#/paths/~1api~1v1~1admin~1room-change~1settings'
+  /api/v1/admin/room-change/requests:
+    $ref: 'roomchange/openapi-room-change.yaml#/paths/~1api~1v1~1admin~1room-change~1requests'
+  /api/v1/admin/room-change/requests/{requestId}/approve:
+    $ref: 'roomchange/openapi-room-change.yaml#/paths/~1api~1v1~1admin~1room-change~1requests~1{requestId}~1approve'
+  /api/v1/admin/room-change/requests/{requestId}/reject:
+    $ref: 'roomchange/openapi-room-change.yaml#/paths/~1api~1v1~1admin~1room-change~1requests~1{requestId}~1reject'
+
   /api/v1/student/preferences:
     $ref: 'student/openapi-preference-policy.yaml#/paths/~1api~1v1~1student~1preferences'
   /api/v1/student/batches/{batchId}/selection-readiness:
@@ -156,6 +170,14 @@ paths:
     $ref: 'student/openapi-room-selection.yaml#/paths/~1api~1v1~1student~1residency'
   /api/v1/student/residency/bed-confirmation:
     $ref: 'student/openapi-room-selection.yaml#/paths/~1api~1v1~1student~1residency~1bed-confirmation'
+  /api/v1/student/room-change/policy:
+    $ref: 'roomchange/openapi-room-change.yaml#/paths/~1api~1v1~1student~1room-change~1policy'
+  /api/v1/student/room-change/candidates:
+    $ref: 'roomchange/openapi-room-change.yaml#/paths/~1api~1v1~1student~1room-change~1candidates'
+  /api/v1/student/room-change/requests:
+    $ref: 'roomchange/openapi-room-change.yaml#/paths/~1api~1v1~1student~1room-change~1requests'
+  /api/v1/student/room-change/requests/{requestId}/cancel:
+    $ref: 'roomchange/openapi-room-change.yaml#/paths/~1api~1v1~1student~1room-change~1requests~1{requestId}~1cancel'
 
   /api/v1/realtime/batches/{batchId}/rooms/{roomId}:
     $ref: 'realtime/openapi-realtime.yaml#/paths/~1api~1v1~1realtime~1batches~1{batchId}~1rooms~1{roomId}'
@@ -170,8 +192,6 @@ paths:
     $ref: 'platform/openapi-platform.yaml#/paths/~1api~1v1~1platform~1plans'
   /api/v1/platform/plans/revisions/{revisionId}:
     $ref: 'platform/openapi-platform.yaml#/paths/~1api~1v1~1platform~1plans~1revisions~1{revisionId}'
-  /api/v1/platform/plans/revisions/{sourceRevisionId}:
-    $ref: 'platform/openapi-platform.yaml#/paths/~1api~1v1~1platform~1plans~1revisions~1{sourceRevisionId}'
   /api/v1/platform/subscription:
     $ref: 'platform/openapi-platform.yaml#/paths/~1api~1v1~1platform~1subscription'
   /api/v1/platform/subscription/history:
