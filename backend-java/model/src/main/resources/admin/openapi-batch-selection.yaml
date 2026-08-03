@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: Wust Dormitory Select 批次双模式接口
-  version: 1.0.0
+  version: 1.1.0
 paths:
   /api/v1/admin/batches:
     get:
@@ -22,6 +22,35 @@ paths:
       responses:
         '200': { $ref: '#/components/responses/ObjectSuccess' }
         '400': { $ref: '#/components/responses/ErrorResponse' }
+        '409': { $ref: '#/components/responses/ErrorResponse' }
+
+  /api/v1/admin/batches/{batchId}/scope:
+    get:
+      tags: [BatchScope]
+      operationId: getBatchScope
+      summary: 查询批次可选学生、宿舍及当前选择范围
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/BatchIdPath'
+      responses:
+        '200': { $ref: '#/components/responses/ObjectSuccess' }
+        '404': { $ref: '#/components/responses/ErrorResponse' }
+    put:
+      tags: [BatchScope]
+      operationId: updateBatchScope
+      summary: 替换草稿批次的学生与宿舍范围
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/BatchIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BatchScopeUpdateRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/ObjectSuccess' }
+        '400': { $ref: '#/components/responses/ErrorResponse' }
+        '404': { $ref: '#/components/responses/ErrorResponse' }
         '409': { $ref: '#/components/responses/ErrorResponse' }
 
   /api/v1/admin/batches/{batchId}/room-preflight:
@@ -84,6 +113,21 @@ components:
           format: int64
           minimum: 1
           description: 精确批次规则模板修订；为空时使用当前默认模板
+
+    BatchScopeUpdateRequest:
+      type: object
+      required: [studentIds, roomIds]
+      properties:
+        studentIds:
+          type: array
+          uniqueItems: true
+          maxItems: 10000
+          items: { type: integer, format: int64, minimum: 1 }
+        roomIds:
+          type: array
+          uniqueItems: true
+          maxItems: 10000
+          items: { type: integer, format: int64, minimum: 1 }
 
   securitySchemes:
     bearerAuth:
