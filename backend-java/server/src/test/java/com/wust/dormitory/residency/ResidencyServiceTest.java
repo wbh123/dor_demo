@@ -1,7 +1,5 @@
 package com.wust.dormitory.residency;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.wust.dormitory.audit.AuditService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -19,16 +17,12 @@ import static org.mockito.Mockito.when;
 
 class ResidencyServiceTest {
     private NamedParameterJdbcTemplate jdbc;
-    private ResidencyService service;
+    private CurrentResidencyQueryService service;
 
     @BeforeEach
     void setUp() {
         jdbc = mock(NamedParameterJdbcTemplate.class);
-        service = new ResidencyService(
-                jdbc,
-                mock(ResidencyPolicyService.class),
-                mock(AuditService.class),
-                mock(ObjectMapper.class));
+        service = new CurrentResidencyQueryService(jdbc);
     }
 
     @Test
@@ -43,5 +37,19 @@ class ResidencyServiceTest {
         assertThat(sql.getValue())
                 .contains("db.id AS building_id")
                 .doesNotContain("db.building_id");
+    }
+
+    @Test
+    void assignmentNormalizesRoomModeToTheExistingAssignmentResponseShape() {
+        when(jdbc.queryForList(anyString(), anyMap())).thenReturn(List.of(Map.of(
+                "residency_id", 9L,
+                "room_number", "301",
+                "building_name", "示例楼栋",
+                "bed_confirmed", false)));
+
+        Map<String, Object> result = service.assignment(7L);
+
+        assertThat(result).containsEntry("assigned", true);
+        assertThat(result.get("assignment")).isInstanceOf(Map.class);
     }
 }
