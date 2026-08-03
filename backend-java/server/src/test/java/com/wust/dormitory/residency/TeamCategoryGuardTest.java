@@ -48,6 +48,22 @@ class TeamCategoryGuardTest {
     }
 
     @Test
+    void firstInvitationUsesTheLeadersActiveBatchBeforeTheTeamIsCreated() {
+        when(jdbc.queryForList(anyString(), anyMap()))
+                .thenReturn(List.of())
+                .thenReturn(List.of(Map.of(
+                        "batch_id", 20L,
+                        "separate_student_categories", 1,
+                        "student_category", "DOMESTIC")))
+                .thenReturn(List.of(Map.of(
+                        "id", 11L,
+                        "student_category", "DOMESTIC")));
+
+        assertThatCode(() -> guard.requireInvitationAllowed("202600000002", leader))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
     void invitationRejectsMixedCategoriesWhenSeparationIsEnabled() {
         when(jdbc.queryForList(anyString(), anyMap()))
                 .thenReturn(List.of(Map.of(
