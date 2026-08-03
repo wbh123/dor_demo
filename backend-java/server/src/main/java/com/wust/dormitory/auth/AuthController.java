@@ -12,6 +12,7 @@ import com.wust.dormitory.model.dto.VoidSuccessResponse;
 import com.wust.dormitory.security.AuthTokenService;
 import com.wust.dormitory.security.CurrentUser;
 import com.wust.dormitory.security.SecurityUsers;
+import com.wust.dormitory.subscription.FeatureAccessService;
 import org.slf4j.MDC;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -25,14 +26,17 @@ public class AuthController implements AuthApi {
     private final AuthService authService;
     private final AuthTokenService tokenService;
     private final StudentWelcomeService welcomeService;
+    private final FeatureAccessService featureAccessService;
 
     public AuthController(
             AuthService authService,
             AuthTokenService tokenService,
-            StudentWelcomeService welcomeService) {
+            StudentWelcomeService welcomeService,
+            FeatureAccessService featureAccessService) {
         this.authService = authService;
         this.tokenService = tokenService;
         this.welcomeService = welcomeService;
+        this.featureAccessService = featureAccessService;
     }
 
     @Override
@@ -86,6 +90,7 @@ public class AuthController implements AuthApi {
         data.setUsername(user.username());
         data.setDisplayName(user.displayName());
         data.setUserType(user.userType());
+        data.setFeatures(featureAccessService.currentFeatures().stream().sorted().toList());
         data.setWelcome(welcomeService.welcomeFor(user));
         return data;
     }
