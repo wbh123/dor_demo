@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - test/private-compatible-selection-enhancements-v2
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
