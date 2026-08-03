@@ -104,8 +104,16 @@ def validate_frontend(errors: list[str]) -> None:
         "administrator batch page does not expose the fixed-questionnaire notice",
         errors,
     )
+    has_admin_batches_path = re.search(
+        r"path:\s*['\"]admin/batches['\"]",
+        router,
+    )
+    has_admin_batches_name = re.search(
+        r"name:\s*['\"]admin-batches['\"]",
+        router,
+    )
     require(
-        "name: 'admin-batches'" in router and "path: 'batches'" in router,
+        bool(has_admin_batches_path and has_admin_batches_name),
         "administrator batch route is missing or renamed",
         errors,
     )
