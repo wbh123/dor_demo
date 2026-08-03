@@ -82,7 +82,7 @@ BEGIN
         table_name VARCHAR(128) PRIMARY KEY
     );
     INSERT INTO required_integrity_table(table_name) VALUES
-    ('major'),('app_user'),('student'),('student_notification'),
+    ('flyway_schema_history'),('major'),('app_user'),('student'),('student_notification'),
     ('import_job'),('import_error'),('campus'),('dormitory_building'),
     ('dormitory_floor'),('room'),('bed_frame'),('bed'),('room_bed_layout'),
     ('questionnaire_version'),('questionnaire_question'),('questionnaire_option'),
@@ -111,6 +111,14 @@ BEGIN
     IF issue_count > 0 THEN
         SET issue_detail=LEFT(CONCAT('缺少数据表：',issue_detail),128);
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT=issue_detail;
+    END IF;
+
+    SELECT COUNT(*) INTO issue_count
+    FROM flyway_schema_history
+    WHERE version='17' AND success=1;
+    IF issue_count <> 1 THEN
+        SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT='Flyway基线或迁移历史未标记V17成功';
     END IF;
 
     -- 二、关键字段完整性。
@@ -222,12 +230,13 @@ BEGIN
     IF EXISTS (
         SELECT 1 FROM system_setting
         WHERE setting_key='STUDENT_WELCOME_MESSAGE'
-          AND (
-              JSON_VALID(setting_value)=0
-              OR JSON_TYPE(setting_value)<>'OBJECT'
-              OR COALESCE(JSON_UNQUOTE(JSON_EXTRACT(setting_value,'$."zh-CN"')),'')=''
-              OR COALESCE(JSON_UNQUOTE(JSON_EXTRACT(setting_value,'$."en-US"')),'')=''
-          )
+          AND CASE
+              WHEN JSON_VALID(setting_value)=0 THEN 1
+              WHEN JSON_TYPE(setting_value)<>'OBJECT' THEN 1
+              WHEN COALESCE(JSON_UNQUOTE(JSON_EXTRACT(setting_value,'$."zh-CN"')),'')='' THEN 1
+              WHEN COALESCE(JSON_UNQUOTE(JSON_EXTRACT(setting_value,'$."en-US"')),'')='' THEN 1
+              ELSE 0
+          END=1
     ) THEN
         SIGNAL SQLSTATE '45000'
             SET MESSAGE_TEXT='学生欢迎语必须是包含zh-CN和en-US的JSON对象';
@@ -354,16 +363,17 @@ BEGIN
     END IF;
 
     SELECT COUNT(*) INTO issue_count
-    FROM room_assignment
-    WHERE assignment_status='ACTIVE'
-    GROUP BY student_id
-    HAVING COUNT(*)>1
-    LIMIT 1;
+    FROM (
+        SELECT student_id
+        FROM room_assignment
+        WHERE assignment_status='ACTIVE'
+        GROUP BY student_id
+        HAVING COUNT(*)>1
+    ) duplicated_student;
     IF issue_count > 0 THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='同一学生存在多条有效在住记录';
     END IF;
 
-    SET issue_count=0;
     SELECT COUNT(*) INTO issue_count
     FROM (
         SELECT bed_id
