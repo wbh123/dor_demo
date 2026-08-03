@@ -4,6 +4,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[2]
 SQL_DIR = ROOT / "backend-java/docs/sql"
 DATA_DIR = SQL_DIR / "test-data"
+NAVICAT_DIR = SQL_DIR / "navicat"
 
 
 def read(path: Path) -> str:
@@ -52,7 +53,6 @@ class ThousandStudentSqlTest(unittest.TestCase):
             "active_batch_room_lock",
             "source_selection_mode",
             "bed_id IS NULL",
-            "ROOM_BED_MAPPING_REQUIRED",
             "student_feature",
             "student_notification",
             "REALISTIC_1000_READY",
@@ -71,6 +71,37 @@ class ThousandStudentSqlTest(unittest.TestCase):
         ):
             self.assertIn(f"'{table}'", base)
         self.assertNotIn("DROP DATABASE", base)
+
+    def test_navicat_schema_recreates_unified_database(self):
+        reset = read(NAVICAT_DIR / "01_数据库架构/00_删除并创建数据库.sql")
+        self.assertIn("DROP DATABASE IF EXISTS `wust_dormitory`", reset)
+        self.assertIn("CREATE DATABASE `wust_dormitory`", reset)
+        self.assertIn("USE `wust_dormitory`", reset)
+        migration_files = sorted((NAVICAT_DIR / "01_数据库架构").glob("[0-9][0-9]_V*.sql"))
+        self.assertEqual(16, len(migration_files))
+        self.assertTrue((NAVICAT_DIR / "01_数据库架构/99_写入Flyway基线.sql").exists())
+
+    def test_navicat_data_packages_select_database_and_clear_business_data(self):
+        for folder, filename, ready_token in (
+            ("02_1000人干净测试数据", "01_清空并导入1000人干净数据.sql", "CLEAN_1000_READY"),
+            ("03_1000人真实业务数据", "01_清空并导入1000人真实业务数据.sql", "REALISTIC_1000_READY"),
+        ):
+            selector = read(NAVICAT_DIR / folder / "00_使用统一数据库.sql")
+            data = read(NAVICAT_DIR / folder / filename)
+            self.assertIn("USE `wust_dormitory`", selector)
+            self.assertIn("CALL clear_1000_test_data();", data)
+            self.assertIn(ready_token, data)
+            self.assertNotIn("DROP DATABASE", data)
+
+    def test_navicat_generators_use_unified_database(self):
+        schema_generator = read(ROOT / "scripts/db/build_frozen_baseline.py")
+        data_generator = read(ROOT / "scripts/db/generate_1000_student_sql.py")
+        orchestrator = read(ROOT / "scripts/db/generate_navicat_sql.py")
+        for source in (schema_generator, data_generator, orchestrator):
+            self.assertIn("wust_dormitory", source)
+        self.assertIn('choices=("source", "inline", "navicat")', schema_generator)
+        self.assertIn("--check", schema_generator)
+        self.assertIn("--check", data_generator)
 
 
 if __name__ == "__main__":
