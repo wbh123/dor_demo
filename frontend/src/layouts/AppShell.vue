@@ -13,6 +13,8 @@ const institutionName = String(import.meta.env.VITE_INSTITUTION_NAME || '示例�
 const productName = `${institutionName}选寝`
 const operatorName = String(import.meta.env.VITE_OPERATOR_NAME || '运营单位信息待填写')
 const icpRecord = String(import.meta.env.VITE_ICP_RECORD || 'ICP备案信息待填写')
+const logoTitleRight = `${import.meta.env.BASE_URL}logo-title-right.png`
+const logoOnly = `${import.meta.env.BASE_URL}logo-only.png`
 const {
   locale, localeOptions, t, subtitle, setLocale,
   applyNationalityLocale, welcomeMessage, translateError,
@@ -71,7 +73,7 @@ async function logout() { await auth.logout(); await router.replace('/login') }
   <div class="app-shell fixed-navigation-shell">
     <aside class="sidebar fixed-sidebar">
       <div class="brand school-brand">
-        <img class="school-brand-logo" src="/logo-title-right.png" :alt="`${institutionName}校徽`" />
+        <img class="school-brand-logo" :src="logoTitleRight" :alt="`${institutionName}校徽`" />
         <div class="school-brand-fallback"><strong>{{ productName }}</strong><small>宿舍智能选择系统</small></div>
       </div>
 
@@ -96,7 +98,7 @@ async function logout() { await auth.logout(); await router.replace('/login') }
       <div v-if="auth.welcomeRequired" class="welcome-overlay" role="presentation">
         <section class="welcome-dialog" role="dialog" aria-modal="true" aria-labelledby="student-welcome-title">
           <div class="welcome-glow welcome-glow-one" /><div class="welcome-glow welcome-glow-two" />
-          <img class="welcome-school-logo" src="/logo-only.png" alt="" aria-hidden="true" />
+          <img class="welcome-school-logo" :src="logoOnly" alt="" aria-hidden="true" />
           <span class="eyebrow">{{ subtitle('欢迎来到校园', 'WELCOME TO CAMPUS') }}</span>
           <h2 id="student-welcome-title">{{ t('welcome.title') }}</h2><p>{{ welcomeText }}</p>
           <p v-if="welcomeError" class="alert error">{{ welcomeError }}</p>
