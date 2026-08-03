@@ -13,6 +13,7 @@ import com.wust.dormitory.model.dto.TeamBedsRequest;
 import com.wust.dormitory.model.dto.TeamConfirmRequest;
 import com.wust.dormitory.model.dto.VoidSuccessResponse;
 import com.wust.dormitory.residency.BedResidencySynchronizationService;
+import com.wust.dormitory.residency.CurrentResidencyQueryService;
 import com.wust.dormitory.residency.ResidencyService;
 import com.wust.dormitory.residency.RoomSelectionService;
 import com.wust.dormitory.residency.SelectionModeGuard;
@@ -40,6 +41,7 @@ public class StudentController implements StudentApi {
     private final BedScopeGuard bedScopeGuard;
     private final RoomSelectionService roomSelectionService;
     private final ResidencyService residencyService;
+    private final CurrentResidencyQueryService currentResidencyQueryService;
     private final SelectionModeGuard selectionModeGuard;
     private final BedResidencySynchronizationService bedResidencySynchronizationService;
     private final TeamCategoryGuard teamCategoryGuard;
@@ -54,6 +56,7 @@ public class StudentController implements StudentApi {
             BedScopeGuard bedScopeGuard,
             RoomSelectionService roomSelectionService,
             ResidencyService residencyService,
+            CurrentResidencyQueryService currentResidencyQueryService,
             SelectionModeGuard selectionModeGuard,
             BedResidencySynchronizationService bedResidencySynchronizationService,
             TeamCategoryGuard teamCategoryGuard) {
@@ -66,6 +69,7 @@ public class StudentController implements StudentApi {
         this.bedScopeGuard = bedScopeGuard;
         this.roomSelectionService = roomSelectionService;
         this.residencyService = residencyService;
+        this.currentResidencyQueryService = currentResidencyQueryService;
         this.selectionModeGuard = selectionModeGuard;
         this.bedResidencySynchronizationService = bedResidencySynchronizationService;
         this.teamCategoryGuard = teamCategoryGuard;
@@ -155,7 +159,7 @@ public class StudentController implements StudentApi {
     public ResponseEntity<ObjectSuccessResponse> getMyResidency() {
         CurrentUser user = student();
         return ResponseEntity.ok(ResponseFactory.object(
-                residencyService.current(user.studentId())));
+                currentResidencyQueryService.current(user.studentId())));
     }
 
     @Override
@@ -221,7 +225,7 @@ public class StudentController implements StudentApi {
         CurrentUser user = student();
         if ("ROOM".equals(selectionModeGuard.mode(batchId))) {
             return ResponseEntity.ok(ResponseFactory.object(
-                    residencyService.current(user.studentId())));
+                    currentResidencyQueryService.assignment(user.studentId())));
         }
         return ResponseEntity.ok(ResponseFactory.object(
                 studentService.assignment(batchId, user)));
