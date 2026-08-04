@@ -1,48 +1,36 @@
 openapi: 3.0.3
-info: { title: Admin import and selection policy, version: 1.0.0 }
+info: { title: Admin templates and selection policy, version: 1.1.0 }
 paths:
-  /api/v1/admin/import/students:
-    post:
-      tags: [AdminImportPolicy]
-      operationId: importStudentsFile
-      security: [{ bearerAuth: [] }]
-      requestBody:
-        required: true
-        content:
-          multipart/form-data:
-            schema:
-              type: object
-              required: [file]
-              properties: { file: { type: string, format: binary } }
-      responses: { '200': { $ref: '#/components/responses/ObjectSuccess' } }
-  /api/v1/admin/import/rooms:
-    post:
-      tags: [AdminImportPolicy]
-      operationId: importRoomsFile
-      security: [{ bearerAuth: [] }]
-      requestBody:
-        required: true
-        content:
-          multipart/form-data:
-            schema:
-              type: object
-              required: [file]
-              properties: { file: { type: string, format: binary } }
-      responses: { '200': { $ref: '#/components/responses/ObjectSuccess' } }
   /api/v1/admin/import/students/template:
     get:
       tags: [AdminImportPolicy]
       operationId: downloadStudentImportTemplate
       security: [{ bearerAuth: [] }]
-      parameters: [{ name: format, in: query, schema: { type: string, enum: [xlsx, csv], default: xlsx } }]
-      responses: { '200': { description: template, content: { application/octet-stream: { schema: { type: string, format: binary } } } } }
+      parameters:
+        - name: format
+          in: query
+          schema: { type: string, enum: [xlsx, csv], default: xlsx }
+      responses:
+        '200':
+          description: current strict student template
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
   /api/v1/admin/import/rooms/template:
     get:
       tags: [AdminImportPolicy]
       operationId: downloadRoomImportTemplate
       security: [{ bearerAuth: [] }]
-      parameters: [{ name: format, in: query, schema: { type: string, enum: [xlsx, csv], default: xlsx } }]
-      responses: { '200': { description: template, content: { application/octet-stream: { schema: { type: string, format: binary } } } } }
+      parameters:
+        - name: format
+          in: query
+          schema: { type: string, enum: [xlsx, csv], default: xlsx }
+      responses:
+        '200':
+          description: current strict room template
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
   /api/v1/admin/settings/selection-policy:
     get:
       tags: [AdminImportPolicy]
@@ -59,10 +47,17 @@ paths:
           application/json:
             schema:
               type: object
-              required: [allowWithoutQuestionnaire, allowStudentReselect, reason]
+              required:
+                - allowWithoutQuestionnaire
+                - allowStudentReselect
+                - directPreferenceWithoutBatchAllowed
+                - reason
               properties:
                 allowWithoutQuestionnaire: { type: boolean }
                 allowStudentReselect: { type: boolean }
+                directPreferenceWithoutBatchAllowed:
+                  type: boolean
+                  description: 无当前批次学生是否可以直接维护跨批次个人偏好
                 reason: { type: string, minLength: 1, maxLength: 500 }
       responses: { '200': { $ref: '#/components/responses/ObjectSuccess' } }
 components:

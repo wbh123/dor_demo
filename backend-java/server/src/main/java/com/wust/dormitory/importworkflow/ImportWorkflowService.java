@@ -21,13 +21,10 @@ import java.util.UUID;
 @Service
 public class ImportWorkflowService {
     private static final String DIGEST_ALGORITHM = "SHA-256";
-
     private final ImportTaskRepository repository;
     private final ImportMutationService mutationService;
 
-    public ImportWorkflowService(
-            ImportTaskRepository repository,
-            ImportMutationService mutationService) {
+    public ImportWorkflowService(ImportTaskRepository repository, ImportMutationService mutationService) {
         this.repository = repository;
         this.mutationService = mutationService;
     }
@@ -43,74 +40,42 @@ public class ImportWorkflowService {
             String normalizedKey = normalizeIdempotencyKey(idempotencyKey, normalizedType, digest);
             ImportTaskRecord existing = repository.findByIdempotencyKey(normalizedKey).orElse(null);
             if (existing != null) {
-                if (existing.digest().equals(digest) && existing.importType().equals(normalizedType)) {
-                    return toMap(existing);
-                }
-                throw new BusinessException(
-                        "IDEMPOTENCY_CONFLICT",
-                        "该幂等键已经用于其他导入文件",
-                        HttpStatus.CONFLICT);
+                if (existing.digest().equals(digest) && existing.importType().equals(normalizedType)) return toMap(existing);
+                throw new BusinessException("IDEMPOTENCY_CONFLICT", "该幂等键已经用于其他导入文件", HttpStatus.CONFLICT);
             }
 
             List<Map<String, String>> rows = SpreadsheetSupport.read(file);
-            if (rows.isEmpty()) {
-                throw new BusinessException("IMPORT_EMPTY", "文件中没有可预检的数据");
-            }
+            if (rows.isEmpty()) throw new BusinessException("IMPORT_EMPTY", "文件中没有可预检的数据");
+            StrictImportHeaders.validate(normalizedType, rows);
             List<Map<String, Object>> fieldErrors = validateRows(normalizedType, rows);
             ImportTaskRecord task = new ImportTaskRecord(
-                    UUID.randomUUID().toString(),
-                    normalizedType,
+                    UUID.randomUUID().toString(), normalizedType,
                     file.getOriginalFilename() == null ? "unnamed" : file.getOriginalFilename(),
-                    digest,
-                    normalizedKey,
-                    "PREVIEWED",
-                    rows,
-                    fieldErrors,
-                    List.of(),
-                    Instant.now(),
-                    null,
-                    null);
+                    digest, normalizedKey, "PREVIEWED", rows, fieldErrors, List.of(),
+                    Instant.now(), null, null);
             repository.save(task);
             return toMap(task);
         } catch (BusinessException exception) {
             throw exception;
         } catch (Exception exception) {
-            throw new BusinessException(
-                    "IMPORT_PREVIEW_FAILED",
-                    "导入文件预检失败：" + safeMessage(exception));
+            throw new BusinessException("IMPORT_PREVIEW_FAILED", "导入文件预检失败：" + safeMessage(exception));
         }
     }
 
-    public List<Map<String, Object>> listTasks() {
-        return repository.list().stream().map(this::toMap).toList();
-    }
-
-    public Map<String, Object> getTask(String taskId) {
-        return toMap(requireTask(taskId));
-    }
+    public List<Map<String, Object>> listTasks() { return repository.list().stream().map(this::toMap).toList(); }
+    public Map<String, Object> getTask(String taskId) { return toMap(requireTask(taskId)); }
 
     @Transactional
     public synchronized Map<String, Object> commitTask(String taskId, CurrentUser operator) {
         ImportTaskRecord task = requireTask(taskId);
-        if ("COMMITTED".equals(task.status())) {
-            return toMap(task);
-        }
+        if ("COMMITTED".equals(task.status())) return toMap(task);
         if (!"PREVIEWED".equals(task.status())) {
-            throw new BusinessException(
-                    "IMPORT_TASK_STATE_INVALID",
-                    "只有预检完成的任务可以提交",
-                    HttpStatus.CONFLICT);
+            throw new BusinessException("IMPORT_TASK_STATE_INVALID", "只有预检完成的任务可以提交", HttpStatus.CONFLICT);
         }
         if (!task.fieldErrors().isEmpty()) {
-            throw new BusinessException(
-                    "IMPORT_VALIDATION_FAILED",
-                    "预检仍存在字段错误，不能提交",
-                    HttpStatus.CONFLICT);
+            throw new BusinessException("IMPORT_VALIDATION_FAILED", "预检仍存在字段错误，不能提交", HttpStatus.CONFLICT);
         }
-        List<ImportJournalEntry> journal = mutationService.applyTask(
-                task.importType(),
-                task.rows(),
-                operator);
+        List<ImportJournalEntry> journal = mutationService.applyTask(task.importType(), task.rows(), operator);
         ImportTaskRecord committed = task.committed(journal, Instant.now());
         repository.save(committed);
         return toMap(committed);
@@ -119,14 +84,9 @@ public class ImportWorkflowService {
     @Transactional
     public synchronized Map<String, Object> rollbackTask(String taskId, CurrentUser operator) {
         ImportTaskRecord task = requireTask(taskId);
-        if ("ROLLED_BACK".equals(task.status())) {
-            return toMap(task);
-        }
+        if ("ROLLED_BACK".equals(task.status())) return toMap(task);
         if (!"COMMITTED".equals(task.status())) {
-            throw new BusinessException(
-                    "IMPORT_TASK_STATE_INVALID",
-                    "只有已经提交的任务可以回滚",
-                    HttpStatus.CONFLICT);
+            throw new BusinessException("IMPORT_TASK_STATE_INVALID", "只有已经提交的任务可以回滚", HttpStatus.CONFLICT);
         }
         mutationService.rollbackJournal(task.journal(), operator);
         ImportTaskRecord rolledBack = task.rolledBack(Instant.now());
@@ -146,9 +106,7 @@ public class ImportWorkflowService {
         return csv.toString().getBytes(StandardCharsets.UTF_8);
     }
 
-    private List<Map<String, Object>> validateRows(
-            String importType,
-            List<Map<String, String>> rows) {
+    private List<Map<String, Object>> validateRows(String importType, List<Map<String, String>> rows) {
         java.util.ArrayList<Map<String, Object>> errors = new java.util.ArrayList<>();
         Map<String, Integer> firstRowByIdentity = new LinkedHashMap<>();
         for (int index = 0; index < rows.size(); index++) {
@@ -158,21 +116,14 @@ public class ImportWorkflowService {
             if (!identity.isBlank()) {
                 Integer firstRow = firstRowByIdentity.putIfAbsent(identity, spreadsheetRow);
                 if (firstRow != null) {
-                    errors.add(error(
-                            spreadsheetRow,
-                            "duplicate",
-                            identity,
+                    errors.add(error(spreadsheetRow, "duplicate", identity,
                             "与第" + firstRow + "行指向同一业务对象，请合并为一行"));
                 }
             }
             try {
                 mutationService.validateRow(importType, row);
             } catch (RuntimeException exception) {
-                errors.add(error(
-                        spreadsheetRow,
-                        "row",
-                        "",
-                        safeMessage(exception)));
+                errors.add(error(spreadsheetRow, "row", "", safeMessage(exception)));
             }
         }
         return List.copyOf(errors);
@@ -180,35 +131,28 @@ public class ImportWorkflowService {
 
     private String rowIdentity(String importType, Map<String, String> row) {
         if ("STUDENT".equals(importType)) {
-            String studentNumber = value(row, "学号", "studentnumber");
+            String studentNumber = exactValue(row, "学号");
             return studentNumber.isBlank() ? "" : "STUDENT:" + studentNumber;
         }
-        String buildingCode = value(row, "楼栋编码", "buildingcode");
-        String floorNumber = value(row, "楼层", "floornumber");
-        String roomNumber = value(row, "房间号", "roomnumber");
-        if (buildingCode.isBlank() || floorNumber.isBlank() || roomNumber.isBlank()) {
-            return "";
-        }
+        String buildingCode = exactValue(row, "楼栋编码");
+        String floorNumber = exactValue(row, "楼层");
+        String roomNumber = exactValue(row, "房间号");
+        if (buildingCode.isBlank() || floorNumber.isBlank() || roomNumber.isBlank()) return "";
         return "ROOM:" + buildingCode + ':' + floorNumber + ':' + roomNumber;
     }
 
-    private String value(Map<String, String> row, String chinese, String english) {
-        String value = row.getOrDefault(chinese, row.getOrDefault(english, ""));
+    private String exactValue(Map<String, String> row, String header) {
+        String value = row.getOrDefault(header, "");
         return value == null ? "" : value.trim().toUpperCase(Locale.ROOT);
     }
 
     private ImportTaskRecord requireTask(String taskId) {
         return repository.findById(taskId).orElseThrow(() -> new BusinessException(
-                "IMPORT_TASK_NOT_FOUND",
-                "导入任务不存在",
-                HttpStatus.NOT_FOUND));
+                "IMPORT_TASK_NOT_FOUND", "导入任务不存在", HttpStatus.NOT_FOUND));
     }
 
     private Map<String, Object> toMap(ImportTaskRecord task) {
-        int invalidRows = (int) task.fieldErrors().stream()
-                .map(item -> item.get("row"))
-                .distinct()
-                .count();
+        int invalidRows = (int) task.fieldErrors().stream().map(item -> item.get("row")).distinct().count();
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("taskId", task.taskId());
         result.put("importType", task.importType());
@@ -248,10 +192,7 @@ public class ImportWorkflowService {
 
     private Map<String, Object> error(int row, String field, String value, String message) {
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("row", row);
-        result.put("field", field);
-        result.put("value", value);
-        result.put("message", message);
+        result.put("row", row); result.put("field", field); result.put("value", value); result.put("message", message);
         return result;
     }
 
@@ -262,7 +203,6 @@ public class ImportWorkflowService {
 
     private String safeMessage(Throwable throwable) {
         return throwable.getMessage() == null || throwable.getMessage().isBlank()
-                ? "导入校验失败"
-                : throwable.getMessage();
+                ? "导入校验失败" : throwable.getMessage();
     }
 }

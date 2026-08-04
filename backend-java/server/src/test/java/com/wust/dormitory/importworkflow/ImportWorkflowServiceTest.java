@@ -34,9 +34,9 @@ class ImportWorkflowServiceTest {
 
     @Test
     void previewRejectsDuplicateStudentsBeforeCommit() {
-        String csv = "学号,姓名,性别,专业编码,国家/地区,学生类别,培养层次,年级,手机号\n"
-                + "202600000001,张三,男,SE,中国,国内生,硕士生,2026,13800000000\n"
-                + "202600000001,张三,男,SE,中国,国内生,硕士生,2026,13800000000\n";
+        String csv = "学号,姓名,性别,专业编码,国家/地区代码,学生类别,培养层次,年级,手机号码（含国家码）\n"
+                + "202600000001,张三,男,SE,CN,国内生,硕士生,2026,+8613800000000\n"
+                + "202600000001,张三,男,SE,CN,国内生,硕士生,2026,+8613800000000\n";
         MockMultipartFile file = new MockMultipartFile(
                 "file",
                 "students.csv",
