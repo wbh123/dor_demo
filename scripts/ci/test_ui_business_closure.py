@@ -18,8 +18,7 @@ def read(path: str) -> str:
         for suffix in (".logic.ts", ".template.html", ".css"):
             companion = Path(str(stem) + suffix)
             if companion.is_file():
-                text += "
-" + companion.read_text(encoding="utf-8")
+                text += "\n" + companion.read_text(encoding="utf-8")
     return text
 
 def require(condition: bool, message: str) -> None:
