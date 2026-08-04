@@ -36,27 +36,29 @@ for token in (
     require(setting_service, token, f"welcome setting must support base and country messages: {token}")
 
 welcome_service = read("backend-java/server/src/main/java/com/wust/dormitory/auth/StudentWelcomeService.java")
-require(welcome_service, "renderedMessages", "student welcome must return administrator-configured base versions")
-require(welcome_service, 'configuration.messages().get("en-US")', "foreign-country fallback must use the administrator English message")
+require(welcome_service, "renderedMessages", "student welcome must return administrator-configured language versions")
+require(welcome_service, "configuration.messages().forEach", "student welcome must render every configured language through the canonical messages object")
 require(welcome_service, "configuration.countryMessages().get(countryCode)", "student welcome must prefer a matching country or region message")
-require(welcome_service, "countryTemplate == null || countryTemplate.isBlank() ? message : countryTemplate", "country or region message must override the base content when configured")
+require(welcome_service, "countryTemplate == null || countryTemplate.isBlank() ? message : countryTemplate", "country or region message must override the language content when configured")
+forbid(welcome_service, "data.setMessage(", "student welcome must not restore the removed single-message compatibility field")
 
 admin_dashboard = read("frontend/src/views/admin/AdminDashboardView.vue")
 for token in (
     "CountryWelcomeEditor",
-    "中国",
-    "美国",
+    "汉语",
+    "英语",
     "countryMessages",
     "其他国家或地区",
-    "未配置时自动使用美国卡片中的英文欢迎语",
+    "未配置时自动使用英语欢迎语",
 ):
-    require(admin_dashboard, token, f"administrator country welcome editor missing behavior: {token}")
-for token in ("newLocale", "languageMessages", "删除语言", "localeCode }}"):
-    forbid(admin_dashboard, token, f"country welcome editor must not expose legacy language-code workflow: {token}")
+    require(admin_dashboard, token, f"administrator welcome editor missing behavior: {token}")
+for token in ("newLocale", "languageMessages", "删除语言", "localeCode }}", "<strong>美国</strong>", "美国卡片"):
+    forbid(admin_dashboard, token, f"welcome editor must not expose a legacy language or United States presentation workflow: {token}")
 
 country_editor = read("frontend/src/components/admin/CountryWelcomeEditor.vue")
 for token in ("已配置国家或地区", "添加国家或地区", "availableCountries", "configuredCodes", "WelcomeMessageEditor"):
     require(country_editor, token, f"shared country welcome editor missing behavior: {token}")
+require(country_editor, "未配置国家或地区自动使用英语欢迎语", "country editor must describe the English fallback without presenting the United States as a language")
 
 shell = read("frontend/src/layouts/AppShell.vue")
 require(shell, "'/assert/logo-only.png'", "navigation must use the fixed /assert/logo-only.png asset")
