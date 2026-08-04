@@ -38,6 +38,7 @@ public class StudentController implements StudentApi {
     private final StudentRoomLayoutService roomLayoutService;
     private final StudentRoomRecommendationService recommendationService;
     private final TeamService teamService;
+    private final VerifiedTeamInvitationService verifiedTeamInvitationService;
     private final TeamHoldReleaseService teamHoldReleaseService;
     private final BedScopeGuard bedScopeGuard;
     private final RoomSelectionService roomSelectionService;
@@ -54,6 +55,7 @@ public class StudentController implements StudentApi {
             StudentRoomLayoutService roomLayoutService,
             StudentRoomRecommendationService recommendationService,
             TeamService teamService,
+            VerifiedTeamInvitationService verifiedTeamInvitationService,
             TeamHoldReleaseService teamHoldReleaseService,
             BedScopeGuard bedScopeGuard,
             RoomSelectionService roomSelectionService,
@@ -68,6 +70,7 @@ public class StudentController implements StudentApi {
         this.roomLayoutService = roomLayoutService;
         this.recommendationService = recommendationService;
         this.teamService = teamService;
+        this.verifiedTeamInvitationService = verifiedTeamInvitationService;
         this.teamHoldReleaseService = teamHoldReleaseService;
         this.bedScopeGuard = bedScopeGuard;
         this.roomSelectionService = roomSelectionService;
@@ -263,7 +266,10 @@ public class StudentController implements StudentApi {
         CurrentUser user = student();
         teamCategoryGuard.requireInvitationAllowed(request.getStudentNumber(), user);
         return ResponseEntity.ok(ResponseFactory.object(
-                teamService.inviteTeammate(request.getStudentNumber(), user)));
+                verifiedTeamInvitationService.invite(
+                        request.getStudentNumber(),
+                        request.getStudentName(),
+                        user)));
     }
 
     @Override
@@ -297,7 +303,7 @@ public class StudentController implements StudentApi {
         CurrentUser user = student();
         teamHoldReleaseService.requireNoActiveHoldForLeader(teamId, user.studentId());
         return ResponseEntity.ok(ResponseFactory.object(
-                teamService.removeMember(teamId, studentId, user)));
+                verifiedTeamInvitationService.removeOrCancel(teamId, studentId, user)));
     }
 
     @Override
