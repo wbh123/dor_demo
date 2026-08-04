@@ -50,9 +50,7 @@ function render(value: string) {
 
 function serialize(node: Node): string {
   if (node.nodeType === Node.TEXT_NODE) return node.textContent ?? ''
-  if (node instanceof HTMLElement && node.classList.contains('welcome-token')) {
-    return node.dataset.token ?? ''
-  }
+  if (node instanceof HTMLElement && node.classList.contains('welcome-token')) return node.dataset.token ?? ''
   if (node instanceof HTMLBRElement) return '\n'
   return Array.from(node.childNodes).map(serialize).join('')
 }
@@ -67,6 +65,12 @@ function sync() {
   internalUpdate = true
   emit('update:modelValue', value)
   void nextTick(() => { internalUpdate = false })
+}
+
+function pastePlainText(event: ClipboardEvent) {
+  const text = event.clipboardData?.getData('text/plain') ?? ''
+  document.execCommand('insertText', false, text)
+  sync()
 }
 
 function insertToken(name: string) {
@@ -111,7 +115,7 @@ defineExpose({ insertToken, focus: () => editor.value?.focus() })
     @focus="emit('focus')"
     @input="sync"
     @blur="sync"
-    @paste.prevent="(event: ClipboardEvent) => document.execCommand('insertText', false, event.clipboardData?.getData('text/plain') ?? '')"
+    @paste.prevent="pastePlainText"
   />
 </template>
 
