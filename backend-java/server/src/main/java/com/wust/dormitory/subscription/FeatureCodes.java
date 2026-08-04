@@ -59,4 +59,8 @@ public final class FeatureCodes {
     public static final String P3_ROOM_EXCHANGE_REVIEW="P3_ROOM_EXCHANGE_REVIEW";
     public static final String P3_ROOM_EXCHANGE_EXECUTE="P3_ROOM_EXCHANGE_EXECUTE";
     public static final String P3_ROOM_EXCHANGE_HISTORY="P3_ROOM_EXCHANGE_HISTORY";
+    public static final String P3_WAITLIST_REQUEST="P3_WAITLIST_REQUEST";
+    public static final String P3_WAITLIST_MANAGE="P3_WAITLIST_MANAGE";
+    public static final String P3_WAITLIST_ASSIGN="P3_WAITLIST_ASSIGN";
+    public static final String P3_WAITLIST_HISTORY="P3_WAITLIST_HISTORY";
 }
