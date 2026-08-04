@@ -102,8 +102,8 @@ class VerifiedTeamInvitationServiceTest {
                 .containsEntry("teamId", 7L)
                 .containsEntry("studentId", 101L)
                 .containsEntry("cancelled", true);
-        verify(jdbc, times(2)).update(anyString(), anyMap());
-        verify(jdbc).update(anyString(), any(MapSqlParameterSource.class));
+        verify(jdbc).update(anyString(), anyMap());
+        verify(jdbc, times(2)).update(anyString(), any(MapSqlParameterSource.class));
         verify(auditService).success(
                 eq(user),
                 eq("TEAM_INVITATION_CANCELLED"),
