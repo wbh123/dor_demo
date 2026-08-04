@@ -70,6 +70,29 @@ public class VerifiedTeamInvitationService {
     }
 
     @Transactional
+    public Map<String, Object> removeOrCancel(
+            long teamId,
+            long studentId,
+            CurrentUser user) {
+        Integer pending = jdbc.queryForObject("""
+                SELECT COUNT(*)
+                FROM team_invitation invitation
+                JOIN selection_team team ON team.id=invitation.team_id
+                WHERE invitation.team_id=:teamId
+                  AND invitation.invitee_student_id=:studentId
+                  AND invitation.invitation_status='PENDING'
+                  AND invitation.expires_at>CURRENT_TIMESTAMP(3)
+                  AND team.team_status='FORMING'
+                """, new MapSqlParameterSource()
+                .addValue("teamId", teamId)
+                .addValue("studentId", studentId), Integer.class);
+        if (pending != null && pending > 0) {
+            return cancelInvitation(teamId, studentId, user);
+        }
+        return teamService.removeMember(teamId, studentId, user);
+    }
+
+    @Transactional
     public Map<String, Object> cancelInvitation(
             long teamId,
             long inviteeStudentId,
@@ -123,7 +146,7 @@ public class VerifiedTeamInvitationService {
                 """, new MapSqlParameterSource()
                 .addValue("teamId", teamId)
                 .addValue("studentId", inviteeStudentId));
-        createNotification(inviteeStudentId, teamId);
+        createNotification(inviteeStudentId, teamId, user.displayName());
         auditService.success(
                 user,
                 "TEAM_INVITATION_CANCELLED",
@@ -140,17 +163,19 @@ public class VerifiedTeamInvitationService {
                 "cancelled", true);
     }
 
-    private void createNotification(long studentId, long teamId) {
+    private void createNotification(long studentId, long teamId, String leaderName) {
         jdbc.update("""
                 INSERT INTO student_notification
                 (student_id, notification_type, title_key, message_key, parameters_json)
                 VALUES (:studentId, 'TEAM_INVITATION_CANCELLED',
-                        'notification.invitationCancelled.title',
-                        'notification.invitationCancelled.message',
+                        'notification.invitationWithdrawn.title',
+                        'notification.invitationWithdrawn.message',
                         CAST(:parameters AS JSON))
                 """, new MapSqlParameterSource()
                 .addValue("studentId", studentId)
-                .addValue("parameters", json(Map.of("teamId", teamId))));
+                .addValue("parameters", json(Map.of(
+                        "teamId", teamId,
+                        "leaderName", leaderName))));
     }
 
     private BusinessException identityMismatch() {
