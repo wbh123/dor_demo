@@ -29,6 +29,7 @@ public class SystemSettingController implements SystemSettingApi {
         return ResponseEntity.ok(ResponseFactory.object(
                 settingService.updateStudentWelcome(
                         request.getMessages(),
+                        request.getCountryMessages(),
                         request.getExpectedVersion(),
                         SecurityUsers.requireAdmin())));
     }
