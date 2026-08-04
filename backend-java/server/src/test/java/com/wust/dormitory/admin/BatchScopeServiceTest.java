@@ -87,9 +87,15 @@ class BatchScopeServiceTest {
                 .containsEntry("selectedStudentCount", 2)
                 .containsEntry("selectedRoomCount", 1);
 
-        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
-        verify(jdbc, times(6)).update(sql.capture(), anyMap());
-        String allSql = String.join("\n", sql.getAllValues());
+        ArgumentCaptor<String> mapSql = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<String> parameterSql = ArgumentCaptor.forClass(String.class);
+        verify(jdbc, times(4)).update(mapSql.capture(), anyMap());
+        verify(jdbc, times(2)).update(
+                parameterSql.capture(),
+                any(MapSqlParameterSource.class));
+        String allSql = String.join("\n", mapSql.getAllValues())
+                + "\n"
+                + String.join("\n", parameterSql.getAllValues());
         assertThat(allSql)
                 .contains("DELETE FROM batch_bed_scope")
                 .contains("DELETE FROM batch_room_scope")
