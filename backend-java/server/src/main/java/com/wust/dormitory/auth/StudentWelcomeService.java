@@ -56,22 +56,20 @@ public class StudentWelcomeService {
         configuration.messages().forEach((locale, message) ->
                 renderedMessages.put(locale, render(message, variables)));
 
-        // Legacy validation marker: configuration.countryMessages().get(countryCode)
-        // is intentionally no longer executed. Locale choice is controlled by the client,
-        // while any unavailable foreign locale falls back to administrator English.
+        // 旧客户端继续读取message；现代客户端按照界面语言读取messages。
+        // 任一未配置外文语言均由前端回退至管理员设置的en-US版本。
         String selectedTemplate = "CN".equals(countryCode)
                 ? configuration.messages().get("zh-CN")
                 : configuration.messages().get("en-US");
         if (selectedTemplate == null || selectedTemplate.isBlank()) {
             selectedTemplate = configuration.messages().get("en-US");
         }
-        String selected = render(selectedTemplate, variables);
 
         WelcomeData data = new WelcomeData();
         data.setRequired(student.get("welcome_acknowledged_at") == null);
         data.setTitle("新同学，欢迎你");
         data.setMessages(renderedMessages);
-        data.setMessage(selected);
+        data.setMessage(render(selectedTemplate, variables));
         return data;
     }
 
