@@ -1,73 +1,70 @@
 package com.wust.dormitory.importworkflow;
 
 import com.wust.dormitory.common.response.ResponseFactory;
+import com.wust.dormitory.model.api.ImportWorkflowApi;
 import com.wust.dormitory.model.dto.ListSuccessResponse;
 import com.wust.dormitory.model.dto.ObjectSuccessResponse;
 import com.wust.dormitory.security.CurrentUser;
 import com.wust.dormitory.security.SecurityUsers;
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.core.io.Resource;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestHeader;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.UUID;
+
 @RestController
-@RequestMapping("/api/v1/admin/import-tasks")
-public class ImportWorkflowController {
+public class ImportWorkflowController implements ImportWorkflowApi {
     private final ImportWorkflowService service;
 
     public ImportWorkflowController(ImportWorkflowService service) {
         this.service = service;
     }
 
-    @PostMapping(value = "/preview", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<ObjectSuccessResponse> preview(
-            @RequestPart("file") MultipartFile file,
-            @RequestParam("type") String type,
-            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey) {
+    @Override
+    public ResponseEntity<ObjectSuccessResponse> previewImportTask(
+            String idempotencyKey,
+            String type,
+            MultipartFile file) {
         SecurityUsers.requireAdmin();
         return ResponseEntity.ok(ResponseFactory.object(service.preview(file, type, idempotencyKey)));
     }
 
-    @GetMapping
-    public ResponseEntity<ListSuccessResponse> listTasks() {
+    @Override
+    public ResponseEntity<ListSuccessResponse> listImportTasks() {
         SecurityUsers.requireAdmin();
         return ResponseEntity.ok(ResponseFactory.list(service.listTasks()));
     }
 
-    @GetMapping("/{taskId}")
-    public ResponseEntity<ObjectSuccessResponse> getTask(@PathVariable String taskId) {
+    @Override
+    public ResponseEntity<ObjectSuccessResponse> getImportTask(UUID taskId) {
         SecurityUsers.requireAdmin();
-        return ResponseEntity.ok(ResponseFactory.object(service.getTask(taskId)));
+        return ResponseEntity.ok(ResponseFactory.object(service.getTask(taskId.toString())));
     }
 
-    @PostMapping("/{taskId}/commit")
-    public ResponseEntity<ObjectSuccessResponse> commit(@PathVariable String taskId) {
+    @Override
+    public ResponseEntity<ObjectSuccessResponse> commitImportTask(UUID taskId) {
         CurrentUser operator = SecurityUsers.requireAdmin();
-        return ResponseEntity.ok(ResponseFactory.object(service.commitTask(taskId, operator)));
+        return ResponseEntity.ok(ResponseFactory.object(service.commitTask(taskId.toString(), operator)));
     }
 
-    @PostMapping("/{taskId}/rollback")
-    public ResponseEntity<ObjectSuccessResponse> rollback(@PathVariable String taskId) {
+    @Override
+    public ResponseEntity<ObjectSuccessResponse> rollbackImportTask(UUID taskId) {
         CurrentUser operator = SecurityUsers.requireAdmin();
-        return ResponseEntity.ok(ResponseFactory.object(service.rollbackTask(taskId, operator)));
+        return ResponseEntity.ok(ResponseFactory.object(service.rollbackTask(taskId.toString(), operator)));
     }
 
-    @GetMapping(value = "/{taskId}/errors.csv", produces = "text/csv;charset=UTF-8")
-    public ResponseEntity<byte[]> errorsCsv(@PathVariable String taskId) {
+    @Override
+    public ResponseEntity<Resource> exportImportTaskErrors(UUID taskId) {
         SecurityUsers.requireAdmin();
+        Resource resource = new ByteArrayResource(service.errorsCsv(taskId.toString()));
         HttpHeaders headers = new HttpHeaders();
         headers.setContentDisposition(ContentDisposition.attachment()
                 .filename("import-errors-" + taskId + ".csv")
                 .build());
-        return ResponseEntity.ok().headers(headers).body(service.errorsCsv(taskId));
+        return ResponseEntity.ok().headers(headers).body(resource);
     }
 }
