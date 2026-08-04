@@ -19,10 +19,10 @@ jobs:
           fetch-depth: 0
       - name: Rebuild and verify patch
         run: |
-          sha256sum .automation/requested-fixes.part*
-          cat .automation/requested-fixes.part* | base64 -d > /tmp/requested.patch.gz
-          sha256sum /tmp/requested.patch.gz
-          gzip -t /tmp/requested.patch.gz
+          echo "ac279feefc310f9ca5a68eed6c7cb0d7e7a89299bbd6bbe90bc5b756e5459673  .automation/requested-fixes.part00a" | sha256sum -c -
+          echo "533043819c9a952e7a411f36a4af6f2540f3bcb92ed3a3dc35e4b13393db9438  .automation/requested-fixes.part00b" | sha256sum -c -
+          cat .automation/requested-fixes.part00a .automation/requested-fixes.part00b .automation/requested-fixes.part01 .automation/requested-fixes.part02 .automation/requested-fixes.part03 | base64 -d > /tmp/requested.patch.gz
+          echo "8f6ef3f3d482ef9b8de17abcc11caec7c8fa40ffe4f93dba5d91a485b57bcd8c  /tmp/requested.patch.gz" | sha256sum -c -
           gzip -dc /tmp/requested.patch.gz > /tmp/requested.patch
           git apply --check /tmp/requested.patch
           git apply /tmp/requested.patch
