@@ -29,21 +29,31 @@ for token in (
     'FALLBACK_WELCOME_LOCALE = "en-US"',
     "normalizeLocaleMessages",
     "normalizeLocaleTag",
+    "normalizeCountryMessages",
+    'result.put("countryMessages", configuration.countryMessages())',
     "DEFAULT_MESSAGES.get(FALLBACK_WELCOME_LOCALE)",
 ):
-    require(setting_service, token, f"welcome setting must support administrator-managed locale messages: {token}")
+    require(setting_service, token, f"welcome setting must support locale and country messages: {token}")
 forbid(setting_service, 'List.of("zh-CN", "en-US")', "welcome languages must not be hard-coded to only Chinese and English")
 
 welcome_service = read("backend-java/server/src/main/java/com/wust/dormitory/auth/StudentWelcomeService.java")
 require(welcome_service, "renderedMessages", "student welcome must return all administrator-configured language versions")
 require(welcome_service, 'configuration.messages().get("en-US")', "foreign-language fallback must use the administrator English message")
-require(welcome_service, "is intentionally no longer executed", "legacy country selection must be documented as disabled")
-forbid(welcome_service, "countryMessages().forEach", "welcome selection must not iterate country-specific copies")
+require(welcome_service, "configuration.countryMessages().get(countryCode)", "student welcome must prefer a matching country or region message")
+require(welcome_service, "countryTemplate == null || countryTemplate.isBlank() ? message : countryTemplate", "country or region message must override language content when configured")
 
 admin_dashboard = read("frontend/src/views/admin/AdminDashboardView.vue")
-for token in ("welcomeLanguageOptions", "addWelcomeLanguage", "removeWelcomeLanguage", "languageMessages"):
-    require(admin_dashboard, token, f"administrator welcome editor missing language management behavior: {token}")
-require(admin_dashboard, "countryMessages configuration is migrated", "legacy editor migration must remain explicit")
+for token in (
+    "welcomeLanguageOptions",
+    "addWelcomeLanguage",
+    "removeWelcomeLanguage",
+    "languageMessages",
+    "countryMessages",
+    "addCountryMessage",
+    "removeCountryMessage",
+    "按国家或地区设置",
+):
+    require(admin_dashboard, token, f"administrator welcome editor missing language or country management behavior: {token}")
 
 shell = read("frontend/src/layouts/AppShell.vue")
 require(shell, "'/assert/logo-only.png'", "navigation must use the fixed /assert/logo-only.png asset")
