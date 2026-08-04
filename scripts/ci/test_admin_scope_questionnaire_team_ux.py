@@ -48,24 +48,35 @@ require(admin_data, (
     "PhoneDialCodeSelect",
     "TransientNotice",
     "student-category-switch-top",
-    "/api/v1/admin/students/${student.id}/residency-adjustment-context",
-    "/api/v1/admin/students/${placementTarget.value.studentId}/residency-adjustment",
     "master-data-card-body",
-), "administrator student page is missing required layout or placement behavior")
+), "administrator student page is missing required layout behavior")
 
+admin_openapi = read(
+    "backend-java/model/src/main/resources/admin/openapi-residency-transfer.yaml")
+require(admin_openapi, (
+    "operationId: getStudentResidencyAdjustmentContext",
+    "operationId: adjustStudentResidency",
+    "AdminResidencyAdjustmentRequest",
+), "administrator residency adjustment is missing from OpenAPI")
 placement_controller = read(
     "backend-java/server/src/main/java/com/wust/dormitory/admin/AdminStudentResidencyAdjustmentController.java")
 require(placement_controller, (
-    '"/residency-adjustment-context"',
-    '"/residency-adjustment"',
-), "administrator residency adjustment endpoints are missing")
+    "implements AdminResidencyAdjustmentApi",
+    "getStudentResidencyAdjustmentContext",
+    "adjustStudentResidency",
+), "administrator residency adjustment must use generated API")
 placement_service = read(
     "backend-java/server/src/main/java/com/wust/dormitory/admin/AdminStudentResidencyAdjustmentService.java")
 require(placement_service, (
     "residencyService.end(",
     "residencyService.assign(",
     "active_batch_room_lock",
-    "RESIDENCY_ADJUSTMENT_TARGET_UNAVAILABLE",
+    "bed_confirmation_request",
+    "room_change_request",
+    "room_exchange_participant_lock",
+    "RESIDENCY_ADJUSTMENT_PENDING_WORKFLOW",
+    "position_index",
+    "rotation_degrees",
 ), "administrator residency adjustment transaction is incomplete")
 
 admin_batch = read("frontend/src/views/admin/AdminBatchView.vue")
@@ -106,13 +117,17 @@ required_flag_test = read(
 require(required_flag_test, ("Boolean.TRUE", '"true"', "assertFalse"),
         "questionnaire flag regression test is incomplete")
 
-team_controller = read(
-    "backend-java/server/src/main/java/com/wust/dormitory/student/VerifiedTeamInvitationController.java")
-require(team_controller, (
-    '"/team-invitations/verified"',
-    '"/teams/{teamId}/invitations/{studentId}"',
-    "cancelTeamInvitation",
-), "verified team invite and cancellation endpoints are incomplete")
+student_openapi = read("backend-java/model/src/main/resources/student/openapi-student.yaml")
+require(student_openapi, (
+    "required: [studentNumber, studentName]",
+    "取消待确认邀请或移除已接受队友",
+), "student invite identity and cancellation contract are incomplete")
+student_controller = read(
+    "backend-java/server/src/main/java/com/wust/dormitory/student/StudentController.java")
+require(student_controller, (
+    "request.getStudentName()",
+    "verifiedTeamInvitationService.removeOrCancel",
+), "StudentApi implementation does not route verified invitations")
 team_service = read(
     "backend-java/server/src/main/java/com/wust/dormitory/student/VerifiedTeamInvitationService.java")
 require(team_service, (
@@ -121,16 +136,9 @@ require(team_service, (
     "teamService.inviteTeammate(normalizedNumber, user)",
     "TEAM_INVITATION_CANCELLED",
     "member_status='INVITED'",
-), "verified invitation identity, first-team creation or cancellation is incomplete")
-
-team_view = read("frontend/src/views/student/TeamView.vue")
-require(team_view, (
-    "inviteStudentName",
-    "studentName }",
-    "cancelInvitation",
-    "TransientNotice",
-    "/team-invitations/verified",
-), "team page must validate identity, cancel invitations and use popup notices")
+    "removeOrCancel",
+    "notification.invitationWithdrawn.title",
+), "verified invitation identity, creation or cancellation is incomplete")
 
 spreadsheet = read("backend-java/server/src/main/java/com/wust/dormitory/admin/SpreadsheetSupport.java")
 require(spreadsheet, (
@@ -172,4 +180,4 @@ require(room_import_test, (
     'normalizeOperationalStatus("维修")',
 ), "room import normalization regression test is incomplete")
 
-print("admin scope, questionnaire and team UX contract: OK")
+print("admin scope, questionnaire, OpenAPI and team UX contract: OK")
