@@ -36,7 +36,7 @@ require("backend-java/server/src/main/java/com/wust/dormitory/student/StudentPre
 require("frontend/src/views/student/QuestionnaireView.vue", "directPreferenceWithoutBatchAllowed")
 
 # System administrator clears only the configured Redis database.
-require("backend-java/model/src/main/resources/platform/openapi-platform.yaml", "/api/v1/platform/redis/clear", "operationId: clearPlatformRedis")
+require("backend-java/model/src/main/resources/platform/openapi-platform-redis.yaml", "/api/v1/platform/redis/clear", "operationId: clearPlatformRedis")
 require("backend-java/server/src/main/java/com/wust/dormitory/platform/PlatformRedisService.java", "flushDb", "CLEAR_REDIS")
 forbid("backend-java/server/src/main/java/com/wust/dormitory/platform/PlatformRedisService.java", "flushAll")
 require("frontend/src/views/platform/PlatformDashboardView.vue", "清空Redis", "CLEAR_REDIS")
