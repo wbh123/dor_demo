@@ -419,7 +419,7 @@ def validate_comprehensive_enhancements(errors: list[str]) -> None:
     require(
         "countryMessages" in dashboard_view
         and "configuration.countryMessages().get(countryCode)" in welcome_service
-        and 'configuration.messages().get("en-US")' in welcome_service
+        and "configuration.messages().forEach" in welcome_service
         and "data.setMessages(renderedMessages)" in welcome_service
         and "data.setMessage(" not in welcome_service,
         "language and country welcome messages do not follow the canonical messages object",
