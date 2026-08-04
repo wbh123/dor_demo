@@ -1,0 +1,23 @@
+name: Temporary source export
+
+on:
+  push:
+    branches:
+      - automation/export-20260804
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+      - name: Upload source snapshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: dor-demo-source
+          path: .
+          include-hidden-files: true
+          retention-days: 1
