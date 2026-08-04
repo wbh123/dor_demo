@@ -23,7 +23,7 @@ class StudentWelcomeServiceTest {
     void rendersAdministratorManagedLocaleMessages() {
         TestFixture fixture = fixture("CN");
         when(fixture.settingService.readConfiguration("{}"))
-                .thenReturn(configuration());
+                .thenReturn(configuration(Map.of()));
 
         WelcomeData result = fixture.service.welcomeFor(studentUser());
 
@@ -36,10 +36,10 @@ class StudentWelcomeServiceTest {
     }
 
     @Test
-    void foreignStudentLegacyMessageFallsBackToAdministratorEnglishVersion() {
+    void foreignStudentFallsBackToAdministratorEnglishVersion() {
         TestFixture fixture = fixture("JP");
         when(fixture.settingService.readConfiguration("{}"))
-                .thenReturn(configuration());
+                .thenReturn(configuration(Map.of()));
 
         WelcomeData result = fixture.service.welcomeFor(studentUser());
 
@@ -47,6 +47,22 @@ class StudentWelcomeServiceTest {
                 .isEqualTo("Welcome 张同学 (202600000001).");
         assertThat(result.getMessages().get("ja-JP"))
                 .isEqualTo("张同学さん、ようこそ。");
+    }
+
+    @Test
+    void countrySpecificMessageOverridesEveryLocaleForMatchingStudent() {
+        TestFixture fixture = fixture("JP");
+        when(fixture.settingService.readConfiguration("{}"))
+                .thenReturn(configuration(Map.of(
+                        "JP", "{{学生姓名}}，请先到国际学生服务中心完成报到。")));
+
+        WelcomeData result = fixture.service.welcomeFor(studentUser());
+
+        assertThat(result.getMessage())
+                .isEqualTo("张同学，请先到国际学生服务中心完成报到。");
+        assertThat(result.getMessages())
+                .allSatisfy((locale, message) -> assertThat(message)
+                        .isEqualTo("张同学，请先到国际学生服务中心完成报到。"));
     }
 
     private TestFixture fixture(String nationalityCode) {
@@ -67,11 +83,14 @@ class StudentWelcomeServiceTest {
         return new TestFixture(service, settingService);
     }
 
-    private SystemSettingService.WelcomeConfiguration configuration() {
-        return new SystemSettingService.WelcomeConfiguration(Map.of(
-                "zh-CN", "欢迎{{学生姓名}}，你是{{年级}}{{专业名称}}的{{培养层次}}。",
-                "en-US", "Welcome {{学生姓名}} ({{学号}}).",
-                "ja-JP", "{{学生姓名}}さん、ようこそ。"));
+    private SystemSettingService.WelcomeConfiguration configuration(
+            Map<String, String> countryMessages) {
+        return new SystemSettingService.WelcomeConfiguration(
+                Map.of(
+                        "zh-CN", "欢迎{{学生姓名}}，你是{{年级}}{{专业名称}}的{{培养层次}}。",
+                        "en-US", "Welcome {{学生姓名}} ({{学号}}).",
+                        "ja-JP", "{{学生姓名}}さん、ようこそ。"),
+                countryMessages);
     }
 
     private CurrentUser studentUser() {
