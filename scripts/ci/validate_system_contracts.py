@@ -16,7 +16,15 @@ def require(condition: bool, message: str, errors: list[str]) -> None:
 
 
 def read(relative: str) -> str:
-    return (ROOT / relative).read_text(encoding="utf-8")
+    path = ROOT / relative
+    text = path.read_text(encoding="utf-8")
+    if path.suffix == ".vue":
+        stem = path.with_suffix("")
+        for suffix in (".logic.ts", ".template.html", ".css"):
+            companion = Path(str(stem) + suffix)
+            if companion.is_file():
+                text += "\n" + companion.read_text(encoding="utf-8")
+    return text
 
 
 def validate_openapi(errors: list[str]) -> int:
