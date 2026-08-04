@@ -27,6 +27,26 @@
   box-shadow: 0 30px 90px rgba(4, 19, 48, 0.4);
 }
 
+:where(.modal-card, .scope-dialog, .preflight-dialog) .section-head {
+  margin-bottom: 12px;
+}
+
+:where(.modal-card, .scope-dialog, .preflight-dialog) .section-head h3 {
+  margin: 4px 0;
+}
+
+:where(.modal-card, .scope-dialog, .preflight-dialog) .section-head p {
+  margin: 0;
+  line-height: 1.55;
+}
+
+.publish-confirmation-overlay {
+  padding: 0 !important;
+  background: transparent !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+
 @media (max-width: 640px) {
   :where(
     .modal-overlay,

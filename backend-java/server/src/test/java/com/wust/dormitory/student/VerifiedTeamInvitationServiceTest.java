@@ -19,6 +19,7 @@ import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -60,14 +61,12 @@ class VerifiedTeamInvitationServiceTest {
     }
 
     @Test
-    void firstVerifiedInvitationCreatesInternalTeamBeforeInviting() {
+    void firstVerifiedInvitationDelegatesAtomicTeamCreationToTeamService() {
         when(jdbc.queryForObject(
                 anyString(),
                 any(MapSqlParameterSource.class),
                 eq(Integer.class)))
                 .thenReturn(1);
-        when(teamService.teams(user)).thenReturn(List.of());
-        when(teamService.createFormingTeam(user)).thenReturn(Map.of("id", 7L));
         when(teamService.inviteTeammate("202600000011", user)).thenReturn(Map.of(
                 "invited", true,
                 "studentNumber", "202600000011",
@@ -79,7 +78,8 @@ class VerifiedTeamInvitationServiceTest {
                 user);
 
         assertThat(result).containsEntry("invited", true);
-        verify(teamService).createFormingTeam(user);
+        verify(teamService, never()).teams(user);
+        verify(teamService, never()).createFormingTeam(user);
         verify(teamService).inviteTeammate("202600000011", user);
     }
 

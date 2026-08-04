@@ -63,9 +63,6 @@ public class VerifiedTeamInvitationService {
             throw identityMismatch();
         }
 
-        if (teamService.teams(user).isEmpty()) {
-            teamService.createFormingTeam(user);
-        }
         return teamService.inviteTeammate(normalizedNumber, user);
     }
 

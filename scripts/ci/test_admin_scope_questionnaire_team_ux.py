@@ -117,7 +117,6 @@ team_service = read(
     "backend-java/server/src/main/java/com/wust/dormitory/student/VerifiedTeamInvitationService.java")
 require(team_service, (
     "INVITEE_IDENTITY_MISMATCH",
-    "teamService.createFormingTeam(user)",
     "teamService.inviteTeammate(normalizedNumber, user)",
     "TEAM_INVITATION_CANCELLED",
     "member_status='INVITED'",

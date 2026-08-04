@@ -1,5 +1,6 @@
 const timers = new WeakMap<HTMLElement, number>()
 const messageSnapshots = new WeakMap<HTMLElement, string>()
+const NOTICE_SELECTOR = '.alert.success, .alert.error, .alert.warning, .alert.info'
 
 function noticeText(element: HTMLElement) {
   return Array.from(element.childNodes)
@@ -9,22 +10,31 @@ function noticeText(element: HTMLElement) {
     .trim()
 }
 
+function noticeType(element: HTMLElement) {
+  if (element.classList.contains('error')) return 'error'
+  if (element.classList.contains('warning')) return 'warning'
+  if (element.classList.contains('info')) return 'info'
+  return 'success'
+}
+
 function close(element: HTMLElement) {
   const timer = timers.get(element)
   if (timer) window.clearTimeout(timer)
   timers.delete(element)
-  element.classList.add('transient-success-hidden')
+  element.classList.add('transient-operation-hidden')
 }
 
 function enhance(element: HTMLElement) {
+  if (element.dataset.persistentAlert === 'true' || element.classList.contains('persistent-alert')) return
   const message = noticeText(element)
   if (!message) return
   const previous = messageSnapshots.get(element)
   if (previous === message && element.dataset.transientNoticeReady === 'true') return
   messageSnapshots.set(element, message)
   element.dataset.transientNoticeReady = 'true'
-  element.classList.add('transient-success-notice')
-  element.classList.remove('transient-success-hidden')
+  element.dataset.noticeType = noticeType(element)
+  element.classList.add('transient-operation-notice')
+  element.classList.remove('transient-operation-hidden')
 
   let button = element.querySelector<HTMLButtonElement>('.notice-close')
   if (!button) {
@@ -43,7 +53,7 @@ function enhance(element: HTMLElement) {
 }
 
 function scan(root: ParentNode = document) {
-  root.querySelectorAll<HTMLElement>('.alert.success').forEach(enhance)
+  root.querySelectorAll<HTMLElement>(NOTICE_SELECTOR).forEach(enhance)
 }
 
 export function installTransientSuccessNotices() {
@@ -53,12 +63,12 @@ export function installTransientSuccessNotices() {
       for (const record of records) {
         if (record.type === 'characterData') {
           const parent = record.target.parentElement
-          if (parent?.matches('.alert.success')) enhance(parent)
+          if (parent?.matches(NOTICE_SELECTOR)) enhance(parent)
           continue
         }
         record.addedNodes.forEach((node) => {
           if (!(node instanceof HTMLElement)) return
-          if (node.matches('.alert.success')) enhance(node)
+          if (node.matches(NOTICE_SELECTOR)) enhance(node)
           scan(node)
         })
       }

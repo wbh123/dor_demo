@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, nextTick, onMounted, reactive, ref } from 'vue'
 import { api } from '../../api/client'
 import type { DataObject, ListSuccessResponse, ObjectSuccessResponse } from '../../api/types'
 import { useFeatureAccess } from '../../composables/useFeatureAccess'
@@ -39,6 +39,7 @@ const roomBuildingFilter = ref('')
 const roomFloorFilter = ref('')
 const publishAfterScope = ref(false)
 const publishConfirmation = ref<DataObject | null>(null)
+const publishPreflightSnapshot = ref<DataObject | null>(null)
 const publishing = ref(false)
 
 const form = reactive({
@@ -291,9 +292,24 @@ async function reopenScopeFromPreflight() {
   }
 }
 
+async function openPublishConfirmationAfterPreflight(batch: DataObject, snapshot: DataObject) {
+  preflightBatch.value = null
+  roomPreflight.value = null
+  await nextTick()
+  publishPreflightSnapshot.value = snapshot
+  publishConfirmation.value = batch
+}
+
+function closePublishConfirmation() {
+  if (publishing.value) return
+  publishConfirmation.value = null
+  publishPreflightSnapshot.value = null
+}
+
 async function preparePublish(batch: DataObject) {
   error.value = ''
   publishConfirmation.value = null
+  publishPreflightSnapshot.value = null
   if (Number(batch.eligible_count ?? 0) === 0) {
     await openScope(batch, true)
     return
@@ -314,7 +330,8 @@ async function preparePublish(batch: DataObject) {
       error.value = '发布前检查未通过，请处理阻断宿舍后重试。'
       return
     }
-    publishConfirmation.value = batch
+    const snapshot = { ...roomPreflight.value }
+    await openPublishConfirmationAfterPreflight(batch, snapshot)
   } catch (reason) {
     error.value = reason instanceof Error ? reason.message : '批次发布预检失败'
   }
@@ -329,6 +346,7 @@ async function confirmPublish() {
     await api.post(`/api/v1/admin/batches/${Number(batch.id)}/status/PUBLISHED`)
     message.value = '批次已发布。'
     publishConfirmation.value = null
+    publishPreflightSnapshot.value = null
     roomPreflight.value = null
     preflightBatch.value = null
     await load()
@@ -597,7 +615,7 @@ function issueText(room: DataObject) {
       </section>
     </div>
 
-    <div v-if="publishConfirmation" class="modal-overlay publish-confirmation-overlay" @click.self="publishConfirmation = null"><section class="modal-card publish-confirmation-dialog"><span class="eyebrow">READY TO PUBLISH</span><h3>{{ publishConfirmation.batch_name }} 已完成发布准备</h3><p>参与学生范围和宿舍范围均已设置，宿舍预检已通过。可以直接发布，无需再次进入范围设置。</p><div class="publish-confirmation-facts"><span>参与学生 {{ publishConfirmation.eligible_count ?? 0 }} 人</span><span>宿舍 {{ roomPreflight?.roomCount ?? 0 }} 间</span><span>可用容量 {{ roomPreflight?.availableCapacity ?? 0 }}</span></div><div class="button-row dialog-actions"><button class="button ghost" type="button" :disabled="publishing" @click="publishConfirmation = null">暂不发布</button><button class="button primary" type="button" :disabled="publishing" @click="confirmPublish">{{ publishing ? '正在发布…' : '直接发布' }}</button></div></section></div>
+    <div v-if="publishConfirmation" class="modal-overlay publish-confirmation-overlay" @click.self="closePublishConfirmation"><section class="modal-card publish-confirmation-dialog"><span class="eyebrow">READY TO PUBLISH</span><h3>{{ publishConfirmation.batch_name }} 已完成发布准备</h3><p>参与学生范围和宿舍范围均已设置，宿舍预检已通过。可以直接发布，无需再次进入范围设置。</p><div class="publish-confirmation-facts"><span>参与学生 {{ publishConfirmation.eligible_count ?? 0 }} 人</span><span>宿舍 {{ publishPreflightSnapshot?.roomCount ?? 0 }} 间</span><span>可用容量 {{ publishPreflightSnapshot?.availableCapacity ?? 0 }}</span></div><div class="button-row dialog-actions"><button class="button ghost" type="button" :disabled="publishing" @click="closePublishConfirmation">暂不发布</button><button class="button primary" type="button" :disabled="publishing" @click="confirmPublish">{{ publishing ? '正在发布…' : '直接发布' }}</button></div></section></div>
 
     <div v-if="copyDialog" class="modal-overlay" @click.self="closeCopy"><section class="modal-card copy-dialog"><header class="section-head split-title"><div><span class="eyebrow">COPY BATCH</span><h3>复制“{{ copySource?.batch_name }}”</h3><p>自动保留选择模式、类别隔离、规则模板和宿舍范围。</p></div><button class="button ghost small" @click="closeCopy">关闭</button></header><form class="form-grid two-column" @submit.prevent="copyBatch"><label><span>新批次编号</span><input v-model.trim="copyForm.batchCode" class="input" required /></label><label><span>新批次名称</span><input v-model.trim="copyForm.batchName" class="input" required /></label><label><span>开始时间</span><input v-model="copyForm.startAt" class="input" type="datetime-local" required /><small>24小时制</small></label><label><span>结束时间</span><input v-model="copyForm.endAt" class="input" type="datetime-local" required /><small>24小时制</small></label><label class="span-2"><span>复制原因</span><textarea v-model.trim="copyForm.reason" class="input" required rows="3" /></label><div class="button-row span-2"><button class="button ghost" type="button" @click="closeCopy">取消</button><button class="button primary" :disabled="copying">{{ copying ? '复制中…' : '创建草稿副本' }}</button></div></form></section></div>
 
@@ -633,7 +651,7 @@ function issueText(room: DataObject) {
 .batch-facts { margin: 14px 0; }
 .batch-facts .warn { color: #b45309; font-weight: 700; }
 .scope-dialog { position:relative; width: min(1180px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow: auto; padding: 24px; }.scope-floating-actions{position:absolute;top:18px;right:22px;z-index:5}.scope-sticky-header{padding-right:250px!important}
-.scope-sticky-header { position: sticky; top: -24px; z-index: 3; margin: -24px -24px 16px; padding: 20px 24px; border-bottom: 1px solid var(--border); background: var(--surface); }
+.scope-sticky-header h3{margin:4px 0}.scope-sticky-header p,.preflight-dialog .section-head p{margin:0}.scope-sticky-header { position: sticky; top: -24px; z-index: 3; margin: -24px -24px 16px; padding: 20px 24px; border-bottom: 1px solid var(--border); background: var(--surface); }
 .scope-filter-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .scope-filter-grid .span-2 { grid-column: span 2; }
 .scope-summary { display: grid; grid-template-columns: repeat(2, minmax(0, 180px)); gap: 12px; margin-bottom: 14px; }
@@ -650,7 +668,7 @@ function issueText(room: DataObject) {
 .scope-option span { color: var(--text-muted); font-size: 12px; }
 .scope-option.disabled { opacity: .55; background: var(--surface-soft); }
 .scope-footer { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--border); color: var(--text-muted); }
-.preflight-dialog, .allocation-dialog { width: min(980px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow: auto; padding: 28px; background:var(--panel,#fff); box-shadow:0 28px 80px rgba(8,25,53,.28); }.allocation-overlay{padding:24px;background:rgba(8,22,47,.76);backdrop-filter:blur(8px)}.publish-confirmation-dialog{width:min(560px,calc(100vw - 32px));padding:26px}.publish-confirmation-dialog p{color:var(--muted);line-height:1.7}.publish-confirmation-facts{display:flex;gap:8px;flex-wrap:wrap;margin:16px 0}.publish-confirmation-facts span{padding:7px 10px;border-radius:999px;color:#315c9e;background:#edf3ff;font-size:12px;font-weight:700}.publish-confirmation-dialog .dialog-actions{justify-content:flex-end}
+.preflight-dialog, .allocation-dialog { width: min(980px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow: auto; padding: 28px; background:var(--panel,#fff); box-shadow:0 28px 80px rgba(8,25,53,.28); }.allocation-overlay{padding:24px;background:rgba(8,22,47,.76);backdrop-filter:blur(8px)}.publish-confirmation-overlay{padding:0;background:transparent;backdrop-filter:none}.publish-confirmation-dialog{width:min(560px,calc(100vw - 32px));padding:26px}.publish-confirmation-dialog p{color:var(--muted);line-height:1.7}.publish-confirmation-facts{display:flex;gap:8px;flex-wrap:wrap;margin:16px 0}.publish-confirmation-facts span{padding:7px 10px;border-radius:999px;color:#315c9e;background:#edf3ff;font-size:12px;font-weight:700}.publish-confirmation-dialog .dialog-actions{justify-content:flex-end}
 .preflight-summary { display: grid; gap: 5px; padding: 15px; border-radius: 13px; background: #fef2f2; color: #991b1b; }
 .preflight-summary.pass { background: #f0fdf4; color: #166534; }
 .preflight-action { margin-top: 12px; }

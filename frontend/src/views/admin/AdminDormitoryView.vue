@@ -5,6 +5,7 @@ import ImportWorkflowModal from '../../components/admin/ImportWorkflowModal.vue'
 import RoomLayoutEditor from '../../components/admin/RoomLayoutEditor.vue'
 import PaginationBar from '../../components/common/PaginationBar.vue'
 import { api } from '../../api/client'
+import { useFeatureAccess } from '../../composables/useFeatureAccess'
 import type { DataObject, ListSuccessResponse } from '../../api/types'
 
 interface RoomEditForm {
@@ -24,6 +25,8 @@ const SCOPE_LABELS: Record<string, string> = {
 }
 
 const router = useRouter()
+const { hasFeature } = useFeatureAccess()
+const canViewRoomLayout = computed(() => hasFeature('P2_ROOM_LAYOUT_VIEW') || hasFeature('P2_ROOM_LAYOUT_UPDATE'))
 const buildings = ref<DataObject[]>([])
 const rooms = ref<DataObject[]>([])
 const buildingId = ref<number | undefined>()
@@ -193,7 +196,7 @@ function bedMappingText(room: DataObject) {
       </div>
       <p v-if="loadingRooms" class="empty-state">正在刷新房间列表…</p>
       <div v-else class="table-wrap">
-        <table><thead><tr><th>楼栋/房间</th><th>房型</th><th>性别</th><th>学生类别</th><th>在住容量</th><th>床位状态</th><th>运行</th><th /></tr></thead><tbody><tr v-for="room in pagedRooms" :key="String(room.id)"><td><strong>{{ room.building_name }} {{ room.room_number }}</strong><small>{{ room.floor_number }}层</small></td><td>{{ roomType(room.room_type) }}</td><td>{{ room.gender_restriction === 'M' ? '男寝' : '女寝' }}</td><td><span class="status-chip compact">{{ scopeText(room.resident_scope) }}</span></td><td><strong>{{ room.active_resident_count ?? 0 }}/{{ room.capacity }}</strong><small>剩余{{ room.remaining_capacity ?? room.capacity }}人</small></td><td><strong>{{ enabledBedCount(room) }}/{{ physicalBedCount(room) }}</strong><small :class="{ warning: Number(room.unconfirmed_bed_count ?? 0) > 0 }">{{ bedMappingText(room) }}</small></td><td><span class="status-chip compact">{{ statusText(room.operational_status) }}</span></td><td><div class="button-row compact-actions"><button class="button ghost small" type="button" @click="openRoomEditor(room)">属性</button><button class="button ghost small" type="button" @click="openLayoutEditor(room)">布局</button></div></td></tr></tbody></table>
+        <table><thead><tr><th>楼栋/房间</th><th>房型</th><th>性别</th><th>学生类别</th><th>在住容量</th><th>床位状态</th><th>运行</th><th /></tr></thead><tbody><tr v-for="room in pagedRooms" :key="String(room.id)"><td><strong>{{ room.building_name }} {{ room.room_number }}</strong><small>{{ room.floor_number }}层</small></td><td>{{ roomType(room.room_type) }}</td><td>{{ room.gender_restriction === 'M' ? '男寝' : '女寝' }}</td><td><span class="status-chip compact">{{ scopeText(room.resident_scope) }}</span></td><td><strong>{{ room.active_resident_count ?? 0 }}/{{ room.capacity }}</strong><small>剩余{{ room.remaining_capacity ?? room.capacity }}人</small></td><td><strong>{{ enabledBedCount(room) }}/{{ physicalBedCount(room) }}</strong><small :class="{ warning: Number(room.unconfirmed_bed_count ?? 0) > 0 }">{{ bedMappingText(room) }}</small></td><td><span class="status-chip compact">{{ statusText(room.operational_status) }}</span></td><td><div class="button-row compact-actions"><button class="button ghost small" type="button" @click="openRoomEditor(room)">属性</button><button v-if="canViewRoomLayout" class="button ghost small" type="button" @click="openLayoutEditor(room)">布局</button></div></td></tr></tbody></table>
       </div>
       <PaginationBar v-model:page="page" v-model:page-size="pageSize" :total="rooms.length" />
     </section>
