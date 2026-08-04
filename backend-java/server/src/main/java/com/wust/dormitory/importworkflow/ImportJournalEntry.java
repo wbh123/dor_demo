@@ -1,5 +1,6 @@
 package com.wust.dormitory.importworkflow;
 
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -11,8 +12,12 @@ public record ImportJournalEntry(
         Map<String, Object> metadata) {
 
     public ImportJournalEntry {
-        beforeState = beforeState == null ? Map.of() : Map.copyOf(new LinkedHashMap<>(beforeState));
-        afterState = afterState == null ? Map.of() : Map.copyOf(new LinkedHashMap<>(afterState));
-        metadata = metadata == null ? Map.of() : Map.copyOf(new LinkedHashMap<>(metadata));
+        beforeState = immutableCopy(beforeState);
+        afterState = immutableCopy(afterState);
+        metadata = immutableCopy(metadata);
+    }
+
+    private static Map<String, Object> immutableCopy(Map<String, Object> source) {
+        return Collections.unmodifiableMap(new LinkedHashMap<>(source == null ? Map.of() : source));
     }
 }
