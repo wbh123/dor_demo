@@ -26,9 +26,9 @@ public class ImportWorkflowController implements ImportWorkflowApi {
 
     @Override
     public ResponseEntity<ObjectSuccessResponse> previewImportTask(
-            String idempotencyKey,
             String type,
-            MultipartFile file) {
+            MultipartFile file,
+            String idempotencyKey) {
         SecurityUsers.requireAdmin();
         return ResponseEntity.ok(ResponseFactory.object(service.preview(file, type, idempotencyKey)));
     }
