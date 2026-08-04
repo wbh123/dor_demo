@@ -78,7 +78,7 @@ function removeSelected() {
         :placeholder="`填写面向${countryLabel(selectedCountry)}学生的欢迎语`"
       />
     </article>
-    <p v-else class="empty-state">通过“添加国家或地区”下拉框新增欢迎语，未配置国家自动使用美国卡片中的英文欢迎语。</p>
+    <p v-else class="empty-state">通过“添加国家或地区”下拉框新增欢迎语，未配置国家或地区自动使用英语欢迎语。</p>
   </section>
 </template>
 

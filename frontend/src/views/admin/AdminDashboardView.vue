@@ -92,7 +92,7 @@ async function translateChinese() {
   if (!source || translating.value) return
   const factory = (window as Window & { Translator?: BrowserTranslatorFactory }).Translator
   if (!factory?.create) {
-    welcomeError.value = '当前浏览器未启用本地翻译能力，请直接编辑美国卡片中的英文欢迎语。'
+    welcomeError.value = '当前浏览器未启用本地翻译能力，请直接编辑英语卡片中的欢迎语。'
     return
   }
   translating.value = true
@@ -111,7 +111,7 @@ async function saveWelcomeSetting() {
   const chinese = baseMessages['zh-CN'].trim()
   const english = baseMessages['en-US'].trim()
   if (!chinese || !english) {
-    welcomeError.value = '中国和美国两个基础欢迎语均为必填项。'
+    welcomeError.value = '汉语和英语两个基础欢迎语均为必填项。'
     return
   }
   const countries = Object.fromEntries(Object.entries(countryMessages.value)
@@ -156,17 +156,17 @@ function batchStatus(value: unknown) {
       </div>
 
       <section class="panel welcome-setting-card">
-        <div class="section-head"><div><span class="eyebrow">首次登录欢迎</span><h3>新生欢迎语</h3><p>基础卡片按国家名称展示。其他国家共用一个编辑器；未配置时自动使用美国卡片中的英文欢迎语。</p></div></div>
+        <div class="section-head"><div><span class="eyebrow">首次登录欢迎</span><h3>新生欢迎语</h3><p>基础卡片按语言展示。其他国家或地区可单独配置；未配置时自动使用英语欢迎语。</p></div></div>
         <p v-if="welcomeError" class="alert error">{{ welcomeError }}</p>
         <div class="base-country-grid">
           <article class="base-country-card">
-            <header><div><strong>中国</strong><small>中文基础欢迎语</small></div><span class="required-chip">必填</span></header>
-            <WelcomeMessageEditor v-model="baseMessages['zh-CN']" :token-examples="tokenExamples" placeholder="填写面向中国学生的中文欢迎语" />
+            <header><div><strong>汉语</strong><small>汉语基础欢迎语</small></div><span class="required-chip">必填</span></header>
+            <WelcomeMessageEditor v-model="baseMessages['zh-CN']" :token-examples="tokenExamples" placeholder="填写默认汉语欢迎语" />
           </article>
           <article class="base-country-card">
-            <header><div><strong>美国</strong><small>英文基础欢迎语，也是其他国家的默认回退</small></div><span class="required-chip">必填</span></header>
+            <header><div><strong>英语</strong><small>英语基础欢迎语，也是其他国家或地区的默认回退</small></div><span class="required-chip">必填</span></header>
             <WelcomeMessageEditor v-model="baseMessages['en-US']" :token-examples="tokenExamples" placeholder="Enter the default English welcome message" />
-            <button class="button ghost" type="button" :disabled="translating" @click="translateChinese">{{ translating ? '正在翻译…' : '根据中国欢迎语自动翻译' }}</button>
+            <button class="button ghost" type="button" :disabled="translating" @click="translateChinese">{{ translating ? '正在翻译…' : '根据汉语欢迎语自动翻译' }}</button>
           </article>
         </div>
 

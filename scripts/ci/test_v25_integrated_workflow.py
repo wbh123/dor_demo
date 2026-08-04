@@ -60,10 +60,10 @@ forbid("backend-java/model/src/main/resources/admin/openapi-import-policy.yaml",
 require("backend-java/server/src/main/java/com/wust/dormitory/importworkflow/StrictImportHeaders.java", "STUDENT_HEADERS", "ROOM_HEADERS", "IMPORT_HEADER_MISMATCH")
 forbid("backend-java/server/src/main/java/com/wust/dormitory/admin/StudentImportRowMapper.java", '"majorcode"', '"studentnumber"')
 
-# Welcome editor uses fixed Chinese/English plus country-name selectors and one shared country editor.
+# Welcome editor uses fixed Chinese/English language cards plus country-name selectors.
 require("frontend/src/components/admin/CountryWelcomeEditor.vue", "已配置国家或地区", "添加国家或地区")
-require("frontend/src/views/admin/AdminDashboardView.vue", "CountryWelcomeEditor", "中国", "美国")
-forbid("frontend/src/views/admin/AdminDashboardView.vue", "newLocale", "localeCode }}", "删除语言")
+require("frontend/src/views/admin/AdminDashboardView.vue", "CountryWelcomeEditor", "汉语", "英语", "countryMessages")
+forbid("frontend/src/views/admin/AdminDashboardView.vue", "newLocale", "localeCode }}", "删除语言", "<strong>美国</strong>", "美国卡片")
 
 # Both room-change policy cards use the shared three-button segmented control.
 require("frontend/src/components/admin/ThreeStateToggle.vue", "three-state-toggle")
@@ -81,11 +81,12 @@ for path in (
 ):
     require(path, "SINGLE_BED")
 
-# Actual-bed declarations are reviewed by administrators, including room-level approval and mobile UI.
+# Actual-bed declarations use one merged administrator business page.
 require("backend-java/model/src/main/resources/bedconfirmation/openapi-bed-confirmation.yaml", "submitBedConfirmation", "listBedConfirmationRooms", "approveRoomBedConfirmations")
 require("backend-java/server/src/main/java/com/wust/dormitory/bedconfirmation/BedConfirmationService.java", "PENDING", "approveRoom", "@Transactional")
 require("frontend/src/views/student/AssignmentView.vue", "提交实际床位核查", "/api/v1/student/bed-confirmations")
 require("frontend/src/views/admin/AdminBedConfirmationView.vue", "按寝室核查", "mobile-room-review", "sticky-room-actions")
-require("frontend/src/router/index.ts", "admin-bed-confirmations")
+require("frontend/src/views/admin/AdminResidencyView.vue", "AdminBedConfirmationView", "residencyTab")
+forbid("frontend/src/router/index.ts", "admin-bed-confirmations")
 
 print("V25 integrated workflow contracts passed")

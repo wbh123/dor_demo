@@ -59,6 +59,28 @@ paths:
                 $ref: '../common-response/openapi-common-response.yaml#/components/schemas/VoidSuccessResponse'
         '401': { $ref: '#/components/responses/ErrorResponse' }
 
+  /api/v1/auth/password:
+    put:
+      tags: [Auth]
+      operationId: changePassword
+      summary: 修改当前学校管理员密码
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ChangePasswordRequest' }
+      responses:
+        '200':
+          description: 修改成功
+          content:
+            application/json:
+              schema:
+                $ref: '../common-response/openapi-common-response.yaml#/components/schemas/VoidSuccessResponse'
+        '400': { $ref: '#/components/responses/ErrorResponse' }
+        '401': { $ref: '#/components/responses/ErrorResponse' }
+        '403': { $ref: '#/components/responses/ErrorResponse' }
+
   /api/v1/auth/me:
     get:
       tags: [Auth]
@@ -98,6 +120,13 @@ components:
         studentName: { type: string, minLength: 1, maxLength: 128 }
         password: { type: string, minLength: 8, maxLength: 72 }
 
+    ChangePasswordRequest:
+      type: object
+      required: [currentPassword, newPassword]
+      properties:
+        currentPassword: { type: string, minLength: 1, maxLength: 72 }
+        newPassword: { type: string, minLength: 12, maxLength: 72 }
+
     WelcomeData:
       type: object
       required: [required, title, messages]
@@ -110,9 +139,6 @@ components:
           type: object
           additionalProperties:
             type: string
-        message:
-          type: string
-          description: 兼容旧客户端的中文欢迎语
 
     CurrentUserData:
       type: object

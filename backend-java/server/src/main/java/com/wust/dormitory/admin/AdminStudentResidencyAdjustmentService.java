@@ -127,7 +127,8 @@ public class AdminStudentResidencyAdjustmentService {
             Long currentBedId) {
         return jdbc.queryForList("""
                 SELECT bed.id AS bed_id, bed.room_id, bed.bed_code, bed.bed_type,
-                       room.room_number, room.capacity, room.resident_scope,
+                       bed.position_index, bed.layout_x, bed.layout_z, bed.rotation_degrees,
+                       bed.operational_status, room.room_number, room.capacity, room.resident_scope,
                        floor.floor_number,
                        building.id AS building_id, building.building_code,
                        building.building_name,

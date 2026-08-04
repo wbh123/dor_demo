@@ -43,6 +43,7 @@ def validate_openapi(errors: list[str]) -> int:
     critical_paths = {
         "/api/v1/auth/login",
         "/api/v1/auth/activate",
+        "/api/v1/auth/password",
         "/api/v1/admin/batches",
         "/api/v1/admin/batches/{batchId}/scope",
         "/api/v1/admin/batches/{batchId}/room-preflight",
@@ -418,8 +419,10 @@ def validate_comprehensive_enhancements(errors: list[str]) -> None:
     require(
         "countryMessages" in dashboard_view
         and "configuration.countryMessages().get(countryCode)" in welcome_service
-        and 'configuration.messages().get("en-US")' in welcome_service,
-        "country-specific welcome messages or English fallback are missing",
+        and "configuration.messages().forEach" in welcome_service
+        and "data.setMessages(renderedMessages)" in welcome_service
+        and "data.setMessage(" not in welcome_service,
+        "language and country welcome messages do not follow the canonical messages object",
         errors,
     )
     for token in (

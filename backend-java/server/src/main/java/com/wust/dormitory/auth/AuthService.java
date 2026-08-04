@@ -88,6 +88,30 @@ public class AuthService {
                 .addValue("userId", ((Number) row.get("user_id")).longValue()));
     }
 
+    @Transactional
+    public void changePassword(CurrentUser user, String currentPassword, String newPassword) {
+        if (user == null || !"ADMIN".equals(user.userType())) {
+            throw new BusinessException("ADMIN_PASSWORD_FORBIDDEN", "只有学校管理员可以在此修改密码", HttpStatus.FORBIDDEN);
+        }
+        if (newPassword == null || newPassword.length() < 12 || newPassword.length() > 72
+                || !newPassword.matches(".*[A-Z].*")
+                || !newPassword.matches(".*[a-z].*")
+                || !newPassword.matches(".*[0-9].*")
+                || !newPassword.matches(".*[^A-Za-z0-9].*")) {
+            throw new BusinessException("PASSWORD_POLICY_INVALID",
+                    "新密码需为12至72位，并同时包含大写字母、小写字母、数字和特殊字符");
+        }
+        String hash = jdbc.queryForObject("SELECT password_hash FROM app_user WHERE id=:id",
+                Map.of("id", user.userId()), String.class);
+        if (hash == null || currentPassword == null || !passwordEncoder.matches(currentPassword, hash)) {
+            throw new BusinessException("CURRENT_PASSWORD_INVALID", "当前密码不正确", HttpStatus.UNAUTHORIZED);
+        }
+        jdbc.update("UPDATE app_user SET password_hash=:hash, password_change_required=0 WHERE id=:id",
+                new MapSqlParameterSource().addValue("hash", passwordEncoder.encode(newPassword))
+                        .addValue("id", user.userId()));
+        tokenService.revokeUser(user.userId());
+    }
+
     public record LoginResult(String accessToken, long expiresInSeconds, CurrentUser user) {
     }
 }

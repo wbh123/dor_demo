@@ -59,22 +59,10 @@ public class StudentWelcomeService {
                         locale,
                         render(countryTemplate == null || countryTemplate.isBlank() ? message : countryTemplate, variables)));
 
-        String selectedTemplate = countryTemplate;
-        if (selectedTemplate == null || selectedTemplate.isBlank()) {
-            selectedTemplate = "CN".equals(countryCode)
-                    ? configuration.messages().get("zh-CN")
-                    : configuration.messages().get("en-US");
-        }
-        if (selectedTemplate == null || selectedTemplate.isBlank()) {
-            selectedTemplate = configuration.messages().get("en-US");
-        }
-        String selected = render(selectedTemplate, variables);
-
         WelcomeData data = new WelcomeData();
         data.setRequired(student.get("welcome_acknowledged_at") == null);
         data.setTitle("新同学，欢迎你");
         data.setMessages(renderedMessages);
-        data.setMessage(selected);
         return data;
     }
 

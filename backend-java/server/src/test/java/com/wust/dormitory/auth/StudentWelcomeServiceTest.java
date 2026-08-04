@@ -27,9 +27,8 @@ class StudentWelcomeServiceTest {
 
         WelcomeData result = fixture.service.welcomeFor(studentUser());
 
-        assertThat(result.getMessage())
-                .isEqualTo("欢迎张同学，你是2026计算机科学与技术的硕士生。");
         assertThat(result.getMessages())
+                .containsEntry("zh-CN", "欢迎张同学，你是2026计算机科学与技术的硕士生。")
                 .containsEntry("en-US", "Welcome 张同学 (202600000001).")
                 .containsEntry("ja-JP", "张同学さん、ようこそ。")
                 .doesNotContainKey("countryMessages");
@@ -43,7 +42,7 @@ class StudentWelcomeServiceTest {
 
         WelcomeData result = fixture.service.welcomeFor(studentUser());
 
-        assertThat(result.getMessage())
+        assertThat(result.getMessages().get("en-US"))
                 .isEqualTo("Welcome 张同学 (202600000001).");
         assertThat(result.getMessages().get("ja-JP"))
                 .isEqualTo("张同学さん、ようこそ。");
@@ -58,8 +57,6 @@ class StudentWelcomeServiceTest {
 
         WelcomeData result = fixture.service.welcomeFor(studentUser());
 
-        assertThat(result.getMessage())
-                .isEqualTo("张同学，请先到国际学生服务中心完成报到。");
         assertThat(result.getMessages())
                 .allSatisfy((locale, message) -> assertThat(message)
                         .isEqualTo("张同学，请先到国际学生服务中心完成报到。"));

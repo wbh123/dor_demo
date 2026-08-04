@@ -73,7 +73,7 @@ function serviceStatus(value: unknown) {
   return ({ ACTIVE: '运行正常', SUSPENDED: '服务已暂停', TERMINATED: '服务已终止' } as Record<string, string>)[String(value)] ?? '状态未知'
 }
 function quotaName(code: unknown) {
-  return ({ MAX_STUDENTS: '学生容量', MAX_ROOMS: '宿舍房间', MAX_BEDS: '床位容量', MAX_ACTIVE_BATCHES: '同时开放批次', MAX_ADMIN_USERS: '管理员账号' } as Record<string, string>)[String(code)] ?? '资源项目'
+  return ({ MAX_ADMIN_USERS: '管理员账号', MAX_STUDENTS: '学生容量', MAX_CAMPUSES: '校区数量', MAX_BUILDINGS: '宿舍楼栋', MAX_ROOMS: '宿舍房间', MAX_BEDS: '床位容量', MAX_BATCHES_PER_YEAR: '年度选寝批次', MAX_CONCURRENT_ACTIVE_BATCHES: '同时开放批次' } as Record<string, string>)[String(code)] ?? String(code ?? '未命名资源')
 }
 </script>
 
