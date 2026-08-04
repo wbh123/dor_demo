@@ -44,7 +44,7 @@ public class BedHoldKeyInspector {
         Set<String> orphanKeys = new LinkedHashSet<>();
         Set<String> retainedKeys = new LinkedHashSet<>();
         for (String key : scannedKeys) {
-            BatchBed parsed = parse(key);
+            BatchBed parsed = parseKey(key);
             Long ttl = redis.getExpire(key);
             if (parsed == null || ttl == null || ttl <= 0 || !activePairs.contains(parsed)) {
                 orphanKeys.add(key);
@@ -72,7 +72,7 @@ public class BedHoldKeyInspector {
         return keys == null ? Set.of() : keys;
     }
 
-    private BatchBed parse(String key) {
+    static BatchBed parseKey(String key) {
         Matcher matcher = HOLD_KEY.matcher(key == null ? "" : key);
         if (!matcher.matches()) {
             return null;
@@ -82,7 +82,7 @@ public class BedHoldKeyInspector {
                 Long.parseLong(matcher.group(2)));
     }
 
-    private record BatchBed(long batchId, long bedId) {
+    record BatchBed(long batchId, long bedId) {
     }
 
     public record Inspection(
