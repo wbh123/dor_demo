@@ -10,9 +10,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @Service
 @Primary
@@ -32,10 +34,21 @@ public class SingleBedRoomLayoutService extends RoomLayoutService {
     public Map<String, Object> getLayout(long roomId) {
         Map<String, Object> source = super.getLayout(roomId);
         Map<String, Object> result = new LinkedHashMap<>(source);
+        Set<Long> residentBedIds = new HashSet<>(jdbc.query("""
+                SELECT bed_id
+                FROM room_assignment
+                WHERE room_id=:roomId
+                  AND assignment_status='ACTIVE'
+                  AND bed_id IS NOT NULL
+                """, Map.of("roomId", roomId), (rs, rowNum) -> rs.getLong(1)));
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> sourceBeds = (List<Map<String, Object>>) source.getOrDefault("beds", List.of());
         List<Map<String, Object>> beds = sourceBeds.stream().map(item -> {
             Map<String, Object> bed = new LinkedHashMap<>(item);
+            long bedId = ((Number) item.get("id")).longValue();
+            if (residentBedIds.contains(bedId)) {
+                bed.put("occupied", 1);
+            }
             if (SINGLE_BED.equals(String.valueOf(item.get("bed_type")))) {
                 bed.put("layout_unit_type", SINGLE_BED);
             }
@@ -59,6 +72,13 @@ public class SingleBedRoomLayoutService extends RoomLayoutService {
                 normalized.add(copy(item, "LOFT_BED_DESK"));
             } else if ("LOFT_BED_DESK".equals(requested)) {
                 convertSingleBedToLoft(item.bedId(), roomId);
+                normalized.add(item);
+            } else if ("BUNK".equals(requested)) {
+                Map<String, Object> bed = lockBed(item.bedId(), roomId);
+                String currentType = String.valueOf(bed.get("bed_type"));
+                if (!currentType.startsWith("BUNK_")) {
+                    requireEmpty(bed);
+                }
                 normalized.add(item);
             } else {
                 normalized.add(item);
@@ -103,6 +123,10 @@ public class SingleBedRoomLayoutService extends RoomLayoutService {
                        CASE WHEN EXISTS (
                            SELECT 1 FROM bed_assignment assignment
                            WHERE assignment.bed_id=bed.id
+                       ) OR EXISTS (
+                           SELECT 1 FROM room_assignment residency
+                           WHERE residency.bed_id=bed.id
+                             AND residency.assignment_status='ACTIVE'
                        ) THEN 1 ELSE 0 END AS occupied
                 FROM bed
                 WHERE bed.id=:bedId AND bed.room_id=:roomId
