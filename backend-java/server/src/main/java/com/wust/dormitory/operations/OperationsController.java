@@ -6,9 +6,6 @@ import com.wust.dormitory.model.dto.ListSuccessResponse;
 import com.wust.dormitory.model.dto.ObjectSuccessResponse;
 import com.wust.dormitory.security.SecurityUsers;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -48,28 +45,26 @@ public class OperationsController implements OperationsApi {
                 randomSeed == null ? 2026L : randomSeed)));
     }
 
-    @GetMapping("/api/v1/admin/operations/redis-recovery/preview")
+    @Override
     public ResponseEntity<ObjectSuccessResponse> previewRedisRecovery() {
         SecurityUsers.requireAdmin();
         return ResponseEntity.ok(ResponseFactory.object(redisRecoveryService.previewRecovery()));
     }
 
-    @PostMapping("/api/v1/admin/operations/redis-recovery/execute")
+    @Override
     public ResponseEntity<ObjectSuccessResponse> executeRedisRecovery() {
         SecurityUsers.requireAdmin();
         return ResponseEntity.ok(ResponseFactory.object(redisRecoveryService.executeRecovery()));
     }
 
-    @GetMapping("/api/v1/admin/operations/anomalies")
-    public ResponseEntity<ListSuccessResponse> listAnomalies(
-            @RequestParam(required = false, defaultValue = "ALL") String type,
-            @RequestParam(required = false, defaultValue = "ALL") String severity) {
+    @Override
+    public ResponseEntity<ListSuccessResponse> listOperationsAnomalies(String type, String severity) {
         SecurityUsers.requireAdmin();
         return ResponseEntity.ok(ResponseFactory.list(anomalyWorkbenchService.listAnomalies(type, severity)));
     }
 
-    @GetMapping("/api/v1/admin/operations/anomalies/summary")
-    public ResponseEntity<ObjectSuccessResponse> anomalySummary() {
+    @Override
+    public ResponseEntity<ObjectSuccessResponse> getOperationsAnomalySummary() {
         SecurityUsers.requireAdmin();
         return ResponseEntity.ok(ResponseFactory.object(anomalyWorkbenchService.summary()));
     }
