@@ -13,6 +13,8 @@ import com.wust.dormitory.security.SecurityUsers;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.LinkedHashMap;
+
 @RestController
 public class WaitlistController implements WaitlistApi {
     private final WaitlistService service;
@@ -156,6 +158,7 @@ public class WaitlistController implements WaitlistApi {
             WaitlistActionRequest request) {
         CurrentUser admin = SecurityUsers.requireAdmin();
         return ResponseEntity.ok(ResponseFactory.object(
-                service.scanAvailableResources(admin)));
+                new LinkedHashMap<String, Object>(
+                        service.scanAvailableResources(admin))));
     }
 }
