@@ -216,12 +216,12 @@ async function saveWelcomeSetting() {
   welcomeError.value = ''
   const normalizedMessages = Object.fromEntries(
     Object.entries(languageMessages).map(([locale, message]) => [locale, message.trim()]),
-  )
+  ) as Record<string, string>
   const normalizedCountries = Object.fromEntries(
     Object.entries(countryMessages)
       .map(([code, message]) => [code.toUpperCase(), message.trim()])
       .filter(([, message]) => Boolean(message)),
-  )
+  ) as Record<string, string>
   if (!normalizedMessages['zh-CN'] || !normalizedMessages['en-US']) {
     welcomeError.value = '中文和英文是必填的基础版本。'
     return
