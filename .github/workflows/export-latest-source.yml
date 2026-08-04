@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - export/latest-public-main-20260804
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
