@@ -22,15 +22,13 @@ const exchangeForm = reactive({ reason: '' })
 const { subtitle, translateError } = useI18n()
 
 const modeText = computed(() => ({
-  DISABLED: '未开放',
-  FREE: '自由换寝',
-  APPROVAL_REQUIRED: '管理员审批',
+  DISABLED: '未开放', FREE: '自由换寝', APPROVAL_REQUIRED: '管理员审批',
 } as Record<string, string>)[String(policy.value.mode)] ?? '未开放')
 const exchangeModeText = computed(() => ({
-  DISABLED: '未开放',
+  DISABLED: '未开放', ENABLED: '已开放',
   MUTUAL_CONFIRMATION: '双方确认后直接交换',
   APPROVAL_REQUIRED: '双方确认后由管理员审批',
-} as Record<string, string>)[String(exchangePolicy.value.mode)] ?? '未开放')
+} as Record<string, string>)[String(exchangePolicy.value.mode)] ?? '已开放')
 const incomingExchanges = computed(() => exchangeRequests.value.filter((item) =>
   String(item.target_student_number) === String(profile.value.student_number)
   && String(item.request_status) === 'WAITING_TARGET',
@@ -45,35 +43,37 @@ async function load() {
   loading.value = true
   error.value = ''
   try {
-    const [profileResponse, policyResponse, historyResponse, exchangePolicyResponse, exchangeHistoryResponse] = await Promise.all([
+    const [profileResponse, policyResponse, historyResponse, exchangeHistoryResponse] = await Promise.all([
       api.get<ObjectSuccessResponse>('/api/v1/student/profile'),
       api.get<ObjectSuccessResponse>('/api/v1/student/room-change/policy'),
       api.get<ListSuccessResponse>('/api/v1/student/room-change/requests'),
-      api.get<ObjectSuccessResponse>('/api/v1/student/room-exchanges/policy'),
       api.get<ListSuccessResponse>('/api/v1/student/room-exchanges'),
     ])
     profile.value = (profileResponse.data.data ?? {}) as DataObject
     policy.value = (policyResponse.data.data ?? {}) as DataObject
     requests.value = (historyResponse.data.data ?? []) as DataObject[]
-    exchangePolicy.value = (exchangePolicyResponse.data.data ?? {}) as DataObject
     exchangeRequests.value = (exchangeHistoryResponse.data.data ?? []) as DataObject[]
 
-    const optionalRequests: Promise<unknown>[] = []
     if (Boolean(policy.value.enabled)) {
-      optionalRequests.push(api.get<ListSuccessResponse>('/api/v1/student/room-change/candidates').then((response) => {
-        candidates.value = (response.data.data ?? []) as DataObject[]
-      }))
+      const candidateResponse = await api.get<ListSuccessResponse>('/api/v1/student/room-change/candidates')
+      candidates.value = (candidateResponse.data.data ?? []) as DataObject[]
     } else {
       candidates.value = []
     }
-    if (Boolean(exchangePolicy.value.enabled)) {
-      optionalRequests.push(api.get<ListSuccessResponse>('/api/v1/student/room-exchanges/candidates').then((response) => {
-        exchangeCandidates.value = (response.data.data ?? []) as DataObject[]
-      }))
-    } else {
+
+    try {
+      const exchangeCandidateResponse = await api.get<ListSuccessResponse>('/api/v1/student/room-exchanges/candidates')
+      exchangeCandidates.value = (exchangeCandidateResponse.data.data ?? []) as DataObject[]
+      const latestMode = String(exchangeRequests.value[0]?.policy_mode ?? 'ENABLED')
+      exchangePolicy.value = {
+        mode: latestMode,
+        enabled: true,
+        requiresApproval: latestMode === 'APPROVAL_REQUIRED',
+      }
+    } catch {
       exchangeCandidates.value = []
+      exchangePolicy.value = { mode: 'DISABLED', enabled: false, requiresApproval: false }
     }
-    await Promise.all(optionalRequests)
   } catch (reason) {
     error.value = translateError(reason)
   } finally {
@@ -87,10 +87,7 @@ function requestChange(room: DataObject) {
   error.value = ''
   message.value = ''
 }
-
-function closeDialog() {
-  if (!submitting.value) target.value = null
-}
+function closeDialog() { if (!submitting.value) target.value = null }
 
 async function submit() {
   if (!target.value || submitting.value) return
@@ -99,8 +96,7 @@ async function submit() {
   message.value = ''
   try {
     const response = await api.post<ObjectSuccessResponse>('/api/v1/student/room-change/requests', {
-      targetRoomId: Number(target.value.id),
-      reason: form.reason.trim(),
+      targetRoomId: Number(target.value.id), reason: form.reason.trim(),
     })
     const result = (response.data.data ?? {}) as DataObject
     message.value = String(result.request_status) === 'EXECUTED'
@@ -133,10 +129,7 @@ function openExchange(candidate: DataObject) {
   error.value = ''
   message.value = ''
 }
-
-function closeExchangeDialog() {
-  if (!submitting.value) exchangeTarget.value = null
-}
+function closeExchangeDialog() { if (!submitting.value) exchangeTarget.value = null }
 
 async function submitExchange() {
   if (!exchangeTarget.value || submitting.value) return
@@ -166,8 +159,7 @@ async function respondExchange(item: DataObject, accepted: boolean) {
   error.value = ''
   try {
     const response = await api.post<ObjectSuccessResponse>(`/api/v1/student/room-exchanges/${item.id}/respond`, {
-      accepted,
-      reason: reason.trim(),
+      accepted, reason: reason.trim(),
     })
     const result = (response.data.data ?? {}) as DataObject
     if (!accepted) message.value = '已拒绝本次交换邀请。'
@@ -204,79 +196,26 @@ function statusText(value: unknown) {
 
 <template>
   <div class="content-column">
-    <header class="page-title split-title">
-      <div>
-        <span class="eyebrow">{{ subtitle('住宿调整', 'ROOM CHANGE') }}</span>
-        <h2>换寝与寝室交换</h2>
-        <p>可以申请迁入空余寝室，也可以在双方达成意向后交换现有寝室和床位。</p>
-      </div>
-      <button class="button secondary" @click="load">刷新</button>
-    </header>
-    <p v-if="error" class="alert error">{{ error }}</p>
-    <p v-if="message" class="alert success">{{ message }}</p>
+    <header class="page-title split-title"><div><span class="eyebrow">{{ subtitle('住宿调整', 'ROOM CHANGE') }}</span><h2>换寝与寝室交换</h2><p>可以申请迁入空余寝室，也可以在双方达成意向后交换现有寝室和床位。</p></div><button class="button secondary" @click="load">刷新</button></header>
+    <p v-if="error" class="alert error">{{ error }}</p><p v-if="message" class="alert success">{{ message }}</p>
 
-    <section class="panel policy-summary-grid">
-      <article><span>单人换寝策略</span><strong>{{ modeText }}</strong><small>迁入空余寝室或床位</small></article>
-      <article><span>双方交换策略</span><strong>{{ exchangeModeText }}</strong><small>互换双方当前寝室与床位</small></article>
-    </section>
+    <section class="panel policy-summary-grid"><article><span>单人换寝策略</span><strong>{{ modeText }}</strong><small>迁入空余寝室或床位</small></article><article><span>双方交换策略</span><strong>{{ exchangeModeText }}</strong><small>互换双方当前寝室与床位</small></article></section>
 
-    <section v-if="policy.enabled" class="panel">
-      <div class="section-head"><div><span class="eyebrow">空余资源换寝</span><h3>符合条件的可用寝室</h3><p>系统已按性别、学生类别和真实剩余容量过滤。</p></div></div>
-      <p v-if="loading" class="empty-state">正在加载…</p>
-      <div v-else class="change-room-grid">
-        <article v-for="room in candidates" :key="String(room.id)" class="change-room-card">
-          <div><span class="eyebrow">{{ room.building_name }}</span><h3>{{ room.room_number }}室</h3><p>{{ room.floor_number }}层 · {{ room.room_type }} · 剩余{{ room.available_count }}个名额</p></div>
-          <button class="button primary" @click="requestChange(room)">选择此寝室</button>
-        </article>
-        <p v-if="!candidates.length" class="empty-state">当前没有符合条件的空余寝室。</p>
-      </div>
-    </section>
+    <section v-if="policy.enabled" class="panel"><div class="section-head"><div><span class="eyebrow">空余资源换寝</span><h3>符合条件的可用寝室</h3><p>系统已按性别、学生类别和真实剩余容量过滤。</p></div></div><p v-if="loading" class="empty-state">正在加载…</p><div v-else class="change-room-grid"><article v-for="room in candidates" :key="String(room.id)" class="change-room-card"><div><span class="eyebrow">{{ room.building_name }}</span><h3>{{ room.room_number }}室</h3><p>{{ room.floor_number }}层 · {{ room.room_type }} · 剩余{{ room.available_count }}个名额</p></div><button class="button primary" @click="requestChange(room)">选择此寝室</button></article><p v-if="!candidates.length" class="empty-state">当前没有符合条件的空余寝室。</p></div></section>
     <section v-else class="panel empty-state"><h3>学校当前未开放单人换寝</h3><p>如有特殊需求，请联系管理员处理。</p></section>
 
-    <section v-if="exchangePolicy.enabled" class="panel">
-      <div class="section-head"><div><span class="eyebrow">双方意向交换</span><h3>可邀请交换的在住学生</h3><p>发送邀请后，对方必须明确接受；管理员可配置双方确认后直接执行或继续审批。</p></div></div>
-      <div class="exchange-candidate-grid">
-        <article v-for="candidate in exchangeCandidates" :key="String(candidate.target_student_id)" class="exchange-candidate-card">
-          <div><strong>{{ candidate.student_name }}</strong><small>{{ candidate.student_number }}</small></div>
-          <p>{{ candidate.building_name }} {{ candidate.room_number }}室<span v-if="candidate.bed_code"> · {{ candidate.bed_code }}</span></p>
-          <button class="button secondary" @click="openExchange(candidate)">发起交换</button>
-        </article>
-        <p v-if="!exchangeCandidates.length" class="empty-state">当前没有可发起交换的学生。</p>
-      </div>
-    </section>
+    <section v-if="exchangePolicy.enabled" class="panel"><div class="section-head"><div><span class="eyebrow">双方意向交换</span><h3>可邀请交换的在住学生</h3><p>发送邀请后，对方必须明确接受；管理员可配置双方确认后直接执行或继续审批。</p></div></div><div class="exchange-candidate-grid"><article v-for="candidate in exchangeCandidates" :key="String(candidate.target_student_id)" class="exchange-candidate-card"><div><strong>{{ candidate.student_name }}</strong><small>{{ candidate.student_number }}</small></div><p>{{ candidate.building_name }} {{ candidate.room_number }}室<span v-if="candidate.bed_code"> · {{ candidate.bed_code }}</span></p><button class="button secondary" @click="openExchange(candidate)">发起交换</button></article><p v-if="!exchangeCandidates.length" class="empty-state">当前没有可发起交换的学生。</p></div></section>
     <section v-else class="panel empty-state"><h3>学校当前未开放寝室交换</h3><p>单人换寝策略不受影响。</p></section>
 
-    <section v-if="incomingExchanges.length" class="panel incoming-panel">
-      <div class="section-head"><div><span class="eyebrow">待你确认</span><h3>收到的寝室交换邀请</h3></div></div>
-      <article v-for="item in incomingExchanges" :key="String(item.id)" class="incoming-exchange-card">
-        <div><strong>{{ item.initiator_student_name }}（{{ item.initiator_student_number }}）</strong><p>希望用 {{ item.initiator_building_name }} {{ item.initiator_room_number }}室 {{ item.initiator_bed_code || '未确认床位' }} 与你的当前寝室床位交换。</p><small>原因：{{ item.reason }}</small></div>
-        <div class="button-row"><button class="button primary" :disabled="submitting" @click="respondExchange(item, true)">接受交换</button><button class="button ghost" :disabled="submitting" @click="respondExchange(item, false)">拒绝</button></div>
-      </article>
-    </section>
+    <section v-if="incomingExchanges.length" class="panel incoming-panel"><div class="section-head"><div><span class="eyebrow">待你确认</span><h3>收到的寝室交换邀请</h3></div></div><article v-for="item in incomingExchanges" :key="String(item.id)" class="incoming-exchange-card"><div><strong>{{ item.initiator_student_name }}（{{ item.initiator_student_number }}）</strong><p>希望用 {{ item.initiator_building_name }} {{ item.initiator_room_number }}室 {{ item.initiator_bed_code || '未确认床位' }} 与你的当前寝室床位交换。</p><small>原因：{{ item.reason }}</small></div><div class="button-row"><button class="button primary" :disabled="submitting" @click="respondExchange(item, true)">接受交换</button><button class="button ghost" :disabled="submitting" @click="respondExchange(item, false)">拒绝</button></div></article></section>
 
-    <section class="panel">
-      <div class="section-head"><div><span class="eyebrow">单人换寝记录</span><h3>我的换寝历史</h3></div></div>
-      <div class="table-wrap"><table><thead><tr><th>申请时间</th><th>原寝室</th><th>目标寝室</th><th>状态</th><th>原因/意见</th><th>操作</th></tr></thead><tbody><tr v-for="item in requests" :key="String(item.id)"><td>{{ item.created_at }}</td><td>{{ item.source_building_name }} {{ item.source_room_number }}</td><td>{{ item.target_building_name }} {{ item.target_room_number }}</td><td><span class="status-pill">{{ statusText(item.request_status) }}</span></td><td>{{ item.review_reason || item.reason }}</td><td><button v-if="item.request_status==='PENDING'" class="button ghost small" @click="cancelRequest(item)">取消申请</button></td></tr></tbody></table></div>
-    </section>
+    <section class="panel"><div class="section-head"><div><span class="eyebrow">单人换寝记录</span><h3>我的换寝历史</h3></div></div><div class="table-wrap"><table><thead><tr><th>申请时间</th><th>原寝室</th><th>目标寝室</th><th>状态</th><th>原因/意见</th><th>操作</th></tr></thead><tbody><tr v-for="item in requests" :key="String(item.id)"><td>{{ item.created_at }}</td><td>{{ item.source_building_name }} {{ item.source_room_number }}</td><td>{{ item.target_building_name }} {{ item.target_room_number }}</td><td><span class="status-pill">{{ statusText(item.request_status) }}</span></td><td>{{ item.review_reason || item.reason }}</td><td><button v-if="item.request_status==='PENDING'" class="button ghost small" @click="cancelRequest(item)">取消申请</button></td></tr></tbody></table></div></section>
 
-    <section class="panel">
-      <div class="section-head"><div><span class="eyebrow">寝室交换记录</span><h3>双方交换历史</h3></div></div>
-      <div class="table-wrap"><table><thead><tr><th>对方学生</th><th>交换方向</th><th>状态</th><th>申请原因</th><th>处理意见</th><th>操作</th></tr></thead><tbody><tr v-for="item in exchangeRequests" :key="String(item.id)"><td>{{ item.initiator_student_number===profile.student_number ? item.target_student_name : item.initiator_student_name }}</td><td>{{ item.initiator_room_number }} ↔ {{ item.target_room_number }}</td><td><span class="status-pill">{{ statusText(item.request_status) }}</span></td><td>{{ item.reason }}</td><td>{{ item.review_reason || item.target_response_reason || '-' }}</td><td><button v-if="outgoingExchanges.includes(item) && ['WAITING_TARGET','PENDING_ADMIN'].includes(String(item.request_status))" class="button ghost small" @click="cancelExchange(item)">取消交换</button></td></tr></tbody></table></div>
-    </section>
+    <section class="panel"><div class="section-head"><div><span class="eyebrow">寝室交换记录</span><h3>双方交换历史</h3></div></div><div class="table-wrap"><table><thead><tr><th>对方学生</th><th>交换方向</th><th>状态</th><th>申请原因</th><th>处理意见</th><th>操作</th></tr></thead><tbody><tr v-for="item in exchangeRequests" :key="String(item.id)"><td>{{ item.initiator_student_number===profile.student_number ? item.target_student_name : item.initiator_student_name }}</td><td>{{ item.initiator_room_number }} ↔ {{ item.target_room_number }}</td><td><span class="status-pill">{{ statusText(item.request_status) }}</span></td><td>{{ item.reason }}</td><td>{{ item.review_reason || item.target_response_reason || '-' }}</td><td><button v-if="outgoingExchanges.includes(item) && ['WAITING_TARGET','PENDING_ADMIN'].includes(String(item.request_status))" class="button ghost small" @click="cancelExchange(item)">取消交换</button></td></tr></tbody></table></div></section>
 
-    <div v-if="target" class="modal-overlay room-change-overlay" @click.self="closeDialog">
-      <section class="modal-card room-change-dialog" role="dialog" aria-modal="true">
-        <header class="section-head split-title"><div><span class="eyebrow">确认换寝</span><h3>{{ target.building_name }} {{ target.room_number }}室</h3><p>{{ policy.requiresApproval ? '提交后由管理员审批。' : '确认后将立即更新住宿记录。' }}</p></div><button class="button ghost small" @click="closeDialog">关闭</button></header>
-        <form class="form-stack" @submit.prevent="submit"><label><span>换寝原因</span><textarea v-model.trim="form.reason" class="input" required maxlength="500" rows="5" placeholder="请说明换寝原因，便于学校留档" /></label><div class="button-row dialog-actions"><button type="button" class="button ghost" @click="closeDialog">取消</button><button class="button primary" :disabled="submitting">{{ submitting ? '正在提交…' : policy.requiresApproval ? '提交申请' : '确认自由换寝' }}</button></div></form>
-      </section>
-    </div>
+    <div v-if="target" class="modal-overlay room-change-overlay" @click.self="closeDialog"><section class="modal-card room-change-dialog" role="dialog" aria-modal="true"><header class="section-head split-title"><div><span class="eyebrow">确认换寝</span><h3>{{ target.building_name }} {{ target.room_number }}室</h3><p>{{ policy.requiresApproval ? '提交后由管理员审批。' : '确认后将立即更新住宿记录。' }}</p></div><button class="button ghost small" @click="closeDialog">关闭</button></header><form class="form-stack" @submit.prevent="submit"><label><span>换寝原因</span><textarea v-model.trim="form.reason" class="input" required maxlength="500" rows="5" placeholder="请说明换寝原因，便于学校留档" /></label><div class="button-row dialog-actions"><button type="button" class="button ghost" @click="closeDialog">取消</button><button class="button primary" :disabled="submitting">{{ submitting ? '正在提交…' : policy.requiresApproval ? '提交申请' : '确认自由换寝' }}</button></div></form></section></div>
 
-    <div v-if="exchangeTarget" class="modal-overlay room-change-overlay" @click.self="closeExchangeDialog">
-      <section class="modal-card room-change-dialog" role="dialog" aria-modal="true">
-        <header class="section-head split-title"><div><span class="eyebrow">发起寝室交换</span><h3>邀请 {{ exchangeTarget.student_name }}</h3><p>对方当前住宿：{{ exchangeTarget.building_name }} {{ exchangeTarget.room_number }}室 {{ exchangeTarget.bed_code || '未确认床位' }}</p></div><button class="button ghost small" @click="closeExchangeDialog">关闭</button></header>
-        <form class="form-stack" @submit.prevent="submitExchange"><label><span>交换原因与双方意向说明</span><textarea v-model.trim="exchangeForm.reason" class="input" required maxlength="500" rows="5" placeholder="请说明交换原因；对方接受后系统才会继续处理" /></label><div class="button-row dialog-actions"><button type="button" class="button ghost" @click="closeExchangeDialog">取消</button><button class="button primary" :disabled="submitting">{{ submitting ? '正在发送…' : '发送交换邀请' }}</button></div></form>
-      </section>
-    </div>
+    <div v-if="exchangeTarget" class="modal-overlay room-change-overlay" @click.self="closeExchangeDialog"><section class="modal-card room-change-dialog" role="dialog" aria-modal="true"><header class="section-head split-title"><div><span class="eyebrow">发起寝室交换</span><h3>邀请 {{ exchangeTarget.student_name }}</h3><p>对方当前住宿：{{ exchangeTarget.building_name }} {{ exchangeTarget.room_number }}室 {{ exchangeTarget.bed_code || '未确认床位' }}</p></div><button class="button ghost small" @click="closeExchangeDialog">关闭</button></header><form class="form-stack" @submit.prevent="submitExchange"><label><span>交换原因与双方意向说明</span><textarea v-model.trim="exchangeForm.reason" class="input" required maxlength="500" rows="5" placeholder="请说明交换原因；对方接受后系统才会继续处理" /></label><div class="button-row dialog-actions"><button type="button" class="button ghost" @click="closeExchangeDialog">取消</button><button class="button primary" :disabled="submitting">{{ submitting ? '正在发送…' : '发送交换邀请' }}</button></div></form></section></div>
   </div>
 </template>
 
