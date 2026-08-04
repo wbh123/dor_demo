@@ -1,0 +1,87 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+ROOT = Path(sys.argv[1] if len(sys.argv) > 1 else ".").resolve()
+errors: list[str] = []
+
+
+def read(path: str) -> str:
+    return (ROOT / path).read_text(encoding="utf-8")
+
+
+def require(condition: bool, message: str) -> None:
+    if not condition:
+        errors.append(message)
+
+
+home_content = read("frontend/src/views/student/StudentHomeContent.vue")
+home_view = read("frontend/src/views/student/StudentHomeView.vue")
+shell = read("frontend/src/layouts/AppShell.vue")
+router = read("frontend/src/router/index.ts")
+i18n = read("frontend/src/i18n/index.ts")
+env_example = read(".env.example")
+welcome_editor = read("frontend/src/components/admin/WelcomeMessageEditor.vue")
+dashboard = read("frontend/src/views/admin/AdminDashboardView.vue")
+platform_layout = read("frontend/src/layouts/PlatformLayout.vue")
+platform_dashboard = read("frontend/src/views/platform/PlatformDashboardView.vue")
+platform_features = read("frontend/src/views/platform/PlatformFeaturesView.vue")
+residency = read("frontend/src/views/admin/AdminResidencyView.vue")
+bed_confirmation = read("frontend/src/views/admin/AdminBedConfirmationView.vue")
+student_admin = read("frontend/src/views/admin/AdminDataView.vue")
+student_service = read("backend-java/server/src/main/java/com/wust/dormitory/admin/StudentAdminService.java")
+batch = read("frontend/src/views/admin/AdminBatchView.vue")
+auth_contract = read("backend-java/model/src/main/resources/auth/openapi-auth.yaml")
+welcome_service = read("backend-java/server/src/main/java/com/wust/dormitory/auth/StudentWelcomeService.java")
+
+require("profileAnswerEntries" in home_content, "student home does not normalize the canonical preference object")
+require("questionnaire.value.answers ?? []" not in home_content, "student home still treats preference answers as a legacy array")
+require("to=\"/student/preferences\"" in home_view, "student home does not expose the cross-batch preference entry")
+require("VITE_ADMIN_CONTACT_PHONE" in home_view and "有疑问请致电" in home_view, "student contact phone is not environment-driven")
+require("phone-edit-fab" not in home_view, "student phone editor still uses a detached floating button")
+
+require("VITE_APP_TITLE" in shell and "VITE_APP_SUBTITLE" in shell, "school application title and subtitle are not environment-driven")
+require("VITE_APP_TITLE" in env_example and "VITE_APP_SUBTITLE" in env_example and "VITE_ADMIN_CONTACT_PHONE" in env_example, "public environment template misses brand or contact settings")
+require("to=\"/admin/profile/password\"" in shell, "school administrator sidebar has no password change entry")
+require("subtitle(chinese: string, english: string)" in i18n and "locale.value === 'zh-CN' ? chinese : english" in i18n, "bilingual subtitle selection remains reversed")
+
+require("token-toolbar" in welcome_editor and "插入学生信息" in welcome_editor, "welcome editor token toolbar is missing")
+require("<strong>汉语</strong>" in dashboard and "<strong>英语</strong>" in dashboard, "welcome language cards are not named 汉语 and 英语")
+require("<strong>美国</strong>" not in dashboard, "welcome editor still presents English as United States")
+require("美国卡片" not in dashboard, "welcome copy still ties English fallback to the United States")
+require("message:" not in auth_contract.split("WelcomeData:", 1)[1].split("CurrentUserData:", 1)[0], "welcome OpenAPI still exposes the legacy message field")
+require("setMessage(" not in welcome_service, "welcome service still writes the legacy message field")
+
+require("<img" not in platform_layout, "system administrator platform still renders a school logo")
+require("exact-active-class" in platform_layout and "custom-active" in platform_layout, "platform navigation does not distinguish service overview from child routes")
+for quota_code in ("MAX_CAMPUSES", "MAX_BUILDINGS", "MAX_BATCHES_PER_YEAR", "MAX_CONCURRENT_ACTIVE_BATCHES"):
+    require(quota_code in platform_dashboard, f"platform dashboard misses quota title mapping: {quota_code}")
+require("batchSelection" in platform_features and "批量开启" in platform_features and "批量关闭" in platform_features, "feature authorization lacks batch operations")
+require("permission-heading-line" in platform_features, "permission badge and enabled count are not aligned on the title line")
+
+require("AdminBedConfirmationView" in residency and "residencyTab" in residency, "residency and actual-bed review are not merged into one business page")
+require("admin/bed-confirmations" not in router, "legacy standalone bed-confirmation route still exists")
+require("实际床位核查" not in shell, "legacy standalone bed-confirmation menu still exists")
+require("reviewFilter" in bed_confirmation and "全部核查状态" in bed_confirmation, "actual-bed review has no dropdown filter")
+
+require("RoomBedScene3D" in student_admin and "placementRoomId" in student_admin, "student accommodation adjustment does not use the visual bed selector and room dropdown")
+for field in ("current_building_name", "current_room_number", "current_bed_code", "selection_review_status"):
+    require(field in student_service, f"student list query misses accommodation field: {field}")
+require("住宿状态" in student_admin and "宿舍与床位" in student_admin, "student table does not show residence and selection locations")
+
+require("scope-floating-actions" in batch, "scope save action is not anchored at the overlay top-right")
+require("publishConfirmation" in batch and "直接发布" in batch, "batch publication does not confirm direct publishing after completed preparation")
+require("allocation-overlay" in batch and "allocation-dialog" in batch, "allocation preview overlay lacks its dedicated visual layer")
+
+require("admin/profile/password" in router, "school administrator password route is missing")
+require((ROOT / "frontend/src/views/admin/AdminPasswordView.vue").is_file(), "school administrator password page is missing")
+
+if errors:
+    print("UI and business closure contract failed:", file=sys.stderr)
+    for error in errors:
+        print(f"- {error}", file=sys.stderr)
+    raise SystemExit(1)
+
+print("UI and business closure contract passed")
