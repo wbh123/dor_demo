@@ -1,0 +1,18 @@
+.panel > .section-head,
+.modal-card > .section-head,
+.modal-dialog > .section-head {
+  margin-bottom: 12px;
+}
+
+.mode-card small {
+  display: none !important;
+}
+
+.mode-card {
+  align-content: start;
+}
+
+.panel > .section-head p {
+  margin-top: 5px;
+  margin-bottom: 0;
+}
