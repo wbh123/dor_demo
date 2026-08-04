@@ -4,18 +4,22 @@ on:
   push:
     branches:
       - fix/requested-ui-20260804
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: write
 
 jobs:
   apply:
-    if: ${{ github.actor == 'wbh123' }}
+    if: ${{ github.repository == 'wbh123/dor_demo' && github.head_ref == 'fix/requested-ui-20260804' || github.ref_name == 'fix/requested-ui-20260804' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout staged branch
         uses: actions/checkout@v4
         with:
+          ref: fix/requested-ui-20260804
           fetch-depth: 0
       - name: Rebuild and verify patch
         run: |
@@ -32,4 +36,4 @@ jobs:
           git config user.email "21192079+wbh123@users.noreply.github.com"
           git add -A
           git commit -m "fix: 完善布局、欢迎语、组队与通知交互"
-          git push origin HEAD
+          git push origin HEAD:fix/requested-ui-20260804
