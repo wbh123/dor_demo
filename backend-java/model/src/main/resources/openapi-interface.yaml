@@ -2,7 +2,7 @@ openapi: 3.0.3
 info:
   title: 示例大学学生宿舍智能选择系统接口
   description: 学生宿舍智能选择、业务管理与系统服务管理接口契约
-  version: 3.2.0
+  version: 3.3.0
 servers:
   - url: http://localhost:8080
 paths:
@@ -139,6 +139,18 @@ paths:
     $ref: 'roomexchange/openapi-room-exchange.yaml#/paths/~1api~1v1~1admin~1room-exchanges~1{exchangeId}~1approve'
   /api/v1/admin/room-exchanges/{exchangeId}/reject:
     $ref: 'roomexchange/openapi-room-exchange.yaml#/paths/~1api~1v1~1admin~1room-exchanges~1{exchangeId}~1reject'
+  /api/v1/admin/waitlist/settings:
+    $ref: 'waitlist/openapi-waitlist.yaml#/paths/~1api~1v1~1admin~1waitlist~1settings'
+  /api/v1/admin/waitlist/entries:
+    $ref: 'waitlist/openapi-waitlist.yaml#/paths/~1api~1v1~1admin~1waitlist~1entries'
+  /api/v1/admin/waitlist/entries/{entryId}/priority:
+    $ref: 'waitlist/openapi-waitlist.yaml#/paths/~1api~1v1~1admin~1waitlist~1entries~1{entryId}~1priority'
+  /api/v1/admin/waitlist/entries/{entryId}/offer:
+    $ref: 'waitlist/openapi-waitlist.yaml#/paths/~1api~1v1~1admin~1waitlist~1entries~1{entryId}~1offer'
+  /api/v1/admin/waitlist/entries/{entryId}/assign:
+    $ref: 'waitlist/openapi-waitlist.yaml#/paths/~1api~1v1~1admin~1waitlist~1entries~1{entryId}~1assign'
+  /api/v1/admin/waitlist/scan:
+    $ref: 'waitlist/openapi-waitlist.yaml#/paths/~1api~1v1~1admin~1waitlist~1scan'
 
   /api/v1/student/preferences:
     $ref: 'student/openapi-preference-policy.yaml#/paths/~1api~1v1~1student~1preferences'
@@ -214,6 +226,18 @@ paths:
     $ref: 'roomexchange/openapi-room-exchange.yaml#/paths/~1api~1v1~1student~1room-exchanges~1{exchangeId}~1respond'
   /api/v1/student/room-exchanges/{exchangeId}/cancel:
     $ref: 'roomexchange/openapi-room-exchange.yaml#/paths/~1api~1v1~1student~1room-exchanges~1{exchangeId}~1cancel'
+  /api/v1/student/waitlist/policy:
+    $ref: 'waitlist/openapi-waitlist.yaml#/paths/~1api~1v1~1student~1waitlist~1policy'
+  /api/v1/student/waitlist/candidates:
+    $ref: 'waitlist/openapi-waitlist.yaml#/paths/~1api~1v1~1student~1waitlist~1candidates'
+  /api/v1/student/waitlist/entries:
+    $ref: 'waitlist/openapi-waitlist.yaml#/paths/~1api~1v1~1student~1waitlist~1entries'
+  /api/v1/student/waitlist/entries/{entryId}/withdraw:
+    $ref: 'waitlist/openapi-waitlist.yaml#/paths/~1api~1v1~1student~1waitlist~1entries~1{entryId}~1withdraw'
+  /api/v1/student/waitlist/offers/{offerId}/accept:
+    $ref: 'waitlist/openapi-waitlist.yaml#/paths/~1api~1v1~1student~1waitlist~1offers~1{offerId}~1accept'
+  /api/v1/student/waitlist/offers/{offerId}/reject:
+    $ref: 'waitlist/openapi-waitlist.yaml#/paths/~1api~1v1~1student~1waitlist~1offers~1{offerId}~1reject'
 
   /api/v1/realtime/batches/{batchId}/rooms/{roomId}:
     $ref: 'realtime/openapi-realtime.yaml#/paths/~1api~1v1~1realtime~1batches~1{batchId}~1rooms~1{roomId}'
