@@ -28,6 +28,7 @@ const router = createRouter({
         { path: 'admin/dormitories', name: 'admin-dormitories', component: () => import('../views/admin/AdminDormitoryView.vue'), meta: { role: 'ADMIN' } },
         { path: 'admin/residencies', name: 'admin-residencies', component: () => import('../views/admin/AdminResidencyView.vue'), meta: { role: 'ADMIN' } },
         { path: 'admin/bed-confirmations', name: 'admin-bed-confirmations', component: () => import('../views/admin/AdminBedConfirmationView.vue'), meta: { role: 'ADMIN' } },
+        { path: 'admin/preference-policy', name: 'admin-preference-policy', component: () => import('../views/admin/AdminPreferencePolicyView.vue'), meta: { role: 'ADMIN' } },
         { path: 'admin/matching', name: 'admin-matching', component: () => import('../views/admin/AdminMatchingView.vue'), meta: { role: 'ADMIN' } },
         { path: 'admin/rule-templates', name: 'admin-rule-templates', component: () => import('../views/admin/AdminRuleTemplateView.vue'), meta: { role: 'ADMIN' } },
         { path: 'admin/batches', name: 'admin-batches', component: () => import('../views/admin/AdminBatchView.vue'), meta: { role: 'ADMIN' } },
