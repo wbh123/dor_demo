@@ -1,0 +1,52 @@
+name: Finalize private migration contracts temporary
+
+on:
+  push:
+    branches:
+      - refactor/private-migration-split-v2-20260805
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refactor/private-migration-split-v2-20260805
+          fetch-depth: 0
+      - name: Make contract readers companion-aware
+        shell: python
+        run: |
+          from pathlib import Path
+          import re
+          targets = [
+              'scripts/ci/validate_system_contracts.py',
+              'scripts/ci/test_phase2_phase3_operations.py',
+              'scripts/ci/test_import_recovery_anomaly_workflows.py',
+              'scripts/ci/test_welcome_brand_room_exchange.py',
+              'scripts/ci/test_waitlist_core.py',
+              'scripts/ci/test_v25_integrated_workflow.py',
+              'scripts/ci/test_admin_scope_questionnaire_team_ux.py',
+              'scripts/ci/test_ui_business_closure.py',
+              'scripts/ci/test_requested_ui_regressions.py',
+          ]
+          replacement = '''def read(path: str) -> str:\n    target = ROOT / path\n    if not target.exists():\n        raise AssertionError(f"missing required file: {path}")\n    text = target.read_text(encoding="utf-8")\n    if target.suffix == ".vue":\n        stem = target.with_suffix("")\n        for suffix in (".logic.ts", ".template.html", ".css"):\n            companion = Path(str(stem) + suffix)\n            if companion.is_file():\n                text += "\\n" + companion.read_text(encoding="utf-8")\n    return text\n'''
+          pattern = re.compile(r'def read\([^\n]*\) -> str:\n.*?(?=\n\ndef |\Z)', re.S)
+          for relative in targets:
+              path = Path(relative)
+              text = path.read_text(encoding='utf-8')
+              updated, count = pattern.subn(replacement.rstrip(), text, count=1)
+              if count != 1:
+                  raise RuntimeError(f'cannot patch read function in {relative}')
+              path.write_text(updated, encoding='utf-8')
+      - name: Commit contract reader fixes
+        run: |
+          rm -f .github/workflows/finalize-private-migration-contracts-temporary.yml
+          rm -f scripts/ci/.private-migration-split-v3-ci-trigger
+          git config user.name "wbh123"
+          git config user.email "21192079+wbh123@users.noreply.github.com"
+          git add -A
+          git commit -m "test: 适配拆分页面契约读取"
+          git push origin HEAD
