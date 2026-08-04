@@ -1,0 +1,68 @@
+.batch-create-form { display: grid; gap: 18px; }
+.mode-card-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+.mode-card { display: grid; gap: 8px; padding: 20px; border: 1px solid var(--border); border-radius: 16px; background: var(--surface); text-align: left; color: inherit; }
+.mode-card span, .mode-card small { color: var(--text-muted); }
+.mode-card.selected { border-color: var(--primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 14%, transparent); }
+.mode-card.disabled { opacity: .55; }
+.separation-switch { display: flex; align-items: center; gap: 14px; padding: 16px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface-soft); }
+.separation-switch > button { position: relative; width: 50px; height: 28px; border: 0; border-radius: 999px; background: #cbd5e1; flex: 0 0 auto; }
+.separation-switch > button span { position: absolute; left: 3px; top: 3px; width: 22px; height: 22px; border-radius: 50%; background: white; transition: .2s; }
+.separation-switch > button.checked { background: var(--primary); }
+.separation-switch > button.checked span { transform: translateX(22px); }
+.separation-switch p { margin: 4px 0 0; color: var(--text-muted); }
+.rule-summary { display: grid; gap: 6px; padding: 12px; border-radius: 12px; background: var(--surface-soft); }
+.batch-list { display: grid; gap: 14px; }
+.batch-card { padding: 18px; border: 1px solid var(--border); border-radius: 16px; background: var(--surface); }
+.batch-card header { display: flex; justify-content: space-between; gap: 16px; }
+.batch-card h3 { margin: 8px 0 3px; }
+.batch-card p { margin: 0; color: var(--text-muted); }
+.badge-row, .batch-facts { display: flex; gap: 8px; flex-wrap: wrap; }
+.status-chip.mode { background: #eff6ff; color: #1d4ed8; }
+.status-chip.category { background: #f5f3ff; color: #6d28d9; }
+.batch-counts { text-align: right; }
+.batch-counts strong { display: block; font-size: 26px; }
+.batch-counts span, .batch-facts { color: var(--text-muted); font-size: 13px; }
+.batch-facts { margin: 14px 0; }
+.batch-facts .warn { color: #b45309; font-weight: 700; }
+.scope-dialog { position:relative; width: min(1180px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow: auto; padding: 24px; }.scope-floating-actions{position:absolute;top:18px;right:22px;z-index:5}.scope-sticky-header{padding-right:250px!important}
+.scope-sticky-header h3{margin:4px 0}.scope-sticky-header p,.preflight-dialog .section-head p{margin:0}.scope-sticky-header { position: sticky; top: -24px; z-index: 3; margin: -24px -24px 16px; padding: 20px 24px; border-bottom: 1px solid var(--border); background: var(--surface); }
+.scope-filter-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.scope-filter-grid .span-2 { grid-column: span 2; }
+.scope-summary { display: grid; grid-template-columns: repeat(2, minmax(0, 180px)); gap: 12px; margin-bottom: 14px; }
+.scope-summary article { padding: 14px; border-radius: 12px; background: var(--surface-soft); }
+.scope-summary strong { display: block; font-size: 24px; }
+.scope-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.scope-column { display: grid; gap: 12px; min-width: 0; }
+.scope-column > header { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
+.scope-column > header small { display: block; color: var(--text-muted); margin-top: 4px; }
+.scope-options { display: grid; gap: 8px; max-height: 440px; overflow: auto; padding-right: 4px; }
+.scope-option { display: flex; gap: 10px; align-items: flex-start; padding: 11px; border: 1px solid var(--border); border-radius: 11px; background: var(--surface); }
+.scope-option input { margin-top: 4px; }
+.scope-option div { display: grid; gap: 3px; }
+.scope-option span { color: var(--text-muted); font-size: 12px; }
+.scope-option.disabled { opacity: .55; background: var(--surface-soft); }
+.scope-footer { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--border); color: var(--text-muted); }
+.preflight-dialog, .allocation-dialog { width: min(980px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow: auto; padding: 28px; background:var(--panel,#fff); box-shadow:0 28px 80px rgba(8,25,53,.28); }.allocation-overlay{padding:24px;background:rgba(8,22,47,.76);backdrop-filter:blur(8px)}.publish-confirmation-overlay{padding:0;background:transparent;backdrop-filter:none}.publish-confirmation-dialog{width:min(560px,calc(100vw - 32px));padding:26px}.publish-confirmation-dialog p{color:var(--muted);line-height:1.7}.publish-confirmation-facts{display:flex;gap:8px;flex-wrap:wrap;margin:16px 0}.publish-confirmation-facts span{padding:7px 10px;border-radius:999px;color:#315c9e;background:#edf3ff;font-size:12px;font-weight:700}.publish-confirmation-dialog .dialog-actions{justify-content:flex-end}
+.preflight-summary { display: grid; gap: 5px; padding: 15px; border-radius: 13px; background: #fef2f2; color: #991b1b; }
+.preflight-summary.pass { background: #f0fdf4; color: #166534; }
+.preflight-action { margin-top: 12px; }
+.preflight-room-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; margin-top: 14px; }
+.preflight-room-grid article { display: grid; gap: 5px; padding: 14px; border: 1px solid var(--border); border-radius: 12px; }
+.preflight-room-grid article.blocker { border-color: #fecaca; background: #fff7f7; }
+.preflight-room-grid span, .preflight-room-grid small { color: var(--text-muted); }
+.copy-dialog { width: min(720px, calc(100vw - 32px)); padding: 24px; }
+.allocation-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 14px 0; }
+.allocation-stats article { padding: 14px; background: var(--surface-soft); border-radius: 12px; }
+.allocation-stats strong { display: block; font-size: 24px; }
+@media (max-width: 900px) {
+  .scope-grid { grid-template-columns: 1fr; }
+  .scope-options { max-height: 320px; }
+}
+@media (max-width: 720px) {
+  .mode-card-grid, .allocation-stats, .scope-filter-grid { grid-template-columns: 1fr; }
+  .scope-filter-grid .span-2 { grid-column: auto; }
+  .scope-summary { grid-template-columns: 1fr; }
+  .batch-card header, .scope-footer, .scope-column > header { flex-direction: column; }
+  .batch-counts { text-align: left; }
+  .scope-sticky-header { top: -24px; padding-right:24px!important; flex-direction: column; }.scope-floating-actions{position:static} .allocation-overlay{padding:10px}
+}
