@@ -57,13 +57,29 @@ import_controller = read(
     "backend-java/server/src/main/java/com/wust/dormitory/importworkflow/ImportWorkflowController.java"
 )
 for token in (
-    "/api/v1/admin/import-tasks",
-    "/preview",
-    "/{taskId}/commit",
-    "/{taskId}/rollback",
-    "/{taskId}/errors.csv",
+    "implements ImportWorkflowApi",
+    "previewImportTask",
+    "listImportTasks",
+    "getImportTask",
+    "commitImportTask",
+    "rollbackImportTask",
+    "exportImportTaskErrors",
 ):
-    require(import_controller, token, f"missing import workflow endpoint: {token}")
+    require(import_controller, token, f"missing generated import workflow method: {token}")
+for forbidden_route_annotation in (
+    "@RequestMapping",
+    "@GetMapping",
+    "@PostMapping",
+    "@RequestParam",
+    "@RequestPart",
+    "@RequestHeader",
+    "@PathVariable",
+):
+    forbid(
+        import_controller,
+        forbidden_route_annotation,
+        f"import workflow controller must not handwrite route annotation: {forbidden_route_annotation}",
+    )
 
 hold_inspector = read(
     "backend-java/server/src/main/java/com/wust/dormitory/operations/BedHoldKeyInspector.java"
