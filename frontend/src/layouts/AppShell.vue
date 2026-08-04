@@ -10,7 +10,8 @@ const auth = useAuthStore()
 const router = useRouter()
 const welcomeError = ref('')
 const institutionName = String(import.meta.env.VITE_INSTITUTION_NAME || '示例大学')
-const productName = `${institutionName}选寝`
+const productName = String(import.meta.env.VITE_APP_TITLE || `${institutionName}选寝`)
+const productSubtitle = String(import.meta.env.VITE_APP_SUBTITLE || '宿舍智能选择系统')
 const operatorName = String(import.meta.env.VITE_OPERATOR_NAME || '运营单位信息待填写')
 const icpRecord = String(import.meta.env.VITE_ICP_RECORD || 'ICP备案信息待填写')
 const logoOnly = '/assert/logo-only.png'
@@ -39,8 +40,7 @@ const links = computed(() => auth.isAdmin ? [
   {to:'/admin/data',label:'专业与学生',icon:icons.students},
   {to:'/admin/import-quality',label:'导入质量',icon:icons.importQuality},
   {to:'/admin/dormitories',label:'宿舍资源',icon:icons.dormitory},
-  {to:'/admin/residencies',label:'在住管理',icon:icons.assignment},
-  {to:'/admin/bed-confirmations',label:'实际床位核查',icon:icons.bedCheck},
+  {to:'/admin/residencies',label:'在住与床位核查',icon:icons.assignment},
   {to:'/admin/matching',label:'匹配规则',icon:icons.matching},
   {to:'/admin/rule-templates',label:'批次规则',icon:icons.rules},
   {to:'/admin/batches',label:'选寝批次',icon:icons.calendar},
@@ -58,7 +58,7 @@ const links = computed(() => auth.isAdmin ? [
 
 const welcomeText = computed(() => {
   const welcome = auth.user?.welcome as (DataObject & { messages?: Record<string,string> }) | undefined
-  return welcomeMessage(welcome?.messages) || String(welcome?.message ?? '')
+  return welcomeMessage(welcome?.messages)
 })
 
 onMounted(async () => {
@@ -94,7 +94,7 @@ async function logout() {
         <img class="school-brand-logo logo-safe-layer" :src="logoOnly" :alt="`${institutionName}校徽`" />
         <div class="school-brand-title">
           <strong>{{ productName }}</strong>
-          <small>宿舍智能选择系统</small>
+          <small>{{ productSubtitle }}</small>
         </div>
       </div>
       <nav class="nav-list">
@@ -111,6 +111,7 @@ async function logout() {
           </select>
         </label>
         <div class="user-card account-card-without-avatar"><div><strong>{{ auth.user?.displayName }}</strong><small>{{ auth.isAdmin ? '业务管理员' : auth.user?.username }}</small></div></div>
+        <RouterLink v-if="auth.isAdmin" to="/admin/profile/password" class="button ghost full sidebar-action-link">修改密码</RouterLink>
         <button class="button ghost full" @click="logout">退出登录</button>
         <footer class="sidebar-compliance"><span>{{ operatorName }}</span><span>{{ icpRecord }}</span></footer>
       </div>
@@ -135,5 +136,5 @@ async function logout() {
 </template>
 
 <style scoped>
-.fixed-navigation-shell{display:block;min-height:100vh}.fixed-sidebar{position:fixed;inset:0 auto 0 0;width:260px;height:100vh;overflow-y:auto;z-index:30}.fixed-sidebar-content{min-height:100vh;margin-left:260px}.school-brand{position:relative;isolation:isolate;display:flex;align-items:center;gap:11px;min-height:62px;padding:9px 12px}.school-brand::before,.school-brand::after,.welcome-dialog::before,.welcome-dialog::after{pointer-events:none;z-index:0}.logo-safe-layer{position:relative;z-index:3;isolation:isolate}.school-brand-logo{flex:0 0 auto;width:46px;height:46px;object-fit:contain}.school-brand-title{position:relative;z-index:2;display:grid;gap:2px;min-width:0;text-align:left}.school-brand-title strong,.school-brand-title small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.school-brand-title strong{font-size:.92rem}.school-brand-title small{color:#91a8d5;font-size:.66rem}.admin-page-container{padding-top:22px}.account-card-without-avatar{padding:14px 16px}.account-card-without-avatar>div{min-width:0}.account-card-without-avatar strong,.account-card-without-avatar small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.sidebar-compliance{display:grid;gap:4px;padding-top:12px;border-top:1px solid rgba(255,255,255,.12);color:#91a8d5;font-size:.66rem;line-height:1.45}.welcome-dialog{position:relative;isolation:isolate}.welcome-school-logo{width:72px;height:72px;object-fit:contain;margin:0 auto 12px}@media(max-width:820px){.fixed-sidebar{position:static;width:auto;height:auto;overflow:visible}.fixed-sidebar-content{margin-left:0}.school-brand{justify-content:flex-start}}
+.fixed-navigation-shell{display:block;min-height:100vh}.fixed-sidebar{position:fixed;inset:0 auto 0 0;display:flex;flex-direction:column;width:260px;height:100vh;overflow:hidden;z-index:30}.fixed-sidebar .nav-list{min-height:0;overflow-y:auto}.fixed-sidebar .sidebar-foot{flex:0 0 auto}.sidebar-action-link{text-decoration:none;text-align:center}.fixed-sidebar-content{min-height:100vh;margin-left:260px}.school-brand{position:relative;z-index:5;isolation:isolate;display:flex;align-items:center;gap:11px;min-height:62px;padding:9px 12px;overflow:visible;background:linear-gradient(180deg,rgba(17,45,96,.98),rgba(17,45,96,.92))}.school-brand::before,.school-brand::after,.welcome-dialog::before,.welcome-dialog::after{pointer-events:none;z-index:0}.logo-safe-layer{position:relative;z-index:3;isolation:isolate}.school-brand-logo{position:relative;z-index:9;flex:0 0 auto;width:46px;height:46px;object-fit:contain;filter:drop-shadow(0 3px 8px rgba(0,0,0,.22))}.school-brand-title{position:relative;z-index:2;display:grid;gap:2px;min-width:0;text-align:left}.school-brand-title strong,.school-brand-title small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.school-brand-title strong{font-size:.92rem}.school-brand-title small{color:#91a8d5;font-size:.66rem}.admin-page-container{padding-top:22px}.account-card-without-avatar{padding:14px 16px}.account-card-without-avatar>div{min-width:0}.account-card-without-avatar strong,.account-card-without-avatar small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.sidebar-compliance{display:grid;gap:4px;padding-top:12px;border-top:1px solid rgba(255,255,255,.12);color:#91a8d5;font-size:.66rem;line-height:1.45}.welcome-dialog{position:relative;isolation:isolate}.welcome-school-logo{width:72px;height:72px;object-fit:contain;margin:0 auto 12px}@media(max-width:820px){.fixed-sidebar{position:static;width:auto;height:auto;overflow:visible}.fixed-sidebar-content{margin-left:0}.school-brand{justify-content:flex-start}}
 </style>

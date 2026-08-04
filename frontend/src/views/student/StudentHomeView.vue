@@ -12,6 +12,7 @@ const phoneError = ref('')
 const countryCallingCode = ref('+86')
 const nationalNumber = ref('')
 const { translateError } = useI18n()
+const adminContactPhone = String(import.meta.env.VITE_ADMIN_CONTACT_PHONE || '000-0000-0000')
 
 const callingCodeOptions = [
   { value: '+86', label: '中国大陆 +86' }, { value: '+852', label: '中国香港 +852' },
@@ -65,9 +66,11 @@ async function savePhoneNumber() {
 
 <template>
   <div class="student-home-wrapper compact-home-top-card">
-    <p class="cross-batch-preference-note">个人偏好可跨批次复用，即使当前没有开放批次，也可在管理员开放后提前维护。</p>
+    <div class="student-home-actions">
+      <p class="cross-batch-preference-note">个人偏好可跨批次复用，即使当前没有开放批次，也可提前维护。<RouterLink to="/student/preferences">进入个人偏好设置</RouterLink></p>
+      <div class="student-contact-strip"><span>有疑问请致电管理员：<a :href="`tel:${adminContactPhone}`">{{ adminContactPhone }}</a></span><button class="button ghost small" type="button" @click="openPhoneEditor">修改手机号码</button></div>
+    </div>
     <StudentHomeContent :key="contentKey" />
-    <button class="phone-edit-fab" type="button" @click="openPhoneEditor">修改手机号码</button>
 
     <div v-if="showPhoneDialog" class="modal-overlay phone-modal-overlay" role="presentation" @click.self="showPhoneDialog=false">
       <section class="modal-card phone-modal-card" role="dialog" aria-modal="true" aria-labelledby="phone-dialog-title">
@@ -88,5 +91,5 @@ async function savePhoneNumber() {
 </template>
 
 <style scoped>
-.student-home-wrapper{position:relative}.cross-batch-preference-note{margin:0 0 10px;padding:9px 12px;border-radius:12px;color:var(--muted);background:var(--soft);font-size:13px}.student-home-wrapper :deep(.light-text-button),.student-home-wrapper :deep(.phone-editor-dialog){display:none!important}.phone-edit-fab{position:fixed;right:24px;bottom:24px;z-index:90;padding:12px 18px;border:0;border-radius:999px;color:#fff;background:var(--primary);box-shadow:0 12px 30px rgba(30,78,140,.28);cursor:pointer}.phone-modal-overlay{z-index:1400;padding:20px;background:rgba(10,24,49,.72);backdrop-filter:blur(8px)}.phone-modal-card{width:min(620px,100%);padding:26px;border-radius:26px;background:var(--panel,#fff);box-shadow:0 28px 80px rgba(8,25,53,.28)}.phone-modal-header{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}.phone-modal-header h3{margin:5px 0}.phone-modal-header p{margin:0;color:var(--muted)}.phone-field-grid{display:grid;grid-template-columns:minmax(190px,.8fr) minmax(240px,1.2fr);gap:14px;margin-top:20px}.phone-field-grid label{display:grid;gap:7px}.phone-preview{padding:10px 12px;border-radius:12px;color:var(--muted);background:var(--soft)}.phone-modal-actions{justify-content:flex-end;margin-top:18px}@media(max-width:640px){.phone-edit-fab{right:14px;bottom:14px}.phone-modal-overlay{align-items:flex-end;padding:10px}.phone-modal-card{padding:20px;border-radius:24px 24px 16px 16px}.phone-field-grid{grid-template-columns:1fr}}
+.student-home-wrapper{position:relative}.student-home-actions{display:grid;gap:10px;margin-bottom:10px}.cross-batch-preference-note{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0;padding:9px 12px;border-radius:12px;color:var(--muted);background:var(--soft);font-size:13px}.cross-batch-preference-note a{color:var(--primary);font-weight:700;text-decoration:none}.student-contact-strip{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 12px;border:1px solid var(--line);border-radius:12px;background:var(--panel,#fff);font-size:13px}.student-contact-strip a{color:var(--primary);font-weight:700}.student-home-wrapper :deep(.light-text-button),.student-home-wrapper :deep(.phone-editor-dialog){display:none!important}.phone-modal-overlay{z-index:1400;padding:20px;background:rgba(10,24,49,.72);backdrop-filter:blur(8px)}.phone-modal-card{width:min(620px,100%);padding:26px;border-radius:26px;background:var(--panel,#fff);box-shadow:0 28px 80px rgba(8,25,53,.28)}.phone-modal-header{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}.phone-modal-header h3{margin:5px 0}.phone-modal-header p{margin:0;color:var(--muted)}.phone-field-grid{display:grid;grid-template-columns:minmax(190px,.8fr) minmax(240px,1.2fr);gap:14px;margin-top:20px}.phone-field-grid label{display:grid;gap:7px}.phone-preview{padding:10px 12px;border-radius:12px;color:var(--muted);background:var(--soft)}.phone-modal-actions{justify-content:flex-end;margin-top:18px}@media(max-width:640px){.cross-batch-preference-note,.student-contact-strip{align-items:flex-start;flex-direction:column}.phone-modal-overlay{align-items:flex-end;padding:10px}.phone-modal-card{padding:20px;border-radius:24px 24px 16px 16px}.phone-field-grid{grid-template-columns:1fr}}
 </style>

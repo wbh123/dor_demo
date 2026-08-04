@@ -42,7 +42,7 @@ function t(key: string, params: Record<string, unknown> = {}) {
 }
 
 function subtitle(chinese: string, english: string) {
-  return locale.value === 'zh-CN' ? english : chinese
+  return locale.value === 'zh-CN' ? chinese : english
 }
 
 function countryName(code: unknown) {

@@ -3,7 +3,9 @@ import { computed, onMounted, ref } from 'vue'
 import { api } from '../../api/client'
 import type { DataObject, ObjectSuccessResponse } from '../../api/types'
 import { bedTypeLabel } from '../../utils/bedLabels'
+import AdminBedConfirmationView from './AdminBedConfirmationView.vue'
 
+const residencyTab = ref<'RESIDENCY' | 'DECLARATION'>('RESIDENCY')
 const items = ref<DataObject[]>([])
 const rooms = ref<DataObject[]>([])
 const keyword = ref('')
@@ -141,7 +143,9 @@ function methodText(value: unknown) {
 
 <template>
   <div class="content-column">
-    <div class="page-title"><span class="eyebrow">RESIDENCY TRUTH</span><h2>在住与实际床位确认</h2><p>批次结束不会释放在住状态。选寝室模式下未确认的实际床位在此核对；存在待确认学生的寝室不能重新开放选床模式。</p></div>
+    <div class="page-title"><span class="eyebrow">RESIDENCY AND BED REVIEW</span><h2>在住与床位核查</h2><p>统一维护正式在住关系、管理员床位确认和学生实际床位申报，避免两个页面重复处理同一业务。</p></div>
+    <div class="residency-tabs"><button class="button" :class="residencyTab === 'RESIDENCY' ? 'primary' : 'ghost'" @click="residencyTab = 'RESIDENCY'">在住名单与管理员确认</button><button class="button" :class="residencyTab === 'DECLARATION' ? 'primary' : 'ghost'" @click="residencyTab = 'DECLARATION'">学生申报核查</button></div>
+    <template v-if="residencyTab === 'RESIDENCY'">
     <p v-if="error" class="alert error">{{ error }}</p><p v-if="message" class="alert success">{{ message }}</p>
 
     <div class="residency-stats">
@@ -180,6 +184,9 @@ function methodText(value: unknown) {
       </section>
     </div>
 
+    </template>
+    <AdminBedConfirmationView v-else embedded />
+
     <div v-if="selected" class="modal-overlay" @click.self="closeDialog">
       <section class="modal-card bed-confirm-dialog"><header class="section-head split-title"><div><span class="eyebrow">BED MAPPING</span><h3>{{ selected.student_name }} · {{ selected.building_name }} {{ selected.room_number }}</h3><p>点击学生现实中实际使用的床位。已被其他在住学生确认的床位不可选择。</p></div><button class="button ghost small" @click="closeDialog">关闭</button></header>
         <div class="bed-card-grid"><button v-for="bed in availableBeds" :key="String(bed.id)" type="button" class="bed-card" :class="{ selected: selectedBedId === Number(bed.id) }" @click="selectedBedId = Number(bed.id)"><strong>{{ bed.bed_code }}</strong><span>{{ bedTypeLabel(bed.bed_type) }}</span><small>{{ selectedBedId === Number(bed.id) ? '已选择' : '可确认' }}</small></button></div>
@@ -191,6 +198,6 @@ function methodText(value: unknown) {
 </template>
 
 <style scoped>
-.residency-end-dialog{width:min(540px,calc(100vw - 32px));padding:24px}.residency-end-dialog p{color:var(--text-muted);line-height:1.7}.residency-end-dialog .dialog-actions{justify-content:flex-end;margin-top:16px}
+.residency-tabs{display:flex;gap:10px;flex-wrap:wrap}.residency-end-dialog{width:min(540px,calc(100vw - 32px));padding:24px}.residency-end-dialog p{color:var(--text-muted);line-height:1.7}.residency-end-dialog .dialog-actions{justify-content:flex-end;margin-top:16px}
 .residency-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}.residency-stats article{padding:18px}.residency-stats span{color:var(--text-muted)}.residency-stats strong{display:block;margin-top:6px;font-size:28px}.residency-filter{display:grid;grid-template-columns:minmax(220px,1fr) 220px 160px auto;gap:10px;margin-bottom:16px}.warning{background:#fff7ed;color:#c2410c}.bed-confirm-dialog{width:min(760px,calc(100vw - 32px));padding:24px}.bed-card-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin:16px 0}.bed-card{display:grid;gap:5px;padding:16px;border:1px solid var(--border);border-radius:14px;background:var(--surface);text-align:left;color:inherit}.bed-card.selected{border-color:var(--primary);box-shadow:0 0 0 3px color-mix(in srgb,var(--primary) 14%,transparent)}.bed-card span,.bed-card small{color:var(--text-muted)}.dialog-actions{justify-content:flex-end;margin-top:16px}@media(max-width:800px){.residency-stats,.residency-filter{grid-template-columns:1fr}}
 </style>

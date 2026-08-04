@@ -33,7 +33,12 @@ const {
 } = useI18n()
 
 const questions = computed(() => (questionnaire.value.questions ?? []) as DataObject[])
-const savedAnswers = computed(() => (questionnaire.value.answers ?? []) as DataObject[])
+const profileAnswers = computed(() => (questionnaire.value.answers ?? {}) as Record<string, unknown>)
+const profileAnswerEntries = computed(() => questions.value.flatMap((question) => {
+  const code = String(question.question_code)
+  if (!(code in profileAnswers.value)) return []
+  return [{ question_id: question.id, answer_json: profileAnswers.value[code] } as DataObject]
+}))
 const questionnaireStarted = computed(() => answerSummary.value.length > 0 || Boolean(currentActivity.value?.questionnaire_started))
 const canEditQuestionnaire = computed(() => true)
 const profileInsightEnabled = computed(() => hasFeature('P2_STUDENT_PROFILE_INSIGHT'))
@@ -49,7 +54,7 @@ const unreadNotifications = computed(() => notifications.value.filter((item) => 
 
 const answerSummary = computed(() => {
   const questionById = new Map(questions.value.map((question) => [Number(question.id), question]))
-  return savedAnswers.value
+  return profileAnswerEntries.value
     .map((answer) => {
       const question = questionById.get(Number(answer.question_id))
       if (!question) return null

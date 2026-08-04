@@ -3,6 +3,7 @@ package com.wust.dormitory.auth;
 import com.wust.dormitory.common.response.ResponseFactory;
 import com.wust.dormitory.model.api.AuthApi;
 import com.wust.dormitory.model.dto.ActivateRequest;
+import com.wust.dormitory.model.dto.ChangePasswordRequest;
 import com.wust.dormitory.model.dto.CurrentUserData;
 import com.wust.dormitory.model.dto.CurrentUserSuccessResponse;
 import com.wust.dormitory.model.dto.LoginData;
@@ -69,6 +70,12 @@ public class AuthController implements AuthApi {
         if (authentication != null && authentication.getCredentials() instanceof String token) {
             tokenService.revoke(token);
         }
+        return ResponseEntity.ok(ResponseFactory.empty());
+    }
+
+    @Override
+    public ResponseEntity<VoidSuccessResponse> changePassword(ChangePasswordRequest request) {
+        authService.changePassword(SecurityUsers.current(), request.getCurrentPassword(), request.getNewPassword());
         return ResponseEntity.ok(ResponseFactory.empty());
     }
 

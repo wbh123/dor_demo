@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { nextTick, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 
 const props = withDefaults(defineProps<{
   modelValue: string
@@ -18,6 +18,7 @@ const emit = defineEmits<{
 }>()
 
 const editor = ref<HTMLElement | null>(null)
+const tokenNames = computed(() => Object.keys(props.tokenExamples))
 let internalUpdate = false
 
 watch(() => props.modelValue, (value) => {
@@ -105,20 +106,23 @@ defineExpose({ insertToken, focus: () => editor.value?.focus() })
 </script>
 
 <template>
-  <div
-    ref="editor"
-    class="welcome-message-editor input"
-    contenteditable="true"
-    role="textbox"
-    aria-multiline="true"
-    :data-placeholder="placeholder"
-    @focus="emit('focus')"
-    @input="sync"
-    @blur="sync"
-    @paste.prevent="pastePlainText"
-  />
+  <div class="welcome-editor-shell">
+    <div class="token-toolbar"><span>插入学生信息</span><button v-for="name in tokenNames" :key="name" type="button" :title="tokenExamples[name]" @click="insertToken(name)">{{ name }}</button></div>
+    <div
+      ref="editor"
+      class="welcome-message-editor input"
+      contenteditable="true"
+      role="textbox"
+      aria-multiline="true"
+      :data-placeholder="placeholder"
+      @focus="emit('focus')"
+      @input="sync"
+      @blur="sync"
+      @paste.prevent="pastePlainText"
+    />
+  </div>
 </template>
 
 <style scoped>
-.welcome-message-editor{min-height:142px;height:100%;padding:12px 13px;overflow:auto;white-space:pre-wrap;line-height:1.75;cursor:text}.welcome-message-editor:empty::before{content:attr(data-placeholder);color:var(--muted);pointer-events:none}.welcome-message-editor:focus{outline:none}.welcome-message-editor :deep(.welcome-token){display:inline-flex;align-items:center;margin:1px 3px;padding:2px 9px;border:1px solid #bed5ff;border-radius:999px;color:#245da8;background:#eef5ff;font-size:12px;font-weight:700;line-height:1.7;vertical-align:baseline;cursor:help;user-select:all}
+.welcome-editor-shell{display:grid;gap:8px}.token-toolbar{display:flex;align-items:center;gap:7px;flex-wrap:wrap;padding:8px 10px;border:1px solid var(--line);border-radius:12px;background:var(--panel,#fff)}.token-toolbar>span{margin-right:3px;color:var(--muted);font-size:12px;font-weight:700}.token-toolbar button{padding:4px 9px;border:1px solid #bed5ff;border-radius:999px;color:#245da8;background:#eef5ff;font-size:12px;cursor:pointer}.welcome-message-editor{min-height:142px;height:100%;padding:12px 13px;overflow:auto;white-space:pre-wrap;line-height:1.75;cursor:text}.welcome-message-editor:empty::before{content:attr(data-placeholder);color:var(--muted);pointer-events:none}.welcome-message-editor:focus{outline:none}.welcome-message-editor :deep(.welcome-token){display:inline-flex;align-items:center;margin:1px 3px;padding:2px 9px;border:1px solid #bed5ff;border-radius:999px;color:#245da8;background:#eef5ff;font-size:12px;font-weight:700;line-height:1.7;vertical-align:baseline;cursor:help;user-select:all}
 </style>
