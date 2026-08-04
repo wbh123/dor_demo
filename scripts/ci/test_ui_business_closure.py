@@ -35,6 +35,7 @@ student_service = read("backend-java/server/src/main/java/com/wust/dormitory/adm
 batch = read("frontend/src/views/admin/AdminBatchView.vue")
 auth_contract = read("backend-java/model/src/main/resources/auth/openapi-auth.yaml")
 welcome_service = read("backend-java/server/src/main/java/com/wust/dormitory/auth/StudentWelcomeService.java")
+admin_password = read("frontend/src/views/admin/AdminPasswordView.vue")
 
 require("profileAnswerEntries" in home_content, "student home does not normalize the canonical preference object")
 require("questionnaire.value.answers ?? []" not in home_content, "student home still treats preference answers as a legacy array")
@@ -56,6 +57,8 @@ require("setMessage(" not in welcome_service, "welcome service still writes the 
 
 require("<img" not in platform_layout, "system administrator platform still renders a school logo")
 require("exact-active-class" in platform_layout and "custom-active" in platform_layout, "platform navigation does not distinguish service overview from child routes")
+for platform_route in ("/platform/plans", "/platform/subscription", "/platform/features", "/platform/quotas", "/platform/audit", "/platform/profile/password"):
+    require(platform_route in platform_layout, f"system administrator does not receive the default platform capability: {platform_route}")
 for quota_code in ("MAX_CAMPUSES", "MAX_BUILDINGS", "MAX_BATCHES_PER_YEAR", "MAX_CONCURRENT_ACTIVE_BATCHES"):
     require(quota_code in platform_dashboard, f"platform dashboard misses quota title mapping: {quota_code}")
 require("batchSelection" in platform_features and "批量开启" in platform_features and "批量关闭" in platform_features, "feature authorization lacks batch operations")
@@ -67,8 +70,9 @@ require("实际床位核查" not in shell, "legacy standalone bed-confirmation m
 require("reviewFilter" in bed_confirmation and "全部核查状态" in bed_confirmation, "actual-bed review has no dropdown filter")
 
 require("RoomBedScene3D" in student_admin and "placementRoomId" in student_admin, "student accommodation adjustment does not use the visual bed selector and room dropdown")
-for field in ("current_building_name", "current_room_number", "current_bed_code", "selection_review_status"):
+for field in ("current_building_name", "current_room_number", "current_bed_code", "selection_review_status", "declared_bed_code"):
     require(field in student_service, f"student list query misses accommodation field: {field}")
+require("TRANSFER_MANUAL" not in student_service, "legacy transfer-student enrollment source remains accepted")
 require("住宿状态" in student_admin and "宿舍与床位" in student_admin, "student table does not show residence and selection locations")
 
 require("scope-floating-actions" in batch, "scope save action is not anchored at the overlay top-right")
@@ -77,6 +81,8 @@ require("allocation-overlay" in batch and "allocation-dialog" in batch, "allocat
 
 require("admin/profile/password" in router, "school administrator password route is missing")
 require((ROOT / "frontend/src/views/admin/AdminPasswordView.vue").is_file(), "school administrator password page is missing")
+for requirement in ("12至72位", "包含大写字母", "包含小写字母", "包含数字", "包含特殊字符"):
+    require(requirement in admin_password, f"school administrator password page misses policy hint: {requirement}")
 
 if errors:
     print("UI and business closure contract failed:", file=sys.stderr)
