@@ -80,12 +80,18 @@ async function selectTask(task: DataObject) {
 
 async function commitTask() {
   if (!selected.value?.taskId) return
+  const confirmed = window.confirm(
+    `确认正式提交“${String(selected.value.fileName ?? '当前文件')}”吗？\n` +
+    `系统将写入 ${Number(selected.value.validRows ?? 0)} 行业务数据；提交后只能通过本任务的回滚功能撤销。`,
+  )
+  if (!confirmed) return
   loading.value = true
   error.value = ''
+  message.value = ''
   try {
     const response = await api.post<ObjectSuccessResponse>(`/api/v1/admin/import-tasks/${selected.value.taskId}/commit`)
     selected.value = (response.data.data ?? {}) as DataObject
-    message.value = '导入任务已提交'
+    message.value = `导入任务已提交，共写入 ${Number(selected.value.mutationCount ?? 0)} 项变更`
     await loadTasks()
   } catch (cause) {
     error.value = translateError(cause)
@@ -96,12 +102,18 @@ async function commitTask() {
 
 async function rollbackTask() {
   if (!selected.value?.taskId) return
+  const confirmed = window.confirm(
+    `确认回滚“${String(selected.value.fileName ?? '当前文件')}”吗？\n` +
+    '系统将按相反顺序撤销本次导入；若相关学生、宿舍或床位已被后续业务使用，系统会拒绝覆盖这些后续变更。',
+  )
+  if (!confirmed) return
   loading.value = true
   error.value = ''
+  message.value = ''
   try {
     const response = await api.post<ObjectSuccessResponse>(`/api/v1/admin/import-tasks/${selected.value.taskId}/rollback`)
     selected.value = (response.data.data ?? {}) as DataObject
-    message.value = '导入任务已回滚'
+    message.value = '导入任务已安全回滚'
     await loadTasks()
   } catch (cause) {
     error.value = translateError(cause)
