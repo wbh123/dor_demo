@@ -24,6 +24,7 @@ public class SystemSettingService {
     private static final String PRIMARY_WELCOME_LOCALE = "zh-CN";
     private static final int MAX_STORED_VALUE_LENGTH = 12000;
     private static final int MAX_LOCALE_COUNT = 20;
+    private static final int MAX_COUNTRY_MESSAGE_COUNT = 80;
     private static final Map<String, String> DEFAULT_MESSAGES = Map.of(
             PRIMARY_WELCOME_LOCALE,
             "欢迎使用示例大学学生宿舍智能选择系统。请先完成个人偏好，再选择合适的宿舍或床位。",
@@ -52,15 +53,19 @@ public class SystemSettingService {
     @Transactional
     public Map<String, Object> updateStudentWelcome(
             Map<String, String> languageMessages,
+            Map<String, String> countryMessages,
             int expectedVersion,
             CurrentUser operator) {
         ensureStudentWelcomeSetting();
         Map<String, String> normalizedMessages = normalizeLocaleMessages(languageMessages);
-        String serialized = json(Map.of("messages", normalizedMessages));
+        Map<String, String> normalizedCountryMessages = normalizeCountryMessages(countryMessages);
+        String serialized = json(Map.of(
+                "messages", normalizedMessages,
+                "countryMessages", normalizedCountryMessages));
         if (serialized.length() > MAX_STORED_VALUE_LENGTH) {
             throw new BusinessException(
                     "STUDENT_WELCOME_MESSAGE_INVALID",
-                    "欢迎语配置内容过长，请减少语言数量或精简文本");
+                    "欢迎语配置内容过长，请减少语言或国家地区数量，或精简文本");
         }
 
         Map<String, Object> before = one();
@@ -92,7 +97,7 @@ public class SystemSettingService {
                 "SYSTEM_SETTING_UPDATE",
                 "SYSTEM_SETTING",
                 before.get("id"),
-                "更新新生欢迎语语言版本",
+                "更新新生欢迎语语言与国家地区版本",
                 before,
                 after);
         return after;
@@ -100,29 +105,33 @@ public class SystemSettingService {
 
     public WelcomeConfiguration readConfiguration(String rawValue) {
         if (rawValue == null || rawValue.isBlank()) {
-            return new WelcomeConfiguration(new LinkedHashMap<>(DEFAULT_MESSAGES));
+            return defaultConfiguration();
         }
         try {
             Map<String, Object> parsed = objectMapper.readValue(
                     rawValue,
                     new TypeReference<Map<String, Object>>() { });
-            if (parsed == null) {
-                return new WelcomeConfiguration(new LinkedHashMap<>(DEFAULT_MESSAGES));
-            }
+            if (parsed == null) return defaultConfiguration();
             if (parsed.containsKey("messages")) {
-                return new WelcomeConfiguration(mergeMessages(stringMap(parsed.get("messages"))));
+                return new WelcomeConfiguration(
+                        mergeMessages(stringMap(parsed.get("messages"))),
+                        mergeCountryMessages(stringMap(parsed.get("countryMessages"))));
             }
             // 兼容旧版扁平 zh-CN/en-US 对象。
-            return new WelcomeConfiguration(mergeMessages(stringMap(parsed)));
+            return new WelcomeConfiguration(mergeMessages(stringMap(parsed)), Map.of());
         } catch (JsonProcessingException ignored) {
             Map<String, String> fallback = new LinkedHashMap<>(DEFAULT_MESSAGES);
             fallback.put(PRIMARY_WELCOME_LOCALE, rawValue.trim());
-            return new WelcomeConfiguration(fallback);
+            return new WelcomeConfiguration(fallback, Map.of());
         }
     }
 
     public Map<String, String> readMessages(String rawValue) {
         return readConfiguration(rawValue).messages();
+    }
+
+    private WelcomeConfiguration defaultConfiguration() {
+        return new WelcomeConfiguration(new LinkedHashMap<>(DEFAULT_MESSAGES), Map.of());
     }
 
     private void ensureStudentWelcomeSetting() {
@@ -132,7 +141,9 @@ public class SystemSettingService {
                 ON DUPLICATE KEY UPDATE setting_key=VALUES(setting_key)
                 """, new MapSqlParameterSource()
                 .addValue("settingKey", STUDENT_WELCOME_MESSAGE)
-                .addValue("settingValue", json(Map.of("messages", DEFAULT_MESSAGES))));
+                .addValue("settingValue", json(Map.of(
+                        "messages", DEFAULT_MESSAGES,
+                        "countryMessages", Map.of()))));
     }
 
     Map<String, String> normalizeLocaleMessages(Map<String, String> values) {
@@ -142,10 +153,7 @@ public class SystemSettingService {
         Map<String, String> normalized = new LinkedHashMap<>();
         values.forEach((locale, message) -> {
             String normalizedLocale = normalizeLocaleTag(locale);
-            String normalizedMessage = message == null ? "" : message.trim();
-            if (normalizedMessage.isEmpty() || normalizedMessage.length() > 1000) {
-                throw invalidMessage();
-            }
+            String normalizedMessage = normalizeMessage(message);
             if (normalized.putIfAbsent(normalizedLocale, normalizedMessage) != null) {
                 throw new BusinessException(
                         "WELCOME_LOCALE_DUPLICATED",
@@ -156,6 +164,26 @@ public class SystemSettingService {
                 || !normalized.containsKey(FALLBACK_WELCOME_LOCALE)) {
             throw invalidMessage();
         }
+        return normalized;
+    }
+
+    Map<String, String> normalizeCountryMessages(Map<String, String> values) {
+        if (values == null || values.isEmpty()) return Map.of();
+        if (values.size() > MAX_COUNTRY_MESSAGE_COUNT) {
+            throw new BusinessException(
+                    "WELCOME_COUNTRY_LIMIT_EXCEEDED",
+                    "国家或地区专属欢迎语最多配置80项");
+        }
+        Map<String, String> normalized = new LinkedHashMap<>();
+        values.forEach((country, message) -> {
+            String normalizedCountry = normalizeCountryCode(country);
+            String normalizedMessage = normalizeMessage(message);
+            if (normalized.putIfAbsent(normalizedCountry, normalizedMessage) != null) {
+                throw new BusinessException(
+                        "WELCOME_COUNTRY_DUPLICATED",
+                        "国家或地区欢迎语重复：" + normalizedCountry);
+            }
+        });
         return normalized;
     }
 
@@ -181,6 +209,28 @@ public class SystemSettingService {
         return normalized.toString();
     }
 
+    String normalizeCountryCode(String value) {
+        String source = value == null ? "" : value.trim().toUpperCase(Locale.ROOT);
+        if (!source.matches("^[A-Z]{2}$")) {
+            throw new BusinessException(
+                    "WELCOME_COUNTRY_INVALID",
+                    "国家或地区必须使用ISO二位代码，例如CN、JP或US");
+        }
+        try {
+            return CountryRegionCatalog.code(source, "INTERNATIONAL");
+        } catch (BusinessException exception) {
+            throw new BusinessException(
+                    "WELCOME_COUNTRY_INVALID",
+                    "无法识别国家或地区代码：" + source);
+        }
+    }
+
+    private String normalizeMessage(String value) {
+        String normalized = value == null ? "" : value.trim();
+        if (normalized.isEmpty() || normalized.length() > 1000) throw invalidMessage();
+        return normalized;
+    }
+
     private Map<String, String> mergeMessages(Map<String, String> values) {
         Map<String, String> merged = new LinkedHashMap<>(DEFAULT_MESSAGES);
         values.forEach((key, value) -> {
@@ -197,13 +247,24 @@ public class SystemSettingService {
         return merged;
     }
 
+    private Map<String, String> mergeCountryMessages(Map<String, String> values) {
+        Map<String, String> merged = new LinkedHashMap<>();
+        values.forEach((key, value) -> {
+            if (key == null || value == null || value.isBlank()) return;
+            try {
+                merged.put(normalizeCountryCode(key), value.trim());
+            } catch (BusinessException ignored) {
+                // 读取历史数据时忽略不合法国家地区代码，保存时再给出明确提示。
+            }
+        });
+        return merged;
+    }
+
     private Map<String, String> stringMap(Object value) {
         if (!(value instanceof Map<?, ?> source)) return Map.of();
         Map<String, String> result = new LinkedHashMap<>();
         source.forEach((key, item) -> {
-            if (key != null && item != null) {
-                result.put(String.valueOf(key), String.valueOf(item));
-            }
+            if (key != null && item != null) result.put(String.valueOf(key), String.valueOf(item));
         });
         return result;
     }
@@ -211,7 +272,7 @@ public class SystemSettingService {
     private BusinessException invalidMessage() {
         return new BusinessException(
                 "STUDENT_WELCOME_MESSAGE_INVALID",
-                "中文和英文欢迎语必须配置；每个语言版本长度为1至1000个字符，最多20种语言");
+                "欢迎语长度必须为1至1000个字符；中文和英文基础版本必须配置");
     }
 
     private Map<String, Object> one() {
@@ -232,6 +293,7 @@ public class SystemSettingService {
         WelcomeConfiguration configuration = readConfiguration(
                 String.valueOf(result.remove("setting_value")));
         result.put("messages", configuration.messages());
+        result.put("countryMessages", configuration.countryMessages());
         result.put("fallbackLocale", FALLBACK_WELCOME_LOCALE);
         result.put("message", configuration.messages().get(PRIMARY_WELCOME_LOCALE));
         return result;
@@ -248,5 +310,7 @@ public class SystemSettingService {
         }
     }
 
-    public record WelcomeConfiguration(Map<String, String> messages) { }
+    public record WelcomeConfiguration(
+            Map<String, String> messages,
+            Map<String, String> countryMessages) { }
 }
