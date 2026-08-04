@@ -29,7 +29,7 @@ for token in (
     'FALLBACK_WELCOME_LOCALE = "en-US"',
     "normalizeLocaleMessages",
     "normalizeLocaleTag",
-    "messages.get(FALLBACK_WELCOME_LOCALE)",
+    "messages().get(FALLBACK_WELCOME_LOCALE)",
 ):
     require(setting_service, token, f"welcome setting must support administrator-managed locale messages: {token}")
 forbid(setting_service, 'List.of("zh-CN", "en-US")', "welcome languages must not be hard-coded to only Chinese and English")
@@ -54,14 +54,16 @@ logo = ROOT / "frontend/public/assert/logo-only.png"
 if not logo.exists() or logo.stat().st_size < 100:
     raise AssertionError("frontend/public/assert/logo-only.png must be a real static image asset")
 
-student_home = read("frontend/src/views/student/StudentHomeView.vue")
+student_home_style = read("frontend/src/student-home-compact.css")
+main_entry = read("frontend/src/main.ts")
+require(main_entry, "./student-home-compact.css", "student home compact stylesheet must be loaded")
 for token in (
     ".welcome-card.compact-home-top-card",
     "align-items: flex-start",
     "min-height: auto",
     "padding: 16px 18px",
 ):
-    require(student_home, token, f"student identity card must be compact and left aligned: {token}")
+    require(student_home_style, token, f"student identity card must be compact and left aligned: {token}")
 
 root_openapi = read("backend-java/model/src/main/resources/openapi-interface.yaml")
 for token in (
