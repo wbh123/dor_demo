@@ -20,7 +20,9 @@ public class StudentWelcomeService {
     private final NamedParameterJdbcTemplate jdbc;
     private final SystemSettingService settingService;
 
-    public StudentWelcomeService(NamedParameterJdbcTemplate jdbc, SystemSettingService settingService) {
+    public StudentWelcomeService(
+            NamedParameterJdbcTemplate jdbc,
+            SystemSettingService settingService) {
         this.jdbc = jdbc;
         this.settingService = settingService;
     }
@@ -40,21 +42,27 @@ public class StudentWelcomeService {
         if (rows.isEmpty()) return null;
 
         Map<String, Object> student = rows.getFirst();
-        String rawValue = jdbc.query("SELECT setting_value FROM system_setting WHERE setting_key=:settingKey",
-                Map.of("settingKey", STUDENT_WELCOME_MESSAGE), resultSet -> resultSet.next() ? resultSet.getString(1) : null);
-        SystemSettingService.WelcomeConfiguration configuration = settingService.readConfiguration(rawValue);
-        String countryCode = String.valueOf(student.getOrDefault("nationality_code", "")).toUpperCase();
+        String rawValue = jdbc.query(
+                "SELECT setting_value FROM system_setting WHERE setting_key=:settingKey",
+                Map.of("settingKey", STUDENT_WELCOME_MESSAGE),
+                resultSet -> resultSet.next() ? resultSet.getString(1) : null);
+        SystemSettingService.WelcomeConfiguration configuration =
+                settingService.readConfiguration(rawValue);
+        String countryCode = String.valueOf(
+                student.getOrDefault("nationality_code", "")).toUpperCase();
         Map<String, String> variables = variables(student, countryCode);
 
         Map<String, String> renderedMessages = new LinkedHashMap<>();
         configuration.messages().forEach((locale, message) ->
                 renderedMessages.put(locale, render(message, variables)));
 
-        String selectedTemplate = configuration.countryMessages().get(countryCode);
+        // message 仅作为旧客户端兼容字段。现代前端按照界面语言从 messages 中选择；
+        // 非中文语言未配置时统一回退管理员设置的英文版本。
+        String selectedTemplate = "CN".equals(countryCode)
+                ? configuration.messages().get("zh-CN")
+                : configuration.messages().get("en-US");
         if (selectedTemplate == null || selectedTemplate.isBlank()) {
-            selectedTemplate = "CN".equals(countryCode)
-                    ? configuration.messages().get("zh-CN")
-                    : configuration.messages().get("en-US");
+            selectedTemplate = configuration.messages().get("en-US");
         }
         String selected = render(selectedTemplate, variables);
 
@@ -68,15 +76,23 @@ public class StudentWelcomeService {
 
     public void acknowledge(CurrentUser user) {
         if (user == null || !"STUDENT".equals(user.userType())) {
-            throw new BusinessException("STUDENT_WELCOME_FORBIDDEN", "只有学生账号可以确认欢迎信息", HttpStatus.FORBIDDEN);
+            throw new BusinessException(
+                    "STUDENT_WELCOME_FORBIDDEN",
+                    "只有学生账号可以确认欢迎信息",
+                    HttpStatus.FORBIDDEN);
         }
         jdbc.update("""
-                UPDATE app_user SET welcome_acknowledged_at=COALESCE(welcome_acknowledged_at, CURRENT_TIMESTAMP(3))
+                UPDATE app_user
+                SET welcome_acknowledged_at=COALESCE(
+                    welcome_acknowledged_at,
+                    CURRENT_TIMESTAMP(3))
                 WHERE id=:userId AND user_type='STUDENT'
                 """, Map.of("userId", user.userId()));
     }
 
-    private Map<String, String> variables(Map<String, Object> student, String countryCode) {
+    private Map<String, String> variables(
+            Map<String, Object> student,
+            String countryCode) {
         Map<String, String> variables = new LinkedHashMap<>();
         variables.put("学生姓名", text(student.get("student_name"), "同学"));
         variables.put("学号", text(student.get("student_number"), "未填写"));
@@ -90,7 +106,9 @@ public class StudentWelcomeService {
     private String render(String template, Map<String, String> variables) {
         String rendered = template == null ? "" : template;
         for (Map.Entry<String, String> variable : variables.entrySet()) {
-            rendered = rendered.replace("{{" + variable.getKey() + "}}", variable.getValue());
+            rendered = rendered.replace(
+                    "{{" + variable.getKey() + "}}",
+                    variable.getValue());
         }
         return rendered;
     }
