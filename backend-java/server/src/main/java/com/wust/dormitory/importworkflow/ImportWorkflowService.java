@@ -1,38 +1,36 @@
 package com.wust.dormitory.importworkflow;
 
+import com.wust.dormitory.admin.SpreadsheetSupport;
 import com.wust.dormitory.common.error.BusinessException;
-import org.apache.poi.ss.usermodel.DataFormatter;
-import org.apache.poi.ss.usermodel.Row;
-import org.apache.poi.ss.usermodel.Sheet;
-import org.apache.poi.ss.usermodel.Workbook;
-import org.apache.poi.ss.usermodel.WorkbookFactory;
+import com.wust.dormitory.security.CurrentUser;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 public class ImportWorkflowService {
     private static final String DIGEST_ALGORITHM = "SHA-256";
-    private static final Map<String, List<String>> REQUIRED_HEADERS = Map.of(
-            "STUDENT", List.of("studentNumber", "name", "gender", "majorCode"),
-            "ROOM", List.of("buildingCode", "floorNumber", "roomNumber", "capacity")
-    );
 
-    private final Map<String, ImportTask> tasks = new ConcurrentHashMap<>();
-    private final Map<String, String> idempotencyIndex = new ConcurrentHashMap<>();
+    private final ImportTaskRepository repository;
+    private final ImportMutationService mutationService;
+
+    public ImportWorkflowService(
+            ImportTaskRepository repository,
+            ImportMutationService mutationService) {
+        this.repository = repository;
+        this.mutationService = mutationService;
+    }
 
     public Map<String, Object> preview(MultipartFile file, String importType, String idempotencyKey) {
         String normalizedType = normalizeType(importType);
@@ -43,11 +41,10 @@ public class ImportWorkflowService {
             byte[] bytes = file.getBytes();
             String digest = digest(bytes);
             String normalizedKey = normalizeIdempotencyKey(idempotencyKey, normalizedType, digest);
-            String existingTaskId = idempotencyIndex.get(normalizedKey);
-            if (existingTaskId != null) {
-                ImportTask existing = tasks.get(existingTaskId);
-                if (existing != null && existing.digest().equals(digest)) {
-                    return existing.toMap();
+            ImportTaskRecord existing = repository.findByIdempotencyKey(normalizedKey).orElse(null);
+            if (existing != null) {
+                if (existing.digest().equals(digest) && existing.importType().equals(normalizedType)) {
+                    return toMap(existing);
                 }
                 throw new BusinessException(
                         "IDEMPOTENCY_CONFLICT",
@@ -55,74 +52,91 @@ public class ImportWorkflowService {
                         HttpStatus.CONFLICT);
             }
 
-            ParsedPreview parsed = parse(file.getOriginalFilename(), bytes, normalizedType);
-            String taskId = UUID.randomUUID().toString();
-            ImportTask task = new ImportTask(
-                    taskId,
+            List<Map<String, String>> rows = SpreadsheetSupport.read(file);
+            if (rows.isEmpty()) {
+                throw new BusinessException("IMPORT_EMPTY", "文件中没有可预检的数据");
+            }
+            List<Map<String, Object>> fieldErrors = validateRows(normalizedType, rows);
+            ImportTaskRecord task = new ImportTaskRecord(
+                    UUID.randomUUID().toString(),
                     normalizedType,
                     file.getOriginalFilename() == null ? "unnamed" : file.getOriginalFilename(),
                     digest,
                     normalizedKey,
                     "PREVIEWED",
-                    parsed.totalRows(),
-                    parsed.validRows(),
-                    parsed.fieldErrors(),
+                    rows,
+                    fieldErrors,
+                    List.of(),
                     Instant.now(),
                     null,
                     null);
-            tasks.put(taskId, task);
-            idempotencyIndex.put(normalizedKey, taskId);
-            return task.toMap();
+            repository.save(task);
+            return toMap(task);
         } catch (BusinessException exception) {
             throw exception;
         } catch (Exception exception) {
-            throw new BusinessException("IMPORT_PREVIEW_FAILED", "导入文件预检失败：" + exception.getMessage());
+            throw new BusinessException(
+                    "IMPORT_PREVIEW_FAILED",
+                    "导入文件预检失败：" + safeMessage(exception));
         }
     }
 
     public List<Map<String, Object>> listTasks() {
-        return tasks.values().stream()
-                .sorted((left, right) -> right.createdAt().compareTo(left.createdAt()))
-                .map(ImportTask::toMap)
-                .toList();
+        return repository.list().stream().map(this::toMap).toList();
     }
 
     public Map<String, Object> getTask(String taskId) {
-        return requireTask(taskId).toMap();
+        return toMap(requireTask(taskId));
     }
 
-    public synchronized Map<String, Object> commitTask(String taskId) {
-        ImportTask task = requireTask(taskId);
+    @Transactional
+    public synchronized Map<String, Object> commitTask(String taskId, CurrentUser operator) {
+        ImportTaskRecord task = requireTask(taskId);
         if ("COMMITTED".equals(task.status())) {
-            return task.toMap();
+            return toMap(task);
         }
         if (!"PREVIEWED".equals(task.status())) {
-            throw new BusinessException("IMPORT_TASK_STATE_INVALID", "只有预检完成的任务可以提交", HttpStatus.CONFLICT);
+            throw new BusinessException(
+                    "IMPORT_TASK_STATE_INVALID",
+                    "只有预检完成的任务可以提交",
+                    HttpStatus.CONFLICT);
         }
         if (!task.fieldErrors().isEmpty()) {
-            throw new BusinessException("IMPORT_VALIDATION_FAILED", "预检仍存在字段错误，不能提交", HttpStatus.CONFLICT);
+            throw new BusinessException(
+                    "IMPORT_VALIDATION_FAILED",
+                    "预检仍存在字段错误，不能提交",
+                    HttpStatus.CONFLICT);
         }
-        ImportTask committed = task.withStatus("COMMITTED", Instant.now(), null);
-        tasks.put(taskId, committed);
-        return committed.toMap();
+        List<ImportJournalEntry> journal = mutationService.applyTask(
+                task.importType(),
+                task.rows(),
+                operator);
+        ImportTaskRecord committed = task.committed(journal, Instant.now());
+        repository.save(committed);
+        return toMap(committed);
     }
 
-    public synchronized Map<String, Object> rollbackTask(String taskId) {
-        ImportTask task = requireTask(taskId);
+    @Transactional
+    public synchronized Map<String, Object> rollbackTask(String taskId, CurrentUser operator) {
+        ImportTaskRecord task = requireTask(taskId);
         if ("ROLLED_BACK".equals(task.status())) {
-            return task.toMap();
+            return toMap(task);
         }
         if (!"COMMITTED".equals(task.status())) {
-            throw new BusinessException("IMPORT_TASK_STATE_INVALID", "只有已经提交的任务可以回滚", HttpStatus.CONFLICT);
+            throw new BusinessException(
+                    "IMPORT_TASK_STATE_INVALID",
+                    "只有已经提交的任务可以回滚",
+                    HttpStatus.CONFLICT);
         }
-        ImportTask rolledBack = task.withStatus("ROLLED_BACK", task.committedAt(), Instant.now());
-        tasks.put(taskId, rolledBack);
-        return rolledBack.toMap();
+        mutationService.rollbackJournal(task.journal(), operator);
+        ImportTaskRecord rolledBack = task.rolledBack(Instant.now());
+        repository.save(rolledBack);
+        return toMap(rolledBack);
     }
 
     public byte[] errorsCsv(String taskId) {
-        ImportTask task = requireTask(taskId);
-        StringBuilder csv = new StringBuilder("row,field,value,message\n");
+        ImportTaskRecord task = requireTask(taskId);
+        StringBuilder csv = new StringBuilder("\uFEFFrow,field,value,message\n");
         for (Map<String, Object> error : task.fieldErrors()) {
             csv.append(csvValue(error.get("row"))).append(',')
                     .append(csvValue(error.get("field"))).append(',')
@@ -132,107 +146,58 @@ public class ImportWorkflowService {
         return csv.toString().getBytes(StandardCharsets.UTF_8);
     }
 
-    private ParsedPreview parse(String filename, byte[] bytes, String type) throws Exception {
-        String lower = filename == null ? "" : filename.toLowerCase(Locale.ROOT);
-        return lower.endsWith(".xlsx") || lower.endsWith(".xls")
-                ? parseWorkbook(bytes, type)
-                : parseCsv(bytes, type);
+    private List<Map<String, Object>> validateRows(
+            String importType,
+            List<Map<String, String>> rows) {
+        java.util.ArrayList<Map<String, Object>> errors = new java.util.ArrayList<>();
+        for (int index = 0; index < rows.size(); index++) {
+            try {
+                mutationService.validateRow(importType, rows.get(index));
+            } catch (RuntimeException exception) {
+                errors.add(error(
+                        index + 2,
+                        "row",
+                        "",
+                        safeMessage(exception)));
+            }
+        }
+        return List.copyOf(errors);
     }
 
-    private ParsedPreview parseCsv(byte[] bytes, String type) {
-        List<String> lines = new String(bytes, StandardCharsets.UTF_8).lines()
-                .filter(line -> !line.isBlank())
-                .toList();
-        if (lines.isEmpty()) {
-            return new ParsedPreview(0, 0, List.of(error(1, "file", "", "文件没有可读取的数据")));
-        }
-        String[] headers = lines.getFirst().split(",", -1);
-        List<Map<String, Object>> errors = validateHeaders(List.of(headers), type);
-        int total = Math.max(0, lines.size() - 1);
-        for (int index = 1; index < lines.size(); index++) {
-            String[] values = lines.get(index).split(",", -1);
-            validateRequiredValues(index + 1, List.of(headers), List.of(values), type, errors);
-        }
-        int invalidRows = (int) errors.stream().map(item -> item.get("row")).distinct().count();
-        return new ParsedPreview(total, Math.max(0, total - invalidRows), List.copyOf(errors));
+    private ImportTaskRecord requireTask(String taskId) {
+        return repository.findById(taskId).orElseThrow(() -> new BusinessException(
+                "IMPORT_TASK_NOT_FOUND",
+                "导入任务不存在",
+                HttpStatus.NOT_FOUND));
     }
 
-    private ParsedPreview parseWorkbook(byte[] bytes, String type) throws Exception {
-        try (Workbook workbook = WorkbookFactory.create(new ByteArrayInputStream(bytes))) {
-            Sheet sheet = workbook.getSheetAt(0);
-            DataFormatter formatter = new DataFormatter();
-            Row headerRow = sheet.getRow(sheet.getFirstRowNum());
-            if (headerRow == null) {
-                return new ParsedPreview(0, 0, List.of(error(1, "file", "", "工作表没有表头")));
-            }
-            List<String> headers = new ArrayList<>();
-            for (int column = 0; column < headerRow.getLastCellNum(); column++) {
-                headers.add(formatter.formatCellValue(headerRow.getCell(column)).trim());
-            }
-            List<Map<String, Object>> errors = validateHeaders(headers, type);
-            int total = 0;
-            for (int rowIndex = headerRow.getRowNum() + 1; rowIndex <= sheet.getLastRowNum(); rowIndex++) {
-                Row row = sheet.getRow(rowIndex);
-                if (row == null) {
-                    continue;
-                }
-                List<String> values = new ArrayList<>();
-                boolean anyValue = false;
-                for (int column = 0; column < headers.size(); column++) {
-                    String value = formatter.formatCellValue(row.getCell(column)).trim();
-                    values.add(value);
-                    anyValue = anyValue || !value.isBlank();
-                }
-                if (!anyValue) {
-                    continue;
-                }
-                total++;
-                validateRequiredValues(rowIndex + 1, headers, values, type, errors);
-            }
-            int invalidRows = (int) errors.stream().map(item -> item.get("row")).distinct().count();
-            return new ParsedPreview(total, Math.max(0, total - invalidRows), List.copyOf(errors));
-        }
-    }
-
-    private List<Map<String, Object>> validateHeaders(List<String> headers, String type) {
-        List<Map<String, Object>> errors = new ArrayList<>();
-        for (String required : REQUIRED_HEADERS.get(type)) {
-            if (!headers.contains(required)) {
-                errors.add(error(1, required, "", "缺少必填表头"));
-            }
-        }
-        return errors;
-    }
-
-    private void validateRequiredValues(
-            int rowNumber,
-            List<String> headers,
-            List<String> values,
-            String type,
-            List<Map<String, Object>> errors) {
-        for (String required : REQUIRED_HEADERS.get(type)) {
-            int index = headers.indexOf(required);
-            if (index < 0) {
-                continue;
-            }
-            String value = index < values.size() ? values.get(index).trim() : "";
-            if (value.isBlank()) {
-                errors.add(error(rowNumber, required, value, "必填字段不能为空"));
-            }
-        }
-    }
-
-    private ImportTask requireTask(String taskId) {
-        ImportTask task = tasks.get(taskId);
-        if (task == null) {
-            throw new BusinessException("IMPORT_TASK_NOT_FOUND", "导入任务不存在", HttpStatus.NOT_FOUND);
-        }
-        return task;
+    private Map<String, Object> toMap(ImportTaskRecord task) {
+        int invalidRows = (int) task.fieldErrors().stream()
+                .map(item -> item.get("row"))
+                .distinct()
+                .count();
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("taskId", task.taskId());
+        result.put("importType", task.importType());
+        result.put("fileName", task.fileName());
+        result.put("digestAlgorithm", DIGEST_ALGORITHM);
+        result.put("digest", task.digest());
+        result.put("idempotencyKey", task.idempotencyKey());
+        result.put("status", task.status());
+        result.put("totalRows", task.rows().size());
+        result.put("validRows", Math.max(0, task.rows().size() - invalidRows));
+        result.put("invalidRows", invalidRows);
+        result.put("fieldErrors", task.fieldErrors());
+        result.put("mutationCount", task.journal().size());
+        result.put("createdAt", task.createdAt().toString());
+        result.put("committedAt", task.committedAt() == null ? null : task.committedAt().toString());
+        result.put("rolledBackAt", task.rolledBackAt() == null ? null : task.rolledBackAt().toString());
+        return result;
     }
 
     private String normalizeType(String value) {
         String normalized = String.valueOf(value).trim().toUpperCase(Locale.ROOT);
-        if (!REQUIRED_HEADERS.containsKey(normalized)) {
+        if (!List.of("STUDENT", "ROOM").contains(normalized)) {
             throw new BusinessException("IMPORT_TYPE_INVALID", "导入类型只支持 STUDENT 或 ROOM");
         }
         return normalized;
@@ -262,56 +227,9 @@ public class ImportWorkflowService {
         return '"' + text + '"';
     }
 
-    private record ParsedPreview(int totalRows, int validRows, List<Map<String, Object>> fieldErrors) {
-    }
-
-    private record ImportTask(
-            String taskId,
-            String importType,
-            String fileName,
-            String digest,
-            String idempotencyKey,
-            String status,
-            int totalRows,
-            int validRows,
-            List<Map<String, Object>> fieldErrors,
-            Instant createdAt,
-            Instant committedAt,
-            Instant rolledBackAt) {
-
-        ImportTask withStatus(String nextStatus, Instant nextCommittedAt, Instant nextRolledBackAt) {
-            return new ImportTask(
-                    taskId,
-                    importType,
-                    fileName,
-                    digest,
-                    idempotencyKey,
-                    nextStatus,
-                    totalRows,
-                    validRows,
-                    fieldErrors,
-                    createdAt,
-                    nextCommittedAt,
-                    nextRolledBackAt);
-        }
-
-        Map<String, Object> toMap() {
-            Map<String, Object> result = new LinkedHashMap<>();
-            result.put("taskId", taskId);
-            result.put("importType", importType);
-            result.put("fileName", fileName);
-            result.put("digestAlgorithm", DIGEST_ALGORITHM);
-            result.put("digest", digest);
-            result.put("idempotencyKey", idempotencyKey);
-            result.put("status", status);
-            result.put("totalRows", totalRows);
-            result.put("validRows", validRows);
-            result.put("invalidRows", Math.max(0, totalRows - validRows));
-            result.put("fieldErrors", fieldErrors);
-            result.put("createdAt", createdAt.toString());
-            result.put("committedAt", committedAt == null ? null : committedAt.toString());
-            result.put("rolledBackAt", rolledBackAt == null ? null : rolledBackAt.toString());
-            return result;
-        }
+    private String safeMessage(Throwable throwable) {
+        return throwable.getMessage() == null || throwable.getMessage().isBlank()
+                ? "导入校验失败"
+                : throwable.getMessage();
     }
 }
