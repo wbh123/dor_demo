@@ -1,0 +1,43 @@
+name: Finalize private migration split temporary
+
+on:
+  push:
+    branches:
+      - refactor/private-migration-split-v2-20260805
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refactor/private-migration-split-v2-20260805
+          fetch-depth: 0
+      - name: Fix external template and contract readers
+        shell: python
+        run: |
+          from pathlib import Path
+          template = Path('frontend/src/views/admin/AdminBatchView.template.html')
+          text = template.read_text(encoding='utf-8')
+          text = text.replace('((room.issues ?? []) as unknown[])', '(room.issues ?? [])')
+          template.write_text(text, encoding='utf-8')
+
+          contract = Path('scripts/ci/validate_system_contracts.py')
+          text = contract.read_text(encoding='utf-8')
+          old = '''def read(relative: str) -> str:\n    return (ROOT / relative).read_text(encoding="utf-8")\n'''
+          new = '''def read(relative: str) -> str:\n    path = ROOT / relative\n    text = path.read_text(encoding="utf-8")\n    if path.suffix == ".vue":\n        stem = path.with_suffix("")\n        for suffix in (".logic.ts", ".template.html", ".css"):\n            companion = Path(str(stem) + suffix)\n            if companion.is_file():\n                text += "\\n" + companion.read_text(encoding="utf-8")\n    return text\n'''
+          if old not in text:
+              raise RuntimeError('contract read function not found')
+          contract.write_text(text.replace(old, new), encoding='utf-8')
+      - name: Commit compatibility fixes
+        run: |
+          rm -f .github/workflows/finalize-private-migration-split-temporary.yml
+          rm -f scripts/ci/.private-migration-split-v2-ci-trigger
+          git config user.name "wbh123"
+          git config user.email "21192079+wbh123@users.noreply.github.com"
+          git add -A
+          git commit -m "fix: 兼容外部模板构建与契约读取"
+          git push origin HEAD
