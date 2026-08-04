@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - automation/export-final-requested-ui-20260805
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [main]
 
 permissions:
   contents: read
@@ -14,6 +17,8 @@ jobs:
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
+        with:
+          ref: automation/export-final-requested-ui-20260805
       - name: Upload source snapshot
         uses: actions/upload-artifact@v4
         with:
