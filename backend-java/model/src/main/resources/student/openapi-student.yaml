@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: Wust Dormitory Select 学生端接口
-  version: 1.2.0
+  version: 1.3.0
 paths:
   /api/v1/student/profile:
     get:
@@ -175,14 +175,6 @@ paths:
       security: [{ bearerAuth: [] }]
       responses:
         '200': { $ref: '#/components/responses/ListSuccess' }
-    post:
-      tags: [Student]
-      operationId: createFormingTeam
-      summary: 创建处于组队中的队伍
-      security: [{ bearerAuth: [] }]
-      responses:
-        '200': { $ref: '#/components/responses/ObjectSuccess' }
-        '409': { $ref: '#/components/responses/ErrorResponse' }
 
   /api/v1/student/team-invitations:
     get:
@@ -194,6 +186,7 @@ paths:
     post:
       tags: [Student]
       operationId: inviteTeammate
+      summary: 使用学号和姓名联合校验后邀请队友
       security: [{ bearerAuth: [] }]
       requestBody:
         required: true
@@ -243,7 +236,7 @@ paths:
     delete:
       tags: [Student]
       operationId: removeTeamMember
-      summary: 邀请发起人移除已接受队友
+      summary: 邀请发起人取消待确认邀请或移除已接受队友
       security: [{ bearerAuth: [] }]
       parameters:
         - $ref: '#/components/parameters/TeamIdPath'
@@ -361,9 +354,10 @@ components:
 
     InviteRequest:
       type: object
-      required: [studentNumber]
+      required: [studentNumber, studentName]
       properties:
         studentNumber: { type: string, pattern: '^\d{12}$' }
+        studentName: { type: string, minLength: 1, maxLength: 128 }
 
     InvitationResponseRequest:
       type: object
