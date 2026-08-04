@@ -180,12 +180,16 @@ public class ImportWorkflowService {
 
     private String rowIdentity(String importType, Map<String, String> row) {
         if ("STUDENT".equals(importType)) {
-            return "STUDENT:" + value(row, "学号", "studentnumber");
+            String studentNumber = value(row, "学号", "studentnumber");
+            return studentNumber.isBlank() ? "" : "STUDENT:" + studentNumber;
         }
-        return "ROOM:"
-                + value(row, "楼栋编码", "buildingcode") + ':'
-                + value(row, "楼层", "floornumber") + ':'
-                + value(row, "房间号", "roomnumber");
+        String buildingCode = value(row, "楼栋编码", "buildingcode");
+        String floorNumber = value(row, "楼层", "floornumber");
+        String roomNumber = value(row, "房间号", "roomnumber");
+        if (buildingCode.isBlank() || floorNumber.isBlank() || roomNumber.isBlank()) {
+            return "";
+        }
+        return "ROOM:" + buildingCode + ':' + floorNumber + ':' + roomNumber;
     }
 
     private String value(Map<String, String> row, String chinese, String english) {
