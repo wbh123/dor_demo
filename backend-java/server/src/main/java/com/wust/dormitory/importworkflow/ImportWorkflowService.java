@@ -150,18 +150,47 @@ public class ImportWorkflowService {
             String importType,
             List<Map<String, String>> rows) {
         java.util.ArrayList<Map<String, Object>> errors = new java.util.ArrayList<>();
+        Map<String, Integer> firstRowByIdentity = new LinkedHashMap<>();
         for (int index = 0; index < rows.size(); index++) {
+            int spreadsheetRow = index + 2;
+            Map<String, String> row = rows.get(index);
+            String identity = rowIdentity(importType, row);
+            if (!identity.isBlank()) {
+                Integer firstRow = firstRowByIdentity.putIfAbsent(identity, spreadsheetRow);
+                if (firstRow != null) {
+                    errors.add(error(
+                            spreadsheetRow,
+                            "duplicate",
+                            identity,
+                            "与第" + firstRow + "行指向同一业务对象，请合并为一行"));
+                }
+            }
             try {
-                mutationService.validateRow(importType, rows.get(index));
+                mutationService.validateRow(importType, row);
             } catch (RuntimeException exception) {
                 errors.add(error(
-                        index + 2,
+                        spreadsheetRow,
                         "row",
                         "",
                         safeMessage(exception)));
             }
         }
         return List.copyOf(errors);
+    }
+
+    private String rowIdentity(String importType, Map<String, String> row) {
+        if ("STUDENT".equals(importType)) {
+            return "STUDENT:" + value(row, "学号", "studentnumber");
+        }
+        return "ROOM:"
+                + value(row, "楼栋编码", "buildingcode") + ':'
+                + value(row, "楼层", "floornumber") + ':'
+                + value(row, "房间号", "roomnumber");
+    }
+
+    private String value(Map<String, String> row, String chinese, String english) {
+        String value = row.getOrDefault(chinese, row.getOrDefault(english, ""));
+        return value == null ? "" : value.trim().toUpperCase(Locale.ROOT);
     }
 
     private ImportTaskRecord requireTask(String taskId) {
