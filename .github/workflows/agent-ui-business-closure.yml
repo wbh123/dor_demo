@@ -6,6 +6,7 @@ on:
       - agent/ui-business-closure-20260804
     paths:
       - scripts/ci/apply_ui_business_closure.py
+      - .github/workflows/agent-ui-business-closure.yml
 
 permissions:
   contents: write
