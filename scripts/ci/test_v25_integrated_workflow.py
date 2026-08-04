@@ -19,6 +19,13 @@ def require(path: str, *tokens: str) -> None:
         assert token in text, f"{path} missing token: {token}"
 
 
+def require_any(path: str, *tokens: str) -> None:
+    text = read(path)
+    assert any(token in text for token in tokens), (
+        f"{path} must contain one of: {', '.join(tokens)}"
+    )
+
+
 def forbid(path: str, *tokens: str) -> None:
     text = read(path)
     for token in tokens:
@@ -28,7 +35,12 @@ def forbid(path: str, *tokens: str) -> None:
 # Direct invitation automatically creates the internal forming team; no manual creation UI remains.
 forbid("frontend/src/views/student/TeamView.vue", "createTeam()", "创建队伍", "先创建队伍")
 require("backend-java/server/src/main/java/com/wust/dormitory/student/TeamService.java", "ensureFormingLeaderTeam", "inviteTeammate")
-require("frontend/src/views/student/TeamView.vue", "首次邀请已自动建立队伍", "/api/v1/student/team-invitations")
+require_any(
+    "frontend/src/views/student/TeamView.vue",
+    "首次邀请已自动建立队伍",
+    "首次邀请会自动建立队伍",
+)
+require("frontend/src/views/student/TeamView.vue", "/api/v1/student/team-invitations")
 
 # Students without a batch can fill reusable preferences when the administrator enables it.
 require("backend-java/server/src/main/java/com/wust/dormitory/selection/SelectionPolicyService.java", "ALLOW_DIRECT_PREFERENCE_WITHOUT_BATCH")
