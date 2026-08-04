@@ -1,0 +1,92 @@
+name: Apply split refactor direct
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refactor/split-large-views-20260804
+          fetch-depth: 0
+      - name: Split large Vue views and update contract readers
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          root = Path('.')
+          views = [
+              root / 'frontend/src/views/admin/AdminBatchView.vue',
+              root / 'frontend/src/views/admin/AdminDataView.vue',
+              root / 'frontend/src/views/student/StudentHomeContent.vue',
+          ]
+          for vue in views:
+              source = vue.read_text(encoding='utf-8')
+              template_open = '<template>'
+              template_close = '</template>'
+              style_open = '<style scoped>'
+              style_close = '</style>'
+              ts = source.index(template_open)
+              te = source.index(template_close, ts)
+              ss = source.index(style_open, te)
+              se = source.index(style_close, ss)
+              template = source[ts + len(template_open):te].strip('\n') + '\n'
+              style = source[ss + len(style_open):se].strip('\n') + '\n'
+              vue.write_text(
+                  source[:ts]
+                  + f'<template src="./{vue.stem}.template.html"></template>\n\n'
+                  + f'<style scoped src="./{vue.stem}.css"></style>\n',
+                  encoding='utf-8',
+              )
+              vue.with_name(f'{vue.stem}.template.html').write_text(template, encoding='utf-8')
+              vue.with_name(f'{vue.stem}.css').write_text(style, encoding='utf-8')
+
+          common = """def read(path: str) -> str:\n    target = ROOT / path\n    content = target.read_text(encoding='utf-8')\n    if target.suffix == '.vue':\n        for sibling_name in (f'{target.stem}.template.html', f'{target.stem}.css'):\n            sibling = target.with_name(sibling_name)\n            if sibling.exists():\n                content += '\\n' + sibling.read_text(encoding='utf-8')\n    return content\n"""
+          replacements = {
+              'scripts/ci/test_phase2_phase3_operations.py': """def read(path: str) -> str:\n    target = ROOT / path\n    if not target.exists():\n        raise AssertionError(f\"missing required file: {path}\")\n    return target.read_text(encoding=\"utf-8\")\n""",
+              'scripts/ci/test_v25_integrated_workflow.py': """def read(path: str) -> str:\n    file = ROOT / path\n    assert file.exists(), f\"missing required file: {path}\"\n    return file.read_text(encoding=\"utf-8\")\n""",
+              'scripts/ci/test_ui_business_closure.py': """def read(path: str) -> str:\n    return (ROOT / path).read_text(encoding=\"utf-8\")\n""",
+              'scripts/ci/test_admin_scope_questionnaire_team_ux.py': """def read(path: str) -> str:\n    target = ROOT / path\n    if not target.exists():\n        raise AssertionError(f\"missing required file: {path}\")\n    return target.read_text(encoding=\"utf-8\")\n""",
+          }
+          for relative, old in replacements.items():
+              path = root / relative
+              text = path.read_text(encoding='utf-8')
+              if old not in text:
+                  raise SystemExit(f'expected reader not found: {relative}')
+              path.write_text(text.replace(old, common, 1), encoding='utf-8')
+
+          requested = root / 'scripts/ci/test_requested_ui_regressions.py'
+          text = requested.read_text(encoding='utf-8')
+          old = """def read(path: str) -> str:\n    return (root / path).read_text(encoding='utf-8')\n"""
+          new = common.replace('ROOT / path', 'root / path')
+          if old not in text:
+              raise SystemExit('expected requested regression reader not found')
+          requested.write_text(text.replace(old, new, 1), encoding='utf-8')
+
+          contracts = root / 'scripts/ci/validate_system_contracts.py'
+          text = contracts.read_text(encoding='utf-8')
+          old = """def read(relative: str) -> str:\n    return (ROOT / relative).read_text(encoding=\"utf-8\")\n"""
+          new = """def read(relative: str) -> str:\n    target = ROOT / relative\n    content = target.read_text(encoding=\"utf-8\")\n    if target.suffix == \".vue\":\n        for sibling_name in (f\"{target.stem}.template.html\", f\"{target.stem}.css\"):\n            sibling = target.with_name(sibling_name)\n            if sibling.exists():\n                content += \"\\n\" + sibling.read_text(encoding=\"utf-8\")\n    return content\n"""
+          if old not in text:
+              raise SystemExit('expected system contract reader not found')
+          contracts.write_text(text.replace(old, new, 1), encoding='utf-8')
+          PY
+          bash scripts/ci/run_contracts.sh
+      - name: Commit source split
+        run: |
+          rm -rf .automation
+          rm -f .github/workflows/apply-split-refactor-temporary.yml
+          rm -f .github/workflows/apply-split-refactor-direct.yml
+          git config user.name "wbh123"
+          git config user.email "21192079+wbh123@users.noreply.github.com"
+          git add -A
+          git commit -m "refactor: 拆分大型页面以便稳定迁移"
+          git push origin HEAD:refactor/split-large-views-20260804
