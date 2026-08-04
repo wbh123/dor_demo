@@ -25,6 +25,7 @@ const icons = {
   calendar:'M7 2h2v2h6V2h2v2h3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h3V2Zm13 8H4v10h16V10ZM4 8h16V6H4v2Z',
   assignment:'M4 3h13a2 2 0 0 1 2 2v3h1a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-3H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Zm3 7v9h13v-9H7Zm2 2h9v2H9v-2Zm0 4h6v2H9v-2ZM4 5v9h1v-4a2 2 0 0 1 2-2h10V5H4Z',
   change:'M7 7h11l-3-3 1.4-1.4L21.8 8l-5.4 5.4L15 12l3-3H7a3 3 0 0 0-3 3v1H2v-1a5 5 0 0 1 5-5Zm10 10H6l3 3-1.4 1.4L2.2 16l5.4-5.4L9 12l-3 3h11a3 3 0 0 0 3-3v-1h2v1a5 5 0 0 1-5 5Z',
+  waitlist:'M12 2a7 7 0 0 0-7 7v3H3v2h2v5a3 3 0 0 0 3 3h8a3 3 0 0 0 3-3v-5h2v-2h-2V9a7 7 0 0 0-7-7Zm0 2a5 5 0 0 1 5 5v3H7V9a5 5 0 0 1 5-5Zm-5 10h10v5a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1v-5Zm4-8h2v4h-2V6Z',
   operations:'M3 20h18v2H3v-2Zm2-2V9h3v9H5Zm5 0V3h3v15h-3Zm5 0v-6h3v6h-3Z',
   importQuality:'M4 3h10l6 6v12H4V3Zm9 2H6v14h12v-9h-5V5Zm2 1.5V8h1.5L15 6.5ZM8 12h8v2H8v-2Zm0 4h6v2H8v-2Z',
   anomaly:'M12 2 2 20h20L12 2Zm0 5.2L18.6 18H5.4L12 7.2ZM11 10v4h2v-4h-2Zm0 5.5v2h2v-2h-2Z',
@@ -42,12 +43,14 @@ const links = computed(() => auth.isAdmin ? [
   {to:'/admin/batches',label:'选寝批次',icon:icons.calendar},
   {to:'/admin/assignments',label:'分配与调整',icon:icons.assignment},
   {to:'/admin/room-change',label:'换寝管理',icon:icons.change},
+  {to:'/admin/waitlist',label:'候补管理',icon:icons.waitlist},
   {to:'/admin/operations',label:'运营与健康',icon:icons.operations},
   {to:'/admin/anomalies',label:'异常工作台',icon:icons.anomaly},
 ] : [
   {to:'/student',label:'选寝首页',icon:icons.home},
   {to:'/student/teams',label:'我的队伍',icon:icons.team},
   {to:'/student/room-change',label:'申请换寝',icon:icons.change},
+  {to:'/student/waitlist',label:'候补补位',icon:icons.waitlist},
 ])
 
 const welcomeText = computed(() => {
