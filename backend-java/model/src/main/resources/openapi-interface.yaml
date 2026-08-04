@@ -12,6 +12,8 @@ paths:
     $ref: 'auth/openapi-auth.yaml#/paths/~1api~1v1~1auth~1activate'
   /api/v1/auth/logout:
     $ref: 'auth/openapi-auth.yaml#/paths/~1api~1v1~1auth~1logout'
+  /api/v1/auth/password:
+    $ref: 'auth/openapi-auth.yaml#/paths/~1api~1v1~1auth~1password'
   /api/v1/auth/me:
     $ref: 'auth/openapi-auth.yaml#/paths/~1api~1v1~1auth~1me'
   /api/v1/auth/welcome/acknowledge:
