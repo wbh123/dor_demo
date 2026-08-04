@@ -34,10 +34,11 @@ import_controller = read(
     "backend-java/server/src/main/java/com/wust/dormitory/importworkflow/ImportWorkflowController.java"
 )
 for token in (
-    "/api/v1/admin/import-tasks/preview",
-    "/api/v1/admin/import-tasks/{taskId}/commit",
-    "/api/v1/admin/import-tasks/{taskId}/rollback",
-    "/api/v1/admin/import-tasks/{taskId}/errors.csv",
+    "/api/v1/admin/import-tasks",
+    "/preview",
+    "/{taskId}/commit",
+    "/{taskId}/rollback",
+    "/{taskId}/errors.csv",
 ):
     require(import_controller, token, f"missing import workflow endpoint: {token}")
 
@@ -77,7 +78,7 @@ for token in (
 ):
     require(operations_controller, token, f"missing operations endpoint: {token}")
 
-root_openapi = read("openapi/openapi.yaml")
+root_openapi = read("backend-java/model/src/main/resources/openapi-interface.yaml")
 for token in (
     "/api/v1/admin/import-tasks/preview:",
     "/api/v1/admin/import-tasks/{taskId}/commit:",
