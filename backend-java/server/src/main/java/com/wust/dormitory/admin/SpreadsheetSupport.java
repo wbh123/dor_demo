@@ -34,7 +34,9 @@ public final class SpreadsheetSupport {
         if (file == null || file.isEmpty()) {
             throw new BusinessException("IMPORT_FILE_REQUIRED", "请选择Excel或CSV文件");
         }
-        String name = file.getOriginalFilename() == null ? "" : file.getOriginalFilename().toLowerCase(Locale.ROOT);
+        String name = file.getOriginalFilename() == null
+                ? ""
+                : file.getOriginalFilename().toLowerCase(Locale.ROOT);
         try {
             if (name.endsWith(".csv")) {
                 return readCsv(new String(file.getBytes(), StandardCharsets.UTF_8));
@@ -54,7 +56,10 @@ public final class SpreadsheetSupport {
         return csvTemplate(headers, example, List.of());
     }
 
-    public static byte[] csvTemplate(List<String> headers, List<String> example, List<String> instructions) {
+    public static byte[] csvTemplate(
+            List<String> headers,
+            List<String> example,
+            List<String> instructions) {
         StringBuilder text = new StringBuilder("\uFEFF");
         for (String instruction : instructions) {
             text.append(csvLine(List.of("# " + instruction))).append('\n');
@@ -64,8 +69,11 @@ public final class SpreadsheetSupport {
         return text.toString().getBytes(StandardCharsets.UTF_8);
     }
 
-    public static byte[] xlsxTemplate(String sheetName, List<String> headers, List<String> example) {
-        return xlsxTemplate(sheetName, headers, example, List.of(), List.of());
+    public static byte[] xlsxTemplate(
+            String sheetName,
+            List<String> headers,
+            List<String> example) {
+        return xlsxTemplate(sheetName, headers, example, List.of(), List.of(), List.of());
     }
 
     public static byte[] xlsxTemplate(
@@ -74,10 +82,28 @@ public final class SpreadsheetSupport {
             List<String> example,
             List<String> instructions,
             List<List<String>> dictionaryRows) {
-        try (Workbook workbook = new XSSFWorkbook(); ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+        return xlsxTemplate(
+                templateName,
+                headers,
+                example,
+                instructions,
+                dictionaryRows,
+                List.of());
+    }
+
+    public static byte[] xlsxTemplate(
+            String templateName,
+            List<String> headers,
+            List<String> example,
+            List<String> instructions,
+            List<List<String>> dictionaryRows,
+            List<List<String>> enumerationRows) {
+        try (Workbook workbook = new XSSFWorkbook();
+             ByteArrayOutputStream output = new ByteArrayOutputStream()) {
             writeInstructionSheet(workbook, templateName, instructions);
             writeDataSheet(workbook, headers, example);
             if (!dictionaryRows.isEmpty()) writeDictionarySheet(workbook, dictionaryRows);
+            if (!enumerationRows.isEmpty()) writeEnumerationSheet(workbook, enumerationRows);
             workbook.write(output);
             return output.toByteArray();
         } catch (IOException exception) {
@@ -95,7 +121,9 @@ public final class SpreadsheetSupport {
                         .map(SpreadsheetSupport::normalizeHeader)
                         .reduce((left, right) -> left + "," + right)
                         .orElse("");
-                if (joined.contains("学号") || joined.contains("楼栋编码") || joined.contains("studentnumber")) {
+                if (joined.contains("学号")
+                        || joined.contains("楼栋编码")
+                        || joined.contains("studentnumber")) {
                     return sheet;
                 }
             }
@@ -141,7 +169,9 @@ public final class SpreadsheetSupport {
             break;
         }
         if (headerIndex < 0) return List.of();
-        List<String> headers = parsed.get(headerIndex).stream().map(SpreadsheetSupport::normalizeHeader).toList();
+        List<String> headers = parsed.get(headerIndex).stream()
+                .map(SpreadsheetSupport::normalizeHeader)
+                .toList();
         List<Map<String, String>> rows = new ArrayList<>();
         for (int index = headerIndex + 1; index < parsed.size(); index++) {
             List<String> values = parsed.get(index);
@@ -160,14 +190,29 @@ public final class SpreadsheetSupport {
         for (int index = 0; index < source.length(); index++) {
             char current = source.charAt(index);
             if (quoted) {
-                if (current == '"' && index + 1 < source.length() && source.charAt(index + 1) == '"') {
-                    cell.append('"'); index++;
-                } else if (current == '"') quoted = false;
-                else cell.append(current);
-            } else if (current == '"') quoted = true;
-            else if (current == ',') { row.add(cell.toString().trim()); cell.setLength(0); }
-            else if (current == '\n') { row.add(cell.toString().trim()); cell.setLength(0); rows.add(row); row = new ArrayList<>(); }
-            else if (current != '\r') cell.append(current);
+                if (current == '"'
+                        && index + 1 < source.length()
+                        && source.charAt(index + 1) == '"') {
+                    cell.append('"');
+                    index++;
+                } else if (current == '"') {
+                    quoted = false;
+                } else {
+                    cell.append(current);
+                }
+            } else if (current == '"') {
+                quoted = true;
+            } else if (current == ',') {
+                row.add(cell.toString().trim());
+                cell.setLength(0);
+            } else if (current == '\n') {
+                row.add(cell.toString().trim());
+                cell.setLength(0);
+                rows.add(row);
+                row = new ArrayList<>();
+            } else if (current != '\r') {
+                cell.append(current);
+            }
         }
         row.add(cell.toString().trim());
         if (row.size() > 1 || !row.getFirst().isBlank()) rows.add(row);
@@ -190,7 +235,10 @@ public final class SpreadsheetSupport {
                 .replace(")", "）");
     }
 
-    private static void writeInstructionSheet(Workbook workbook, String templateName, List<String> instructions) {
+    private static void writeInstructionSheet(
+            Workbook workbook,
+            String templateName,
+            List<String> instructions) {
         Sheet sheet = workbook.createSheet("填写说明");
         CellStyle titleStyle = workbook.createCellStyle();
         Font titleFont = workbook.createFont();
@@ -208,58 +256,87 @@ public final class SpreadsheetSupport {
             Row row = sheet.createRow(rowIndex++);
             row.createCell(0).setCellValue((index + 1) + ". " + content.get(index));
         }
-        sheet.setColumnWidth(0, 24000);
+        sheet.setColumnWidth(0, 30000);
     }
 
-    private static void writeDataSheet(Workbook workbook, List<String> headers, List<String> example) {
+    private static void writeDataSheet(
+            Workbook workbook,
+            List<String> headers,
+            List<String> example) {
         Sheet sheet = workbook.createSheet(DATA_SHEET_NAME);
-        CellStyle headerStyle = workbook.createCellStyle();
-        Font headerFont = workbook.createFont();
-        headerFont.setBold(true);
-        headerFont.setColor(IndexedColors.WHITE.getIndex());
-        headerStyle.setFont(headerFont);
-        headerStyle.setFillForegroundColor(IndexedColors.DARK_BLUE.getIndex());
-        headerStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
-        headerStyle.setAlignment(HorizontalAlignment.CENTER);
+        CellStyle headerStyle = coloredHeaderStyle(workbook, IndexedColors.DARK_BLUE);
         Row headerRow = sheet.createRow(0);
         writeRow(headerRow, headers);
         for (Cell cell : headerRow) cell.setCellStyle(headerStyle);
         writeRow(sheet.createRow(1), example);
         sheet.createFreezePane(0, 1);
-        sheet.setAutoFilter(new org.apache.poi.ss.util.CellRangeAddress(0, 0, 0, Math.max(0, headers.size() - 1)));
-        for (int index = 0; index < headers.size(); index++) {
-            sheet.autoSizeColumn(index);
-            sheet.setColumnWidth(index, Math.min(sheet.getColumnWidth(index) + 1400, 16000));
-        }
+        sheet.setAutoFilter(new org.apache.poi.ss.util.CellRangeAddress(
+                0, 0, 0, Math.max(0, headers.size() - 1)));
+        autoSize(sheet, headers.size(), 16000);
     }
 
-    private static void writeDictionarySheet(Workbook workbook, List<List<String>> dictionaryRows) {
+    private static void writeDictionarySheet(
+            Workbook workbook,
+            List<List<String>> dictionaryRows) {
         Sheet sheet = workbook.createSheet("国家地区代码");
-        CellStyle headerStyle = workbook.createCellStyle();
-        Font font = workbook.createFont();
-        font.setBold(true);
-        headerStyle.setFont(font);
-        headerStyle.setFillForegroundColor(IndexedColors.LIGHT_CORNFLOWER_BLUE.getIndex());
-        headerStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
         Row header = sheet.createRow(0);
-        writeRow(header, List.of("国家/地区代码", "国家或地区", "手机国家码"));
-        for (Cell cell : header) cell.setCellStyle(headerStyle);
+        writeRow(header, List.of("国家/地区代码", "中文名称", "英文名称", "手机地区码"));
+        CellStyle style = coloredHeaderStyle(workbook, IndexedColors.LIGHT_CORNFLOWER_BLUE);
+        for (Cell cell : header) cell.setCellStyle(style);
         for (int index = 0; index < dictionaryRows.size(); index++) {
             writeRow(sheet.createRow(index + 1), dictionaryRows.get(index));
         }
         sheet.createFreezePane(0, 1);
-        for (int index = 0; index < 3; index++) {
+        autoSize(sheet, 4, 14000);
+    }
+
+    private static void writeEnumerationSheet(
+            Workbook workbook,
+            List<List<String>> enumerationRows) {
+        Sheet sheet = workbook.createSheet("字段枚举");
+        Row header = sheet.createRow(0);
+        writeRow(header, List.of("字段名称", "允许填写内容", "系统规范值", "容错说明"));
+        CellStyle style = coloredHeaderStyle(workbook, IndexedColors.LIGHT_CORNFLOWER_BLUE);
+        for (Cell cell : header) cell.setCellStyle(style);
+        for (int index = 0; index < enumerationRows.size(); index++) {
+            writeRow(sheet.createRow(index + 1), enumerationRows.get(index));
+        }
+        sheet.createFreezePane(0, 1);
+        autoSize(sheet, 4, 22000);
+    }
+
+    private static CellStyle coloredHeaderStyle(
+            Workbook workbook,
+            IndexedColors color) {
+        CellStyle style = workbook.createCellStyle();
+        Font font = workbook.createFont();
+        font.setBold(true);
+        if (color == IndexedColors.DARK_BLUE) font.setColor(IndexedColors.WHITE.getIndex());
+        style.setFont(font);
+        style.setFillForegroundColor(color.getIndex());
+        style.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+        style.setAlignment(HorizontalAlignment.CENTER);
+        return style;
+    }
+
+    private static void autoSize(Sheet sheet, int columns, int maximumWidth) {
+        for (int index = 0; index < columns; index++) {
             sheet.autoSizeColumn(index);
-            sheet.setColumnWidth(index, Math.min(sheet.getColumnWidth(index) + 1200, 12000));
+            sheet.setColumnWidth(index,
+                    Math.min(sheet.getColumnWidth(index) + 1400, maximumWidth));
         }
     }
 
     private static void writeRow(Row row, List<String> values) {
-        for (int index = 0; index < values.size(); index++) row.createCell(index).setCellValue(values.get(index));
+        for (int index = 0; index < values.size(); index++) {
+            row.createCell(index).setCellValue(values.get(index));
+        }
     }
 
     private static String csvLine(List<String> values) {
-        return values.stream().map(value -> "\"" + value.replace("\"", "\"\"") + "\"")
-                .reduce((left, right) -> left + "," + right).orElse("");
+        return values.stream()
+                .map(value -> "\"" + value.replace("\"", "\"\"") + "\"")
+                .reduce((left, right) -> left + "," + right)
+                .orElse("");
     }
 }
