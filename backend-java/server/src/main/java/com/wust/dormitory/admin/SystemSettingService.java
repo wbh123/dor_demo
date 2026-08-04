@@ -26,7 +26,7 @@ public class SystemSettingService {
     private static final int MAX_LOCALE_COUNT = 20;
     private static final Map<String, String> DEFAULT_MESSAGES = Map.of(
             PRIMARY_WELCOME_LOCALE,
-            "欢迎使用示例大学学生宿舍智能选择系统。请先完成个人偏好，再选择合适的宿舍或床位。",
+            "欢迎使用武汉科技大学学生宿舍智能选择系统。请先完成个人偏好，再选择合适的宿舍或床位。",
             FALLBACK_WELCOME_LOCALE,
             "Welcome to the university dormitory selection system. Complete your personal preferences first, then choose a suitable room or bed.");
 
@@ -112,7 +112,6 @@ public class SystemSettingService {
             if (parsed.containsKey("messages")) {
                 return new WelcomeConfiguration(mergeMessages(stringMap(parsed.get("messages"))));
             }
-            // 兼容旧版扁平 zh-CN/en-US 对象。
             return new WelcomeConfiguration(mergeMessages(stringMap(parsed)));
         } catch (JsonProcessingException ignored) {
             Map<String, String> fallback = new LinkedHashMap<>(DEFAULT_MESSAGES);
@@ -188,11 +187,12 @@ public class SystemSettingService {
             try {
                 merged.put(normalizeLocaleTag(key), value.trim());
             } catch (BusinessException ignored) {
-                // 读取历史数据时忽略不合法语言代码，管理员下次保存时会得到明确校验提示。
+                // 读取历史数据时忽略不合法语言代码。
             }
         });
         if (!merged.containsKey(FALLBACK_WELCOME_LOCALE)) {
-            merged.put(FALLBACK_WELCOME_LOCALE, DEFAULT_MESSAGES.get(FALLBACK_WELCOME_LOCALE));
+            merged.put(FALLBACK_WELCOME_LOCALE,
+                    DEFAULT_MESSAGES.get(FALLBACK_WELCOME_LOCALE));
         }
         return merged;
     }
