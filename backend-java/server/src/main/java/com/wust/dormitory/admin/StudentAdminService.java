@@ -247,7 +247,7 @@ public class StudentAdminService {
         if (!List.of("DOMESTIC", "INTERNATIONAL").contains(command.studentCategory())) {
             throw new BusinessException("STUDENT_CATEGORY_INVALID", "学生类别必须为国内生或国际生");
         }
-        if (!List.of("INITIAL_IMPORT", "TRANSFER_MANUAL", "ADMIN_MANUAL", "BATCH_IMPORT")
+        if (!List.of("INITIAL_IMPORT", "ADMIN_MANUAL", "BATCH_IMPORT")
                 .contains(command.enrollmentSource())) {
             throw new BusinessException("ENROLLMENT_SOURCE_INVALID", "学生录入来源不合法");
         }
