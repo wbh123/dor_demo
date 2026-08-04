@@ -1,13 +1,13 @@
 openapi: 3.0.3
 info:
   title: Wust Dormitory Select 系统设置接口
-  version: 1.2.0
+  version: 1.3.0
 paths:
   /api/v1/admin/settings/student-welcome:
     get:
       tags: [SystemSetting]
       operationId: getStudentWelcomeSetting
-      summary: 获取学生首次登录多语言欢迎语
+      summary: 获取学生首次登录多语言及国家地区欢迎语
       security:
         - bearerAuth: []
       responses:
@@ -22,7 +22,7 @@ paths:
     put:
       tags: [SystemSetting]
       operationId: updateStudentWelcomeSetting
-      summary: 更新学生首次登录语言版本欢迎语
+      summary: 更新学生首次登录语言及国家地区欢迎语
       security:
         - bearerAuth: []
       requestBody:
@@ -57,9 +57,17 @@ components:
       properties:
         messages:
           type: object
-          description: 管理员统一维护的BCP-47语言代码到欢迎语映射；必须包含zh-CN和en-US，未配置的外文语言回退en-US
+          description: 管理员维护的BCP-47语言代码到欢迎语映射；必须包含zh-CN和en-US，未配置的外文语言回退en-US
           minProperties: 2
           maxProperties: 20
+          additionalProperties:
+            type: string
+            minLength: 1
+            maxLength: 1000
+        countryMessages:
+          type: object
+          description: 可选的ISO 3166-1二位国家或地区代码到专属欢迎语映射；匹配时优先于语言版本
+          maxProperties: 80
           additionalProperties:
             type: string
             minLength: 1
