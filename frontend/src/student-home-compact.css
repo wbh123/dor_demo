@@ -1,0 +1,26 @@
+.welcome-card.compact-home-top-card {
+  min-height: auto;
+  padding: 16px 18px;
+  align-items: flex-start;
+  justify-content: flex-start;
+  text-align: left;
+}
+
+.welcome-card.compact-home-top-card > div,
+.welcome-card.compact-home-top-card .student-profile-inline-meta {
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  text-align: left;
+  justify-content: flex-start;
+}
+
+.welcome-card.compact-home-top-card h2,
+.welcome-card.compact-home-top-card p {
+  margin-left: 0;
+  text-align: left;
+}
+
+.welcome-card.compact-home-top-card .home-corner-badge {
+  align-self: flex-start;
+}
