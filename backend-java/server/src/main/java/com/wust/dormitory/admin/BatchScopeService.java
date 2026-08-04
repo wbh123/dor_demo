@@ -86,6 +86,12 @@ public class BatchScopeService {
                 WHERE b.enabled=1
                 ORDER BY b.building_code, f.floor_number, r.room_number
                 """, Map.of("batchId", batchId));
+        rooms.forEach(room -> {
+            Object disabledReason = room.get("disabled_reason");
+            if (disabledReason != null && !String.valueOf(disabledReason).isBlank()) {
+                room.put("operational_status", disabledReason);
+            }
+        });
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("batchId", batchId);
