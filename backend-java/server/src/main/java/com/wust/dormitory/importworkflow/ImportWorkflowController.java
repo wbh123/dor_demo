@@ -3,6 +3,7 @@ package com.wust.dormitory.importworkflow;
 import com.wust.dormitory.common.response.ResponseFactory;
 import com.wust.dormitory.model.dto.ListSuccessResponse;
 import com.wust.dormitory.model.dto.ObjectSuccessResponse;
+import com.wust.dormitory.security.CurrentUser;
 import com.wust.dormitory.security.SecurityUsers;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
@@ -50,14 +51,14 @@ public class ImportWorkflowController {
 
     @PostMapping("/{taskId}/commit")
     public ResponseEntity<ObjectSuccessResponse> commit(@PathVariable String taskId) {
-        SecurityUsers.requireAdmin();
-        return ResponseEntity.ok(ResponseFactory.object(service.commitTask(taskId)));
+        CurrentUser operator = SecurityUsers.requireAdmin();
+        return ResponseEntity.ok(ResponseFactory.object(service.commitTask(taskId, operator)));
     }
 
     @PostMapping("/{taskId}/rollback")
     public ResponseEntity<ObjectSuccessResponse> rollback(@PathVariable String taskId) {
-        SecurityUsers.requireAdmin();
-        return ResponseEntity.ok(ResponseFactory.object(service.rollbackTask(taskId)));
+        CurrentUser operator = SecurityUsers.requireAdmin();
+        return ResponseEntity.ok(ResponseFactory.object(service.rollbackTask(taskId, operator)));
     }
 
     @GetMapping(value = "/{taskId}/errors.csv", produces = "text/csv;charset=UTF-8")
