@@ -11,8 +11,15 @@ def read(path: str) -> str:
     target = ROOT / path
     if not target.exists():
         raise AssertionError(f"missing required file: {path}")
-    return target.read_text(encoding="utf-8")
-
+    text = target.read_text(encoding="utf-8")
+    if target.suffix == ".vue":
+        stem = target.with_suffix("")
+        for suffix in (".logic.ts", ".template.html", ".css"):
+            companion = Path(str(stem) + suffix)
+            if companion.is_file():
+                text += "
+" + companion.read_text(encoding="utf-8")
+    return text
 
 def require(source: str, tokens: tuple[str, ...], context: str) -> None:
     for token in tokens:

@@ -8,10 +8,18 @@ ROOT = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else Path(__file__).reso
 
 
 def read(path: str) -> str:
-    file = ROOT / path
-    assert file.exists(), f"missing required file: {path}"
-    return file.read_text(encoding="utf-8")
-
+    target = ROOT / path
+    if not target.exists():
+        raise AssertionError(f"missing required file: {path}")
+    text = target.read_text(encoding="utf-8")
+    if target.suffix == ".vue":
+        stem = target.with_suffix("")
+        for suffix in (".logic.ts", ".template.html", ".css"):
+            companion = Path(str(stem) + suffix)
+            if companion.is_file():
+                text += "
+" + companion.read_text(encoding="utf-8")
+    return text
 
 def require(path: str, *tokens: str) -> None:
     text = read(path)

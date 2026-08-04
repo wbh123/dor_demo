@@ -9,8 +9,18 @@ errors: list[str] = []
 
 
 def read(path: str) -> str:
-    return (ROOT / path).read_text(encoding="utf-8")
-
+    target = ROOT / path
+    if not target.exists():
+        raise AssertionError(f"missing required file: {path}")
+    text = target.read_text(encoding="utf-8")
+    if target.suffix == ".vue":
+        stem = target.with_suffix("")
+        for suffix in (".logic.ts", ".template.html", ".css"):
+            companion = Path(str(stem) + suffix)
+            if companion.is_file():
+                text += "
+" + companion.read_text(encoding="utf-8")
+    return text
 
 def require(condition: bool, message: str) -> None:
     if not condition:

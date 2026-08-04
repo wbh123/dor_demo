@@ -15,17 +15,19 @@ def require(condition: bool, message: str, errors: list[str]) -> None:
         errors.append(message)
 
 
-def read(relative: str) -> str:
-    path = ROOT / relative
-    text = path.read_text(encoding="utf-8")
-    if path.suffix == ".vue":
-        stem = path.with_suffix("")
+def read(path: str) -> str:
+    target = ROOT / path
+    if not target.exists():
+        raise AssertionError(f"missing required file: {path}")
+    text = target.read_text(encoding="utf-8")
+    if target.suffix == ".vue":
+        stem = target.with_suffix("")
         for suffix in (".logic.ts", ".template.html", ".css"):
             companion = Path(str(stem) + suffix)
             if companion.is_file():
-                text += "\n" + companion.read_text(encoding="utf-8")
+                text += "
+" + companion.read_text(encoding="utf-8")
     return text
-
 
 def validate_openapi(errors: list[str]) -> int:
     require(OPENAPI_ROOT.is_file(), "missing OpenAPI root contract", errors)
