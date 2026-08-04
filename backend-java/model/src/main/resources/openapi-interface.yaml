@@ -2,7 +2,7 @@ openapi: 3.0.3
 info:
   title: 示例大学学生宿舍智能选择系统接口
   description: 学生宿舍智能选择、业务管理与系统服务管理接口契约
-  version: 3.1.0
+  version: 3.2.0
 servers:
   - url: http://localhost:8080
 paths:
@@ -131,6 +131,14 @@ paths:
     $ref: 'roomchange/openapi-room-change.yaml#/paths/~1api~1v1~1admin~1room-change~1requests~1{requestId}~1approve'
   /api/v1/admin/room-change/requests/{requestId}/reject:
     $ref: 'roomchange/openapi-room-change.yaml#/paths/~1api~1v1~1admin~1room-change~1requests~1{requestId}~1reject'
+  /api/v1/admin/room-exchanges/settings:
+    $ref: 'roomexchange/openapi-room-exchange.yaml#/paths/~1api~1v1~1admin~1room-exchanges~1settings'
+  /api/v1/admin/room-exchanges:
+    $ref: 'roomexchange/openapi-room-exchange.yaml#/paths/~1api~1v1~1admin~1room-exchanges'
+  /api/v1/admin/room-exchanges/{exchangeId}/approve:
+    $ref: 'roomexchange/openapi-room-exchange.yaml#/paths/~1api~1v1~1admin~1room-exchanges~1{exchangeId}~1approve'
+  /api/v1/admin/room-exchanges/{exchangeId}/reject:
+    $ref: 'roomexchange/openapi-room-exchange.yaml#/paths/~1api~1v1~1admin~1room-exchanges~1{exchangeId}~1reject'
 
   /api/v1/student/preferences:
     $ref: 'student/openapi-preference-policy.yaml#/paths/~1api~1v1~1student~1preferences'
@@ -198,6 +206,14 @@ paths:
     $ref: 'roomchange/openapi-room-change.yaml#/paths/~1api~1v1~1student~1room-change~1requests'
   /api/v1/student/room-change/requests/{requestId}/cancel:
     $ref: 'roomchange/openapi-room-change.yaml#/paths/~1api~1v1~1student~1room-change~1requests~1{requestId}~1cancel'
+  /api/v1/student/room-exchanges/candidates:
+    $ref: 'roomexchange/openapi-room-exchange.yaml#/paths/~1api~1v1~1student~1room-exchanges~1candidates'
+  /api/v1/student/room-exchanges:
+    $ref: 'roomexchange/openapi-room-exchange.yaml#/paths/~1api~1v1~1student~1room-exchanges'
+  /api/v1/student/room-exchanges/{exchangeId}/respond:
+    $ref: 'roomexchange/openapi-room-exchange.yaml#/paths/~1api~1v1~1student~1room-exchanges~1{exchangeId}~1respond'
+  /api/v1/student/room-exchanges/{exchangeId}/cancel:
+    $ref: 'roomexchange/openapi-room-exchange.yaml#/paths/~1api~1v1~1student~1room-exchanges~1{exchangeId}~1cancel'
 
   /api/v1/realtime/batches/{batchId}/rooms/{roomId}:
     $ref: 'realtime/openapi-realtime.yaml#/paths/~1api~1v1~1realtime~1batches~1{batchId}~1rooms~1{roomId}'
