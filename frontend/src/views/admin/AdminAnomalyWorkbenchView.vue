@@ -56,12 +56,15 @@ async function previewRecovery() {
 async function executeRecovery() {
   loading.value = true
   error.value = ''
+  message.value = ''
   try {
     const response = await api.post<ObjectSuccessResponse>('/api/v1/admin/operations/redis-recovery/execute')
-    recoveryResult.value = (response.data.data ?? {}) as DataObject
+    const result = (response.data.data ?? {}) as DataObject
+    recoveryResult.value = result
     confirmRecovery.value = false
-    message.value = `恢复完成：清理 ${recoveryResult.value.removedKeys ?? 0} 个失效键，重建 ${recoveryResult.value.recreatedKeys ?? 0} 个房间投影`
-    await Promise.all([load(), previewRecovery()])
+    await load()
+    await previewRecovery()
+    message.value = `恢复完成：清理 ${result.removedKeys ?? 0} 个失效键，重建 ${result.recreatedKeys ?? 0} 个房间投影`
   } catch (cause) {
     error.value = translateError(cause)
   } finally {
