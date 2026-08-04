@@ -33,6 +33,7 @@ bed_confirmation = read("frontend/src/views/admin/AdminBedConfirmationView.vue")
 student_admin = read("frontend/src/views/admin/AdminDataView.vue")
 student_service = read("backend-java/server/src/main/java/com/wust/dormitory/admin/StudentAdminService.java")
 batch = read("frontend/src/views/admin/AdminBatchView.vue")
+openapi_root = read("backend-java/model/src/main/resources/openapi-interface.yaml")
 auth_contract = read("backend-java/model/src/main/resources/auth/openapi-auth.yaml")
 welcome_service = read("backend-java/server/src/main/java/com/wust/dormitory/auth/StudentWelcomeService.java")
 admin_password = read("frontend/src/views/admin/AdminPasswordView.vue")
@@ -79,6 +80,7 @@ require("scope-floating-actions" in batch, "scope save action is not anchored at
 require("publishConfirmation" in batch and "直接发布" in batch, "batch publication does not confirm direct publishing after completed preparation")
 require("allocation-overlay" in batch and "allocation-dialog" in batch, "allocation preview overlay lacks its dedicated visual layer")
 
+require("/api/v1/auth/password" in openapi_root, "school administrator password endpoint is missing from the root OpenAPI contract")
 require("admin/profile/password" in router, "school administrator password route is missing")
 require((ROOT / "frontend/src/views/admin/AdminPasswordView.vue").is_file(), "school administrator password page is missing")
 for requirement in ("12至72位", "包含大写字母", "包含小写字母", "包含数字", "包含特殊字符"):
