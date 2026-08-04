@@ -82,10 +82,9 @@ public class AdminStudentResidencyAdjustmentService {
                         HttpStatus.CONFLICT));
 
         if (!current.isEmpty()) {
-            residencyService.end(
-                    number(current.get("residency_id")),
-                    "管理员调整住宿：" + normalizedReason,
-                    operator);
+            long residencyId = number(current.get("residency_id"));
+            requireNoPendingWorkflow(studentId, residencyId);
+            residencyService.end(residencyId, normalizedReason, operator);
         }
         Map<String, Object> assignment = residencyService.assign(
                 studentId,
@@ -104,6 +103,35 @@ public class AdminStudentResidencyAdjustmentService {
         result.put("assignment", assignment);
         result.put("moved", !current.isEmpty());
         return result;
+    }
+
+    private void requireNoPendingWorkflow(long studentId, long residencyId) {
+        Integer blocked = jdbc.queryForObject("""
+                SELECT
+                    EXISTS (
+                        SELECT 1 FROM bed_confirmation_request confirmation
+                        WHERE confirmation.residency_id=:residencyId
+                          AND confirmation.request_status='PENDING'
+                    )
+                    + EXISTS (
+                        SELECT 1 FROM room_change_request room_change
+                        WHERE room_change.student_id=:studentId
+                          AND room_change.source_residency_id=:residencyId
+                          AND room_change.request_status IN ('PENDING','APPROVED')
+                    )
+                    + EXISTS (
+                        SELECT 1 FROM room_exchange_participant_lock exchange_lock
+                        WHERE exchange_lock.student_id=:studentId
+                    )
+                """, new MapSqlParameterSource()
+                .addValue("studentId", studentId)
+                .addValue("residencyId", residencyId), Integer.class);
+        if (blocked != null && blocked > 0) {
+            throw new BusinessException(
+                    "RESIDENCY_ADJUSTMENT_PENDING_WORKFLOW",
+                    "该学生存在待处理的床位核查、换寝或寝室交换，请先完成或取消相关流程",
+                    HttpStatus.CONFLICT);
+        }
     }
 
     private Map<String, Object> student(long studentId) {
