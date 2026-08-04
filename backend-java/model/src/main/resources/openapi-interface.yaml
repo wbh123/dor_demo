@@ -2,7 +2,7 @@ openapi: 3.0.3
 info:
   title: 示例大学学生宿舍智能选择系统接口
   description: 学生宿舍智能选择、业务管理与系统服务管理接口契约
-  version: 3.0.0
+  version: 3.1.0
 servers:
   - url: http://localhost:8080
 paths:
@@ -97,12 +97,32 @@ paths:
     $ref: 'admin/openapi-import-policy.yaml#/paths/~1api~1v1~1admin~1import~1students~1template'
   /api/v1/admin/import/rooms/template:
     $ref: 'admin/openapi-import-policy.yaml#/paths/~1api~1v1~1admin~1import~1rooms~1template'
+  /api/v1/admin/import-tasks/preview:
+    $ref: 'importworkflow/openapi-import-workflow.yaml#/paths/~1api~1v1~1admin~1import-tasks~1preview'
+  /api/v1/admin/import-tasks:
+    $ref: 'importworkflow/openapi-import-workflow.yaml#/paths/~1api~1v1~1admin~1import-tasks'
+  /api/v1/admin/import-tasks/{taskId}:
+    $ref: 'importworkflow/openapi-import-workflow.yaml#/paths/~1api~1v1~1admin~1import-tasks~1{taskId}'
+  /api/v1/admin/import-tasks/{taskId}/commit:
+    $ref: 'importworkflow/openapi-import-workflow.yaml#/paths/~1api~1v1~1admin~1import-tasks~1{taskId}~1commit'
+  /api/v1/admin/import-tasks/{taskId}/rollback:
+    $ref: 'importworkflow/openapi-import-workflow.yaml#/paths/~1api~1v1~1admin~1import-tasks~1{taskId}~1rollback'
+  /api/v1/admin/import-tasks/{taskId}/errors.csv:
+    $ref: 'importworkflow/openapi-import-workflow.yaml#/paths/~1api~1v1~1admin~1import-tasks~1{taskId}~1errors.csv'
   /api/v1/admin/settings/selection-policy:
     $ref: 'admin/openapi-import-policy.yaml#/paths/~1api~1v1~1admin~1settings~1selection-policy'
   /api/v1/admin/operations/overview:
     $ref: 'operations/openapi-operations.yaml#/paths/~1api~1v1~1admin~1operations~1overview'
   /api/v1/admin/operations/health:
     $ref: 'operations/openapi-operations.yaml#/paths/~1api~1v1~1admin~1operations~1health'
+  /api/v1/admin/operations/redis-recovery/preview:
+    $ref: 'operations/openapi-operations.yaml#/paths/~1api~1v1~1admin~1operations~1redis-recovery~1preview'
+  /api/v1/admin/operations/redis-recovery/execute:
+    $ref: 'operations/openapi-operations.yaml#/paths/~1api~1v1~1admin~1operations~1redis-recovery~1execute'
+  /api/v1/admin/operations/anomalies:
+    $ref: 'operations/openapi-operations.yaml#/paths/~1api~1v1~1admin~1operations~1anomalies'
+  /api/v1/admin/operations/anomalies/summary:
+    $ref: 'operations/openapi-operations.yaml#/paths/~1api~1v1~1admin~1operations~1anomalies~1summary'
   /api/v1/admin/room-change/settings:
     $ref: 'roomchange/openapi-room-change.yaml#/paths/~1api~1v1~1admin~1room-change~1settings'
   /api/v1/admin/room-change/requests:

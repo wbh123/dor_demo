@@ -27,6 +27,8 @@ const icons = {
   assignment:'M4 3h13a2 2 0 0 1 2 2v3h1a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-3H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Zm3 7v9h13v-9H7Zm2 2h9v2H9v-2Zm0 4h6v2H9v-2ZM4 5v9h1v-4a2 2 0 0 1 2-2h10V5H4Z',
   change:'M7 7h11l-3-3 1.4-1.4L21.8 8l-5.4 5.4L15 12l3-3H7a3 3 0 0 0-3 3v1H2v-1a5 5 0 0 1 5-5Zm10 10H6l3 3-1.4 1.4L2.2 16l5.4-5.4L9 12l-3 3h11a3 3 0 0 0 3-3v-1h2v1a5 5 0 0 1-5 5Z',
   operations:'M3 20h18v2H3v-2Zm2-2V9h3v9H5Zm5 0V3h3v15h-3Zm5 0v-6h3v6h-3Z',
+  importQuality:'M4 3h10l6 6v12H4V3Zm9 2H6v14h12v-9h-5V5Zm2 1.5V8h1.5L15 6.5ZM8 12h8v2H8v-2Zm0 4h6v2H8v-2Z',
+  anomaly:'M12 2 2 20h20L12 2Zm0 5.2L18.6 18H5.4L12 7.2ZM11 10v4h2v-4h-2Zm0 5.5v2h2v-2h-2Z',
   home:'m12 3 9 8h-3v10h-5v-6h-2v6H6V11H3l9-8Z',
   team:'M16 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM7 12a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Zm9 2c-3.31 0-6 1.79-6 4v3h12v-3c0-2.21-2.69-4-6-4ZM7 14c-2.76 0-5 1.57-5 3.5V21h6v-3c0-1.4.53-2.69 1.45-3.76A8.4 8.4 0 0 0 7 14Z',
 }
@@ -34,6 +36,7 @@ const icons = {
 const links = computed(() => auth.isAdmin ? [
   {to:'/admin',label:'工作台',icon:icons.dashboard},
   {to:'/admin/data',label:'专业与学生',icon:icons.students},
+  {to:'/admin/import-quality',label:'导入质量',icon:icons.importQuality},
   {to:'/admin/dormitories',label:'宿舍资源',icon:icons.dormitory},
   {to:'/admin/matching',label:'匹配规则',icon:icons.matching},
   {to:'/admin/rule-templates',label:'批次规则',icon:icons.rules},
@@ -41,6 +44,7 @@ const links = computed(() => auth.isAdmin ? [
   {to:'/admin/assignments',label:'分配与调整',icon:icons.assignment},
   {to:'/admin/room-change',label:'换寝管理',icon:icons.change},
   {to:'/admin/operations',label:'运营与健康',icon:icons.operations},
+  {to:'/admin/anomalies',label:'异常工作台',icon:icons.anomaly},
 ] : [
   {to:'/student',label:'选寝首页',icon:icons.home},
   {to:'/student/teams',label:'我的队伍',icon:icons.team},

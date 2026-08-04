@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
-  title: 宿舍运营与运行健康接口
-  version: 1.0.0
+  title: 宿舍运营、运行恢复与异常工作台接口
+  version: 1.1.0
 paths:
   /api/v1/admin/operations/overview:
     get:
@@ -37,6 +37,46 @@ paths:
       responses:
         '200': { $ref: '#/components/responses/ObjectSuccess' }
         '404': { $ref: '#/components/responses/ErrorResponse' }
+  /api/v1/admin/operations/redis-recovery/preview:
+    get:
+      tags: [Operations]
+      operationId: previewRedisRecovery
+      summary: 预检失效Redis临时状态和房间占用投影
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { $ref: '#/components/responses/ObjectSuccess' }
+  /api/v1/admin/operations/redis-recovery/execute:
+    post:
+      tags: [Operations]
+      operationId: executeRedisRecovery
+      summary: 清理失效临时键并根据最终在住事实重建房间投影
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { $ref: '#/components/responses/ObjectSuccess' }
+        '409': { $ref: '#/components/responses/ErrorResponse' }
+  /api/v1/admin/operations/anomalies:
+    get:
+      tags: [Operations]
+      operationId: listOperationsAnomalies
+      summary: 查询统一异常工作台问题列表
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: type
+          in: query
+          schema: { type: string, default: ALL }
+        - name: severity
+          in: query
+          schema: { type: string, default: ALL, enum: [ALL, WARNING, ERROR, CRITICAL] }
+      responses:
+        '200': { $ref: '#/components/responses/ListSuccess' }
+  /api/v1/admin/operations/anomalies/summary:
+    get:
+      tags: [Operations]
+      operationId: getOperationsAnomalySummary
+      summary: 查询异常工作台分类汇总
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { $ref: '#/components/responses/ObjectSuccess' }
 components:
   responses:
     ObjectSuccess:
@@ -44,6 +84,11 @@ components:
       content:
         application/json:
           schema: { $ref: '../common-response/openapi-common-response.yaml#/components/schemas/ObjectSuccessResponse' }
+    ListSuccess:
+      description: 查询成功
+      content:
+        application/json:
+          schema: { $ref: '../common-response/openapi-common-response.yaml#/components/schemas/ListSuccessResponse' }
     ErrorResponse:
       description: 业务错误
       content:
