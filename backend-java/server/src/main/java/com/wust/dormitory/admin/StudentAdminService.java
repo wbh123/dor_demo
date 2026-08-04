@@ -70,13 +70,33 @@ public class StudentAdminService {
                        s.nationality_code, s.student_category,
                        s.enrollment_source, s.phone_number, s.degree_level, s.grade_year, s.major_id,
                        m.major_code, m.major_name, u.account_status,
-                       EXISTS(
-                           SELECT 1 FROM room_assignment ra
-                           WHERE ra.student_id=s.id AND ra.assignment_status='ACTIVE'
-                       ) AS currently_resident
+                       (active_ra.id IS NOT NULL) AS currently_resident,
+                       active_ra.id AS current_residency_id,
+                       current_building.building_name AS current_building_name,
+                       current_room.room_number AS current_room_number,
+                       current_bed.bed_code AS current_bed_code,
+                       current_bed.bed_type AS current_bed_type,
+                       pending_request.request_status AS selection_review_status,
+                       declared_bed.bed_code AS declared_bed_code,
+                       declared_bed.bed_type AS declared_bed_type
                 FROM student s
                 JOIN major m ON m.id=s.major_id
                 LEFT JOIN app_user u ON u.student_id=s.id
+                LEFT JOIN room_assignment active_ra ON active_ra.id=(
+                    SELECT ra.id FROM room_assignment ra
+                    WHERE ra.student_id=s.id AND ra.assignment_status='ACTIVE'
+                    ORDER BY ra.assigned_at DESC, ra.id DESC LIMIT 1
+                )
+                LEFT JOIN room current_room ON current_room.id=active_ra.room_id
+                LEFT JOIN dormitory_floor current_floor ON current_floor.id=current_room.floor_id
+                LEFT JOIN dormitory_building current_building ON current_building.id=current_floor.building_id
+                LEFT JOIN bed current_bed ON current_bed.id=active_ra.bed_id
+                LEFT JOIN bed_confirmation_request pending_request ON pending_request.id=(
+                    SELECT request.id FROM bed_confirmation_request request
+                    WHERE request.residency_id=active_ra.id AND request.request_status='PENDING'
+                    ORDER BY request.submitted_at DESC, request.id DESC LIMIT 1
+                )
+                LEFT JOIN bed declared_bed ON declared_bed.id=pending_request.declared_bed_id
                 """ + where + " ORDER BY s.student_number LIMIT :limit OFFSET :offset", parameters);
         return Map.of(
                 "page", safePage,
