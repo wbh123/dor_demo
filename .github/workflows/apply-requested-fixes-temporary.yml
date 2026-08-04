@@ -1,19 +1,15 @@
 name: Apply requested fixes temporary
 
 on:
-  push:
-    branches:
-      - fix/requested-ui-20260804
   pull_request:
-    branches:
-      - main
+    types: [opened, synchronize, reopened]
+    branches: [main]
 
 permissions:
   contents: write
 
 jobs:
   apply:
-    if: ${{ github.repository == 'wbh123/dor_demo' && github.head_ref == 'fix/requested-ui-20260804' || github.ref_name == 'fix/requested-ui-20260804' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout staged branch
