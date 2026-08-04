@@ -16,3 +16,87 @@
   margin-top: 5px;
   margin-bottom: 0;
 }
+
+.scope-filter-grid {
+  align-content: start;
+  align-items: start;
+  grid-auto-rows: 42px;
+}
+
+.scope-filter-grid .input,
+.scope-filter-control {
+  box-sizing: border-box;
+  height: 42px !important;
+  min-height: 42px !important;
+  max-height: 42px !important;
+  align-self: start;
+}
+
+.scope-option.disabled {
+  position: relative;
+  padding-bottom: 42px !important;
+}
+
+.scope-option.disabled::after {
+  content: "活动互斥或房间不可用，当前不能勾选";
+  position: absolute;
+  left: 36px;
+  bottom: 10px;
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: #fff1f2;
+  color: #a11f35;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.transient-success-notice {
+  position: fixed !important;
+  z-index: 2200 !important;
+  top: 22px !important;
+  right: 22px !important;
+  display: grid !important;
+  grid-template-columns: minmax(180px, 1fr) auto;
+  align-items: start;
+  gap: 12px;
+  width: min(440px, calc(100vw - 32px));
+  margin: 0 !important;
+  padding: 14px 15px !important;
+  border: 1px solid #bde5d5 !important;
+  border-radius: 15px !important;
+  background: #f2fcf7 !important;
+  color: #145c43 !important;
+  box-shadow: 0 20px 55px rgba(15, 23, 42, .2);
+  transition: .2s ease;
+}
+
+.transient-success-notice .notice-close {
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.transient-success-notice .notice-close:hover {
+  background: rgba(15, 23, 42, .08);
+}
+
+.transient-success-hidden {
+  transform: translateY(-10px) !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+@media (max-width: 620px) {
+  .transient-success-notice {
+    top: 12px !important;
+    right: 12px !important;
+  }
+}

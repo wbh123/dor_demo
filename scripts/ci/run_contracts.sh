@@ -10,3 +10,4 @@ python3 "$ROOT_DIR/scripts/ci/test_import_recovery_anomaly_workflows.py" "$ROOT_
 python3 "$ROOT_DIR/scripts/ci/test_welcome_brand_room_exchange.py" "$ROOT_DIR"
 python3 "$ROOT_DIR/scripts/ci/test_waitlist_core.py" "$ROOT_DIR"
 python3 "$ROOT_DIR/scripts/ci/test_v25_integrated_workflow.py" "$ROOT_DIR"
+python3 "$ROOT_DIR/scripts/ci/test_admin_scope_questionnaire_team_ux.py" "$ROOT_DIR"

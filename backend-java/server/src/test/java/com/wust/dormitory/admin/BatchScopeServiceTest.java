@@ -6,6 +6,7 @@ import com.wust.dormitory.security.CurrentUser;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 
 import java.util.List;
@@ -13,6 +14,7 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -68,7 +70,11 @@ class BatchScopeServiceTest {
                 "batch_status", "DRAFT",
                 "batch_name", "2026级选寝")));
         when(jdbc.queryForObject(anyString(), anyMap(), eq(Integer.class)))
-                .thenReturn(2)
+                .thenReturn(2);
+        when(jdbc.queryForObject(
+                anyString(),
+                any(MapSqlParameterSource.class),
+                eq(Integer.class)))
                 .thenReturn(1);
 
         Map<String, Object> result = service.update(
@@ -81,9 +87,15 @@ class BatchScopeServiceTest {
                 .containsEntry("selectedStudentCount", 2)
                 .containsEntry("selectedRoomCount", 1);
 
-        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
-        verify(jdbc, times(6)).update(sql.capture(), anyMap());
-        String allSql = String.join("\n", sql.getAllValues());
+        ArgumentCaptor<String> mapSql = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<String> parameterSql = ArgumentCaptor.forClass(String.class);
+        verify(jdbc, times(4)).update(mapSql.capture(), anyMap());
+        verify(jdbc, times(2)).update(
+                parameterSql.capture(),
+                any(MapSqlParameterSource.class));
+        String allSql = String.join("\n", mapSql.getAllValues())
+                + "\n"
+                + String.join("\n", parameterSql.getAllValues());
         assertThat(allSql)
                 .contains("DELETE FROM batch_bed_scope")
                 .contains("DELETE FROM batch_room_scope")

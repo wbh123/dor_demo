@@ -3,6 +3,7 @@ import App from './App.vue'
 import router from './router'
 import { pinia } from './stores'
 import { useI18n } from './i18n'
+import { installTransientSuccessNotices } from './utils/installTransientSuccessNotices'
 import './style.css'
 import './ux-refinement.css'
 import './room-selection-refinement.css'
@@ -22,3 +23,4 @@ import './admin-density-refinement.css'
 
 createApp(App).use(pinia).use(router).mount('#app')
 useI18n().installDomI18n()
+installTransientSuccessNotices()

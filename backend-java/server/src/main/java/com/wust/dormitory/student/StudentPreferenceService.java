@@ -28,8 +28,11 @@ public class StudentPreferenceService {
     private final MatchingService matchingService;
     private final AuditService auditService;
 
-    public StudentPreferenceService(NamedParameterJdbcTemplate jdbc, ObjectMapper objectMapper,
-                                    MatchingService matchingService, AuditService auditService) {
+    public StudentPreferenceService(
+            NamedParameterJdbcTemplate jdbc,
+            ObjectMapper objectMapper,
+            MatchingService matchingService,
+            AuditService auditService) {
         this.jdbc = jdbc;
         this.objectMapper = objectMapper;
         this.matchingService = matchingService;
@@ -61,7 +64,7 @@ public class StudentPreferenceService {
         for (Map<String, Object> question : questions) {
             String code = String.valueOf(question.get("question_code"));
             Object value = answers.get(code);
-            if (((Number) question.get("required_flag")).intValue() == 1 && value == null) {
+            if (requiredFlag(question.get("required_flag")) && value == null) {
                 throw new BusinessException("QUESTION_REQUIRED", "问卷题目未填写：" + code);
             }
             if (value != null) {
@@ -84,9 +87,26 @@ public class StudentPreferenceService {
                 .addValue("features", json(normalizedFeatures)));
         auditService.success(user, "PREFERENCE_PROFILE_UPDATE", "STUDENT", user.studentId(),
                 "更新跨批次个人偏好", null, Map.of("questionCount", normalizedAnswers.size()));
-        return Map.of("completed", true,
+        return Map.of(
+                "completed", true,
                 "questionCount", normalizedAnswers.size(),
                 "featureCount", normalizedFeatures.size());
+    }
+
+    static boolean requiredFlag(Object value) {
+        if (value instanceof Boolean booleanValue) return booleanValue;
+        if (value instanceof Number numberValue) return numberValue.intValue() != 0;
+        if (value instanceof String stringValue) {
+            String normalized = stringValue.trim();
+            if (normalized.equalsIgnoreCase("true")) return true;
+            if (normalized.equalsIgnoreCase("false") || normalized.isEmpty()) return false;
+            try {
+                return Integer.parseInt(normalized) != 0;
+            } catch (NumberFormatException ignored) {
+                return false;
+            }
+        }
+        return false;
     }
 
     public boolean completed(long studentId) {
@@ -112,15 +132,20 @@ public class StudentPreferenceService {
                 """, Map.of("studentId", studentId), (rs, rowNum) -> rs.getString(1));
         if (rows.isEmpty() || rows.getFirst() == null) return Map.of();
         try {
-            return objectMapper.readValue(rows.getFirst(), new TypeReference<Map<String, Object>>() { });
+            return objectMapper.readValue(
+                    rows.getFirst(),
+                    new TypeReference<Map<String, Object>>() { });
         } catch (JsonProcessingException exception) {
             return Map.of();
         }
     }
 
     @Transactional
-    public void synchronizeFromBatch(long batchId, long studentId, Map<String, Object> answers,
-                                     Map<String, Object> featureVector) {
+    public void synchronizeFromBatch(
+            long batchId,
+            long studentId,
+            Map<String, Object> answers,
+            Map<String, Object> featureVector) {
         jdbc.update("""
                 INSERT INTO student_preference_profile
                 (student_id, questionnaire_version_id, answers_json, feature_vector_json, completed_at, version)
@@ -139,7 +164,8 @@ public class StudentPreferenceService {
     private PreferenceAccess requireAccess(long studentId) {
         boolean included = includedInCurrentBatch(studentId);
         boolean directAllowed = settingEnabled(
-                SelectionPolicyService.ALLOW_DIRECT_PREFERENCE_WITHOUT_BATCH, true);
+                SelectionPolicyService.ALLOW_DIRECT_PREFERENCE_WITHOUT_BATCH,
+                true);
         if (!included && !directAllowed) {
             throw new BusinessException(
                     "DIRECT_PREFERENCE_WITHOUT_BATCH_DISABLED",
@@ -174,10 +200,14 @@ public class StudentPreferenceService {
     }
 
     private long versionId() {
-        List<Long> ids = jdbc.query("SELECT id FROM questionnaire_version WHERE version_code=:code LIMIT 1",
-                Map.of("code", QUESTIONNAIRE_CODE), (rs, rowNum) -> rs.getLong(1));
+        List<Long> ids = jdbc.query(
+                "SELECT id FROM questionnaire_version WHERE version_code=:code LIMIT 1",
+                Map.of("code", QUESTIONNAIRE_CODE),
+                (rs, rowNum) -> rs.getLong(1));
         if (ids.isEmpty()) {
-            throw new BusinessException("BUILTIN_QUESTIONNAIRE_MISSING", "系统内置个人偏好问卷不可用");
+            throw new BusinessException(
+                    "BUILTIN_QUESTIONNAIRE_MISSING",
+                    "系统内置个人偏好问卷不可用");
         }
         return ids.getFirst();
     }
@@ -186,19 +216,25 @@ public class StudentPreferenceService {
         List<Map<String, Object>> questions = questionDefinitions(versionId);
         List<Map<String, Object>> options = jdbc.queryForList("""
                 SELECT o.id,o.question_id,o.option_code,o.option_text,o.feature_value,o.sort_order
-                FROM questionnaire_option o JOIN questionnaire_question q ON q.id=o.question_id
+                FROM questionnaire_option o
+                JOIN questionnaire_question q ON q.id=o.question_id
                 WHERE q.questionnaire_version_id=:versionId AND o.enabled=1
                 ORDER BY o.question_id,o.sort_order
                 """, Map.of("versionId", versionId));
         Map<Object, List<Map<String, Object>>> grouped = new HashMap<>();
-        options.forEach(option -> grouped.computeIfAbsent(option.get("question_id"), ignored -> new ArrayList<>()).add(option));
-        questions.forEach(question -> question.put("options", grouped.getOrDefault(question.get("id"), List.of())));
+        options.forEach(option -> grouped
+                .computeIfAbsent(option.get("question_id"), ignored -> new ArrayList<>())
+                .add(option));
+        questions.forEach(question -> question.put(
+                "options",
+                grouped.getOrDefault(question.get("id"), List.of())));
         return questions;
     }
 
     private List<Map<String, Object>> questionDefinitions(long versionId) {
         return jdbc.queryForList("""
-                SELECT q.id,q.question_code,q.question_text,q.question_type,q.feature_key,q.required_flag,q.sort_order
+                SELECT q.id,q.question_code,q.question_text,q.question_type,
+                       q.feature_key,q.required_flag,q.sort_order
                 FROM questionnaire_question q
                 WHERE q.questionnaire_version_id=:versionId AND q.enabled=1
                 ORDER BY q.sort_order
@@ -218,5 +254,6 @@ public class StudentPreferenceService {
         }
     }
 
-    private record PreferenceAccess(boolean includedInBatch, boolean directAllowed) { }
+    private record PreferenceAccess(boolean includedInBatch, boolean directAllowed) {
+    }
 }
