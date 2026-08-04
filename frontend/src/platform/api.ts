@@ -10,8 +10,8 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const response = await fetch(`${API_BASE}${path}`, { ...init, headers })
   if (response.status === 401) clearSession()
   if (!response.ok) {
-    const body = await response.json().catch(() => ({})) as { message?: string; code?: string }
-    throw new Error(body.message || body.code || `请求失败（${response.status}）`)
+    const body = await response.json().catch(() => ({})) as { message?: string; code?: string; error?: { message?: string; code?: string } }
+    throw new Error(body.error?.message || body.message || body.error?.code || body.code || `请求失败（${response.status}）`)
   }
   if (response.status === 204) return undefined as T
   return await response.json() as T
@@ -49,6 +49,13 @@ export interface FeatureEntitlement {
 export interface FeatureStateChange {
   featureCode: string
   targetState: FeatureTargetState
+}
+
+export interface RedisClearResult {
+  cleared: boolean
+  beforeKeyCount: number
+  afterKeyCount: number
+  scope: 'CURRENT_DATABASE'
 }
 
 export const platformApi = {
@@ -93,4 +100,7 @@ export const platformApi = {
     method: 'POST', body: JSON.stringify(payload),
   }),
   audit: (limit = 100) => request<Record<string, unknown>[]>(`/audit?limit=${limit}`),
+  clearRedis: (reason: string, confirmation: 'CLEAR_REDIS') => request<RedisClearResult>('/redis/clear', {
+    method: 'POST', body: JSON.stringify({ reason, confirmation }),
+  }),
 }
