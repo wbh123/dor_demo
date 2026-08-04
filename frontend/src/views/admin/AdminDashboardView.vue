@@ -21,6 +21,7 @@ const activeEditor = ref<HTMLTextAreaElement | null>(null)
 const activeLocale = ref('zh-CN')
 const { subtitle, translateError } = useI18n()
 
+// Legacy countryMessages configuration is migrated to administrator-managed languageMessages.
 const placeholders = ['学生姓名', '学号', '专业名称', '年级', '培养层次', '国家或地区']
 const requiredLocales = new Set(['zh-CN', 'en-US'])
 const welcomeLanguageOptions = [
