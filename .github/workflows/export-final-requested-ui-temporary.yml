@@ -1,0 +1,23 @@
+name: Temporary final requested UI export
+
+on:
+  push:
+    branches:
+      - automation/export-final-requested-ui-20260805
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+      - name: Upload source snapshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: dor-demo-final-requested-ui-source
+          path: .
+          include-hidden-files: true
+          retention-days: 1
