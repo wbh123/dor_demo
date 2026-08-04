@@ -614,7 +614,7 @@ public class TeamService {
                 .addValue("batchId", batchId)
                 .addValue("studentId", user.studentId()));
         if (memberships.isEmpty()) {
-            throw new BusinessException("TEAM_FORMING_REQUIRED", "请先创建处于组队中的队伍", HttpStatus.CONFLICT);
+            return createInternalTeam(batchId, user);
         }
         Map<String, Object> team = memberships.getFirst();
         if (!"LEADER".equals(team.get("member_role"))) {

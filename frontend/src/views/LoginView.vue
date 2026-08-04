@@ -58,8 +58,8 @@ async function submitActivate() {
         </form>
 
         <p v-if="error" class="alert error">{{ error }}</p><p v-if="message" class="alert success">{{ message }}</p>
-        <footer class="login-compliance"><span>{{ operatorName }}</span><span>{{ icpRecord }}</span></footer>
       </div>
+      <footer class="login-compliance"><span>{{ operatorName }}</span><span>{{ icpRecord }}</span></footer>
     </section>
   </div>
 </template>
@@ -67,5 +67,5 @@ async function submitActivate() {
 <style scoped>
 .login-school-logo { width: min(330px, 80%); max-height: 150px; object-fit: contain; object-position: left center; margin-bottom: 28px; filter: drop-shadow(0 12px 30px rgba(0,0,0,.16)); }
 .school-login-brand img { width: min(280px, 100%); max-height: 70px; object-fit: contain; object-position: left center; }
-.login-compliance { display: grid; gap: 4px; margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--line); color: var(--muted); text-align: center; font-size: .7rem; }
+.login-panel{display:flex;flex-direction:column;justify-content:center}.login-card{margin:auto}.login-compliance{display:flex;justify-content:center;gap:12px;flex-wrap:wrap;width:100%;margin-top:auto;padding-top:18px;color:var(--muted);text-align:center;font-size:.7rem}.login-compliance span+span::before{content:"·";margin-right:12px}
 </style>

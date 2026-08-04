@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import WelcomeMessageEditor from './WelcomeMessageEditor.vue'
 import { countryLabel, countryOptions } from '../../utils/countries'
 
@@ -12,7 +12,10 @@ const props = defineProps<{
 const emit = defineEmits<{
   'update:modelValue': [value: Record<string, string>]
   'update:selectedCountry': [value: string]
+  focus: []
 }>()
+
+const editor = ref<InstanceType<typeof WelcomeMessageEditor> | null>(null)
 
 const configuredCodes = computed(() => Object.keys(props.modelValue)
   .sort((left, right) => countryLabel(left).localeCompare(countryLabel(right), 'zh-CN')))
@@ -46,6 +49,11 @@ function removeSelected() {
   emit('update:modelValue', next)
   emit('update:selectedCountry', remaining[0] ?? '')
 }
+
+defineExpose({
+  insertToken: (name: string) => editor.value?.insertToken(name),
+  focus: () => editor.value?.focus(),
+})
 </script>
 
 <template>
@@ -73,9 +81,11 @@ function removeSelected() {
         <button class="button ghost" type="button" @click="removeSelected">删除该国家配置</button>
       </header>
       <WelcomeMessageEditor
+        ref="editor"
         v-model="selectedMessage"
         :token-examples="tokenExamples"
         :placeholder="`填写面向${countryLabel(selectedCountry)}学生的欢迎语`"
+        @focus="emit('focus')"
       />
     </article>
     <p v-else class="empty-state">通过“添加国家或地区”下拉框新增欢迎语，未配置国家或地区自动使用英语欢迎语。</p>

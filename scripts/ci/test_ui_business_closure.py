@@ -41,7 +41,11 @@ admin_password = read("frontend/src/views/admin/AdminPasswordView.vue")
 
 require("profileAnswerEntries" in home_content, "student home does not normalize the canonical preference object")
 require("questionnaire.value.answers ?? []" not in home_content, "student home still treats preference answers as a legacy array")
-require("to=\"/student/preferences\"" in home_view, "student home does not expose the cross-batch preference entry")
+require(
+    "to=\"/student/preferences\"" in home_content
+    and "cross-batch-preference-note" not in home_view,
+    "student preference entry must remain in the card without the detached cross-batch bar",
+)
 require("VITE_ADMIN_CONTACT_PHONE" in home_view and "有疑问请致电" in home_view, "student contact phone is not environment-driven")
 require("phone-edit-fab" not in home_view, "student phone editor still uses a detached floating button")
 
@@ -50,7 +54,7 @@ require("VITE_APP_TITLE" in env_example and "VITE_APP_SUBTITLE" in env_example a
 require("to=\"/admin/profile/password\"" in shell, "school administrator sidebar has no password change entry")
 require("subtitle(chinese: string, english: string)" in i18n and "locale.value === 'zh-CN' ? chinese : english" in i18n, "bilingual subtitle selection remains reversed")
 
-require("token-toolbar" in welcome_editor and "插入学生信息" in welcome_editor, "welcome editor token toolbar is missing")
+require("welcome-token-toolbar" in dashboard and "插入学生信息" in dashboard and "token-toolbar" not in welcome_editor, "welcome token toolbar must be centralized around the active editor")
 require("<strong>汉语</strong>" in dashboard and "<strong>英语</strong>" in dashboard, "welcome language cards are not named 汉语 and 英语")
 require("<strong>美国</strong>" not in dashboard, "welcome editor still presents English as United States")
 require("美国卡片" not in dashboard, "welcome copy still ties English fallback to the United States")

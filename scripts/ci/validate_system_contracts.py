@@ -438,7 +438,7 @@ def validate_comprehensive_enhancements(errors: list[str]) -> None:
     )
     require(
         "/api/v1/student/preferences" in questionnaire_view
-        and "即使当前没有开放批次" in home_view
+        and "cross-batch-preference-note" not in home_view
         and "student_preference_profile" in preference_service,
         "students cannot maintain preferences outside an active batch",
         errors,
@@ -476,9 +476,11 @@ def validate_comprehensive_enhancements(errors: list[str]) -> None:
     )
     require(
         "TEAM_ASSIGNED_FORBIDDEN" in team_service
-        and "请先创建处于组队中的队伍" in team_service
-        and "请先创建处于组队中的队伍" in team_view,
-        "assigned-student team restrictions or invitation guidance are missing",
+        and "ensureFormingLeaderTeam" in team_service
+        and "return createInternalTeam(batchId, user);" in team_service
+        and "/api/v1/student/team-invitations" in team_view
+        and "createTeam()" not in team_view,
+        "assigned-student restriction or invitation-driven automatic team creation is missing",
         errors,
     )
     require(

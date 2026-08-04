@@ -71,7 +71,7 @@ require("frontend/src/views/admin/AdminRoomChangeView.vue", "ThreeStateToggle", 
 
 # Brand logos are above decorative overlays; phone modal has a country calling-code selector.
 require("frontend/src/layouts/AppShell.vue", "logo-safe-layer")
-require("frontend/src/views/student/StudentHomeView.vue", "phone-modal-card", "countryCallingCode", "callingCodeOptions")
+require("frontend/src/views/student/StudentHomeContent.vue", "profile-phone-input", "phoneDialCode", "PhoneDialCodeSelect")
 
 # Single beds are supported throughout layout and selection.
 for path in (

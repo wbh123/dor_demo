@@ -47,3 +47,53 @@ export function splitInternationalPhone(value: unknown, nationalityCode: unknown
   if (!match) return { dialCode: fallback, localNumber: digits }
   return { dialCode: `+${match}`, localNumber: digits.slice(match.length) }
 }
+export interface PhoneDisplayParts {
+  dialCode: string
+  localNumber: string
+  formattedLocalNumber: string
+}
+
+function groupDigits(digits: string, groups: number[]): string {
+  const result: string[] = []
+  let cursor = 0
+  for (const size of groups) {
+    if (cursor >= digits.length) break
+    result.push(digits.slice(cursor, cursor + size))
+    cursor += size
+  }
+  if (cursor < digits.length) result.push(digits.slice(cursor))
+  return result.filter(Boolean).join(' ')
+}
+
+function formatLocalNumber(dialCode: string, digits: string): string {
+  if (!digits) return ''
+  if (dialCode === '+86' && digits.length === 11) return groupDigits(digits, [3, 4, 4])
+  if (dialCode === '+1' && digits.length === 10) return groupDigits(digits, [3, 3, 4])
+  if (dialCode === '+81' && (digits.length === 9 || digits.length === 10)) {
+    return digits.length === 10 ? groupDigits(digits, [3, 3, 4]) : groupDigits(digits, [2, 3, 4])
+  }
+  if (dialCode === '+82' && (digits.length === 9 || digits.length === 10)) {
+    return digits.length === 10 ? groupDigits(digits, [3, 3, 4]) : groupDigits(digits, [2, 3, 4])
+  }
+  if (dialCode === '+44' && digits.length === 10) return groupDigits(digits, [4, 3, 3])
+  if (digits.length <= 6) return digits
+  const groups: string[] = []
+  for (let index = 0; index < digits.length; index += 3) groups.push(digits.slice(index, index + 3))
+  return groups.join(' ')
+}
+
+export function phoneDisplayParts(value: unknown, nationalityCode: unknown): PhoneDisplayParts {
+  const split = splitInternationalPhone(value, nationalityCode)
+  const localNumber = split.localNumber.replace(/\D/g, '')
+  return {
+    dialCode: split.dialCode,
+    localNumber,
+    formattedLocalNumber: formatLocalNumber(split.dialCode, localNumber),
+  }
+}
+
+export function formatPhoneDisplay(value: unknown, nationalityCode: unknown): string {
+  const parts = phoneDisplayParts(value, nationalityCode)
+  if (!parts.localNumber) return ''
+  return `${parts.dialCode} ${parts.formattedLocalNumber}`.trim()
+}

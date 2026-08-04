@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import PhoneDialCodeSelect from '../../components/common/PhoneDialCodeSelect.vue'
 import { api } from '../../api/client'
 import type { DataObject, ListSuccessResponse, ObjectSuccessResponse } from '../../api/types'
 import { useI18n } from '../../i18n'
 import { useFeatureAccess } from '../../composables/useFeatureAccess'
 import { bedTypeLabel } from '../../utils/bedLabels'
+import { formatPhoneDisplay, normalizeInternationalPhone, splitInternationalPhone } from '../../utils/phoneCodes'
 
 const profile = ref<DataObject>({})
 const currentActivity = ref<DataObject | null>(null)
@@ -17,7 +19,8 @@ const loading = ref(true)
 const invitationSubmitting = ref(false)
 const phoneSaving = ref(false)
 const showPhoneDialog = ref(false)
-const phoneDraft = ref('')
+const phoneDialCode = ref('+86')
+const phoneLocalNumber = ref('')
 const error = ref('')
 const phoneError = ref('')
 const { hasFeature } = useFeatureAccess()
@@ -141,7 +144,9 @@ async function load() {
       api.get<ListSuccessResponse>('/api/v1/student/notifications'),
     ])
     profile.value = (profileResponse.data.data ?? {}) as DataObject
-    phoneDraft.value = String(profile.value.phone_number ?? '')
+    const phone = splitInternationalPhone(profile.value.phone_number, profile.value.nationality_code)
+    phoneDialCode.value = phone.dialCode
+    phoneLocalNumber.value = phone.localNumber
     applyNationalityLocale(profile.value.nationality_code)
     invitations.value = (invitationResponse.data.data ?? []) as DataObject[]
     notifications.value = (notificationResponse.data.data ?? []) as DataObject[]
@@ -208,7 +213,9 @@ async function markNotificationRead(notification: DataObject) {
 }
 
 function openPhoneEditor() {
-  phoneDraft.value = String(profile.value.phone_number ?? '')
+  const phone = splitInternationalPhone(profile.value.phone_number, profile.value.nationality_code)
+  phoneDialCode.value = phone.dialCode
+  phoneLocalNumber.value = phone.localNumber
   phoneError.value = ''
   showPhoneDialog.value = true
 }
@@ -218,7 +225,7 @@ async function savePhoneNumber() {
   phoneSaving.value = true
   try {
     const response = await api.put<ObjectSuccessResponse>('/api/v1/student/profile', {
-      phoneNumber: phoneDraft.value.trim(),
+      phoneNumber: normalizeInternationalPhone(phoneDialCode.value, phoneLocalNumber.value),
     })
     profile.value = (response.data.data ?? profile.value) as DataObject
     showPhoneDialog.value = false
@@ -362,12 +369,15 @@ function bedTypeText(value: unknown) { return bedTypeLabel(value) }
           <span v-if="isForeignStudent" class="nationality-chip">
             {{ t('profile.nationality') }}：{{ countryName(profile.nationality_code) }}
           </span>
-          <span>
-            {{ t('profile.phone') }}：{{ profile.phone_number || t('profile.phoneEmpty') }}
+          <span class="profile-phone-line">
+            <span>{{ t('profile.phone') }}：{{ formatPhoneDisplay(profile.phone_number, profile.nationality_code) || t('profile.phoneEmpty') }}</span>
+            <button class="text-button light-text-button" type="button" @click="openPhoneEditor">{{ t('profile.phoneEdit') }}</button>
           </span>
-          <button class="text-button light-text-button" type="button" @click="openPhoneEditor">
-            {{ t('profile.phoneEdit') }}
-          </button>
+        </div>
+        <div v-if="currentActivity && !assigned" class="profile-primary-actions">
+          <RouterLink v-if="currentActivity.allow_team" class="button accent" to="/student/teams">组队选寝</RouterLink>
+          <RouterLink v-if="canSelectRoom" class="button primary" :to="`/student/batches/${currentActivityId}/rooms`">选择宿舍和床位</RouterLink>
+          <button v-else class="button primary" type="button" disabled>选寝尚未开放</button>
         </div>
       </div>
     </section>
@@ -425,7 +435,7 @@ function bedTypeText(value: unknown) { return bedTypeLabel(value) }
         >{{ questionnaireStarted ? '修改个人偏好' : '填写个人偏好' }}</RouterLink>
       </div>
 
-      <p v-if="answerSummary.length === 0" class="empty-state">尚未填写个人偏好。即使当前没有开放批次，也可以提前完成偏好设置。</p>
+      <p v-if="answerSummary.length === 0" class="empty-state">尚未填写个人偏好。尚未填写个人偏好，可通过卡片右上角按钮开始填写。</p>
       <div v-else class="personal-preference-content">
         <div class="personal-preference-table-column">
           <dl class="personal-preference-list">
@@ -447,21 +457,7 @@ function bedTypeText(value: unknown) { return bedTypeLabel(value) }
             </div>
           </div>
 
-          <div
-            v-if="currentActivity && !assigned"
-            class="student-primary-actions personal-preference-action-panel"
-          >
-            <RouterLink
-              v-if="canSelectRoom"
-              class="button primary student-action-button"
-              :to="`/student/batches/${currentActivityId}/rooms`"
-            >选择宿舍和床位</RouterLink>
-            <RouterLink
-              v-if="canSelectRoom && currentActivity.allow_team"
-              class="button accent student-action-button"
-              to="/student/teams"
-            >组队选寝</RouterLink>
-          </div>
+
         </aside>
       </div>
     </section>
@@ -500,7 +496,7 @@ function bedTypeText(value: unknown) { return bedTypeLabel(value) }
         </div>
         <label class="form-stack">
           <span>{{ t('profile.phone') }}</span>
-          <input v-model.trim="phoneDraft" class="input" maxlength="32" placeholder="+86 138 0000 0000" />
+          <span class="profile-phone-input"><PhoneDialCodeSelect v-model="phoneDialCode" /><input v-model.trim="phoneLocalNumber" class="input" maxlength="24" inputmode="tel" placeholder="本地手机号码" /></span>
         </label>
         <p v-if="phoneError" class="alert error">{{ phoneError }}</p>
         <div class="button-row">
@@ -513,6 +509,5 @@ function bedTypeText(value: unknown) { return bedTypeLabel(value) }
 </template>
 
 <style scoped>
-.compact-home-top-card { min-height: 150px; padding-top: 18px; padding-bottom: 18px; }
-.personal-preference-card { margin-top: -2px; }
+.compact-home-top-card { min-height: 150px; padding-top: 18px; padding-bottom: 18px; }.profile-phone-line{display:inline-flex;align-items:center;gap:7px;flex-wrap:wrap}.profile-primary-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}.profile-primary-actions .button{text-decoration:none}.profile-phone-input{display:grid;grid-template-columns:94px minmax(0,1fr);gap:8px}.personal-preference-card { margin-top: -2px; }
 </style>
