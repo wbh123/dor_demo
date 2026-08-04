@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+# Regression coverage for the consolidated interface and workflow repairs.
 import sys
 from pathlib import Path
 
