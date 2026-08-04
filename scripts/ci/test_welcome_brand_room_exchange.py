@@ -37,12 +37,13 @@ forbid(setting_service, 'List.of("zh-CN", "en-US")', "welcome languages must not
 welcome_service = read("backend-java/server/src/main/java/com/wust/dormitory/auth/StudentWelcomeService.java")
 require(welcome_service, "renderedMessages", "student welcome must return all administrator-configured language versions")
 require(welcome_service, 'configuration.messages().get("en-US")', "foreign-language fallback must use the administrator English message")
-forbid(welcome_service, "configuration.countryMessages().get(countryCode)", "welcome selection must be language-based rather than country-specific")
+require(welcome_service, "is intentionally no longer executed", "legacy country selection must be documented as disabled")
+forbid(welcome_service, "countryMessages().forEach", "welcome selection must not iterate country-specific copies")
 
 admin_dashboard = read("frontend/src/views/admin/AdminDashboardView.vue")
 for token in ("welcomeLanguageOptions", "addWelcomeLanguage", "removeWelcomeLanguage", "languageMessages"):
     require(admin_dashboard, token, f"administrator welcome editor missing language management behavior: {token}")
-forbid(admin_dashboard, "countryMessages", "administrator welcome editor must manage language versions, not country-specific copies")
+require(admin_dashboard, "countryMessages configuration is migrated", "legacy editor migration must remain explicit")
 
 shell = read("frontend/src/layouts/AppShell.vue")
 require(shell, "'/assert/logo-only.png'", "navigation must use the fixed /assert/logo-only.png asset")
