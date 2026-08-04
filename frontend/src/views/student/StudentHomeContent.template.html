@@ -1,0 +1,148 @@
+  <div class="student-home-grid">
+    <section class="welcome-card panel gradient-panel compact-home-top-card">
+      <span class="home-corner-badge">{{ profile.gender === 'M' ? '男寝' : '女寝' }}</span>
+      <div>
+        <span class="eyebrow light">{{ subtitle('欢迎回来', 'WELCOME BACK') }}</span>
+        <h2>{{ profile.student_name || local('同学', 'Student') }}</h2>
+        <p>{{ profile.student_number }} · {{ profile.major_code }} {{ profile.major_name }}</p>
+        <div class="student-profile-inline-meta">
+          <span v-if="isForeignStudent" class="nationality-chip">
+            {{ t('profile.nationality') }}：{{ countryName(profile.nationality_code) }}
+          </span>
+          <span class="profile-phone-line">
+            <span>{{ t('profile.phone') }}：{{ formatPhoneDisplay(profile.phone_number, profile.nationality_code) || t('profile.phoneEmpty') }}</span>
+            <button class="text-button light-text-button" type="button" @click="openPhoneEditor">{{ t('profile.phoneEdit') }}</button>
+          </span>
+        </div>
+        <div v-if="currentActivity && !assigned" class="profile-primary-actions">
+          <RouterLink v-if="currentActivity.allow_team" class="button accent" to="/student/teams">组队选寝</RouterLink>
+          <RouterLink v-if="canSelectRoom" class="button primary" :to="`/student/batches/${currentActivityId}/rooms`">选择宿舍和床位</RouterLink>
+          <button v-else class="button primary" type="button" disabled>选寝尚未开放</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel assignment-summary compact-home-top-card">
+      <div>
+        <span class="eyebrow">{{ subtitle('我的住宿结果', 'MY DORMITORY') }}</span>
+        <h2>我的住宿结果</h2>
+      </div>
+      <template v-if="assigned">
+        <div class="assignment-place">
+          <strong>{{ assignment.building_name }}</strong>
+          <span>{{ assignment.room_number }} 室 · {{ assignment.bed_code }} 床位</span>
+        </div>
+        <p>{{ assignment.floor_number }}层 · {{ bedTypeText(assignment.bed_type) }}</p>
+        <RouterLink v-if="currentActivityId" class="button secondary compact-home-card-action" :to="`/student/batches/${currentActivityId}/assignment`">查看完整结果</RouterLink>
+      </template>
+      <template v-else>
+        <p>尚未确定宿舍和床位。完善个人偏好后，可在开放选寝期间选择合适的房间。</p>
+      </template>
+    </section>
+
+    <p v-if="loading" class="panel empty-state home-span-2">正在读取个人选寝信息…</p>
+    <p v-else-if="error" class="alert error home-span-2">{{ error }}</p>
+
+    <section v-if="!loading && unreadNotifications.length" class="panel home-span-2 student-notification-panel">
+      <div class="section-head">
+        <div>
+          <span class="eyebrow">{{ subtitle('系统通知', 'SYSTEM NOTIFICATIONS') }}</span>
+          <h3>{{ local('系统通知', 'Notifications') }}</h3>
+        </div>
+      </div>
+      <div class="student-notification-list">
+        <article v-for="notification in unreadNotifications" :key="String(notification.id)" class="student-notification-item">
+          <div>
+            <strong>{{ notificationTitle(notification) }}</strong>
+            <p>{{ notificationMessage(notification) }}</p>
+          </div>
+          <button class="button ghost small" @click="markNotificationRead(notification)">{{ t('common.confirm') }}</button>
+        </article>
+      </div>
+    </section>
+
+    <section v-if="!loading" class="panel home-span-2 personal-preference-card">
+      <div class="section-head split-title">
+        <div>
+          <span class="eyebrow">{{ subtitle('个人偏好', 'PERSONAL PREFERENCES') }}</span>
+          <h2>我的个人偏好</h2>
+          <p>完整展示你的已保存偏好，并形成便于理解的宿舍生活画像。</p>
+        </div>
+        <RouterLink
+          v-if="canEditQuestionnaire"
+          class="button secondary"
+          to="/student/preferences"
+        >{{ questionnaireStarted ? '修改个人偏好' : '填写个人偏好' }}</RouterLink>
+      </div>
+
+      <p v-if="answerSummary.length === 0" class="empty-state">尚未填写个人偏好。尚未填写个人偏好，可通过卡片右上角按钮开始填写。</p>
+      <div v-else class="personal-preference-content">
+        <div class="personal-preference-table-column">
+          <dl class="personal-preference-list">
+            <div v-for="item in answerSummary" :key="item.code" class="personal-preference-row">
+              <dt>{{ item.label }}</dt>
+              <dd>{{ item.value }}</dd>
+            </div>
+          </dl>
+        </div>
+
+        <aside class="personal-preference-side-column">
+          <div v-if="profileInsightEnabled" class="preference-profile-overview personal-preference-profile-panel">
+            <div>
+              <span class="profile-caption">{{ local('用户画像概述', 'Profile overview') }}</span>
+              <h3>{{ preferenceProfileSummary }}</h3>
+            </div>
+            <div v-if="preferenceProfileTags.length" class="profile-tag-row">
+              <span v-for="tag in preferenceProfileTags" :key="tag" class="profile-tag">{{ tag }}</span>
+            </div>
+          </div>
+
+
+        </aside>
+      </div>
+    </section>
+
+    <section class="panel info-card home-span-2 compact-rule-card">
+      <span class="eyebrow">{{ subtitle('规则说明', 'RULES') }}</span>
+      <h3>请在规定时间内完成选择</h3>
+      <p>床位在确认前只会短暂保留，最终确认后会立即显示住宿结果。</p>
+    </section>
+
+    <div v-if="homeInvitation && !assigned" class="modal-overlay home-invitation-overlay" role="presentation">
+      <section class="modal-card home-invitation-dialog" role="dialog" aria-modal="true">
+        <span class="eyebrow">{{ subtitle('组队邀请', 'TEAM INVITATION') }}</span>
+        <h2>{{ t('team.invitation.title') }}</h2>
+        <p>{{ t('team.invitation.message', { name: homeInvitation.inviter_name }) }}</p>
+        <div class="invitation-student-summary">
+          <strong>{{ homeInvitation.inviter_name }}</strong>
+          <span>{{ homeInvitation.inviter_student_number }}</span>
+        </div>
+        <div class="button-row invitation-dialog-actions">
+          <button class="button ghost" :disabled="invitationSubmitting" @click="dismissHomeInvitation">{{ t('common.dismiss') }}</button>
+          <button class="button secondary" :disabled="invitationSubmitting" @click="respondHomeInvitation(false)">{{ t('common.reject') }}</button>
+          <button class="button primary" :disabled="invitationSubmitting" @click="respondHomeInvitation(true)">{{ t('common.accept') }}</button>
+        </div>
+      </section>
+    </div>
+
+    <div v-if="showPhoneDialog" class="modal-overlay" role="presentation">
+      <section class="modal-card phone-editor-dialog" role="dialog" aria-modal="true">
+        <div class="section-head">
+          <div>
+            <span class="eyebrow">{{ subtitle('联系方式', 'CONTACT INFORMATION') }}</span>
+            <h3>{{ t('profile.phoneEdit') }}</h3>
+          </div>
+          <button class="modal-close" type="button" @click="showPhoneDialog = false">×</button>
+        </div>
+        <label class="form-stack">
+          <span>{{ t('profile.phone') }}</span>
+          <span class="profile-phone-input"><PhoneDialCodeSelect v-model="phoneDialCode" /><input v-model.trim="phoneLocalNumber" class="input" maxlength="24" inputmode="tel" placeholder="本地手机号码" /></span>
+        </label>
+        <p v-if="phoneError" class="alert error">{{ phoneError }}</p>
+        <div class="button-row">
+          <button class="button ghost" type="button" @click="showPhoneDialog = false">{{ t('common.cancel') }}</button>
+          <button class="button primary" :disabled="phoneSaving" @click="savePhoneNumber">{{ t('profile.phoneSave') }}</button>
+        </div>
+      </section>
+    </div>
+  </div>
