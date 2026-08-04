@@ -117,11 +117,18 @@ team_service = read(
     "backend-java/server/src/main/java/com/wust/dormitory/student/VerifiedTeamInvitationService.java")
 require(team_service, (
     "INVITEE_IDENTITY_MISMATCH",
-    "teamService.createFormingTeam(user)",
     "teamService.inviteTeammate(normalizedNumber, user)",
     "TEAM_INVITATION_CANCELLED",
     "member_status='INVITED'",
-), "verified invitation identity, first-team creation or cancellation is incomplete")
+), "verified invitation identity or cancellation is incomplete")
+if "createFormingTeam(user)" in team_service or "teamService.teams(user).isEmpty()" in team_service:
+    raise AssertionError("verified invitation service must delegate team creation to TeamService.inviteTeammate")
+
+team_core = read("backend-java/server/src/main/java/com/wust/dormitory/student/TeamService.java")
+require(team_core, (
+    "ensureFormingLeaderTeam(batchId, user)",
+    "createInternalTeam(batchId, user)",
+), "TeamService must retain internal automatic team creation")
 
 team_view = read("frontend/src/views/student/TeamView.vue")
 require(team_view, (
