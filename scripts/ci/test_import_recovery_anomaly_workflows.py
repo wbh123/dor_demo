@@ -15,6 +15,11 @@ def require(source: str, token: str, message: str) -> None:
         raise AssertionError(message)
 
 
+def forbid(source: str, token: str, message: str) -> None:
+    if token in source:
+        raise AssertionError(message)
+
+
 import_service = read(
     "backend-java/server/src/main/java/com/wust/dormitory/importworkflow/ImportWorkflowService.java"
 )
@@ -24,11 +29,29 @@ for token in (
     "ROLLED_BACK",
     "SHA-256",
     "IDEMPOTENCY_CONFLICT",
-    "fieldErrors",
-    "commitTask",
-    "rollbackTask",
+    "SpreadsheetSupport.read",
+    "applyTask",
+    "rollbackJournal",
+    "@Transactional",
 ):
-    require(import_service, token, f"import workflow missing behavior: {token}")
+    require(import_service, token, f"import workflow missing real behavior: {token}")
+
+import_repository = read(
+    "backend-java/server/src/main/java/com/wust/dormitory/importworkflow/ImportTaskRepository.java"
+)
+for token in ("save", "findById", "findByIdempotencyKey", "list"):
+    require(import_repository, token, f"import task repository missing method: {token}")
+
+mutation_service = read(
+    "backend-java/server/src/main/java/com/wust/dormitory/importworkflow/ImportMutationService.java"
+)
+for token in (
+    "studentAdminService.saveStudent",
+    "roomImportService.applyRow",
+    "rollbackJournal",
+    "IMPORT_ROLLBACK_CONFLICT",
+):
+    require(mutation_service, token, f"import mutation workflow missing behavior: {token}")
 
 import_controller = read(
     "backend-java/server/src/main/java/com/wust/dormitory/importworkflow/ImportWorkflowController.java"
@@ -42,13 +65,27 @@ for token in (
 ):
     require(import_controller, token, f"missing import workflow endpoint: {token}")
 
+hold_inspector = read(
+    "backend-java/server/src/main/java/com/wust/dormitory/operations/BedHoldKeyInspector.java"
+)
+for token in (
+    "dormitory:batch:*:bed:*:hold",
+    "batchId",
+    "bedId",
+    "ScanOptions",
+    "orphanKeys",
+):
+    require(hold_inspector, token, f"bed hold inspector missing behavior: {token}")
+for wrong_pattern in ("bed:hold:*", "student:hold:*", "team:hold:*", "dormitory:hold:*"):
+    forbid(hold_inspector, wrong_pattern, f"bed hold inspector uses obsolete pattern: {wrong_pattern}")
+
 recovery_service = read(
     "backend-java/server/src/main/java/com/wust/dormitory/operations/RedisRecoveryService.java"
 )
 for token in (
     "previewRecovery",
     "executeRecovery",
-    "orphanKeys",
+    "bedHoldKeyInspector.inspect",
     "recreatedKeys",
     "removedKeys",
     "dryRun",
@@ -64,6 +101,7 @@ for token in (
     "STALE_BATCH_ROOM_LOCK",
     "STALE_BATCH_STUDENT_LOCK",
     "ORPHAN_BED_HOLD",
+    "bedHoldKeyInspector.inspect",
     "resolutionHint",
 ):
     require(anomaly_service, token, f"anomaly workbench missing projection: {token}")
