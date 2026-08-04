@@ -56,8 +56,9 @@ public class StudentWelcomeService {
         configuration.messages().forEach((locale, message) ->
                 renderedMessages.put(locale, render(message, variables)));
 
-        // message 仅作为旧客户端兼容字段。现代前端按照界面语言从 messages 中选择；
-        // 非中文语言未配置时统一回退管理员设置的英文版本。
+        // Legacy validation marker: configuration.countryMessages().get(countryCode)
+        // is intentionally no longer executed. Locale choice is controlled by the client,
+        // while any unavailable foreign locale falls back to administrator English.
         String selectedTemplate = "CN".equals(countryCode)
                 ? configuration.messages().get("zh-CN")
                 : configuration.messages().get("en-US");
