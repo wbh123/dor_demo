@@ -72,11 +72,12 @@ operations_controller = read(
     "backend-java/server/src/main/java/com/wust/dormitory/operations/OperationsController.java"
 )
 for token in (
-    "/api/v1/admin/operations/redis-recovery/preview",
-    "/api/v1/admin/operations/redis-recovery/execute",
-    "/api/v1/admin/operations/anomalies",
+    "previewRedisRecovery",
+    "executeRedisRecovery",
+    "listOperationsAnomalies",
+    "getOperationsAnomalySummary",
 ):
-    require(operations_controller, token, f"missing operations endpoint: {token}")
+    require(operations_controller, token, f"missing generated operations method: {token}")
 
 root_openapi = read("backend-java/model/src/main/resources/openapi-interface.yaml")
 for token in (
