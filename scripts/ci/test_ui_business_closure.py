@@ -36,6 +36,7 @@ batch = read("frontend/src/views/admin/AdminBatchView.vue")
 openapi_root = read("backend-java/model/src/main/resources/openapi-interface.yaml")
 auth_contract = read("backend-java/model/src/main/resources/auth/openapi-auth.yaml")
 welcome_service = read("backend-java/server/src/main/java/com/wust/dormitory/auth/StudentWelcomeService.java")
+welcome_service_test = read("backend-java/server/src/test/java/com/wust/dormitory/auth/StudentWelcomeServiceTest.java")
 admin_password = read("frontend/src/views/admin/AdminPasswordView.vue")
 
 require("profileAnswerEntries" in home_content, "student home does not normalize the canonical preference object")
@@ -55,6 +56,7 @@ require("<strong>美国</strong>" not in dashboard, "welcome editor still presen
 require("美国卡片" not in dashboard, "welcome copy still ties English fallback to the United States")
 require("message:" not in auth_contract.split("WelcomeData:", 1)[1].split("CurrentUserData:", 1)[0], "welcome OpenAPI still exposes the legacy message field")
 require("setMessage(" not in welcome_service, "welcome service still writes the legacy message field")
+require("getMessage()" not in welcome_service_test, "welcome service tests still use the removed legacy message field")
 
 require("<img" not in platform_layout, "system administrator platform still renders a school logo")
 require("exact-active-class" in platform_layout and "custom-active" in platform_layout, "platform navigation does not distinguish service overview from child routes")
