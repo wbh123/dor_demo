@@ -1,24 +1,23 @@
 package com.wust.dormitory.operations;
 
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 @Service
 public class AnomalyWorkbenchService {
     private final NamedParameterJdbcTemplate jdbc;
-    private final StringRedisTemplate redis;
+    private final BedHoldKeyInspector bedHoldKeyInspector;
 
-    public AnomalyWorkbenchService(NamedParameterJdbcTemplate jdbc, StringRedisTemplate redis) {
+    public AnomalyWorkbenchService(
+            NamedParameterJdbcTemplate jdbc,
+            BedHoldKeyInspector bedHoldKeyInspector) {
         this.jdbc = jdbc;
-        this.redis = redis;
+        this.bedHoldKeyInspector = bedHoldKeyInspector;
     }
 
     public List<Map<String, Object>> listAnomalies(String type, String severity) {
@@ -56,7 +55,7 @@ public class AnomalyWorkbenchService {
                        assignment.student_id AS studentId,
                        assignment.room_id AS roomId,
                        student.student_number AS studentNumber,
-                       student.name AS studentName,
+                       student.student_name AS studentName,
                        building.building_name AS buildingName,
                        room.room_number AS roomNumber
                 FROM room_assignment assignment
@@ -135,31 +134,19 @@ public class AnomalyWorkbenchService {
     }
 
     private List<Map<String, Object>> orphanBedHolds() {
-        Set<String> keys = new LinkedHashSet<>();
-        for (String pattern : List.of("bed:hold:*", "student:hold:*", "team:hold:*", "dormitory:hold:*")) {
-            Set<String> matched = redis.keys(pattern);
-            if (matched != null) {
-                keys.addAll(matched);
-            }
-        }
-        List<Map<String, Object>> result = new ArrayList<>();
-        for (String key : keys) {
-            Long ttl = redis.getExpire(key);
-            if (ttl != null && ttl > 0) {
-                continue;
-            }
-            Map<String, Object> details = new LinkedHashMap<>();
-            details.put("targetId", key);
-            details.put("redisKey", key);
-            details.put("ttl", ttl);
-            result.add(anomaly(
-                    "ORPHAN_BED_HOLD",
-                    "WARNING",
-                    details,
-                    "Redis 中存在没有有效过期时间的临时占用",
-                    "先执行 Redis 恢复预检，确认后清理孤立键"));
-        }
-        return result;
+        return bedHoldKeyInspector.inspect().orphanKeys().stream()
+                .map(key -> {
+                    Map<String, Object> details = new LinkedHashMap<>();
+                    details.put("targetId", key);
+                    details.put("redisKey", key);
+                    return anomaly(
+                            "ORPHAN_BED_HOLD",
+                            "WARNING",
+                            details,
+                            "Redis 中存在不属于活动批次床位范围或没有有效过期时间的临时占用",
+                            "先执行 Redis 恢复预检，确认后清理孤立键");
+                })
+                .toList();
     }
 
     private Map<String, Object> anomaly(
