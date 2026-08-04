@@ -13,7 +13,6 @@ import org.springframework.jdbc.support.GeneratedKeyHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -23,8 +22,6 @@ public class RoomExchangeService {
     private static final String SETTING_KEY = "ROOM_EXCHANGE_POLICY";
     private static final Set<String> MODES = Set.of(
             "DISABLED", "MUTUAL_CONFIRMATION", "APPROVAL_REQUIRED");
-    private static final Set<String> ACTIVE_STATUSES = Set.of(
-            "WAITING_TARGET", "PENDING_ADMIN", "APPROVED");
 
     private final NamedParameterJdbcTemplate jdbc;
     private final ResidencyPolicyService residencyPolicy;
@@ -51,15 +48,11 @@ public class RoomExchangeService {
     }
 
     public List<Map<String, Object>> candidates(long studentId) {
-        if ("DISABLED".equals(currentMode())) {
-            throw new BusinessException(
-                    "ROOM_EXCHANGE_DISABLED",
-                    "学校当前未开放学生寝室交换",
-                    HttpStatus.CONFLICT);
-        }
-        Map<String, Object> source = activeResidency(studentId, false);
+        requireEnabled();
+        Map<String, Object> sourceResidency = activeResidency(studentId, false);
         Map<String, Object> sourceStudent = residencyPolicy.student(studentId);
-        Map<String, Object> sourceRoom = residencyPolicy.room(number(source.get("room_id")), false);
+        Map<String, Object> sourceRoom = residencyPolicy.room(
+                longValue(sourceResidency.get("room_id")), false);
         return jdbc.queryForList("""
                 SELECT target.id AS target_student_id,
                        target.student_number, target.student_name,
@@ -89,11 +82,11 @@ public class RoomExchangeService {
                 .addValue("studentId", studentId)
                 .addValue("gender", sourceStudent.get("gender")))
                 .stream()
-                .filter(candidate -> compatible(
+                .filter(row -> compatible(
                         sourceStudent,
                         sourceRoom,
-                        residencyPolicy.student(number(candidate.get("target_student_id"))),
-                        residencyPolicy.room(number(candidate.get("room_id")), false)))
+                        residencyPolicy.student(longValue(row.get("target_student_id"))),
+                        residencyPolicy.room(longValue(row.get("room_id")), false)))
                 .toList();
     }
 
@@ -102,7 +95,8 @@ public class RoomExchangeService {
     }
 
     public List<Map<String, Object>> listAdmin(String status, String keyword) {
-        return list(status, keyword, null);
+        return list(status == null ? "ALL" : status,
+                keyword == null ? "" : keyword.trim(), null);
     }
 
     @Transactional
@@ -111,65 +105,52 @@ public class RoomExchangeService {
             long targetStudentId,
             String reason,
             CurrentUser initiator) {
-        String mode = currentMode();
-        if ("DISABLED".equals(mode)) {
-            throw new BusinessException(
-                    "ROOM_EXCHANGE_DISABLED",
-                    "学校当前未开放学生寝室交换",
-                    HttpStatus.CONFLICT);
-        }
+        String mode = requireEnabled();
         if (initiatorStudentId == targetStudentId) {
             throw new BusinessException(
-                    "ROOM_EXCHANGE_SAME_STUDENT",
-                    "不能向本人发起寝室交换");
+                    "ROOM_EXCHANGE_SAME_STUDENT", "不能向本人发起寝室交换");
         }
-        List<Map<String, Object>> residencies = lockActiveResidencies(
-                initiatorStudentId,
-                targetStudentId);
-        Map<String, Object> initiatorResidency = residencyOf(residencies, initiatorStudentId);
-        Map<String, Object> targetResidency = residencyOf(residencies, targetStudentId);
-        requireCompatible(initiatorStudentId, initiatorResidency, targetStudentId, targetResidency);
+        List<Map<String, Object>> residencies = lockResidencies(
+                initiatorStudentId, targetStudentId);
+        Map<String, Object> initiatorResidency = residencyFor(
+                residencies, initiatorStudentId);
+        Map<String, Object> targetResidency = residencyFor(
+                residencies, targetStudentId);
+        requireCompatible(initiatorStudentId, initiatorResidency,
+                targetStudentId, targetResidency);
 
         GeneratedKeyHolder keyHolder = new GeneratedKeyHolder();
         jdbc.update("""
                 INSERT INTO room_exchange_request
                 (initiator_student_id, target_student_id,
                  initiator_residency_id, target_residency_id,
-                 policy_mode, request_status, reason,
-                 created_at, updated_at)
+                 policy_mode, request_status, reason)
                 VALUES
-                (:initiatorStudentId, :targetStudentId,
-                 :initiatorResidencyId, :targetResidencyId,
-                 :policyMode, 'WAITING_TARGET', :reason,
-                 CURRENT_TIMESTAMP(3), CURRENT_TIMESTAMP(3))
+                (:initiatorStudentId,:targetStudentId,
+                 :initiatorResidencyId,:targetResidencyId,
+                 :policyMode,'WAITING_TARGET',:reason)
                 """, new MapSqlParameterSource()
                 .addValue("initiatorStudentId", initiatorStudentId)
                 .addValue("targetStudentId", targetStudentId)
                 .addValue("initiatorResidencyId", initiatorResidency.get("id"))
                 .addValue("targetResidencyId", targetResidency.get("id"))
                 .addValue("policyMode", mode)
-                .addValue("reason", requiredReason(reason)),
-                keyHolder,
-                new String[]{"id"});
+                .addValue("reason", requireReason(reason)),
+                keyHolder, new String[]{"id"});
         long exchangeId = keyHolder.getKey().longValue();
         try {
-            lockParticipant(exchangeId, initiatorStudentId, "INITIATOR");
-            lockParticipant(exchangeId, targetStudentId, "TARGET");
+            addParticipantLock(exchangeId, initiatorStudentId, "INITIATOR");
+            addParticipantLock(exchangeId, targetStudentId, "TARGET");
         } catch (DataIntegrityViolationException exception) {
             throw new BusinessException(
                     "ROOM_EXCHANGE_PARTICIPANT_BUSY",
                     "本人或对方已有进行中的寝室交换",
                     HttpStatus.CONFLICT);
         }
-        Map<String, Object> after = request(exchangeId);
-        auditService.success(
-                initiator,
-                "ROOM_EXCHANGE_CREATE",
-                "ROOM_EXCHANGE_REQUEST",
-                exchangeId,
-                reason.trim(),
-                null,
-                after);
+        Map<String, Object> after = view(exchangeId);
+        auditService.success(initiator, "ROOM_EXCHANGE_CREATE",
+                "ROOM_EXCHANGE_REQUEST", exchangeId,
+                reason.trim(), null, after);
         return after;
     }
 
@@ -180,32 +161,33 @@ public class RoomExchangeService {
             boolean accepted,
             String reason,
             CurrentUser targetUser) {
-        Map<String, Object> before = requestForUpdate(exchangeId);
-        if (number(before.get("target_student_id")) != targetStudentId) {
+        Map<String, Object> before = lockRequest(exchangeId);
+        if (longValue(before.get("target_student_id")) != targetStudentId) {
             throw new BusinessException(
-                    "ROOM_EXCHANGE_NOT_FOUND",
-                    "寝室交换邀请不存在",
+                    "ROOM_EXCHANGE_NOT_FOUND", "寝室交换邀请不存在",
                     HttpStatus.NOT_FOUND);
         }
         requireStatus(before, "WAITING_TARGET");
         if (!accepted) {
-            updateTerminal(
-                    exchangeId,
-                    "REJECTED",
-                    "target_response_reason",
-                    requiredReason(reason),
-                    "responded_at");
-            releaseParticipants(exchangeId);
-            Map<String, Object> after = request(exchangeId);
+            jdbc.update("""
+                    UPDATE room_exchange_request
+                    SET request_status='REJECTED',
+                        target_response_reason=:reason,
+                        responded_at=CURRENT_TIMESTAMP(3),
+                        updated_at=CURRENT_TIMESTAMP(3)
+                    WHERE id=:id
+                    """, Map.of("id", exchangeId, "reason", requireReason(reason)));
+            releaseParticipantLocks(exchangeId);
+            Map<String, Object> after = view(exchangeId);
             auditService.success(targetUser, "ROOM_EXCHANGE_REJECT_BY_TARGET",
-                    "ROOM_EXCHANGE_REQUEST", exchangeId, reason.trim(), before, after);
+                    "ROOM_EXCHANGE_REQUEST", exchangeId,
+                    reason.trim(), before, after);
             return after;
         }
 
         String mode = String.valueOf(before.get("policy_mode"));
-        String nextStatus = "APPROVAL_REQUIRED".equals(mode)
-                ? "PENDING_ADMIN"
-                : "APPROVED";
+        String status = "APPROVAL_REQUIRED".equals(mode)
+                ? "PENDING_ADMIN" : "APPROVED";
         jdbc.update("""
                 UPDATE room_exchange_request
                 SET request_status=:status,
@@ -214,59 +196,17 @@ public class RoomExchangeService {
                     updated_at=CURRENT_TIMESTAMP(3)
                 WHERE id=:id
                 """, new MapSqlParameterSource()
-                .addValue("status", nextStatus)
-                .addValue("reason", requiredReason(reason))
-                .addValue("id", exchangeId));
+                .addValue("id", exchangeId)
+                .addValue("status", status)
+                .addValue("reason", requireReason(reason)));
         if ("MUTUAL_CONFIRMATION".equals(mode)) {
-            return executeExchange(exchangeId, targetUser, "双方确认后自动交换寝室床位");
+            return executeExchange(
+                    exchangeId, targetUser, "双方确认后自动交换寝室床位");
         }
-        Map<String, Object> after = request(exchangeId);
+        Map<String, Object> after = view(exchangeId);
         auditService.success(targetUser, "ROOM_EXCHANGE_ACCEPT_BY_TARGET",
-                "ROOM_EXCHANGE_REQUEST", exchangeId, reason.trim(), before, after);
-        return after;
-    }
-
-    @Transactional
-    public Map<String, Object> approve(
-            long exchangeId,
-            String reason,
-            CurrentUser admin) {
-        Map<String, Object> before = requestForUpdate(exchangeId);
-        requireStatus(before, "PENDING_ADMIN");
-        jdbc.update("""
-                UPDATE room_exchange_request
-                SET request_status='APPROVED', reviewed_by=:reviewedBy,
-                    review_reason=:reason, reviewed_at=CURRENT_TIMESTAMP(3),
-                    updated_at=CURRENT_TIMESTAMP(3)
-                WHERE id=:id
-                """, new MapSqlParameterSource()
-                .addValue("reviewedBy", admin.userId())
-                .addValue("reason", requiredReason(reason))
-                .addValue("id", exchangeId));
-        return executeExchange(exchangeId, admin, "管理员批准寝室交换：" + reason.trim());
-    }
-
-    @Transactional
-    public Map<String, Object> reject(
-            long exchangeId,
-            String reason,
-            CurrentUser admin) {
-        Map<String, Object> before = requestForUpdate(exchangeId);
-        requireStatus(before, "PENDING_ADMIN");
-        jdbc.update("""
-                UPDATE room_exchange_request
-                SET request_status='REJECTED', reviewed_by=:reviewedBy,
-                    review_reason=:reason, reviewed_at=CURRENT_TIMESTAMP(3),
-                    updated_at=CURRENT_TIMESTAMP(3)
-                WHERE id=:id
-                """, new MapSqlParameterSource()
-                .addValue("reviewedBy", admin.userId())
-                .addValue("reason", requiredReason(reason))
-                .addValue("id", exchangeId));
-        releaseParticipants(exchangeId);
-        Map<String, Object> after = request(exchangeId);
-        auditService.success(admin, "ROOM_EXCHANGE_REJECT",
-                "ROOM_EXCHANGE_REQUEST", exchangeId, reason.trim(), before, after);
+                "ROOM_EXCHANGE_REQUEST", exchangeId,
+                reason.trim(), before, after);
         return after;
     }
 
@@ -276,26 +216,75 @@ public class RoomExchangeService {
             long initiatorStudentId,
             String reason,
             CurrentUser initiator) {
-        Map<String, Object> before = requestForUpdate(exchangeId);
-        if (number(before.get("initiator_student_id")) != initiatorStudentId) {
+        Map<String, Object> before = lockRequest(exchangeId);
+        if (longValue(before.get("initiator_student_id")) != initiatorStudentId) {
             throw new BusinessException(
-                    "ROOM_EXCHANGE_NOT_FOUND",
-                    "寝室交换申请不存在",
+                    "ROOM_EXCHANGE_NOT_FOUND", "寝室交换申请不存在",
                     HttpStatus.NOT_FOUND);
         }
-        String status = String.valueOf(before.get("request_status"));
-        if (!Set.of("WAITING_TARGET", "PENDING_ADMIN").contains(status)) {
+        if (!Set.of("WAITING_TARGET", "PENDING_ADMIN")
+                .contains(String.valueOf(before.get("request_status")))) {
             throw new BusinessException(
-                    "ROOM_EXCHANGE_STATE_INVALID",
-                    "当前状态不能取消",
+                    "ROOM_EXCHANGE_STATE_INVALID", "当前状态不能取消",
                     HttpStatus.CONFLICT);
         }
-        updateTerminal(exchangeId, "CANCELLED", "review_reason",
-                requiredReason(reason), null);
-        releaseParticipants(exchangeId);
-        Map<String, Object> after = request(exchangeId);
+        jdbc.update("""
+                UPDATE room_exchange_request
+                SET request_status='CANCELLED', review_reason=:reason,
+                    updated_at=CURRENT_TIMESTAMP(3)
+                WHERE id=:id
+                """, Map.of("id", exchangeId, "reason", requireReason(reason)));
+        releaseParticipantLocks(exchangeId);
+        Map<String, Object> after = view(exchangeId);
         auditService.success(initiator, "ROOM_EXCHANGE_CANCEL",
-                "ROOM_EXCHANGE_REQUEST", exchangeId, reason.trim(), before, after);
+                "ROOM_EXCHANGE_REQUEST", exchangeId,
+                reason.trim(), before, after);
+        return after;
+    }
+
+    @Transactional
+    public Map<String, Object> approve(
+            long exchangeId,
+            String reason,
+            CurrentUser admin) {
+        Map<String, Object> before = lockRequest(exchangeId);
+        requireStatus(before, "PENDING_ADMIN");
+        jdbc.update("""
+                UPDATE room_exchange_request
+                SET request_status='APPROVED', reviewed_by=:reviewedBy,
+                    review_reason=:reason, reviewed_at=CURRENT_TIMESTAMP(3),
+                    updated_at=CURRENT_TIMESTAMP(3)
+                WHERE id=:id
+                """, new MapSqlParameterSource()
+                .addValue("id", exchangeId)
+                .addValue("reviewedBy", admin.userId())
+                .addValue("reason", requireReason(reason)));
+        return executeExchange(exchangeId, admin,
+                "管理员批准寝室交换：" + reason.trim());
+    }
+
+    @Transactional
+    public Map<String, Object> reject(
+            long exchangeId,
+            String reason,
+            CurrentUser admin) {
+        Map<String, Object> before = lockRequest(exchangeId);
+        requireStatus(before, "PENDING_ADMIN");
+        jdbc.update("""
+                UPDATE room_exchange_request
+                SET request_status='REJECTED', reviewed_by=:reviewedBy,
+                    review_reason=:reason, reviewed_at=CURRENT_TIMESTAMP(3),
+                    updated_at=CURRENT_TIMESTAMP(3)
+                WHERE id=:id
+                """, new MapSqlParameterSource()
+                .addValue("id", exchangeId)
+                .addValue("reviewedBy", admin.userId())
+                .addValue("reason", requireReason(reason)));
+        releaseParticipantLocks(exchangeId);
+        Map<String, Object> after = view(exchangeId);
+        auditService.success(admin, "ROOM_EXCHANGE_REJECT",
+                "ROOM_EXCHANGE_REQUEST", exchangeId,
+                reason.trim(), before, after);
         return after;
     }
 
@@ -306,14 +295,13 @@ public class RoomExchangeService {
             CurrentUser admin) {
         if (!MODES.contains(mode)) {
             throw new BusinessException(
-                    "ROOM_EXCHANGE_MODE_INVALID",
-                    "寝室交换模式无效");
+                    "ROOM_EXCHANGE_MODE_INVALID", "寝室交换模式无效");
         }
         String before = currentMode();
         jdbc.update("""
                 INSERT INTO system_setting
                 (setting_key, setting_value, version, updated_by)
-                VALUES (:settingKey, :mode, 0, :updatedBy)
+                VALUES (:settingKey,:mode,0,:updatedBy)
                 ON DUPLICATE KEY UPDATE
                     setting_value=VALUES(setting_value),
                     version=version+1,
@@ -325,7 +313,7 @@ public class RoomExchangeService {
                 .addValue("updatedBy", admin.userId()));
         Map<String, Object> after = policy();
         auditService.success(admin, "ROOM_EXCHANGE_POLICY_UPDATE",
-                "SYSTEM_SETTING", 0L, requiredReason(reason),
+                "SYSTEM_SETTING", 0L, requireReason(reason),
                 Map.of("mode", before), after);
         return after;
     }
@@ -334,17 +322,20 @@ public class RoomExchangeService {
             long exchangeId,
             CurrentUser operator,
             String reason) {
-        Map<String, Object> before = requestForUpdate(exchangeId);
-        requireStatus(before, "APPROVED");
-        long initiatorStudentId = number(before.get("initiator_student_id"));
-        long targetStudentId = number(before.get("target_student_id"));
-        List<Map<String, Object>> current = lockActiveResidencies(
-                initiatorStudentId,
-                targetStudentId);
-        Map<String, Object> initiatorResidency = residencyOf(current, initiatorStudentId);
-        Map<String, Object> targetResidency = residencyOf(current, targetStudentId);
-        if (number(initiatorResidency.get("id")) != number(before.get("initiator_residency_id"))
-                || number(targetResidency.get("id")) != number(before.get("target_residency_id"))) {
+        Map<String, Object> request = lockRequest(exchangeId);
+        requireStatus(request, "APPROVED");
+        long initiatorStudentId = longValue(request.get("initiator_student_id"));
+        long targetStudentId = longValue(request.get("target_student_id"));
+        List<Map<String, Object>> residencies = lockResidencies(
+                initiatorStudentId, targetStudentId);
+        Map<String, Object> initiatorResidency = residencyFor(
+                residencies, initiatorStudentId);
+        Map<String, Object> targetResidency = residencyFor(
+                residencies, targetStudentId);
+        if (longValue(initiatorResidency.get("id"))
+                    != longValue(request.get("initiator_residency_id"))
+                || longValue(targetResidency.get("id"))
+                    != longValue(request.get("target_residency_id"))) {
             throw new BusinessException(
                     "ROOM_EXCHANGE_RESIDENCY_CHANGED",
                     "双方住宿记录已经变化，请重新发起交换",
@@ -353,17 +344,17 @@ public class RoomExchangeService {
         requireCompatible(initiatorStudentId, initiatorResidency,
                 targetStudentId, targetResidency);
 
-        residencyService.end(number(initiatorResidency.get("id")), reason, operator);
-        residencyService.end(number(targetResidency.get("id")), reason, operator);
+        residencyService.end(longValue(initiatorResidency.get("id")), reason, operator);
+        residencyService.end(longValue(targetResidency.get("id")), reason, operator);
         Map<String, Object> initiatorNew = residencyService.assign(
                 initiatorStudentId,
-                number(targetResidency.get("room_id")),
-                nullableNumber(targetResidency.get("bed_id")),
+                longValue(targetResidency.get("room_id")),
+                nullableLong(targetResidency.get("bed_id")),
                 null, null, "DIRECT", "ROOM_EXCHANGE", reason, operator);
         Map<String, Object> targetNew = residencyService.assign(
                 targetStudentId,
-                number(initiatorResidency.get("room_id")),
-                nullableNumber(initiatorResidency.get("bed_id")),
+                longValue(initiatorResidency.get("room_id")),
+                nullableLong(initiatorResidency.get("bed_id")),
                 null, null, "DIRECT", "ROOM_EXCHANGE", reason, operator);
         jdbc.update("""
                 UPDATE room_exchange_request
@@ -374,13 +365,14 @@ public class RoomExchangeService {
                     updated_at=CURRENT_TIMESTAMP(3)
                 WHERE id=:id
                 """, new MapSqlParameterSource()
+                .addValue("id", exchangeId)
                 .addValue("initiatorResidencyId", initiatorNew.get("id"))
-                .addValue("targetResidencyId", targetNew.get("id"))
-                .addValue("id", exchangeId));
-        releaseParticipants(exchangeId);
-        Map<String, Object> after = request(exchangeId);
+                .addValue("targetResidencyId", targetNew.get("id")));
+        releaseParticipantLocks(exchangeId);
+        Map<String, Object> after = view(exchangeId);
         auditService.success(operator, "ROOM_EXCHANGE_EXECUTE",
-                "ROOM_EXCHANGE_REQUEST", exchangeId, reason, before, after);
+                "ROOM_EXCHANGE_REQUEST", exchangeId,
+                reason, request, after);
         return after;
     }
 
@@ -401,73 +393,79 @@ public class RoomExchangeService {
                        target_building.building_name AS target_building_name,
                        target_bed.bed_code AS target_bed_code
                 FROM room_exchange_request exchange_row
-                JOIN student initiator ON initiator.id=exchange_row.initiator_student_id
-                JOIN student target ON target.id=exchange_row.target_student_id
+                JOIN student initiator
+                  ON initiator.id=exchange_row.initiator_student_id
+                JOIN student target
+                  ON target.id=exchange_row.target_student_id
                 JOIN room_assignment initiator_residency
                   ON initiator_residency.id=exchange_row.initiator_residency_id
-                JOIN room initiator_room ON initiator_room.id=initiator_residency.room_id
-                JOIN dormitory_floor initiator_floor ON initiator_floor.id=initiator_room.floor_id
+                JOIN room initiator_room
+                  ON initiator_room.id=initiator_residency.room_id
+                JOIN dormitory_floor initiator_floor
+                  ON initiator_floor.id=initiator_room.floor_id
                 JOIN dormitory_building initiator_building
                   ON initiator_building.id=initiator_floor.building_id
-                LEFT JOIN bed initiator_bed ON initiator_bed.id=initiator_residency.bed_id
+                LEFT JOIN bed initiator_bed
+                  ON initiator_bed.id=initiator_residency.bed_id
                 JOIN room_assignment target_residency
                   ON target_residency.id=exchange_row.target_residency_id
-                JOIN room target_room ON target_room.id=target_residency.room_id
-                JOIN dormitory_floor target_floor ON target_floor.id=target_room.floor_id
+                JOIN room target_room
+                  ON target_room.id=target_residency.room_id
+                JOIN dormitory_floor target_floor
+                  ON target_floor.id=target_room.floor_id
                 JOIN dormitory_building target_building
                   ON target_building.id=target_floor.building_id
-                LEFT JOIN bed target_bed ON target_bed.id=target_residency.bed_id
+                LEFT JOIN bed target_bed
+                  ON target_bed.id=target_residency.bed_id
                 WHERE (:studentId IS NULL
                        OR exchange_row.initiator_student_id=:studentId
                        OR exchange_row.target_student_id=:studentId)
                   AND (:status='ALL' OR exchange_row.request_status=:status)
-                  AND (:keyword='' OR initiator.student_number LIKE CONCAT('%',:keyword,'%')
+                  AND (:keyword=''
+                       OR initiator.student_number LIKE CONCAT('%',:keyword,'%')
                        OR initiator.student_name LIKE CONCAT('%',:keyword,'%')
                        OR target.student_number LIKE CONCAT('%',:keyword,'%')
                        OR target.student_name LIKE CONCAT('%',:keyword,'%'))
                 ORDER BY exchange_row.created_at DESC
                 """, new MapSqlParameterSource()
                 .addValue("studentId", studentId)
-                .addValue("status", status == null ? "ALL" : status)
-                .addValue("keyword", keyword == null ? "" : keyword.trim()));
+                .addValue("status", status)
+                .addValue("keyword", keyword));
     }
 
-    private Map<String, Object> request(long exchangeId) {
+    private Map<String, Object> view(long exchangeId) {
         List<Map<String, Object>> rows = list("ALL", "", null).stream()
-                .filter(item -> number(item.get("id")) == exchangeId)
+                .filter(row -> longValue(row.get("id")) == exchangeId)
                 .toList();
         if (rows.isEmpty()) {
             throw new BusinessException(
-                    "ROOM_EXCHANGE_NOT_FOUND",
-                    "寝室交换申请不存在",
+                    "ROOM_EXCHANGE_NOT_FOUND", "寝室交换申请不存在",
                     HttpStatus.NOT_FOUND);
         }
         return rows.getFirst();
     }
 
-    private Map<String, Object> requestForUpdate(long exchangeId) {
+    private Map<String, Object> lockRequest(long exchangeId) {
         List<Map<String, Object>> rows = jdbc.queryForList("""
                 SELECT * FROM room_exchange_request
                 WHERE id=:id FOR UPDATE
                 """, Map.of("id", exchangeId));
         if (rows.isEmpty()) {
             throw new BusinessException(
-                    "ROOM_EXCHANGE_NOT_FOUND",
-                    "寝室交换申请不存在",
+                    "ROOM_EXCHANGE_NOT_FOUND", "寝室交换申请不存在",
                     HttpStatus.NOT_FOUND);
         }
         return rows.getFirst();
     }
 
-    private List<Map<String, Object>> lockActiveResidencies(
+    private List<Map<String, Object>> lockResidencies(
             long firstStudentId,
             long secondStudentId) {
         List<Map<String, Object>> rows = jdbc.queryForList("""
                 SELECT * FROM room_assignment
                 WHERE student_id IN (:firstStudentId,:secondStudentId)
                   AND assignment_status='ACTIVE'
-                ORDER BY student_id
-                FOR UPDATE
+                ORDER BY student_id FOR UPDATE
                 """, new MapSqlParameterSource()
                 .addValue("firstStudentId", firstStudentId)
                 .addValue("secondStudentId", secondStudentId));
@@ -485,7 +483,8 @@ public class RoomExchangeService {
             boolean forUpdate) {
         List<Map<String, Object>> rows = jdbc.queryForList("""
                 SELECT * FROM room_assignment
-                WHERE student_id=:studentId AND assignment_status='ACTIVE'
+                WHERE student_id=:studentId
+                  AND assignment_status='ACTIVE'
                 """ + (forUpdate ? " FOR UPDATE" : ""),
                 Map.of("studentId", studentId));
         if (rows.size() != 1) {
@@ -497,11 +496,11 @@ public class RoomExchangeService {
         return rows.getFirst();
     }
 
-    private Map<String, Object> residencyOf(
-            List<Map<String, Object>> rows,
+    private Map<String, Object> residencyFor(
+            List<Map<String, Object>> residencies,
             long studentId) {
-        return rows.stream()
-                .filter(row -> number(row.get("student_id")) == studentId)
+        return residencies.stream()
+                .filter(row -> longValue(row.get("student_id")) == studentId)
                 .findFirst()
                 .orElseThrow(() -> new BusinessException(
                         "ROOM_EXCHANGE_RESIDENCY_REQUIRED",
@@ -517,10 +516,11 @@ public class RoomExchangeService {
         Map<String, Object> initiatorStudent = residencyPolicy.student(initiatorStudentId);
         Map<String, Object> targetStudent = residencyPolicy.student(targetStudentId);
         Map<String, Object> initiatorRoom = residencyPolicy.room(
-                number(initiatorResidency.get("room_id")), true);
+                longValue(initiatorResidency.get("room_id")), true);
         Map<String, Object> targetRoom = residencyPolicy.room(
-                number(targetResidency.get("room_id")), true);
-        if (!compatible(initiatorStudent, initiatorRoom, targetStudent, targetRoom)) {
+                longValue(targetResidency.get("room_id")), true);
+        if (!compatible(initiatorStudent, initiatorRoom,
+                targetStudent, targetRoom)) {
             throw new BusinessException(
                     "ROOM_EXCHANGE_POLICY_MISMATCH",
                     "双方不符合对方寝室的性别或学生类别要求",
@@ -547,43 +547,36 @@ public class RoomExchangeService {
                     String.valueOf(targetStudent.get("student_category")), false);
     }
 
-    private void lockParticipant(
+    private void addParticipantLock(
             long exchangeId,
             long studentId,
             String role) {
         jdbc.update("""
                 INSERT INTO room_exchange_participant_lock
-                (student_id, exchange_id, participant_role, created_at)
-                VALUES (:studentId,:exchangeId,:role,CURRENT_TIMESTAMP(3))
+                (student_id, exchange_id, participant_role)
+                VALUES (:studentId,:exchangeId,:role)
                 """, new MapSqlParameterSource()
                 .addValue("studentId", studentId)
                 .addValue("exchangeId", exchangeId)
                 .addValue("role", role));
     }
 
-    private void releaseParticipants(long exchangeId) {
+    private void releaseParticipantLocks(long exchangeId) {
         jdbc.update("""
                 DELETE FROM room_exchange_participant_lock
                 WHERE exchange_id=:exchangeId
                 """, Map.of("exchangeId", exchangeId));
     }
 
-    private void updateTerminal(
-            long exchangeId,
-            String status,
-            String reasonColumn,
-            String reason,
-            String timeColumn) {
-        String timeUpdate = timeColumn == null
-                ? ""
-                : ", " + timeColumn + "=CURRENT_TIMESTAMP(3)";
-        jdbc.update("UPDATE room_exchange_request SET request_status=:status, "
-                        + reasonColumn + "=:reason" + timeUpdate
-                        + ", updated_at=CURRENT_TIMESTAMP(3) WHERE id=:id",
-                new MapSqlParameterSource()
-                        .addValue("status", status)
-                        .addValue("reason", reason)
-                        .addValue("id", exchangeId));
+    private String requireEnabled() {
+        String mode = currentMode();
+        if ("DISABLED".equals(mode)) {
+            throw new BusinessException(
+                    "ROOM_EXCHANGE_DISABLED",
+                    "学校当前未开放学生寝室交换",
+                    HttpStatus.CONFLICT);
+        }
+        return mode;
     }
 
     private String currentMode() {
@@ -606,7 +599,7 @@ public class RoomExchangeService {
         }
     }
 
-    private String requiredReason(String reason) {
+    private String requireReason(String reason) {
         String normalized = reason == null ? "" : reason.trim();
         if (normalized.isEmpty() || normalized.length() > 500) {
             throw new BusinessException(
@@ -616,11 +609,11 @@ public class RoomExchangeService {
         return normalized;
     }
 
-    private int number(Object value) {
-        return value == null ? 0 : ((Number) value).intValue();
+    private long longValue(Object value) {
+        return value == null ? 0L : ((Number) value).longValue();
     }
 
-    private Long nullableNumber(Object value) {
+    private Long nullableLong(Object value) {
         return value == null ? null : ((Number) value).longValue();
     }
 }
