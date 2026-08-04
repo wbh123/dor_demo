@@ -2,7 +2,7 @@ openapi: 3.0.3
 info:
   title: 示例大学学生宿舍智能选择系统接口
   description: 学生宿舍智能选择、业务管理与系统服务管理接口契约
-  version: 3.3.0
+  version: 3.4.0
 servers:
   - url: http://localhost:8080
 paths:
@@ -89,10 +89,6 @@ paths:
     $ref: 'admin/openapi-admin.yaml#/paths/~1api~1v1~1admin~1audit-logs'
   /api/v1/admin/batches/{batchId}/assignments.csv:
     $ref: 'admin/openapi-admin.yaml#/paths/~1api~1v1~1admin~1batches~1{batchId}~1assignments.csv'
-  /api/v1/admin/import/students:
-    $ref: 'admin/openapi-import-policy.yaml#/paths/~1api~1v1~1admin~1import~1students'
-  /api/v1/admin/import/rooms:
-    $ref: 'admin/openapi-import-policy.yaml#/paths/~1api~1v1~1admin~1import~1rooms'
   /api/v1/admin/import/students/template:
     $ref: 'admin/openapi-import-policy.yaml#/paths/~1api~1v1~1admin~1import~1students~1template'
   /api/v1/admin/import/rooms/template:
@@ -151,6 +147,14 @@ paths:
     $ref: 'waitlist/openapi-waitlist.yaml#/paths/~1api~1v1~1admin~1waitlist~1entries~1{entryId}~1assign'
   /api/v1/admin/waitlist/scan:
     $ref: 'waitlist/openapi-waitlist.yaml#/paths/~1api~1v1~1admin~1waitlist~1scan'
+  /api/v1/admin/bed-confirmations/rooms:
+    $ref: 'bedconfirmation/openapi-bed-confirmation.yaml#/paths/~1api~1v1~1admin~1bed-confirmations~1rooms'
+  /api/v1/admin/bed-confirmations/rooms/{roomId}:
+    $ref: 'bedconfirmation/openapi-bed-confirmation.yaml#/paths/~1api~1v1~1admin~1bed-confirmations~1rooms~1{roomId}'
+  /api/v1/admin/bed-confirmations/rooms/{roomId}/approve:
+    $ref: 'bedconfirmation/openapi-bed-confirmation.yaml#/paths/~1api~1v1~1admin~1bed-confirmations~1rooms~1{roomId}~1approve'
+  /api/v1/admin/bed-confirmations/requests/{requestId}/reject:
+    $ref: 'bedconfirmation/openapi-bed-confirmation.yaml#/paths/~1api~1v1~1admin~1bed-confirmations~1requests~1{requestId}~1reject'
 
   /api/v1/student/preferences:
     $ref: 'student/openapi-preference-policy.yaml#/paths/~1api~1v1~1student~1preferences'
@@ -238,6 +242,10 @@ paths:
     $ref: 'waitlist/openapi-waitlist.yaml#/paths/~1api~1v1~1student~1waitlist~1offers~1{offerId}~1accept'
   /api/v1/student/waitlist/offers/{offerId}/reject:
     $ref: 'waitlist/openapi-waitlist.yaml#/paths/~1api~1v1~1student~1waitlist~1offers~1{offerId}~1reject'
+  /api/v1/student/bed-confirmations:
+    $ref: 'bedconfirmation/openapi-bed-confirmation.yaml#/paths/~1api~1v1~1student~1bed-confirmations'
+  /api/v1/student/bed-confirmations/{requestId}/cancel:
+    $ref: 'bedconfirmation/openapi-bed-confirmation.yaml#/paths/~1api~1v1~1student~1bed-confirmations~1{requestId}~1cancel'
 
   /api/v1/realtime/batches/{batchId}/rooms/{roomId}:
     $ref: 'realtime/openapi-realtime.yaml#/paths/~1api~1v1~1realtime~1batches~1{batchId}~1rooms~1{roomId}'
@@ -278,3 +286,5 @@ paths:
     $ref: 'platform/openapi-platform.yaml#/paths/~1api~1v1~1platform~1quota-overrides'
   /api/v1/platform/audit:
     $ref: 'platform/openapi-platform.yaml#/paths/~1api~1v1~1platform~1audit'
+  /api/v1/platform/redis/clear:
+    $ref: 'platform/openapi-platform-redis.yaml#/paths/~1api~1v1~1platform~1redis~1clear'
