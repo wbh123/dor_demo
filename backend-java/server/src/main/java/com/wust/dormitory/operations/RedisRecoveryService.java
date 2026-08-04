@@ -6,29 +6,25 @@ import org.springframework.stereotype.Service;
 
 import java.time.Duration;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 @Service
 public class RedisRecoveryService {
-    private static final List<String> TRANSIENT_PATTERNS = List.of(
-            "bed:hold:*",
-            "student:hold:*",
-            "team:hold:*",
-            "dormitory:hold:*"
-    );
     private static final String OCCUPANCY_KEY_PREFIX = "dormitory:recovery:room:";
 
     private final StringRedisTemplate redis;
     private final NamedParameterJdbcTemplate jdbc;
+    private final BedHoldKeyInspector bedHoldKeyInspector;
 
-    public RedisRecoveryService(StringRedisTemplate redis, NamedParameterJdbcTemplate jdbc) {
+    public RedisRecoveryService(
+            StringRedisTemplate redis,
+            NamedParameterJdbcTemplate jdbc,
+            BedHoldKeyInspector bedHoldKeyInspector) {
         this.redis = redis;
         this.jdbc = jdbc;
+        this.bedHoldKeyInspector = bedHoldKeyInspector;
     }
 
     public Map<String, Object> previewRecovery() {
@@ -39,7 +35,8 @@ public class RedisRecoveryService {
         Map<String, Object> plan = buildPlan(false);
         @SuppressWarnings("unchecked")
         List<String> orphanKeys = (List<String>) plan.get("orphanKeys");
-        long removedKeys = orphanKeys.isEmpty() ? 0L : redis.delete(orphanKeys);
+        Long deleted = orphanKeys.isEmpty() ? 0L : redis.delete(orphanKeys);
+        long removedKeys = deleted == null ? 0L : deleted;
 
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> roomProjections = (List<Map<String, Object>>) plan.get("roomProjections");
@@ -66,35 +63,7 @@ public class RedisRecoveryService {
     }
 
     private Map<String, Object> buildPlan(boolean dryRun) {
-        Set<String> transientKeys = new LinkedHashSet<>();
-        for (String pattern : TRANSIENT_PATTERNS) {
-            Set<String> keys = redis.keys(pattern);
-            if (keys != null) {
-                transientKeys.addAll(keys);
-            }
-        }
-
-        Set<Long> activeBedIds = new LinkedHashSet<>(jdbc.queryForList("""
-                SELECT scope.bed_id
-                FROM batch_bed_scope scope
-                JOIN selection_batch batch ON batch.id=scope.batch_id
-                JOIN bed ON bed.id=scope.bed_id
-                WHERE batch.batch_status IN ('PUBLISHED','OPEN','PAUSED')
-                  AND bed.operational_status='ENABLED'
-                """, Map.of(), Long.class));
-
-        List<String> orphanKeys = new ArrayList<>();
-        List<String> retainedKeys = new ArrayList<>();
-        for (String key : transientKeys) {
-            Long bedId = parseTrailingLong(key);
-            Long ttl = redis.getExpire(key);
-            if (bedId == null || !activeBedIds.contains(bedId) || ttl == null || ttl <= 0) {
-                orphanKeys.add(key);
-            } else {
-                retainedKeys.add(key);
-            }
-        }
-
+        BedHoldKeyInspector.Inspection inspection = bedHoldKeyInspector.inspect();
         List<Map<String, Object>> roomProjections = jdbc.queryForList("""
                 SELECT room.id AS roomId,
                        room.capacity AS capacity,
@@ -111,29 +80,16 @@ public class RedisRecoveryService {
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("dryRun", dryRun);
-        result.put("scannedKeys", transientKeys.size());
-        result.put("orphanKeys", List.copyOf(orphanKeys));
-        result.put("retainedKeys", List.copyOf(retainedKeys));
+        result.put("scannedKeys", inspection.scannedKeys().size());
+        result.put("orphanKeys", inspection.orphanKeys());
+        result.put("retainedKeys", inspection.retainedKeys());
         result.put("roomProjections", roomProjections);
-        result.put("removedKeys", dryRun ? orphanKeys.size() : 0);
+        result.put("removedKeys", dryRun ? inspection.orphanKeys().size() : 0);
         result.put("recreatedKeys", dryRun ? roomProjections.size() : 0);
         result.put("warnings", List.of(
                 "Redis只保存临时状态，MySQL在住记录仍是最终事实",
                 "服务重启期间丢失的临时床位占用不会自动恢复，学生需要重新选择"
         ));
         return result;
-    }
-
-    private Long parseTrailingLong(String key) {
-        if (key == null) {
-            return null;
-        }
-        String[] parts = key.split(":");
-        for (int index = parts.length - 1; index >= 0; index--) {
-            if (parts[index].matches("\\d+")) {
-                return Long.valueOf(parts[index]);
-            }
-        }
-        return null;
     }
 }
