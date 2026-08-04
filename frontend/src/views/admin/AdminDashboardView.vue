@@ -1,55 +1,50 @@
 <script setup lang="ts">
-import { nextTick, onMounted, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, reactive, ref } from 'vue'
 import { api } from '../../api/client'
 import type { DataObject, ListSuccessResponse, ObjectSuccessResponse } from '../../api/types'
-import { countryLabel, countryOptions } from '../../utils/countries'
 import { useI18n } from '../../i18n'
-
-interface BrowserTranslator {
-  translate(text: string): Promise<string>
-}
-
-interface BrowserTranslatorFactory {
-  create(options: { sourceLanguage: string; targetLanguage: string }): Promise<BrowserTranslator>
-}
 
 const dashboard = ref<DataObject>({})
 const batches = ref<DataObject[]>([])
 const auditLogs = ref<DataObject[]>([])
 const loading = ref(true)
 const error = ref('')
-const welcomeMessages = reactive<Record<string, string>>({ 'zh-CN': '', 'en-US': '' })
-const countryMessages = reactive<Record<string, string>>({})
-const newCountryCode = ref('US')
+const languageMessages = reactive<Record<string, string>>({ 'zh-CN': '', 'en-US': '' })
+const newLocale = ref('ja-JP')
 const welcomeVersion = ref(0)
 const welcomeUpdatedAt = ref('')
 const welcomeUpdatedBy = ref('')
 const welcomeSaving = ref(false)
 const welcomeError = ref('')
 const welcomeSuccess = ref('')
-const autoTranslate = ref(true)
-const translating = ref(false)
 const activeEditor = ref<HTMLTextAreaElement | null>(null)
-const activeEditorKind = ref<'message' | 'country'>('message')
-const activeEditorKey = ref('zh-CN')
-let translationTimer: number | undefined
+const activeLocale = ref('zh-CN')
 const { subtitle, translateError } = useI18n()
 
 const placeholders = ['学生姓名', '学号', '专业名称', '年级', '培养层次', '国家或地区']
+const requiredLocales = new Set(['zh-CN', 'en-US'])
+const welcomeLanguageOptions = [
+  { value: 'zh-CN', label: '简体中文' },
+  { value: 'en-US', label: 'English' },
+  { value: 'ja-JP', label: '日本語' },
+  { value: 'ko-KR', label: '한국어' },
+  { value: 'fr-FR', label: 'Français' },
+  { value: 'de-DE', label: 'Deutsch' },
+  { value: 'es-ES', label: 'Español' },
+  { value: 'ru-RU', label: 'Русский' },
+]
 const stats = [
   ['studentCount', '学生总数', '人'],
   ['roomCount', '宿舍房间', '间'],
   ['bedCount', '启用床位', '个'],
   ['activeAssignmentCount', '已完成分配', '人'],
 ]
+const orderedLocales = computed(() => Object.keys(languageMessages).sort((left, right) => {
+  const priority = (value: string) => value === 'zh-CN' ? 0 : value === 'en-US' ? 1 : 2
+  return priority(left) - priority(right) || left.localeCompare(right)
+}))
 
 onMounted(load)
-
-watch(() => welcomeMessages['zh-CN'], () => {
-  if (!autoTranslate.value || translating.value) return
-  if (translationTimer) window.clearTimeout(translationTimer)
-  translationTimer = window.setTimeout(() => void translateChinese(false), 700)
-})
 
 async function load() {
   loading.value = true
@@ -77,10 +72,10 @@ async function loadWelcomeSetting() {
     const response = await api.get<ObjectSuccessResponse>('/api/v1/admin/settings/student-welcome')
     const data = (response.data.data ?? {}) as DataObject
     const messages = (data.messages ?? {}) as Record<string, string>
-    welcomeMessages['zh-CN'] = String(messages['zh-CN'] ?? data.message ?? '')
-    welcomeMessages['en-US'] = String(messages['en-US'] ?? '')
-    Object.keys(countryMessages).forEach((key) => delete countryMessages[key])
-    Object.assign(countryMessages, (data.countryMessages ?? {}) as Record<string, string>)
+    Object.keys(languageMessages).forEach((key) => delete languageMessages[key])
+    Object.assign(languageMessages, messages)
+    languageMessages['zh-CN'] = String(languageMessages['zh-CN'] ?? data.message ?? '')
+    languageMessages['en-US'] = String(languageMessages['en-US'] ?? '')
     welcomeVersion.value = Number(data.version ?? 0)
     welcomeUpdatedAt.value = String(data.updated_at ?? '')
     welcomeUpdatedBy.value = String(data.updated_by_name ?? '')
@@ -89,82 +84,90 @@ async function loadWelcomeSetting() {
   }
 }
 
-async function translateChinese(force: boolean) {
-  const source = welcomeMessages['zh-CN'].trim()
-  if (!source || translating.value || (!force && !autoTranslate.value)) return
+function normalizeLocale(value: string) {
+  const parts = value.trim().replaceAll('_', '-').split('-').filter(Boolean)
+  if (!/^[A-Za-z]{2,3}$/.test(parts[0] ?? '')) return ''
+  return parts.map((part, index) => {
+    if (index === 0) return part.toLowerCase()
+    if (part.length === 4) return `${part[0].toUpperCase()}${part.slice(1).toLowerCase()}`
+    return part.toUpperCase()
+  }).join('-')
+}
+
+function addWelcomeLanguage() {
+  const locale = normalizeLocale(newLocale.value)
   welcomeError.value = ''
-  const factory = (window as Window & { Translator?: BrowserTranslatorFactory }).Translator
-  if (!factory?.create) {
-    if (force) welcomeError.value = '当前浏览器未提供本地翻译能力，请直接修改英文欢迎语。'
+  if (!locale || !/^[a-z]{2,3}(?:-[A-Za-z0-9]{2,4}){0,2}$/.test(locale)) {
+    welcomeError.value = '请输入类似 ja-JP、fr-FR 的语言代码。'
     return
   }
-  translating.value = true
-  try {
-    const translator = await factory.create({ sourceLanguage: 'zh', targetLanguage: 'en' })
-    welcomeMessages['en-US'] = await translator.translate(source)
-    welcomeSuccess.value = '英文欢迎语已根据中文更新，你仍可单独修改。'
-  } catch {
-    if (force) welcomeError.value = '自动翻译暂时不可用，请稍后重试或直接修改英文欢迎语。'
-  } finally {
-    translating.value = false
+  if (languageMessages[locale] !== undefined) {
+    welcomeError.value = '该语言版本已经存在。'
+    return
   }
+  languageMessages[locale] = languageMessages['en-US']
+  newLocale.value = ''
 }
 
-function markEnglishEdited() {
-  if (!translating.value) autoTranslate.value = false
+function removeWelcomeLanguage(locale: string) {
+  if (requiredLocales.has(locale)) return
+  delete languageMessages[locale]
 }
 
-function setActiveEditor(event: FocusEvent, kind: 'message' | 'country', key: string) {
+function localeLabel(locale: string) {
+  return welcomeLanguageOptions.find((item) => item.value === locale)?.label ?? locale
+}
+
+function setActiveEditor(event: FocusEvent, locale: string) {
   activeEditor.value = event.target as HTMLTextAreaElement
-  activeEditorKind.value = kind
-  activeEditorKey.value = key
+  activeLocale.value = locale
 }
 
 async function insertPlaceholder(name: string) {
   const token = `{{${name}}}`
   const editor = activeEditor.value
+  const locale = activeLocale.value
   if (!editor) {
-    welcomeMessages['zh-CN'] += token
+    languageMessages['zh-CN'] += token
     return
   }
-  const current = activeEditorKind.value === 'country'
-    ? String(countryMessages[activeEditorKey.value] ?? '')
-    : String(welcomeMessages[activeEditorKey.value] ?? '')
+  const current = String(languageMessages[locale] ?? '')
   const start = editor.selectionStart ?? current.length
   const end = editor.selectionEnd ?? start
-  const next = `${current.slice(0, start)}${token}${current.slice(end)}`
-  if (activeEditorKind.value === 'country') countryMessages[activeEditorKey.value] = next
-  else welcomeMessages[activeEditorKey.value] = next
+  languageMessages[locale] = `${current.slice(0, start)}${token}${current.slice(end)}`
   await nextTick()
   editor.focus()
   editor.setSelectionRange(start + token.length, start + token.length)
 }
 
 async function saveWelcomeSetting() {
-  const normalized = { 'zh-CN': welcomeMessages['zh-CN'].trim(), 'en-US': welcomeMessages['en-US'].trim() }
   welcomeError.value = ''
   welcomeSuccess.value = ''
+  const normalized = Object.fromEntries(
+    Object.entries(languageMessages).map(([locale, message]) => [locale, message.trim()]),
+  )
+  if (!normalized['zh-CN'] || !normalized['en-US']) {
+    welcomeError.value = '中文和英文是必填的基础版本。'
+    return
+  }
   if (Object.values(normalized).some((message) => !message || message.length > 1000)) {
-    welcomeError.value = '中文和英文欢迎语均不能为空，且长度必须为1至1000个字符。'
+    welcomeError.value = '每个语言版本长度必须为1至1000个字符。'
     return
   }
   welcomeSaving.value = true
   try {
     const response = await api.put<ObjectSuccessResponse>('/api/v1/admin/settings/student-welcome', {
       messages: normalized,
-      countryMessages: { ...countryMessages },
       expectedVersion: welcomeVersion.value,
     })
     const data = (response.data.data ?? {}) as DataObject
-    const messages = (data.messages ?? normalized) as Record<string, string>
-    welcomeMessages['zh-CN'] = String(messages['zh-CN'] ?? normalized['zh-CN'])
-    welcomeMessages['en-US'] = String(messages['en-US'] ?? normalized['en-US'])
-    Object.keys(countryMessages).forEach((key) => delete countryMessages[key])
-    Object.assign(countryMessages, (data.countryMessages ?? countryMessages) as Record<string, string>)
+    const savedMessages = (data.messages ?? normalized) as Record<string, string>
+    Object.keys(languageMessages).forEach((key) => delete languageMessages[key])
+    Object.assign(languageMessages, savedMessages)
     welcomeVersion.value = Number(data.version ?? welcomeVersion.value + 1)
     welcomeUpdatedAt.value = String(data.updated_at ?? '')
     welcomeUpdatedBy.value = String(data.updated_by_name ?? '')
-    welcomeSuccess.value = '新生欢迎语已保存。'
+    welcomeSuccess.value = '新生欢迎语语言版本已保存。未配置的外文语言将展示英文版本。'
   } catch (reason) {
     welcomeError.value = translateError(reason)
   } finally {
@@ -172,22 +175,10 @@ async function saveWelcomeSetting() {
   }
 }
 
-function addCountryWelcome() {
-  const code = newCountryCode.value.trim().toUpperCase()
-  if (!code || countryMessages[code] !== undefined) return
-  countryMessages[code] = welcomeMessages['en-US']
-}
-
-function removeCountryWelcome(code: string) {
-  delete countryMessages[code]
-}
-
 function auditAction(value: unknown) {
   const labels: Record<string, string> = {
     CREATE: '新增了', UPDATE: '修改了', DELETE: '删除了', IMPORT: '导入了',
-    LOGIN: '登录了系统', LOGOUT: '退出了系统', BED_ASSIGN_SELF: '确认了学生床位',
-    RESIDENCY_ROOM_ASSIGN: '确认了学生寝室', SYSTEM_SETTING_UPDATE: '更新了系统设置',
-    QUESTIONNAIRE_SUBMIT: '提交了个人偏好', BATCH_PUBLISH: '发布了选寝批次',
+    LOGIN: '登录了系统', LOGOUT: '退出了系统', SYSTEM_SETTING_UPDATE: '更新了系统设置',
   }
   const key = String(value ?? '')
   return labels[key] ?? (key.includes('UPDATE') ? '修改了' : key.includes('CREATE') ? '新增了' : '完成了一项操作')
@@ -196,8 +187,7 @@ function auditAction(value: unknown) {
 function auditResource(value: unknown) {
   const labels: Record<string, string> = {
     STUDENT: '学生资料', MAJOR: '专业信息', ROOM: '宿舍房间', BED: '床位信息',
-    SELECTION_BATCH: '选寝批次', ROOM_ASSIGNMENT: '寝室分配', BED_ASSIGNMENT: '床位分配',
-    SYSTEM_SETTING: '系统设置', QUESTIONNAIRE: '偏好问卷', TEAM: '学生队伍',
+    SELECTION_BATCH: '选寝批次', ROOM_ASSIGNMENT: '寝室分配', SYSTEM_SETTING: '系统设置',
   }
   return labels[String(value ?? '')] ?? '业务数据'
 }
@@ -229,10 +219,9 @@ function auditResource(value: unknown) {
         <div class="section-head split-title">
           <div>
             <span class="eyebrow">{{ subtitle('首次登录欢迎', 'FIRST LOGIN WELCOME') }}</span>
-            <h3>新生欢迎语</h3>
-            <p>中文可自动生成英文版本，也可以分别修改；将光标放在文字中间后点击学生信息即可插入。</p>
+            <h3>新生欢迎语语言版本</h3>
+            <p>由管理员统一维护。中文和英文为基础版本；学生选择的外文未配置时，系统统一展示英文提示语。</p>
           </div>
-          <label class="auto-translate-switch"><input v-model="autoTranslate" type="checkbox" /><span>英文跟随中文自动更新</span></label>
         </div>
 
         <div class="placeholder-toolbar">
@@ -240,33 +229,28 @@ function auditResource(value: unknown) {
           <button v-for="name in placeholders" :key="name" type="button" @click="insertPlaceholder(name)">{{ name }}</button>
         </div>
 
-        <div class="multilingual-welcome-grid">
-          <label>
-            <span>中文欢迎语</span><small>{{ welcomeMessages['zh-CN'].length }}/1000</small>
-            <textarea v-model="welcomeMessages['zh-CN']" class="input welcome-message-input" rows="5" maxlength="1000" placeholder="请输入中文首次登录欢迎文本" @focus="setActiveEditor($event, 'message', 'zh-CN')" />
-          </label>
-          <label>
-            <span>英文欢迎语</span><small>{{ welcomeMessages['en-US'].length }}/1000</small>
-            <textarea v-model="welcomeMessages['en-US']" class="input welcome-message-input" rows="5" maxlength="1000" placeholder="Enter the English welcome message" @focus="setActiveEditor($event, 'message', 'en-US')" @input="markEnglishEdited" />
-            <button class="text-button translate-button" type="button" :disabled="translating" @click="translateChinese(true)">{{ translating ? '正在翻译…' : '根据中文重新翻译' }}</button>
-          </label>
+        <div class="language-editor-grid">
+          <article v-for="localeCode in orderedLocales" :key="localeCode" class="language-editor-card">
+            <header>
+              <div><strong>{{ localeLabel(localeCode) }}</strong><small>{{ localeCode }}</small></div>
+              <button v-if="!requiredLocales.has(localeCode)" class="text-button danger-text" type="button" @click="removeWelcomeLanguage(localeCode)">删除语言</button>
+              <span v-else class="required-chip">必填</span>
+            </header>
+            <textarea v-model="languageMessages[localeCode]" class="input" rows="5" maxlength="1000" :placeholder="`请输入 ${localeCode} 欢迎语`" @focus="setActiveEditor($event, localeCode)" />
+            <small>{{ languageMessages[localeCode]?.length ?? 0 }}/1000</small>
+          </article>
         </div>
 
-        <section class="country-welcome-section">
-          <div class="section-head split-title">
-            <div><strong>按国家或地区设置欢迎语</strong><p>专属欢迎语优先显示；没有专属内容时使用中文或英文通用版本。</p></div>
-            <div class="button-row"><select v-model="newCountryCode" class="input"><option v-for="country in countryOptions" :key="country.code" :value="country.code">{{ country.name }}</option></select><button class="button secondary" @click="addCountryWelcome">添加</button></div>
-          </div>
-          <div v-if="Object.keys(countryMessages).length" class="country-welcome-list">
-            <label v-for="(_, code) in countryMessages" :key="code"><span>{{ countryLabel(code) }}</span><textarea v-model="countryMessages[code]" class="input" rows="3" maxlength="1000" :placeholder="`请输入${countryLabel(code)}学生的欢迎语`" @focus="setActiveEditor($event, 'country', String(code))" /><button class="text-button danger-text" type="button" @click="removeCountryWelcome(String(code))">删除该专属欢迎语</button></label>
-          </div>
-          <p v-else class="empty-state">尚未设置国家或地区专属欢迎语。</p>
-        </section>
+        <div class="language-add-row">
+          <label><span>新增语言代码</span><input v-model.trim="newLocale" class="input" list="welcome-language-list" placeholder="例如 ja-JP" @keyup.enter="addWelcomeLanguage" /></label>
+          <datalist id="welcome-language-list"><option v-for="option in welcomeLanguageOptions" :key="option.value" :value="option.value">{{ option.label }}</option></datalist>
+          <button class="button secondary" type="button" @click="addWelcomeLanguage">添加语言版本</button>
+        </div>
 
         <div class="welcome-setting-meta"><span v-if="welcomeUpdatedAt">最后修改：{{ welcomeUpdatedAt }}</span><span v-if="welcomeUpdatedBy">修改人：{{ welcomeUpdatedBy }}</span></div>
         <p v-if="welcomeError" class="alert error">{{ welcomeError }}</p>
         <p v-if="welcomeSuccess" class="alert success">{{ welcomeSuccess }}</p>
-        <div class="button-row welcome-setting-actions"><button class="button ghost" :disabled="welcomeSaving" @click="loadWelcomeSetting">重新加载</button><button class="button primary" :disabled="welcomeSaving" @click="saveWelcomeSetting">{{ welcomeSaving ? '正在保存…' : '保存欢迎语' }}</button></div>
+        <div class="button-row welcome-setting-actions"><button class="button ghost" :disabled="welcomeSaving" @click="loadWelcomeSetting">重新加载</button><button class="button primary" :disabled="welcomeSaving" @click="saveWelcomeSetting">{{ welcomeSaving ? '正在保存…' : '保存全部语言版本' }}</button></div>
       </section>
 
       <div class="admin-grid">
@@ -277,7 +261,7 @@ function auditResource(value: unknown) {
 
         <section class="panel">
           <div class="section-head"><div><span class="eyebrow">{{ subtitle('操作记录', 'ACTIVITY') }}</span><h3>最近操作</h3></div></div>
-          <div class="audit-list friendly-audit-list"><article v-for="log in auditLogs" :key="String(log.id)"><span class="audit-dot" /><div><strong>{{ auditAction(log.action_type) }}{{ auditResource(log.resource_type) }}</strong><p>{{ log.operator_name || log.operator_display_name || '系统管理员' }} · {{ log.created_at || log.occurred_at || '刚刚' }}</p></div></article></div>
+          <div class="audit-list friendly-audit-list"><article v-for="log in auditLogs" :key="String(log.id)"><span class="audit-dot" /><div><strong>{{ auditAction(log.action_type) }}{{ auditResource(log.resource_type) }}</strong><p>{{ log.operator_display_name || '系统' }} · {{ log.created_at }}</p></div></article><p v-if="!auditLogs.length" class="empty-state">暂无操作记录。</p></div>
         </section>
       </div>
     </template>
@@ -285,21 +269,5 @@ function auditResource(value: unknown) {
 </template>
 
 <style scoped>
-.dashboard-stat-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-.dashboard-stat-card { min-width: 0; }
-.stat-value-line { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-top: 12px; }
-.stat-value-line strong { font-size: clamp(1.9rem, 3vw, 2.7rem); line-height: 1; }
-.stat-value-line small { margin-left: auto; color: var(--muted); font-size: .82rem; font-weight: 700; }
-.auto-translate-switch { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: .82rem; }
-.placeholder-toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; padding: 12px; border-radius: 13px; background: var(--soft); }
-.placeholder-toolbar > span { margin-right: 4px; color: var(--muted); font-size: .76rem; font-weight: 700; }
-.placeholder-toolbar button { padding: 6px 10px; border: 1px solid #cfdaf0; border-radius: 999px; color: #315c9e; background: #fff; cursor: pointer; }
-.translate-button { justify-self: start; margin-top: 4px; }
-.country-welcome-section { margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--line); }
-.country-welcome-list { display: grid; grid-template-columns: repeat(auto-fit,minmax(300px,1fr)); gap: 12px; }
-.country-welcome-list label { display: grid; gap: 7px; padding: 14px; border: 1px solid var(--line); border-radius: 13px; }
-.danger-text { color: #b91c1c; justify-self: start; }
-.friendly-audit-list strong { line-height: 1.45; }
-@media (max-width: 1050px) { .dashboard-stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 620px) { .dashboard-stat-grid { grid-template-columns: 1fr; } }
+.language-editor-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}.language-editor-card{display:grid;gap:10px;padding:15px;border:1px solid var(--line);border-radius:16px;background:var(--soft)}.language-editor-card header{display:flex;align-items:center;justify-content:space-between;gap:10px}.language-editor-card header div{display:grid;gap:2px}.language-editor-card header small,.language-editor-card>small{color:var(--muted)}.required-chip{padding:4px 8px;border-radius:999px;color:#17664f;background:#e8f8f2;font-size:12px}.language-add-row{display:flex;align-items:end;gap:10px;margin-top:15px}.language-add-row label{display:grid;gap:6px;min-width:240px}.welcome-setting-meta{display:flex;gap:18px;margin-top:14px;color:var(--muted);font-size:12px}.welcome-setting-actions{justify-content:flex-end;margin-top:14px}.danger-text{color:var(--danger)}@media(max-width:680px){.language-add-row{display:grid}.language-add-row label{min-width:0}.language-editor-grid{grid-template-columns:1fr}}
 </style>
