@@ -36,6 +36,13 @@ require(notice, (
     "notice-close",
 ), "transient notice must auto-close and support manual close")
 
+global_notice = read("frontend/src/utils/installTransientSuccessNotices.ts")
+require(global_notice, (
+    "window.setTimeout(() => close(element), 3000)",
+    ".alert.success",
+    "notice-close",
+), "existing success alerts must be enhanced as three-second popup notices")
+
 admin_data = read("frontend/src/views/admin/AdminDataView.vue")
 require(admin_data, (
     "PhoneDialCodeSelect",
@@ -46,26 +53,46 @@ require(admin_data, (
     "master-data-card-body",
 ), "administrator student page is missing required layout or placement behavior")
 
+placement_controller = read(
+    "backend-java/server/src/main/java/com/wust/dormitory/admin/AdminStudentResidencyAdjustmentController.java")
+require(placement_controller, (
+    '"/residency-adjustment-context"',
+    '"/residency-adjustment"',
+), "administrator residency adjustment endpoints are missing")
+placement_service = read(
+    "backend-java/server/src/main/java/com/wust/dormitory/admin/AdminStudentResidencyAdjustmentService.java")
+require(placement_service, (
+    "residencyService.end(",
+    "residencyService.assign(",
+    "active_batch_room_lock",
+    "RESIDENCY_ADJUSTMENT_TARGET_UNAVAILABLE",
+), "administrator residency adjustment transaction is incomplete")
+
 admin_batch = read("frontend/src/views/admin/AdminBatchView.vue")
 require(admin_batch, (
-    "TransientNotice",
-    "room.conflict_batch_name",
-    "room.conflict_selection_mode",
-    "scope-filter-control",
     "全选当前可用",
     "studentMajorFilter",
     "studentGradeFilter",
     "roomBuildingFilter",
     "roomFloorFilter",
-), "batch scope filtering, conflict labels or notices are incomplete")
+), "batch scope filters and select-all controls are incomplete")
 
 batch_scope = read("backend-java/server/src/main/java/com/wust/dormitory/admin/BatchScopeService.java")
 require(batch_scope, (
     "conflict_batch_name",
     "conflict_selection_mode",
+    "disabled_reason",
     "ROOM_ACTIVE_BATCH_CONFLICT",
     "active_batch_room_lock",
 ), "batch scope service must expose and validate active room conflicts")
+
+scope_styles = read("frontend/src/admin-density-refinement.css")
+require(scope_styles, (
+    ".scope-filter-grid .input",
+    "height: 42px",
+    ".scope-option.disabled::after",
+    "活动互斥或房间不可用",
+), "scope filter height and conflict label styles are incomplete")
 
 preference = read("backend-java/server/src/main/java/com/wust/dormitory/student/StudentPreferenceService.java")
 require(preference, (
@@ -73,29 +100,35 @@ require(preference, (
     "value instanceof Boolean",
     "value instanceof Number",
 ), "questionnaire required flags must accept JDBC boolean and numeric values")
+required_flag_test = read(
+    "backend-java/server/src/test/java/com/wust/dormitory/student/StudentPreferenceRequiredFlagTest.java")
+require(required_flag_test, ("Boolean.TRUE", '"true"', "assertFalse"),
+        "questionnaire flag regression test is incomplete")
 
-student_openapi = read("backend-java/model/src/main/resources/student/openapi-student.yaml")
-require(student_openapi, (
-    "required: [studentNumber, studentName]",
-    "/api/v1/student/teams/{teamId}/invitations/{studentId}",
-    "operationId: cancelTeamInvitation",
-), "team invite identity and cancellation OpenAPI are incomplete")
-
-team_service = read("backend-java/server/src/main/java/com/wust/dormitory/student/TeamService.java")
+team_controller = read(
+    "backend-java/server/src/main/java/com/wust/dormitory/student/VerifiedTeamInvitationController.java")
+require(team_controller, (
+    '"/team-invitations/verified"',
+    '"/teams/{teamId}/invitations/{studentId}"',
+    "cancelTeamInvitation",
+), "verified team invite and cancellation endpoints are incomplete")
+team_service = read(
+    "backend-java/server/src/main/java/com/wust/dormitory/student/VerifiedTeamInvitationService.java")
 require(team_service, (
-    "inviteTeammate(String studentNumber, String studentName",
     "INVITEE_IDENTITY_MISMATCH",
-    "return createInternalTeam(batchId, user)",
-    "cancelInvitation(",
+    "teamService.createFormingTeam(user)",
+    "teamService.inviteTeammate(normalizedNumber, user)",
     "TEAM_INVITATION_CANCELLED",
-), "team invitation service is incomplete")
+    "member_status='INVITED'",
+), "verified invitation identity, first-team creation or cancellation is incomplete")
 
 team_view = read("frontend/src/views/student/TeamView.vue")
 require(team_view, (
     "inviteStudentName",
-    "studentName: inviteStudentName.value.trim()",
+    "studentName }",
     "cancelInvitation",
     "TransientNotice",
+    "/team-invitations/verified",
 ), "team page must validate identity, cancel invitations and use popup notices")
 
 spreadsheet = read("backend-java/server/src/main/java/com/wust/dormitory/admin/SpreadsheetSupport.java")
