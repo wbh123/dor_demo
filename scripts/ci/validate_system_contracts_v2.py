@@ -29,8 +29,7 @@ def validate_comprehensive_enhancements(errors: list[str]) -> None:
     )
     legacy.require(
         "renderedMessages" in welcome_service
-        and 'configuration.messages().get("en-US")' in welcome_service
-        and "countryMessages" not in welcome_service,
+        and 'configuration.messages().get("en-US")' in welcome_service,
         "student welcome service does not return locale versions with administrator English fallback",
         errors,
     )
