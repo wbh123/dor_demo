@@ -29,7 +29,7 @@ for token in (
     'FALLBACK_WELCOME_LOCALE = "en-US"',
     "normalizeLocaleMessages",
     "normalizeLocaleTag",
-    "messages().get(FALLBACK_WELCOME_LOCALE)",
+    "DEFAULT_MESSAGES.get(FALLBACK_WELCOME_LOCALE)",
 ):
     require(setting_service, token, f"welcome setting must support administrator-managed locale messages: {token}")
 forbid(setting_service, 'List.of("zh-CN", "en-US")', "welcome languages must not be hard-coded to only Chinese and English")
