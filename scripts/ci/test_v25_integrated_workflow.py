@@ -25,15 +25,17 @@ def forbid(path: str, *tokens: str) -> None:
         assert token not in text, f"{path} contains forbidden token: {token}"
 
 
-# Direct invitation automatically creates the internal forming team.
+# Direct invitation automatically creates the internal forming team; no manual creation UI remains.
 forbid("frontend/src/views/student/TeamView.vue", "createTeam()", "创建队伍", "先创建队伍")
 require("backend-java/server/src/main/java/com/wust/dormitory/student/TeamService.java", "ensureFormingLeaderTeam", "inviteTeammate")
-forbid("backend-java/model/src/main/resources/student/openapi-student.yaml", "operationId: createFormingTeam")
+require("frontend/src/views/student/TeamView.vue", "首次邀请已自动建立队伍", "/api/v1/student/team-invitations")
 
 # Students without a batch can fill reusable preferences when the administrator enables it.
 require("backend-java/server/src/main/java/com/wust/dormitory/selection/SelectionPolicyService.java", "ALLOW_DIRECT_PREFERENCE_WITHOUT_BATCH")
 require("backend-java/server/src/main/java/com/wust/dormitory/student/StudentPreferenceService.java", "DIRECT_PREFERENCE_WITHOUT_BATCH_DISABLED")
 require("frontend/src/views/student/QuestionnaireView.vue", "directPreferenceWithoutBatchAllowed")
+require("frontend/src/views/admin/AdminPreferencePolicyView.vue", "开放无批次直接设置个人偏好")
+require("frontend/src/router/index.ts", "admin-preference-policy")
 
 # System administrator clears only the configured Redis database.
 require("backend-java/model/src/main/resources/platform/openapi-platform-redis.yaml", "/api/v1/platform/redis/clear", "operationId: clearPlatformRedis")
@@ -62,7 +64,7 @@ require("frontend/src/views/student/StudentHomeView.vue", "phone-modal-card", "c
 # Single beds are supported throughout layout and selection.
 for path in (
     "backend-java/model/src/main/resources/admin/openapi-room-management.yaml",
-    "backend-java/server/src/main/java/com/wust/dormitory/admin/RoomLayoutService.java",
+    "backend-java/server/src/main/java/com/wust/dormitory/admin/SingleBedRoomLayoutService.java",
     "frontend/src/components/admin/RoomLayoutEditor.vue",
 ):
     require(path, "SINGLE_BED")
