@@ -6,6 +6,7 @@ import com.wust.dormitory.security.CurrentUser;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 
 import java.util.List;
@@ -13,6 +14,7 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -68,7 +70,11 @@ class BatchScopeServiceTest {
                 "batch_status", "DRAFT",
                 "batch_name", "2026级选寝")));
         when(jdbc.queryForObject(anyString(), anyMap(), eq(Integer.class)))
-                .thenReturn(2)
+                .thenReturn(2);
+        when(jdbc.queryForObject(
+                anyString(),
+                any(MapSqlParameterSource.class),
+                eq(Integer.class)))
                 .thenReturn(1);
 
         Map<String, Object> result = service.update(
