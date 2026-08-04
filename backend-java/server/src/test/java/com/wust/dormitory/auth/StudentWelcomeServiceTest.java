@@ -31,7 +31,7 @@ class StudentWelcomeServiceTest {
                 .isEqualTo("欢迎张同学，你是2026计算机科学与技术的硕士生。");
         assertThat(result.getMessages())
                 .containsEntry("en-US", "Welcome 张同学 (202600000001).")
-                .containsEntry("ja-JP", "張同学さん、ようこそ。")
+                .containsEntry("ja-JP", "张同学さん、ようこそ。")
                 .doesNotContainKey("countryMessages");
     }
 
@@ -46,7 +46,7 @@ class StudentWelcomeServiceTest {
         assertThat(result.getMessage())
                 .isEqualTo("Welcome 张同学 (202600000001).");
         assertThat(result.getMessages().get("ja-JP"))
-                .isEqualTo("張同学さん、ようこそ。");
+                .isEqualTo("张同学さん、ようこそ。");
     }
 
     private TestFixture fixture(String nationalityCode) {
