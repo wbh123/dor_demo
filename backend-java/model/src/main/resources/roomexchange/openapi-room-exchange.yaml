@@ -1,0 +1,186 @@
+openapi: 3.0.3
+info:
+  title: 双人寝室与床位交换接口
+  version: 1.0.0
+paths:
+  /api/v1/student/room-exchanges/candidates:
+    get:
+      tags: [RoomExchange]
+      operationId: listRoomExchangeCandidates
+      summary: 查询可发起交换的在住学生
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { $ref: '#/components/responses/ListSuccess' }
+        '409': { $ref: '#/components/responses/ErrorResponse' }
+  /api/v1/student/room-exchanges:
+    get:
+      tags: [RoomExchange]
+      operationId: listMyRoomExchanges
+      summary: 查询本人发起或收到的交换记录
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { $ref: '#/components/responses/ListSuccess' }
+    post:
+      tags: [RoomExchange]
+      operationId: submitRoomExchange
+      summary: 向另一名在住学生发起寝室床位交换
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RoomExchangeSubmitRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/ObjectSuccess' }
+        '400': { $ref: '#/components/responses/ErrorResponse' }
+        '409': { $ref: '#/components/responses/ErrorResponse' }
+  /api/v1/student/room-exchanges/{exchangeId}/respond:
+    post:
+      tags: [RoomExchange]
+      operationId: respondRoomExchange
+      summary: 被邀请学生接受或拒绝交换
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/ExchangeId' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RoomExchangeRespondRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/ObjectSuccess' }
+        '404': { $ref: '#/components/responses/ErrorResponse' }
+        '409': { $ref: '#/components/responses/ErrorResponse' }
+  /api/v1/student/room-exchanges/{exchangeId}/cancel:
+    post:
+      tags: [RoomExchange]
+      operationId: cancelRoomExchange
+      summary: 发起人取消尚未执行的交换
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/ExchangeId' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RoomExchangeReviewRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/ObjectSuccess' }
+        '404': { $ref: '#/components/responses/ErrorResponse' }
+        '409': { $ref: '#/components/responses/ErrorResponse' }
+  /api/v1/admin/room-exchanges/settings:
+    get:
+      tags: [RoomExchange]
+      operationId: getRoomExchangeSettings
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { $ref: '#/components/responses/ObjectSuccess' }
+    put:
+      tags: [RoomExchange]
+      operationId: updateRoomExchangeSettings
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RoomExchangeSettingsRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/ObjectSuccess' }
+        '400': { $ref: '#/components/responses/ErrorResponse' }
+  /api/v1/admin/room-exchanges:
+    get:
+      tags: [RoomExchange]
+      operationId: listRoomExchanges
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string, default: ALL }
+        - name: keyword
+          in: query
+          schema: { type: string, maxLength: 128 }
+      responses:
+        '200': { $ref: '#/components/responses/ListSuccess' }
+  /api/v1/admin/room-exchanges/{exchangeId}/approve:
+    post:
+      tags: [RoomExchange]
+      operationId: approveRoomExchange
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/ExchangeId' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RoomExchangeReviewRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/ObjectSuccess' }
+        '409': { $ref: '#/components/responses/ErrorResponse' }
+  /api/v1/admin/room-exchanges/{exchangeId}/reject:
+    post:
+      tags: [RoomExchange]
+      operationId: rejectRoomExchange
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/ExchangeId' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RoomExchangeReviewRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/ObjectSuccess' }
+        '409': { $ref: '#/components/responses/ErrorResponse' }
+components:
+  parameters:
+    ExchangeId:
+      name: exchangeId
+      in: path
+      required: true
+      schema: { type: integer, format: int64, minimum: 1 }
+  responses:
+    ObjectSuccess:
+      description: 操作成功
+      content:
+        application/json:
+          schema: { $ref: '../common-response/openapi-common-response.yaml#/components/schemas/ObjectSuccessResponse' }
+    ListSuccess:
+      description: 查询成功
+      content:
+        application/json:
+          schema: { $ref: '../common-response/openapi-common-response.yaml#/components/schemas/ListSuccessResponse' }
+    ErrorResponse:
+      description: 业务错误
+      content:
+        application/json:
+          schema: { $ref: '../common-response/openapi-common-response.yaml#/components/schemas/ErrorResponse' }
+  schemas:
+    RoomExchangeSubmitRequest:
+      type: object
+      required: [targetStudentId, reason]
+      properties:
+        targetStudentId: { type: integer, format: int64, minimum: 1 }
+        reason: { type: string, minLength: 1, maxLength: 500 }
+    RoomExchangeRespondRequest:
+      type: object
+      required: [accepted, reason]
+      properties:
+        accepted: { type: boolean }
+        reason: { type: string, minLength: 1, maxLength: 500 }
+    RoomExchangeReviewRequest:
+      type: object
+      required: [reason]
+      properties:
+        reason: { type: string, minLength: 1, maxLength: 500 }
+    RoomExchangeSettingsRequest:
+      type: object
+      required: [mode, reason]
+      properties:
+        mode:
+          type: string
+          enum: [DISABLED, MUTUAL_CONFIRMATION, APPROVAL_REQUIRED]
+        reason: { type: string, minLength: 1, maxLength: 500 }
+    RoomExchangeStatus:
+      type: string
+      enum: [WAITING_TARGET, PENDING_ADMIN, APPROVED, REJECTED, EXECUTED, CANCELLED, FAILED]
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: Token
