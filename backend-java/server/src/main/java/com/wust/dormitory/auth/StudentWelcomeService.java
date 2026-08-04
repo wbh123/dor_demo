@@ -51,17 +51,20 @@ public class StudentWelcomeService {
         String countryCode = String.valueOf(
                 student.getOrDefault("nationality_code", "")).toUpperCase();
         Map<String, String> variables = variables(student, countryCode);
+        String countryTemplate = configuration.countryMessages().get(countryCode);
 
         Map<String, String> renderedMessages = new LinkedHashMap<>();
         configuration.messages().forEach((locale, message) ->
-                renderedMessages.put(locale, render(message, variables)));
+                renderedMessages.put(
+                        locale,
+                        render(countryTemplate == null || countryTemplate.isBlank() ? message : countryTemplate, variables)));
 
-        // Legacy validation marker: configuration.countryMessages().get(countryCode)
-        // is intentionally no longer executed. Locale choice is controlled by the client,
-        // while any unavailable foreign locale falls back to administrator English.
-        String selectedTemplate = "CN".equals(countryCode)
-                ? configuration.messages().get("zh-CN")
-                : configuration.messages().get("en-US");
+        String selectedTemplate = countryTemplate;
+        if (selectedTemplate == null || selectedTemplate.isBlank()) {
+            selectedTemplate = "CN".equals(countryCode)
+                    ? configuration.messages().get("zh-CN")
+                    : configuration.messages().get("en-US");
+        }
         if (selectedTemplate == null || selectedTemplate.isBlank()) {
             selectedTemplate = configuration.messages().get("en-US");
         }
