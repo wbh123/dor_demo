@@ -20,10 +20,16 @@ def require(source: str, token: str, message: str) -> None:
 openapi = read("backend-java/model/src/main/resources/openapi-interface.yaml")
 for token in (
     "/api/v1/student/waitlist/policy",
+    "/api/v1/student/waitlist/candidates",
     "/api/v1/student/waitlist/entries",
+    "/api/v1/student/waitlist/entries/{entryId}/withdraw",
     "/api/v1/student/waitlist/offers/{offerId}/accept",
+    "/api/v1/student/waitlist/offers/{offerId}/reject",
     "/api/v1/admin/waitlist/settings",
+    "/api/v1/admin/waitlist/entries",
     "/api/v1/admin/waitlist/entries/{entryId}/priority",
+    "/api/v1/admin/waitlist/entries/{entryId}/offer",
+    "/api/v1/admin/waitlist/entries/{entryId}/assign",
     "/api/v1/admin/waitlist/scan",
 ):
     require(openapi, token, f"missing waitlist OpenAPI path: {token}")
