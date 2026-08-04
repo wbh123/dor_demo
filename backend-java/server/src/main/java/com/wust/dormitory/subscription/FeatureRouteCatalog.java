@@ -9,6 +9,11 @@ import java.util.Optional;
 @Component
 public class FeatureRouteCatalog {
     private final List<RouteRule> rules = List.of(
+            rule("/api/v1/admin/room-exchanges/", "/approve", FeatureCodes.P3_ROOM_EXCHANGE_EXECUTE, AccessMode.START_NEW),
+            rule("/api/v1/admin/room-exchanges/", "/reject", FeatureCodes.P3_ROOM_EXCHANGE_REVIEW, AccessMode.START_NEW),
+            rule("/api/v1/admin/room-exchanges/settings", null, FeatureCodes.P3_ROOM_EXCHANGE_REVIEW, AccessMode.START_NEW),
+            rule("/api/v1/admin/room-exchanges", null, FeatureCodes.P3_ROOM_EXCHANGE_HISTORY, AccessMode.READ_EXISTING),
+            rule("/api/v1/student/room-exchanges", null, FeatureCodes.P3_ROOM_EXCHANGE_REQUEST, AccessMode.START_NEW),
             rule("/api/v1/admin/room-change/requests/", "/approve", FeatureCodes.P3_ROOM_CHANGE_APPROVE, AccessMode.START_NEW),
             rule("/api/v1/admin/room-change/requests/", "/reject", FeatureCodes.P3_ROOM_CHANGE_REJECT, AccessMode.START_NEW),
             rule("/api/v1/admin/room-change/settings", null, FeatureCodes.P3_ROOM_CHANGE_REVIEW, AccessMode.START_NEW),

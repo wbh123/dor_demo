@@ -55,4 +55,8 @@ public final class FeatureCodes {
     public static final String P3_ROOM_CHANGE_REJECT="P3_ROOM_CHANGE_REJECT";
     public static final String P3_ROOM_CHANGE_EXECUTE="P3_ROOM_CHANGE_EXECUTE";
     public static final String P3_ROOM_CHANGE_HISTORY="P3_ROOM_CHANGE_HISTORY";
+    public static final String P3_ROOM_EXCHANGE_REQUEST="P3_ROOM_EXCHANGE_REQUEST";
+    public static final String P3_ROOM_EXCHANGE_REVIEW="P3_ROOM_EXCHANGE_REVIEW";
+    public static final String P3_ROOM_EXCHANGE_EXECUTE="P3_ROOM_EXCHANGE_EXECUTE";
+    public static final String P3_ROOM_EXCHANGE_HISTORY="P3_ROOM_EXCHANGE_HISTORY";
 }
