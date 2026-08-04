@@ -5,14 +5,41 @@ import com.wust.dormitory.model.dto.ObjectSuccessResponse;
 import com.wust.dormitory.security.SecurityUsers;
 import com.wust.dormitory.selection.SelectionPolicyService;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/v1/admin/settings/selection-policy")
 public class SelectionPolicyController {
     private final SelectionPolicyService service;
-    public SelectionPolicyController(SelectionPolicyService service) { this.service=service; }
-    @GetMapping public ResponseEntity<ObjectSuccessResponse> get() { SecurityUsers.requireAdmin(); return ResponseEntity.ok(ResponseFactory.object(service.policy())); }
-    @PutMapping public ResponseEntity<ObjectSuccessResponse> update(@RequestBody UpdateRequest request) { return ResponseEntity.ok(ResponseFactory.object(service.update(request.allowWithoutQuestionnaire(),request.allowStudentReselect(),request.reason(),SecurityUsers.requireAdmin()))); }
-    public record UpdateRequest(boolean allowWithoutQuestionnaire, boolean allowStudentReselect, String reason) { }
+
+    public SelectionPolicyController(SelectionPolicyService service) {
+        this.service = service;
+    }
+
+    @GetMapping
+    public ResponseEntity<ObjectSuccessResponse> get() {
+        SecurityUsers.requireAdmin();
+        return ResponseEntity.ok(ResponseFactory.object(service.policy()));
+    }
+
+    @PutMapping
+    public ResponseEntity<ObjectSuccessResponse> update(@RequestBody UpdateRequest request) {
+        return ResponseEntity.ok(ResponseFactory.object(service.update(
+                request.allowWithoutQuestionnaire(),
+                request.allowStudentReselect(),
+                request.directPreferenceWithoutBatchAllowed(),
+                request.reason(),
+                SecurityUsers.requireAdmin())));
+    }
+
+    public record UpdateRequest(
+            boolean allowWithoutQuestionnaire,
+            boolean allowStudentReselect,
+            boolean directPreferenceWithoutBatchAllowed,
+            String reason) {
+    }
 }
