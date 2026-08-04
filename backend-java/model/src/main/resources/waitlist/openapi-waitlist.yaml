@@ -1,0 +1,231 @@
+openapi: 3.0.3
+info:
+  title: Waitlist core API
+  version: 1.0.0
+paths:
+  /api/v1/student/waitlist/policy:
+    get:
+      tags: [Waitlist]
+      operationId: getStudentWaitlistPolicy
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { $ref: '#/components/responses/ObjectSuccess' }
+  /api/v1/student/waitlist/candidates:
+    get:
+      tags: [Waitlist]
+      operationId: listStudentWaitlistCandidates
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { $ref: '#/components/responses/ListSuccess' }
+        '409': { $ref: '#/components/responses/ErrorResponse' }
+  /api/v1/student/waitlist/entries:
+    get:
+      tags: [Waitlist]
+      operationId: listMyWaitlistEntries
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { $ref: '#/components/responses/ListSuccess' }
+    post:
+      tags: [Waitlist]
+      operationId: joinWaitlist
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/WaitlistJoinRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/ObjectSuccess' }
+        '409': { $ref: '#/components/responses/ErrorResponse' }
+  /api/v1/student/waitlist/entries/{entryId}/withdraw:
+    post:
+      tags: [Waitlist]
+      operationId: withdrawWaitlistEntry
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/EntryId' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/WaitlistActionRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/ObjectSuccess' }
+        '409': { $ref: '#/components/responses/ErrorResponse' }
+  /api/v1/student/waitlist/offers/{offerId}/accept:
+    post:
+      tags: [Waitlist]
+      operationId: acceptWaitlistOffer
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/OfferId' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/WaitlistActionRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/ObjectSuccess' }
+        '409': { $ref: '#/components/responses/ErrorResponse' }
+  /api/v1/student/waitlist/offers/{offerId}/reject:
+    post:
+      tags: [Waitlist]
+      operationId: rejectWaitlistOffer
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/OfferId' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/WaitlistActionRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/ObjectSuccess' }
+        '409': { $ref: '#/components/responses/ErrorResponse' }
+  /api/v1/admin/waitlist/settings:
+    get:
+      tags: [Waitlist]
+      operationId: getWaitlistSettings
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { $ref: '#/components/responses/ObjectSuccess' }
+    put:
+      tags: [Waitlist]
+      operationId: updateWaitlistSettings
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/WaitlistPolicyRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/ObjectSuccess' }
+        '400': { $ref: '#/components/responses/ErrorResponse' }
+  /api/v1/admin/waitlist/entries:
+    get:
+      tags: [Waitlist]
+      operationId: listAdminWaitlistEntries
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string, default: ALL }
+        - name: keyword
+          in: query
+          schema: { type: string, maxLength: 128 }
+      responses:
+        '200': { $ref: '#/components/responses/ListSuccess' }
+  /api/v1/admin/waitlist/entries/{entryId}/priority:
+    post:
+      tags: [Waitlist]
+      operationId: updateWaitlistPriority
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/EntryId' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/WaitlistPriorityRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/ObjectSuccess' }
+        '409': { $ref: '#/components/responses/ErrorResponse' }
+  /api/v1/admin/waitlist/entries/{entryId}/offer:
+    post:
+      tags: [Waitlist]
+      operationId: createWaitlistOffer
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/EntryId' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/WaitlistActionRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/ObjectSuccess' }
+        '409': { $ref: '#/components/responses/ErrorResponse' }
+  /api/v1/admin/waitlist/entries/{entryId}/assign:
+    post:
+      tags: [Waitlist]
+      operationId: directlyAssignWaitlistEntry
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/EntryId' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/WaitlistActionRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/ObjectSuccess' }
+        '409': { $ref: '#/components/responses/ErrorResponse' }
+  /api/v1/admin/waitlist/scan:
+    post:
+      tags: [Waitlist]
+      operationId: scanWaitlist
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/WaitlistActionRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/ObjectSuccess' }
+components:
+  parameters:
+    EntryId:
+      name: entryId
+      in: path
+      required: true
+      schema: { type: integer, format: int64, minimum: 1 }
+    OfferId:
+      name: offerId
+      in: path
+      required: true
+      schema: { type: integer, format: int64, minimum: 1 }
+  schemas:
+    WaitlistJoinRequest:
+      type: object
+      required: [targetRoomId, reason]
+      properties:
+        targetRoomId: { type: integer, format: int64, minimum: 1 }
+        targetBedId: { type: integer, format: int64, minimum: 1, nullable: true }
+        reason: { type: string, minLength: 1, maxLength: 500 }
+    WaitlistPolicyRequest:
+      type: object
+      required: [enabled, offerTtlMinutes, priorityMode, scanBatchSize, reason]
+      properties:
+        enabled: { type: boolean }
+        offerTtlMinutes: { type: integer, minimum: 5, maximum: 1440 }
+        priorityMode:
+          type: string
+          enum: [PRIORITY_THEN_FIFO, FIFO]
+        scanBatchSize: { type: integer, minimum: 1, maximum: 500 }
+        reason: { type: string, minLength: 1, maxLength: 500 }
+    WaitlistPriorityRequest:
+      type: object
+      required: [priorityScore, reason]
+      properties:
+        priorityScore: { type: integer, minimum: -100000, maximum: 100000 }
+        reason: { type: string, minLength: 1, maxLength: 500 }
+    WaitlistActionRequest:
+      type: object
+      required: [reason]
+      properties:
+        reason: { type: string, minLength: 1, maxLength: 500 }
+  responses:
+    ObjectSuccess:
+      description: success
+      content:
+        application/json:
+          schema: { $ref: '../common-response/openapi-common-response.yaml#/components/schemas/ObjectSuccessResponse' }
+    ListSuccess:
+      description: success
+      content:
+        application/json:
+          schema: { $ref: '../common-response/openapi-common-response.yaml#/components/schemas/ListSuccessResponse' }
+    ErrorResponse:
+      description: business error
+      content:
+        application/json:
+          schema: { $ref: '../common-response/openapi-common-response.yaml#/components/schemas/ErrorResponse' }
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: Token
