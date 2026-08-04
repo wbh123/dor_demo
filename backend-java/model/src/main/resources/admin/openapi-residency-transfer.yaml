@@ -1,9 +1,19 @@
 openapi: 3.0.3
 info:
   title: Wust Dormitory Select 在住管理接口
-  version: 1.0.0
+  version: 1.2.0
 paths:
   /api/v1/admin/students/{studentId}/direct-assignment:
+    get:
+      tags: [AdminResidencyAdjustment]
+      operationId: getStudentResidencyAdjustmentContext
+      summary: 查询学生当前住宿和可调整床位
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/StudentIdPath'
+      responses:
+        '200': { $ref: '#/components/responses/ObjectSuccess' }
+        '404': { $ref: '#/components/responses/ErrorResponse' }
     post:
       tags: [Admin]
       operationId: directlyAssignStudent
@@ -73,6 +83,21 @@ paths:
           schema: { type: string, enum: [ALL, CONFIRMED, UNCONFIRMED] }
       responses:
         '200': { $ref: '#/components/responses/ObjectSuccess' }
+    post:
+      tags: [AdminResidencyAdjustment]
+      operationId: adjustStudentResidency
+      summary: 调整学生当前寝室和床位
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AdminResidencyAdjustmentRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/ObjectSuccess' }
+        '400': { $ref: '#/components/responses/ErrorResponse' }
+        '404': { $ref: '#/components/responses/ErrorResponse' }
+        '409': { $ref: '#/components/responses/ErrorResponse' }
 
   /api/v1/admin/residencies/{residencyId}/bed:
     put:
@@ -149,6 +174,14 @@ components:
         roomId: { type: integer, format: int64, minimum: 1 }
         bedId: { type: integer, format: int64, minimum: 1, nullable: true }
         reason: { type: string, minLength: 1, maxLength: 500 }
+
+    AdminResidencyAdjustmentRequest:
+      type: object
+      required: [studentId, bedId, reason]
+      properties:
+        studentId: { type: integer, format: int64, minimum: 1 }
+        bedId: { type: integer, format: int64, minimum: 1 }
+        reason: { type: string, minLength: 2, maxLength: 500 }
 
     BatchEnrollmentRequest:
       type: object
