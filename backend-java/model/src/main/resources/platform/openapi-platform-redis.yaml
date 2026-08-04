@@ -1,0 +1,55 @@
+openapi: 3.0.3
+info:
+  title: Platform Redis administration API
+  version: 1.0.0
+paths:
+  /api/v1/platform/redis/clear:
+    post:
+      tags: [PlatformRedis]
+      operationId: clearPlatformRedis
+      summary: 清空当前应用配置的Redis数据库
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PlatformRedisClearRequest'
+      responses:
+        '200':
+          description: 清理成功
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '400':
+          description: 确认文本或原因无效
+          content:
+            application/json:
+              schema:
+                $ref: '../common-response/openapi-common-response.yaml#/components/schemas/ErrorResponse'
+        '503':
+          description: Redis不可用
+          content:
+            application/json:
+              schema:
+                $ref: '../common-response/openapi-common-response.yaml#/components/schemas/ErrorResponse'
+components:
+  schemas:
+    PlatformRedisClearRequest:
+      type: object
+      required: [confirmation, reason]
+      properties:
+        confirmation:
+          type: string
+          enum: [CLEAR_REDIS]
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 500
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: Token
