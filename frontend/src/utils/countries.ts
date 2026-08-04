@@ -12,16 +12,27 @@ const COUNTRY_CODES = [
   'ZA','EG','MA','DZ','TN','LY','SD','SS','ET','ER','DJ','SO','KE','UG','TZ','RW','BI','CD','CG','GA','CM','NG','GH','CI','SN','ML','NE','TD','BF','BJ','TG','GM','GN','GW','SL','LR','MR','CV','GQ','ST','AO','ZM','ZW','BW','NA','MZ','MG','MU','SC','KM','LS','SZ','MW'
 ] as const
 
+const DOMESTIC_REGION_NAMES: Record<string, string> = {
+  CN: '中国大陆',
+  HK: '中国香港',
+  MO: '中国澳门',
+  TW: '中国台湾',
+}
+
 const DISPLAY_NAMES = typeof Intl !== 'undefined' && 'DisplayNames' in Intl
   ? new Intl.DisplayNames(['zh-CN'], { type: 'region' })
   : null
 
 export const countryOptions: CountryOption[] = COUNTRY_CODES
-  .map((code) => ({ code, name: DISPLAY_NAMES?.of(code) ?? code }))
+  .map((code) => ({ code, name: DOMESTIC_REGION_NAMES[code] ?? DISPLAY_NAMES?.of(code) ?? code }))
   .sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'))
+
+export const domesticRegionOptions = ['CN', 'HK', 'MO', 'TW']
+  .map((code) => countryOptions.find((country) => country.code === code))
+  .filter((country): country is CountryOption => Boolean(country))
 
 export function countryLabel(code: unknown): string {
   const normalized = String(code ?? '').trim().toUpperCase()
   if (!normalized) return '未填写'
-  return DISPLAY_NAMES?.of(normalized) ?? normalized
+  return DOMESTIC_REGION_NAMES[normalized] ?? DISPLAY_NAMES?.of(normalized) ?? normalized
 }
