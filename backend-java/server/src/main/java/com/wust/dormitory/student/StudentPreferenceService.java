@@ -7,6 +7,8 @@ import com.wust.dormitory.audit.AuditService;
 import com.wust.dormitory.common.error.BusinessException;
 import com.wust.dormitory.matching.MatchingService;
 import com.wust.dormitory.security.CurrentUser;
+import com.wust.dormitory.selection.SelectionPolicyService;
+import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -35,18 +37,23 @@ public class StudentPreferenceService {
     }
 
     public Map<String, Object> questionnaire(CurrentUser user) {
+        PreferenceAccess access = requireAccess(user.studentId());
         long versionId = versionId();
         List<Map<String, Object>> questions = questions(versionId);
         Map<String, Object> answers = storedAnswers(user.studentId());
-        return Map.of(
-                "questionnaireCode", QUESTIONNAIRE_CODE,
-                "questions", questions,
-                "answers", answers,
-                "completed", !answers.isEmpty());
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("questionnaireCode", QUESTIONNAIRE_CODE);
+        result.put("questions", questions);
+        result.put("answers", answers);
+        result.put("completed", !answers.isEmpty());
+        result.put("includedInSelectionBatch", access.includedInBatch());
+        result.put("directPreferenceWithoutBatchAllowed", access.directAllowed());
+        return result;
     }
 
     @Transactional
     public Map<String, Object> save(Map<String, Object> answers, CurrentUser user) {
+        requireAccess(user.studentId());
         long versionId = versionId();
         List<Map<String, Object>> questions = questionDefinitions(versionId);
         Map<String, Object> normalizedAnswers = new LinkedHashMap<>();
@@ -70,31 +77,45 @@ public class StudentPreferenceService {
                 ON DUPLICATE KEY UPDATE questionnaire_version_id=VALUES(questionnaire_version_id),
                     answers_json=VALUES(answers_json), feature_vector_json=VALUES(feature_vector_json),
                     completed_at=VALUES(completed_at), version=version+1
-                """, new MapSqlParameterSource().addValue("studentId", user.studentId()).addValue("versionId", versionId)
-                .addValue("answers", json(normalizedAnswers)).addValue("features", json(normalizedFeatures)));
+                """, new MapSqlParameterSource()
+                .addValue("studentId", user.studentId())
+                .addValue("versionId", versionId)
+                .addValue("answers", json(normalizedAnswers))
+                .addValue("features", json(normalizedFeatures)));
         auditService.success(user, "PREFERENCE_PROFILE_UPDATE", "STUDENT", user.studentId(),
                 "更新跨批次个人偏好", null, Map.of("questionCount", normalizedAnswers.size()));
-        return Map.of("completed", true, "questionCount", normalizedAnswers.size(), "featureCount", normalizedFeatures.size());
+        return Map.of("completed", true,
+                "questionCount", normalizedAnswers.size(),
+                "featureCount", normalizedFeatures.size());
     }
 
     public boolean completed(long studentId) {
-        Integer count = jdbc.queryForObject("SELECT COUNT(*) FROM student_preference_profile WHERE student_id=:studentId AND completed_at IS NOT NULL",
-                Map.of("studentId", studentId), Integer.class);
+        Integer count = jdbc.queryForObject("""
+                SELECT COUNT(*) FROM student_preference_profile
+                WHERE student_id=:studentId AND completed_at IS NOT NULL
+                """, Map.of("studentId", studentId), Integer.class);
         return count != null && count > 0;
     }
 
     public String featureJson(long studentId) {
-        List<String> rows = jdbc.query("SELECT feature_vector_json FROM student_preference_profile WHERE student_id=:studentId",
-                Map.of("studentId", studentId), (rs, rowNum) -> rs.getString(1));
+        List<String> rows = jdbc.query("""
+                SELECT feature_vector_json FROM student_preference_profile
+                WHERE student_id=:studentId
+                """, Map.of("studentId", studentId), (rs, rowNum) -> rs.getString(1));
         return rows.isEmpty() ? "{}" : rows.getFirst();
     }
 
     public Map<String, Object> storedAnswers(long studentId) {
-        List<String> rows = jdbc.query("SELECT answers_json FROM student_preference_profile WHERE student_id=:studentId",
-                Map.of("studentId", studentId), (rs, rowNum) -> rs.getString(1));
+        List<String> rows = jdbc.query("""
+                SELECT answers_json FROM student_preference_profile
+                WHERE student_id=:studentId
+                """, Map.of("studentId", studentId), (rs, rowNum) -> rs.getString(1));
         if (rows.isEmpty() || rows.getFirst() == null) return Map.of();
-        try { return objectMapper.readValue(rows.getFirst(), new TypeReference<Map<String, Object>>() { }); }
-        catch (JsonProcessingException exception) { return Map.of(); }
+        try {
+            return objectMapper.readValue(rows.getFirst(), new TypeReference<Map<String, Object>>() { });
+        } catch (JsonProcessingException exception) {
+            return Map.of();
+        }
     }
 
     @Transactional
@@ -108,14 +129,56 @@ public class StudentPreferenceService {
                 ON DUPLICATE KEY UPDATE questionnaire_version_id=VALUES(questionnaire_version_id),
                     answers_json=VALUES(answers_json), feature_vector_json=VALUES(feature_vector_json),
                     completed_at=VALUES(completed_at), version=version+1
-                """, new MapSqlParameterSource().addValue("studentId", studentId).addValue("batchId", batchId)
-                .addValue("answers", json(answers)).addValue("features", json(featureVector)));
+                """, new MapSqlParameterSource()
+                .addValue("studentId", studentId)
+                .addValue("batchId", batchId)
+                .addValue("answers", json(answers))
+                .addValue("features", json(featureVector)));
+    }
+
+    private PreferenceAccess requireAccess(long studentId) {
+        boolean included = includedInCurrentBatch(studentId);
+        boolean directAllowed = settingEnabled(
+                SelectionPolicyService.ALLOW_DIRECT_PREFERENCE_WITHOUT_BATCH, true);
+        if (!included && !directAllowed) {
+            throw new BusinessException(
+                    "DIRECT_PREFERENCE_WITHOUT_BATCH_DISABLED",
+                    "你当前没有可参与的选寝批次，管理员尚未开放直接设置个人偏好",
+                    HttpStatus.FORBIDDEN);
+        }
+        return new PreferenceAccess(included, directAllowed);
+    }
+
+    private boolean includedInCurrentBatch(long studentId) {
+        Integer count = jdbc.queryForObject("""
+                SELECT COUNT(*)
+                FROM batch_student_eligibility eligibility
+                JOIN selection_batch batch_record ON batch_record.id=eligibility.batch_id
+                WHERE eligibility.student_id=:studentId
+                  AND eligibility.eligibility_status='ELIGIBLE'
+                  AND batch_record.batch_status IN ('DRAFT','PUBLISHED','OPEN','ALLOCATING')
+                """, Map.of("studentId", studentId), Integer.class);
+        return count != null && count > 0;
+    }
+
+    private boolean settingEnabled(String key, boolean defaultValue) {
+        jdbc.update("""
+                INSERT INTO system_setting(setting_key,setting_value,version)
+                VALUES (:key,:value,0)
+                ON DUPLICATE KEY UPDATE setting_key=VALUES(setting_key)
+                """, Map.of("key", key, "value", Boolean.toString(defaultValue)));
+        List<String> values = jdbc.query("""
+                SELECT setting_value FROM system_setting WHERE setting_key=:key
+                """, Map.of("key", key), (rs, rowNum) -> rs.getString(1));
+        return values.isEmpty() ? defaultValue : Boolean.parseBoolean(values.getFirst());
     }
 
     private long versionId() {
         List<Long> ids = jdbc.query("SELECT id FROM questionnaire_version WHERE version_code=:code LIMIT 1",
                 Map.of("code", QUESTIONNAIRE_CODE), (rs, rowNum) -> rs.getLong(1));
-        if (ids.isEmpty()) throw new BusinessException("BUILTIN_QUESTIONNAIRE_MISSING", "系统内置个人偏好问卷不可用");
+        if (ids.isEmpty()) {
+            throw new BusinessException("BUILTIN_QUESTIONNAIRE_MISSING", "系统内置个人偏好问卷不可用");
+        }
         return ids.getFirst();
     }
 
@@ -148,7 +211,12 @@ public class StudentPreferenceService {
     }
 
     private String json(Object value) {
-        try { return objectMapper.writeValueAsString(value); }
-        catch (JsonProcessingException exception) { throw new BusinessException("JSON_ERROR", "偏好数据序列化失败"); }
+        try {
+            return objectMapper.writeValueAsString(value);
+        } catch (JsonProcessingException exception) {
+            throw new BusinessException("JSON_ERROR", "偏好数据序列化失败");
+        }
     }
+
+    private record PreferenceAccess(boolean includedInBatch, boolean directAllowed) { }
 }
