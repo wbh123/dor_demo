@@ -1,0 +1,31 @@
+name: Agent Contract Generation Fix
+
+on:
+  push:
+    branches:
+      - agent/ui-business-closure-20260804
+    paths:
+      - scripts/ci/apply_contract_generation_fix.py
+      - .github/workflows/agent-contract-generation-fix.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/ui-business-closure-20260804
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python3 scripts/ci/apply_contract_generation_fix.py
+      - run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "fix: 同步改密接口生成与欢迎语门禁"
+          git push origin HEAD:agent/ui-business-closure-20260804
