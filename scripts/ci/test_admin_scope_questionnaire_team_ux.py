@@ -82,9 +82,10 @@ require(batch_scope, (
     "conflict_batch_name",
     "conflict_selection_mode",
     "disabled_reason",
+    "room.put(\"operational_status\", disabledReason)",
     "ROOM_ACTIVE_BATCH_CONFLICT",
     "active_batch_room_lock",
-), "batch scope service must expose and validate active room conflicts")
+), "batch scope service must expose, display and validate active room conflicts")
 
 scope_styles = read("frontend/src/admin-density-refinement.css")
 require(scope_styles, (
@@ -154,5 +155,21 @@ require(mapper, (
     "normalizeDegreeLevel",
     "normalizeCountryCode",
 ), "student import values must be normalized without loosening headers")
+
+room_import = read("backend-java/server/src/main/java/com/wust/dormitory/admin/RoomImportService.java")
+require(room_import, (
+    "normalizeRoomType",
+    "normalizeGender",
+    "normalizeResidentScope",
+    "normalizeOperationalStatus",
+    'integer(value(values, "楼层", "floornumber"), "楼层", "层")',
+), "room import values must accept documented human-friendly forms")
+room_import_test = read(
+    "backend-java/server/src/test/java/com/wust/dormitory/admin/RoomImportValueNormalizationTest.java")
+require(room_import_test, (
+    'normalizeRoomType("四人间")',
+    'normalizeResidentScope("国际生")',
+    'normalizeOperationalStatus("维修")',
+), "room import normalization regression test is incomplete")
 
 print("admin scope, questionnaire and team UX contract: OK")
