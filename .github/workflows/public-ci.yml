@@ -17,6 +17,87 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  requested-fixes:
+    name: Apply and verify requested residency governance fixes
+    if: >-
+      github.actor != 'github-actions[bot]' &&
+      ((github.event_name == 'push' && github.ref_name == 'fix/student-residency-governance-ui') ||
+       (github.event_name == 'pull_request' && github.head_ref == 'fix/student-residency-governance-ui'))
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: fix/student-residency-governance-ui
+          fetch-depth: 0
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Normalize patch script anchors and quoting
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('scripts/ci/apply_requested_residency_governance_fixes.py')
+          text = path.read_text(encoding='utf-8')
+          old_block = '''    """                       bed.position_index, bed.layout_x, bed.layout_z, bed.rotation_degrees,
+                       room.id AS room_id, room.room_number, room.room_type,
+""",
+    """                       bed.position_index, layout.layout_x, layout.layout_z, layout.rotation_degrees,
+                       room.id AS room_id, room.room_number, room.room_type,
+""",'''
+          new_block = '''    "bed.position_index, bed.layout_x, bed.layout_z, bed.rotation_degrees",
+    "bed.position_index, layout.layout_x, layout.layout_z, layout.rotation_degrees",'''
+          assert text.count(old_block) == 1, text.count(old_block)
+          text = text.replace(old_block, new_block, 1)
+          lines = text.splitlines(keepends=True)
+          fixed = 0
+          for index, line in enumerate(lines):
+              stripped = line.strip()
+              if stripped.startswith("'<div v-if=\"canAuditQuery\"") and 'selectedAudit.error_code' in stripped:
+                  assert stripped.endswith("',")
+                  lines[index] = '    """' + stripped[1:-2] + '""",\n'
+                  fixed += 1
+          assert fixed == 1, fixed
+          text = ''.join(lines)
+          text = text.replace(
+              "?? key.replaceAll('_',' ').toLowerCase() || '完成业务操作'",
+              "?? (key ? key.replaceAll('_',' ').toLowerCase() : '完成业务操作')",
+          )
+          path.write_text(text, encoding='utf-8')
+          PY
+          python -m py_compile scripts/ci/apply_requested_residency_governance_fixes.py
+      - name: Apply requested fixes
+        run: python scripts/ci/apply_requested_residency_governance_fixes.py
+      - name: Run focused regression contract
+        run: python scripts/ci/test_requested_residency_governance_regressions.py
+      - name: Build frontend
+        working-directory: frontend
+        run: npm ci && npm run build
+      - name: Run focused backend tests
+        run: mvn -f backend-java/pom.xml -pl server -am test -Dtest=AdminStudentResidencyAdjustmentServiceTest -Dsurefire.failIfNoSpecifiedTests=false
+      - name: Commit verified changes
+        run: |
+          rm scripts/ci/apply_requested_residency_governance_fixes.py
+          rm .github/workflows/temp-requested-regression-red.yml
+          git checkout origin/main -- .github/workflows/public-ci.yml
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A
+          git commit -m "fix: 修复在住床位同步与治理界面"
+          git push origin HEAD:fix/student-residency-governance-ui
+
   policy:
     name: Public content policy
     runs-on: ubuntu-latest
