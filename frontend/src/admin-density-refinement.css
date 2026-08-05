@@ -17,19 +17,44 @@
   margin-bottom: 0;
 }
 
+.page-container {
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 !important;
+}
+
+.content-column,
+.content-column.narrow {
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 !important;
+}
+
 .scope-filter-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   align-content: start;
   align-items: start;
-  grid-auto-rows: 42px;
+  gap: 6px;
+  grid-auto-rows: 36px;
 }
 
 .scope-filter-grid .input,
-.scope-filter-control {
+.scope-filter-control,
+.scope-filter-compact {
   box-sizing: border-box;
-  height: 42px !important;
-  min-height: 42px !important;
-  max-height: 42px !important;
+  width: 100%;
+  min-width: 0;
+  height: 36px !important;
+  min-height: 36px !important;
+  max-height: 36px !important;
+  padding: 6px 9px !important;
   align-self: start;
+  font-size: 12px;
+}
+
+.scope-filter-grid .span-2 {
+  grid-column: span 2;
 }
 
 .scope-option.disabled {
@@ -50,6 +75,81 @@
   color: #a11f35;
   font-size: 12px;
   font-weight: 700;
+}
+
+.app-modal-surface:has(.welcome-modal-content) {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  text-align: center;
+}
+
+.app-modal-surface:has(.welcome-modal-content)::before,
+.app-modal-surface:has(.welcome-modal-content)::after {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  width: 230px;
+  height: 230px;
+  border-radius: 50%;
+  pointer-events: none;
+  filter: blur(2px);
+}
+
+.app-modal-surface:has(.welcome-modal-content)::before {
+  top: -130px;
+  right: -95px;
+  background: rgba(72, 125, 229, .13);
+}
+
+.app-modal-surface:has(.welcome-modal-content)::after {
+  bottom: -145px;
+  left: -110px;
+  background: rgba(118, 87, 232, .11);
+}
+
+.app-modal-surface:has(.welcome-modal-content) .app-modal-body {
+  z-index: 1;
+  order: -1;
+  flex: 0 0 auto;
+  padding: 30px 30px 8px;
+  overflow: visible;
+}
+
+.app-modal-surface:has(.welcome-modal-content) .app-modal-header {
+  z-index: 1;
+  justify-content: center;
+  padding: 4px 30px 22px;
+  border-bottom: 0;
+  background: transparent;
+  text-align: center;
+}
+
+.app-modal-surface:has(.welcome-modal-content) .app-modal-heading {
+  width: 100%;
+}
+
+.app-modal-surface:has(.welcome-modal-content) .app-modal-heading p {
+  max-width: 560px;
+  margin: 10px auto 0;
+  font-size: .96rem;
+}
+
+.app-modal-surface:has(.welcome-modal-content) .app-modal-footer {
+  z-index: 1;
+  justify-content: center;
+  padding: 18px 30px 28px;
+  border-top: 0;
+  background: transparent;
+}
+
+.welcome-modal-content {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  text-align: center;
 }
 
 .transient-operation-notice {
@@ -112,7 +212,22 @@
   pointer-events: none !important;
 }
 
+@media (max-width: 1080px) {
+  .scope-filter-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 620px) {
+  .scope-filter-grid {
+    grid-template-columns: 1fr;
+    grid-auto-rows: auto;
+  }
+
+  .scope-filter-grid .span-2 {
+    grid-column: auto;
+  }
+
   .transient-operation-notice {
     top: 12px !important;
     right: 12px !important;
