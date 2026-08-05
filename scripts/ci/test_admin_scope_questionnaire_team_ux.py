@@ -123,10 +123,20 @@ team_service = read(
     "backend-java/server/src/main/java/com/wust/dormitory/student/VerifiedTeamInvitationService.java")
 require(team_service, (
     "INVITEE_IDENTITY_MISMATCH",
-    "teamService.inviteTeammate(normalizedNumber, user)",
+    "TEAM_INVITATION_PENDING_DUPLICATE",
+    "ON DUPLICATE KEY UPDATE",
+    "member_status IN ('JOINED','LOCKED')",
     "TEAM_INVITATION_CANCELLED",
     "member_status='INVITED'",
-), "verified invitation identity, first-team creation or cancellation is incomplete")
+), "verified invitation identity, multi-invite creation or cancellation is incomplete")
+team_response_service = read(
+    "backend-java/server/src/main/java/com/wust/dormitory/student/TeamInvitationResponseService.java")
+require(team_response_service, (
+    "other_invitation.id<>:invitationId",
+    "other_member.team_id<>:teamId",
+    "supersededInvitationCount",
+    "other_invitation.invitation_status='PENDING'",
+), "competing team invitations must close transactionally after one is accepted")
 
 team_view = read("frontend/src/views/student/TeamView.vue")
 require(team_view, (
