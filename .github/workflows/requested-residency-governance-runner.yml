@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   apply-and-verify:
-    if: github.head_ref == 'fix/student-residency-governance-ui' && github.actor != 'github-actions[bot]'
+    if: github.head_ref == 'fix/student-residency-governance-ui'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -25,7 +25,7 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v6
         with:
           node-version: '22'
           cache: npm
@@ -35,46 +35,19 @@ jobs:
           distribution: temurin
           java-version: '21'
           cache: maven
-      - name: Apply, build and record result
+      - name: Apply and verify requested fixes
         shell: bash
         run: |
           set +e
           {
-            python - <<'PY'
-          from pathlib import Path
-          path = Path('scripts/ci/apply_requested_residency_governance_fixes.py')
-          text = path.read_text(encoding='utf-8')
-          old_block = '''    """                       bed.position_index, bed.layout_x, bed.layout_z, bed.rotation_degrees,
-                       room.id AS room_id, room.room_number, room.room_type,
-""",
-    """                       bed.position_index, layout.layout_x, layout.layout_z, layout.rotation_degrees,
-                       room.id AS room_id, room.room_number, room.room_type,
-""",'''
-          new_block = '''    "bed.position_index, bed.layout_x, bed.layout_z, bed.rotation_degrees",
-    "bed.position_index, layout.layout_x, layout.layout_z, layout.rotation_degrees",'''
-          assert text.count(old_block) == 1, text.count(old_block)
-          text = text.replace(old_block, new_block, 1)
-          lines = text.splitlines(keepends=True)
-          fixed = 0
-          for index, line in enumerate(lines):
-              stripped = line.strip()
-              if stripped.startswith("'<div v-if=\"canAuditQuery\"") and 'selectedAudit.error_code' in stripped:
-                  assert stripped.endswith("',")
-                  lines[index] = '    """' + stripped[1:-2] + '""",\n'
-                  fixed += 1
-          assert fixed == 1, fixed
-          text = ''.join(lines)
-          text = text.replace(
-              "?? key.replaceAll('_',' ').toLowerCase() || '完成业务操作'",
-              "?? (key ? key.replaceAll('_',' ').toLowerCase() : '完成业务操作')",
-          )
-          path.write_text(text, encoding='utf-8')
-          PY
+            python scripts/ci/normalize_requested_residency_governance_fixes.py
             python -m py_compile scripts/ci/apply_requested_residency_governance_fixes.py
             python scripts/ci/apply_requested_residency_governance_fixes.py
             python scripts/ci/test_requested_residency_governance_regressions.py
             (cd frontend && npm ci && npm run build)
-            mvn -f backend-java/pom.xml -pl server -am test -Dtest=AdminStudentResidencyAdjustmentServiceTest -Dsurefire.failIfNoSpecifiedTests=false
+            mvn -f backend-java/pom.xml -pl server -am test \
+              -Dtest=AdminStudentResidencyAdjustmentServiceTest \
+              -Dsurefire.failIfNoSpecifiedTests=false
           } > /tmp/requested-fix-validation.log 2>&1
           status=$?
           set -e
@@ -92,6 +65,7 @@ jobs:
 
           rm -f scripts/ci/last_requested_fix_failure.log
           rm -f scripts/ci/apply_requested_residency_governance_fixes.py
+          rm -f scripts/ci/normalize_requested_residency_governance_fixes.py
           rm -f .github/workflows/temp-requested-regression-red.yml
           git add -A
           git commit -m "fix: 修复在住床位同步与治理界面"
