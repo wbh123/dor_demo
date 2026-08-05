@@ -21,18 +21,19 @@ jobs:
           from pathlib import Path
           service_path = Path('backend-java/server/src/main/java/com/wust/dormitory/admin/RoomManagementService.java')
           text = service_path.read_text(encoding='utf-8')
-          old = '''                    INSERT INTO dormitory_floor (building_id, floor_number, enabled)
-                    VALUES (:buildingId, :floor, 1)
-                    """, Map.of("buildingId", buildingId, "floor", floor));'''
-          new = '''                    INSERT INTO dormitory_floor (building_id, floor_number, floor_name, enabled)
-                    VALUES (:buildingId, :floor, :floorName, 1)
-                    """, Map.of(
-                            "buildingId", buildingId,
-                            "floor", floor,
-                            "floorName", floor + "层"));'''
-          if old not in text:
-              raise SystemExit('expected floor insert block not found')
-          service_path.write_text(text.replace(old, new, 1), encoding='utf-8')
+          replacements = [
+              ('INSERT INTO dormitory_floor (building_id, floor_number, enabled)',
+               'INSERT INTO dormitory_floor (building_id, floor_number, floor_name, enabled)'),
+              ('VALUES (:buildingId, :floor, 1)',
+               'VALUES (:buildingId, :floor, :floorName, 1)'),
+              ('""", Map.of("buildingId", buildingId, "floor", floor));',
+               '""", Map.of(\n                            "buildingId", buildingId,\n                            "floor", floor,\n                            "floorName", floor + "层"));'),
+          ]
+          for old, new in replacements:
+              if old not in text:
+                  raise SystemExit(f'expected floor insert fragment not found: {old}')
+              text = text.replace(old, new, 1)
+          service_path.write_text(text, encoding='utf-8')
 
           runner = Path('scripts/ci/run_contracts.sh')
           runner_text = runner.read_text(encoding='utf-8')
