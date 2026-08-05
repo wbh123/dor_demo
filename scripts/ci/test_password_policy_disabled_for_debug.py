@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -11,6 +12,10 @@ def read(path: str) -> str:
 def password_property_lines(source: str) -> list[str]:
     names = ("password:", "currentPassword:", "newPassword:")
     return [line.strip() for line in source.splitlines() if line.strip().startswith(names)]
+
+
+def password_inputs(source: str) -> list[str]:
+    return re.findall(r'<input\b[^>]*\btype="password"[^>]*>', source, flags=re.IGNORECASE)
 
 
 auth_openapi = read("backend-java/model/src/main/resources/auth/openapi-auth.yaml")
@@ -28,9 +33,12 @@ for line in password_lines:
     assert "maxLength" not in line
     assert "pattern" not in line
 
-for view in (login_view, admin_password_view, platform_password_view):
-    assert 'minlength=' not in view.lower()
-    assert 'maxlength=' not in view.lower()
+inputs = password_inputs(login_view) + password_inputs(admin_password_view) + password_inputs(platform_password_view)
+assert len(inputs) >= 8
+for input_tag in inputs:
+    assert 'minlength=' not in input_tag.lower()
+    assert 'maxlength=' not in input_tag.lower()
+    assert 'pattern=' not in input_tag.lower()
 
 for obsolete in ("至少8位", "至少12位", "4至72位", "12至72位", "包含大写字母", "包含小写字母", "包含数字", "包含特殊字符"):
     assert obsolete not in login_view + admin_password_view + platform_password_view
