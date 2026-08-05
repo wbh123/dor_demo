@@ -1,8 +1,8 @@
 name: Apply UI Patch
 on:
-  push:
-    branches:
-      - fix/dormitory-login-preference-ui-20260805
+  pull_request:
+    branches: [main]
+    types: [synchronize, reopened]
 permissions:
   contents: write
 jobs:
