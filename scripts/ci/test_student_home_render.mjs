@@ -1,11 +1,18 @@
 #!/usr/bin/env node
 import assert from 'node:assert/strict'
-import { fileURLToPath } from 'node:url'
+import { createRequire } from 'node:module'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import path from 'node:path'
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url))
 const root = path.resolve(scriptDir, '../..')
 const frontendRoot = path.join(root, 'frontend')
+const frontendRequire = createRequire(path.join(frontendRoot, 'package.json'))
+
+const importFrontendPackage = async (name) => {
+  const resolved = frontendRequire.resolve(name)
+  return import(pathToFileURL(resolved).href)
+}
 
 const storage = new Map()
 Object.defineProperty(globalThis, 'navigator', {
@@ -35,9 +42,9 @@ globalThis.MutationObserver = class MutationObserver {
   disconnect() {}
 }
 
-const { createServer } = await import('vite')
-const { createSSRApp, h } = await import('vue')
-const { renderToString } = await import('@vue/server-renderer')
+const { createServer } = await importFrontendPackage('vite')
+const { createSSRApp, h } = await importFrontendPackage('vue')
+const { renderToString } = await importFrontendPackage('@vue/server-renderer')
 
 const server = await createServer({
   root: frontendRoot,
