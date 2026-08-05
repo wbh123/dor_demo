@@ -55,6 +55,15 @@ jobs:
           git apply --check /tmp/team-multi-invitation.patch
           git apply /tmp/team-multi-invitation.patch
           git diff --check
+      - name: Export applied source for review
+        uses: actions/upload-artifact@v4
+        with:
+          name: team-multi-invitation-applied-source
+          path: |
+            backend-java/server/src/main/java/com/wust/dormitory/student/TeamService.java
+            backend-java/server/src/test/java/com/wust/dormitory/student/TeamInvitationConcurrencyServiceTest.java
+          if-no-files-found: error
+          retention-days: 1
       - name: Run targeted Java tests
         run: mvn -f backend-java/pom.xml -pl server -am -Dtest=TeamInvitationConcurrencyServiceTest -Dsurefire.failIfNoSpecifiedTests=false test
       - name: Run cross-layer contracts
