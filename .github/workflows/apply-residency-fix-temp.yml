@@ -3,6 +3,10 @@ on:
   push:
     branches:
       - fix/residency-bed-end-20260806
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened]
 permissions:
   contents: write
 concurrency:
@@ -10,7 +14,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   apply-and-verify:
-    if: github.actor != 'github-actions[bot]'
+    if: github.actor != 'github-actions[bot]' && (github.event_name == 'push' || github.head_ref == 'fix/residency-bed-end-20260806')
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
