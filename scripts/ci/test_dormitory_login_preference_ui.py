@@ -57,7 +57,7 @@ assert 'width:52px' in shell
 
 # Login/activation design and focus behavior.
 assert 'hero-stats' not in login
-assert '武汉科技大学马德里学院' in login
+assert 'VITE_LOGIN_HERO_TITLE' in login and 'VITE_LOGIN_HERO_DESCRIPTION' in login
 assert 'loginFormHint' in login and 'activateFormHint' in login
 assert 'AppModal' not in login
 assert 'focusModePrimaryInput' in login

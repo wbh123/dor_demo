@@ -4,9 +4,13 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import type { ActivateRequest, LoginRequest } from '../api/types'
 
-const institutionName = String(import.meta.env.VITE_INSTITUTION_NAME || '武汉科技大学马德里学院')
+const institutionName = String(import.meta.env.VITE_INSTITUTION_NAME || '示例院校')
 const operatorName = String(import.meta.env.VITE_OPERATOR_NAME || '')
 const icpRecord = String(import.meta.env.VITE_ICP_RECORD || '')
+const heroTitle = String(import.meta.env.VITE_LOGIN_HERO_TITLE || `${institutionName}学生社区`)
+const heroDescription = String(import.meta.env.VITE_LOGIN_HERO_DESCRIPTION || '尊重差异、友好相处，共同建设温暖有序的学生社区。')
+const heroBrandSubtitle = String(import.meta.env.VITE_LOGIN_BRAND_SUBTITLE || '学生社区')
+const loginServiceName = String(import.meta.env.VITE_LOGIN_SERVICE_NAME || '学生宿舍服务')
 const showOperatorInfo = String(import.meta.env.VITE_SHOW_OPERATOR_INFO || 'false').toLowerCase() === 'true' && Boolean(operatorName.trim())
 const showIcpRecord = String(import.meta.env.VITE_SHOW_ICP_RECORD || 'false').toLowerCase() === 'true' && Boolean(icpRecord.trim())
 const logoOnly = `${import.meta.env.BASE_URL}assert/logo-only.png`
@@ -59,15 +63,15 @@ async function submitActivate() {
   <div class="login-page">
     <section class="login-hero">
       <div class="hero-copy">
-        <div class="madrid-brand"><img class="login-school-logo" :src="logoOnly" :alt="`${institutionName}校徽`" /><div><strong>武汉科技大学</strong><span>马德里学院</span></div></div>
-        <h1>在多元文化校园中<br />安心学习，友好相处</h1>
-        <p>愿每位同学都能在马德里学院的校园生活中，找到彼此尊重、作息合拍的宿舍伙伴，共同建设温暖有序的学生社区。</p>
+        <div class="madrid-brand"><img class="login-school-logo" :src="logoOnly" :alt="`${institutionName}校徽`" /><div><strong>{{ institutionName }}</strong><span>{{ heroBrandSubtitle }}</span></div></div>
+        <h1 class="login-hero-title">{{ heroTitle }}</h1>
+        <p>{{ heroDescription }}</p>
       </div>
     </section>
 
     <section class="login-panel">
       <div class="login-card auth-card-fixed">
-        <div class="brand login-brand school-login-brand"><img :src="logoOnly" :alt="`${institutionName}校徽`" /><div><strong>武汉科技大学马德里学院</strong><span>学生宿舍服务</span></div></div>
+        <div class="brand login-brand school-login-brand"><img :src="logoOnly" :alt="`${institutionName}校徽`" /><div><strong>{{ institutionName }}</strong><span>{{ loginServiceName }}</span></div></div>
         <div class="segment auth-mode-switch"><button :class="{ active: mode === 'login' }" type="button" @click="setMode('login')">登录</button><button :class="{ active: mode === 'activate' }" type="button" @click="setMode('activate')">学生激活</button></div>
 
         <div class="auth-form-frame">

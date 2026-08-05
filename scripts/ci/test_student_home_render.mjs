@@ -69,7 +69,8 @@ try {
   app.config.warnHandler = (message) => warnings.push(String(message))
 
   const html = await renderToString(app)
-  assert.match(html, /欢迎回来|WELCOME BACK/)
+  assert.match(html, /welcome-card/)
+  assert.match(html, /同学/)
   assert.doesNotMatch(warnings.join('\n'), /subtitle.*function/i)
   assert.doesNotMatch(warnings.join('\n'), /Property .*subtitle.*was accessed during render/i)
   console.log('StudentHomeContent real SSR render passed')
