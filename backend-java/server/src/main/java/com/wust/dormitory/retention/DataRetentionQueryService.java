@@ -80,10 +80,7 @@ public class DataRetentionQueryService {
                 WHERE task_status IN ('SUCCEEDED','FAILED','CANCELLED')
                   AND completed_at<:dataCutoff
                 """, params));
-        counts.put("expiredOperationalAnomalies", scalar("""
-                SELECT COUNT(*) FROM operation_anomaly
-                WHERE resolved_at IS NOT NULL AND resolved_at<:dataCutoff
-                """, params));
+        counts.put("expiredOperationalAnomalies", 0L);
         counts.put("expiredAuditRows", scalar("""
                 SELECT COUNT(*) FROM audit_log
                 WHERE occurred_at<:auditCutoff
@@ -92,7 +89,9 @@ public class DataRetentionQueryService {
                 "cutoffs", Map.of(
                         "dataCutoff", dataCutoff.toString(),
                         "auditCutoff", auditCutoff.toString()),
-                "counts", counts);
+                "counts", counts,
+                "notes", Map.of(
+                        "expiredOperationalAnomalies", "当前异常工作台未提供统一可清理持久化表，因此不纳入到期清理统计"));
     }
 
     public Map<String, Object> simulate() {
@@ -132,15 +131,38 @@ public class DataRetentionQueryService {
 
     private Map<String, Long> protectedCounts() {
         Map<String, Long> counts = new LinkedHashMap<>();
-        counts.put(CURRENT_STUDENT, scalar("SELECT COUNT(*) FROM student WHERE student_status='ACTIVE'", new MapSqlParameterSource()));
-        counts.put(ACTIVE_RESIDENCY, scalar("SELECT COUNT(*) FROM room_assignment WHERE assignment_status='ACTIVE'", new MapSqlParameterSource()));
-        counts.put(ACTIVE_BATCH, scalar("SELECT COUNT(*) FROM selection_batch WHERE batch_status IN ('DRAFT','PUBLISHED','OPEN','PAUSED','CLOSED','ALLOCATING')", new MapSqlParameterSource()));
-        counts.put(PENDING_ROOM_CHANGE, scalar("SELECT COUNT(*) FROM room_change_request WHERE request_status NOT IN ('EXECUTED','REJECTED','CANCELLED')", new MapSqlParameterSource()));
-        counts.put(PENDING_EXCHANGE, scalar("SELECT COUNT(*) FROM room_exchange_request WHERE exchange_status NOT IN ('EXECUTED','REJECTED','CANCELLED')", new MapSqlParameterSource()));
-        counts.put(PENDING_WAITLIST, scalar("SELECT COUNT(*) FROM waitlist_entry WHERE entry_status IN ('WAITING','OFFERED')", new MapSqlParameterSource()));
-        counts.put(ACTIVE_ENTITLEMENT, scalar("SELECT COUNT(*) FROM service_subscription_revision WHERE is_current=1", new MapSqlParameterSource()));
-        counts.put(PENDING_EXPORT, scalar("SELECT COUNT(*) FROM export_task WHERE task_status IN ('QUEUED','RUNNING')", new MapSqlParameterSource()));
-        counts.put(LEGAL_AUDIT_HOLD, scalar("SELECT COUNT(*) FROM audit_retention_hold WHERE active=1", new MapSqlParameterSource()));
+        counts.put(CURRENT_STUDENT, scalar(
+                "SELECT COUNT(*) FROM student WHERE housing_eligibility='ELIGIBLE'",
+                new MapSqlParameterSource()));
+        counts.put(ACTIVE_RESIDENCY, scalar(
+                "SELECT COUNT(*) FROM room_assignment WHERE assignment_status='ACTIVE'",
+                new MapSqlParameterSource()));
+        counts.put(ACTIVE_BATCH, scalar("""
+                SELECT COUNT(*) FROM selection_batch
+                WHERE batch_status IN ('DRAFT','PUBLISHED','OPEN','PAUSED','CLOSED','ALLOCATING')
+                """, new MapSqlParameterSource()));
+        counts.put(PENDING_ROOM_CHANGE, scalar("""
+                SELECT COUNT(*) FROM room_change_request
+                WHERE request_status NOT IN ('EXECUTED','REJECTED','CANCELLED','FAILED')
+                """, new MapSqlParameterSource()));
+        counts.put(PENDING_EXCHANGE, scalar("""
+                SELECT COUNT(*) FROM room_exchange_request
+                WHERE request_status NOT IN ('EXECUTED','REJECTED','CANCELLED','FAILED')
+                """, new MapSqlParameterSource()));
+        counts.put(PENDING_WAITLIST, scalar("""
+                SELECT COUNT(*) FROM waitlist_entry
+                WHERE entry_status IN ('WAITING','OFFERED')
+                """, new MapSqlParameterSource()));
+        counts.put(ACTIVE_ENTITLEMENT, scalar(
+                "SELECT COUNT(*) FROM service_subscription_revision WHERE is_current=1",
+                new MapSqlParameterSource()));
+        counts.put(PENDING_EXPORT, scalar("""
+                SELECT COUNT(*) FROM export_task
+                WHERE task_status IN ('QUEUED','RUNNING')
+                """, new MapSqlParameterSource()));
+        counts.put(LEGAL_AUDIT_HOLD, scalar(
+                "SELECT COUNT(*) FROM audit_retention_hold WHERE active=1",
+                new MapSqlParameterSource()));
         return counts;
     }
 
