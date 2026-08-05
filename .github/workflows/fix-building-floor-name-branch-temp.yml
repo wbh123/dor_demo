@@ -1,8 +1,8 @@
 name: Fix Building Floor Name Branch
 on:
-  push:
-    branches:
-      - fix/building-floor-name-20260805
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
 permissions:
   contents: write
 jobs:
