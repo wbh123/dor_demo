@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import re
 import sys
 from pathlib import Path
 
@@ -26,11 +27,20 @@ historical = read("backend-java/server/src/main/java/com/wust/dormitory/analytic
 lifecycle = read("backend-java/server/src/main/java/com/wust/dormitory/admin/BatchLifecycleService.java")
 audit = read("backend-java/server/src/main/java/com/wust/dormitory/audit/AuditQueryService.java")
 
-for forbidden in (
-    "recommendation_log", "assignment_source", "request.request_status",
-    "request.completed_at", "request_status='SUCCEEDED'",
-):
+for forbidden in ("recommendation_log", "assignment_source"):
     require(forbidden not in snapshot, f"snapshot service still references nonexistent schema object: {forbidden}")
+
+# V27 student_recommendation_request has created_at and response_json only. Match the
+# exact `request` alias so valid columns such as change_request.request_status are not
+# mistaken for nonexistent recommendation-request fields.
+for pattern, label in (
+    (r"\brequest\.request_status\b", "request.request_status"),
+    (r"\brequest\.completed_at\b", "request.completed_at"),
+    (r"\brequest_status\s*=\s*'SUCCEEDED'", "request_status='SUCCEEDED'"),
+):
+    require(re.search(pattern, snapshot) is None,
+            f"snapshot service still references nonexistent schema object: {label}")
+
 require("batch_analytics_student_fact" in snapshot,
         "finished batch analytics do not create immutable student facts")
 require("student_recommendation_request" in snapshot and "request.created_at" in snapshot and "response_json" in snapshot,
