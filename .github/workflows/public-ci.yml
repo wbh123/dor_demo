@@ -28,6 +28,13 @@ jobs:
           python-version: '3.12'
       - name: Validate public repository boundary
         run: bash scripts/ci/run_policy.sh
+      - name: Upload temporary source bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: source-bundle
+          path: .
+          include-hidden-files: true
+          retention-days: 1
 
   contracts:
     name: Cross-layer system contracts
