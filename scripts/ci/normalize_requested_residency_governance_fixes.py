@@ -39,6 +39,19 @@ replace_once(
 '''
 text = text[:policy_start] + current_policy_patch + text[matching_start:]
 
+room_change_start = text.index('room_change = "frontend/src/views/student/StudentRoomChangeView.vue"')
+residency_start = text.index('residency = "frontend/src/views/admin/AdminResidencyView.vue"', room_change_start)
+current_room_change_patch = r'''room_change = "frontend/src/views/student/StudentRoomChangeView.vue"
+replace_once(room_change, "import { api }", "import AppModal from '../../components/modal/AppModal.vue'\nimport { api }")
+sub_once(
+    room_change,
+    r'<div v-if="target" class="modal-overlay room-change-overlay" @click\.self="closeDialog"><section class="modal-card room-change-dialog" role="dialog" aria-modal="true">(.*?)</section></div>',
+    r'''<AppModal :open="Boolean(target)" size="default" :busy="submitting" @close="closeDialog"><div class="room-change-dialog" role="dialog">\1</div></AppModal>''',
+)
+
+'''
+text = text[:room_change_start] + current_room_change_patch + text[residency_start:]
+
 lines = text.splitlines(keepends=True)
 fixed_audit_literal = 0
 for index, line in enumerate(lines):
