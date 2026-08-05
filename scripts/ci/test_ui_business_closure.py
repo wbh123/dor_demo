@@ -9,7 +9,14 @@ errors: list[str] = []
 
 
 def read(path: str) -> str:
-    return (ROOT / path).read_text(encoding="utf-8")
+    target = ROOT / path
+    content = target.read_text(encoding="utf-8")
+    if target.suffix == ".vue":
+        for suffix in (".logic.ts", ".template.html", ".css"):
+            companion = target.with_name(f"{target.stem}{suffix}")
+            if companion.exists():
+                content += "\n" + companion.read_text(encoding="utf-8")
+    return content
 
 
 def require(condition: bool, message: str) -> None:
@@ -82,9 +89,24 @@ for field in ("current_building_name", "current_room_number", "current_bed_code"
 require("TRANSFER_MANUAL" not in student_service, "legacy transfer-student enrollment source remains accepted")
 require("住宿状态" in student_admin and "宿舍与床位" in student_admin, "student table does not show residence and selection locations")
 
-require("scope-floating-actions" in batch, "scope save action is not anchored at the overlay top-right")
-require("publishConfirmation" in batch and "直接发布" in batch, "batch publication does not confirm direct publishing after completed preparation")
-require("allocation-overlay" in batch and "allocation-dialog" in batch, "allocation preview overlay lacks its dedicated visual layer")
+require(
+    "scope-footer-status" in batch
+    and "仅保存范围" in batch
+    and "保存并发布" in batch,
+    "scope save and publish actions are not anchored in the shared modal footer",
+)
+require(
+    "<AppConfirmDialog" in batch
+    and "publishConfirmation" in batch
+    and "confirm-text=\"确认发布\"" in batch,
+    "batch publication does not use the shared confirmation dialog after completed preparation",
+)
+require(
+    "<AppModal :open=\"Boolean(allocationPreview)\"" in batch
+    and "统一分配预演" in batch
+    and "allocation-stats" in batch,
+    "allocation preview does not use the shared modal visual layer",
+)
 
 require("/api/v1/auth/password" in openapi_root, "school administrator password endpoint is missing from the root OpenAPI contract")
 require("admin/profile/password" in router, "school administrator password route is missing")

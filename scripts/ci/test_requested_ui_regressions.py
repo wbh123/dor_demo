@@ -10,7 +10,14 @@ errors: list[str] = []
 
 
 def read(path: str) -> str:
-    return (root / path).read_text(encoding='utf-8')
+    target = root / path
+    content = target.read_text(encoding='utf-8')
+    if target.suffix == '.vue':
+        for suffix in ('.logic.ts', '.template.html', '.css'):
+            companion = target.with_name(f'{target.stem}{suffix}')
+            if companion.exists():
+                content += '\n' + companion.read_text(encoding='utf-8')
+    return content
 
 
 def require(condition: bool, message: str) -> None:
@@ -47,11 +54,21 @@ require("P2_MULTILINGUAL_INTERFACE" in welcome and 'multilingualWelcomeEnabled' 
         'multilingual welcome editing is not protected by a system feature')
 
 batch = read('frontend/src/views/admin/AdminBatchView.vue')
-require('publishPreflightSnapshot' in batch and 'openPublishConfirmationAfterPreflight' in batch
-        and 'await nextTick()' in batch,
-        'batch publishing overlays are not sequenced after preflight closes')
-require('background:transparent' in batch and 'padding:0' in batch,
-        'publish confirmation overlay still adds a background or padding')
+require(
+    'publishPreflightSnapshot' in batch
+    and 'openPublishConfirmationAfterPreflight' in batch
+    and 'WAITING_CONFIRMATION' in batch
+    and '<AppConfirmDialog' in batch,
+    'batch publishing does not enter a nested shared confirmation dialog after preflight',
+)
+require(
+    'description="发布后学生可以按开放时间参与选择' in batch
+    and 'confirm-text="确认发布"' in batch
+    and 'publish-confirmation-facts' in batch,
+    'publish confirmation dialog does not provide the required surface, padding and summary',
+)
+require('background:transparent' not in batch and 'publish-confirmation-overlay' not in batch,
+        'legacy transparent publication overlay remains in the batch page')
 
 home_view = read('frontend/src/views/student/StudentHomeView.vue')
 home_content = read('frontend/src/views/student/StudentHomeContent.vue')

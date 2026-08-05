@@ -46,6 +46,10 @@ public class BatchLifecycleService {
     public void changeStatus(long batchId, String targetStatus, CurrentUser operator) {
         Map<String, Object> current = currentBatch(batchId);
         String currentStatus = String.valueOf(current.get("batch_status"));
+        if (currentStatus.equals(targetStatus)) {
+            return;
+        }
+
         boolean enteringActiveState = !ACTIVE_STATUSES.contains(currentStatus)
                 && ACTIVE_STATUSES.contains(targetStatus);
         boolean leavingActiveState = ACTIVE_STATUSES.contains(currentStatus)
