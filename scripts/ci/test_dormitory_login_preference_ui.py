@@ -53,7 +53,8 @@ positions = [shell.index(item) for item in expected_menu]
 assert positions == sorted(positions)
 assert 'showOperatorInfo' in shell and 'showIcpRecord' in shell
 assert 'v-if="showOperatorInfo"' in shell and 'v-if="showIcpRecord"' in shell
-assert 'width:52px' in shell
+assert 'width:60px' in shell
+assert 'object-fit:contain' in shell
 
 # Login/activation design and focus behavior.
 assert 'hero-stats' not in login

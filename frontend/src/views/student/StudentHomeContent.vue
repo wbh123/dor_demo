@@ -387,8 +387,12 @@ function bedTypeText(value: unknown) { return bedTypeLabel(value) }
       </div>
       <template v-if="assigned">
         <div class="assignment-place">
-          <strong>{{ assignment.building_name }}</strong>
-          <span>{{ assignment.room_number }} 室 · {{ assignment.bed_code }} 床位</span>
+          <span class="assignment-building">{{ assignment.building_name }}</span>
+          <div class="assignment-primary-values">
+            <strong class="assignment-room">{{ assignment.room_number }}<small>室</small></strong>
+            <strong v-if="assignment.bed_code" class="assignment-bed">{{ assignment.bed_code }}<small>床</small></strong>
+            <strong v-else class="assignment-bed-pending">床位待确认</strong>
+          </div>
         </div>
         <p>{{ assignment.floor_number }}层 · {{ bedTypeText(assignment.bed_type) }}</p>
         <RouterLink v-if="currentActivityId" class="button secondary compact-home-card-action" :to="`/student/batches/${currentActivityId}/assignment`">查看完整结果</RouterLink>
@@ -493,5 +497,5 @@ function bedTypeText(value: unknown) { return bedTypeLabel(value) }
 </template>
 
 <style scoped>
-.compact-home-top-card { min-height: 150px; padding-top: 18px; padding-bottom: 18px; }.profile-phone-line{display:inline-flex;align-items:center;gap:7px;flex-wrap:wrap}.profile-primary-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}.profile-primary-actions .button{text-decoration:none}.profile-phone-input{display:grid;grid-template-columns:94px minmax(0,1fr);gap:8px}.personal-preference-card { margin-top: -2px; }
+.compact-home-top-card { min-height: 150px; padding-top: 18px; padding-bottom: 18px; }.profile-phone-line{display:inline-flex;align-items:center;gap:7px;flex-wrap:wrap}.profile-primary-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}.profile-primary-actions .button{text-decoration:none}.profile-phone-input{display:grid;grid-template-columns:94px minmax(0,1fr);gap:8px}.personal-preference-card { margin-top: -2px; }.assignment-place{display:grid;gap:7px;margin-top:4px}.assignment-building{color:var(--muted);font-size:.94rem;font-weight:700;letter-spacing:.02em}.assignment-primary-values{display:flex;align-items:baseline;gap:22px;flex-wrap:wrap}.assignment-room,.assignment-bed{color:var(--text);font-size:clamp(2.1rem,5vw,3.35rem);line-height:1;font-weight:850;letter-spacing:-.04em}.assignment-bed{color:var(--primary)}.assignment-room small,.assignment-bed small{margin-left:5px;font-size:.92rem;font-weight:750;letter-spacing:0}.assignment-bed-pending{color:var(--muted);font-size:1.12rem}
 </style>

@@ -18,7 +18,8 @@ const operatorName = String(import.meta.env.VITE_OPERATOR_NAME || '')
 const icpRecord = String(import.meta.env.VITE_ICP_RECORD || '')
 const showOperatorInfo = String(import.meta.env.VITE_SHOW_OPERATOR_INFO || 'false').toLowerCase() === 'true' && Boolean(operatorName.trim())
 const showIcpRecord = String(import.meta.env.VITE_SHOW_ICP_RECORD || 'false').toLowerCase() === 'true' && Boolean(icpRecord.trim())
-const logoOnly = '/assert/logo-only.png'
+const publicBase = String(import.meta.env.BASE_URL || '/').replace(/\/?$/, '/')
+const logoOnly = `${publicBase}assert/logo-only.png`
 const { locale, localeOptions, t, subtitle, setLocale, applyNationalityLocale, welcomeMessage, translateError } = useI18n()
 const { hasFeature } = useFeatureAccess()
 
@@ -132,7 +133,7 @@ async function logout() {
       </div>
     </aside>
     <main class="main-content fixed-sidebar-content" :class="{ 'student-main-content': auth.isStudent }">
-      <section class="page-container" :class="{ 'student-page-container': auth.isStudent, 'admin-page-container': auth.isAdmin }"><RouterView /></section>
+      <section class="page-container" :class="{ 'student-page-container': auth.isStudent, 'admin-page-container': auth.isAdmin }"><RouterView v-if="!auth.welcomeRequired" /></section>
       <footer v-if="showOperatorInfo || showIcpRecord" class="page-compliance"><span v-if="showOperatorInfo">{{ operatorName }}</span><span v-if="showIcpRecord">{{ icpRecord }}</span></footer>
     </main>
 
@@ -144,9 +145,10 @@ async function logout() {
       size="default"
     >
       <template #header>
-        <div class="welcome-modal-heading-row">
-          <img class="welcome-school-logo logo-safe-layer" :src="logoOnly" alt="" aria-hidden="true" />
-          <div><span class="eyebrow">{{ subtitle('欢迎来到校园', 'WELCOME TO CAMPUS') }}</span><h2>{{ t('welcome.title') }}</h2></div>
+        <div class="welcome-modal-heading">
+          <img class="welcome-school-logo logo-safe-layer" :src="logoOnly" :alt="`${institutionName}校徽`" />
+          <span class="eyebrow">{{ subtitle('欢迎来到校园', 'WELCOME TO CAMPUS') }}</span>
+          <h2>{{ t('welcome.title') }}</h2>
         </div>
       </template>
       <div class="welcome-modal-content">
@@ -161,6 +163,6 @@ async function logout() {
 </template>
 
 <style scoped>
-.welcome-modal-heading-row{display:flex;align-items:center;justify-content:flex-start;gap:14px;width:100%;text-align:left}.welcome-modal-heading-row h2{margin:4px 0 0;font-size:26px;line-height:1.2}.welcome-modal-heading-row .welcome-school-logo{width:52px;height:52px;object-fit:contain;flex:0 0 auto}.welcome-modal-content{text-align:left}.welcome-modal-message{margin:0;line-height:1.75;color:var(--text-muted)}
-.fixed-navigation-shell{display:block;min-height:100vh}.fixed-sidebar{position:fixed;inset:0 auto 0 0;display:flex;flex-direction:column;width:260px;height:100vh;overflow:hidden;z-index:30}.fixed-sidebar .nav-list{min-height:0;overflow-y:auto;scrollbar-width:none}.fixed-sidebar .nav-list::-webkit-scrollbar{display:none}.fixed-sidebar .sidebar-foot{flex:0 0 auto}.sidebar-action-link{text-decoration:none;text-align:center}.fixed-sidebar-content{display:flex;flex-direction:column;min-height:100vh;margin-left:260px}.fixed-sidebar-content>.page-container{flex:1 0 auto}.school-brand{position:relative;z-index:5;isolation:isolate;display:flex;align-items:center;gap:11px;min-height:62px;padding:9px 12px;overflow:visible;background:linear-gradient(180deg,rgba(17,45,96,.98),rgba(17,45,96,.92))}.school-brand::before,.school-brand::after{pointer-events:none;z-index:0}.logo-safe-layer{position:relative;z-index:3;isolation:isolate}.school-brand-logo{position:relative;z-index:9;flex:0 0 auto;width:52px;height:52px;object-fit:contain;filter:drop-shadow(0 3px 8px rgba(0,0,0,.22))}.school-brand-title{position:relative;z-index:2;display:grid;gap:2px;min-width:0;text-align:left}.school-brand-title strong,.school-brand-title small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.school-brand-title strong{font-size:.92rem}.school-brand-title small{color:#91a8d5;font-size:.66rem}.admin-page-container{padding-top:22px}.account-card-without-avatar{padding:14px 16px}.account-card-without-avatar>div{min-width:0}.account-card-without-avatar strong,.account-card-without-avatar small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.page-compliance{display:flex;justify-content:center;gap:12px;flex-wrap:wrap;padding:18px 24px 22px;color:var(--muted);font-size:.72rem;line-height:1.45;text-align:center}.page-compliance span+span::before{content:"·";margin-right:12px}.welcome-modal-content{display:grid;justify-items:stretch;gap:12px;text-align:left}.welcome-school-logo{width:72px;height:72px;object-fit:contain}.welcome-start-button{min-width:180px}@media(max-width:820px){.fixed-sidebar{position:static;width:auto;height:auto;overflow:visible}.fixed-sidebar-content{margin-left:0}.school-brand{justify-content:flex-start}}
+.welcome-modal-heading{display:grid;justify-items:center;gap:8px;width:100%;text-align:center}.welcome-modal-heading h2{margin:0;font-size:28px;line-height:1.25}.welcome-modal-heading .eyebrow{margin-top:3px}.welcome-modal-content{text-align:center}.welcome-modal-message{margin:0;line-height:1.8;color:var(--text-muted)}
+.fixed-navigation-shell{display:block;min-height:100vh}.fixed-sidebar{position:fixed;inset:0 auto 0 0;display:flex;flex-direction:column;width:260px;height:100vh;overflow:hidden;z-index:30}.fixed-sidebar .nav-list{min-height:0;overflow-y:auto;scrollbar-width:none}.fixed-sidebar .nav-list::-webkit-scrollbar{display:none}.fixed-sidebar .sidebar-foot{flex:0 0 auto}.sidebar-action-link{text-decoration:none;text-align:center}.fixed-sidebar-content{display:flex;flex-direction:column;min-height:100vh;margin-left:260px}.fixed-sidebar-content>.page-container{flex:1 0 auto}.school-brand{position:relative;z-index:5;isolation:isolate;display:flex;align-items:center;gap:12px;min-height:78px;padding:8px 12px;overflow:visible;background:linear-gradient(180deg,rgba(17,45,96,.98),rgba(17,45,96,.92))}.school-brand::before,.school-brand::after{pointer-events:none;z-index:0}.logo-safe-layer{position:relative;z-index:3;isolation:isolate}.school-brand-logo{position:relative;z-index:9;flex:0 0 auto;width:60px;height:60px;object-fit:contain;filter:drop-shadow(0 3px 8px rgba(0,0,0,.22))}.school-brand-title{position:relative;z-index:2;display:grid;gap:2px;min-width:0;text-align:left}.school-brand-title strong,.school-brand-title small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.school-brand-title strong{font-size:.92rem}.school-brand-title small{color:#91a8d5;font-size:.66rem}.admin-page-container{padding-top:22px}.account-card-without-avatar{padding:14px 16px}.account-card-without-avatar>div{min-width:0}.account-card-without-avatar strong,.account-card-without-avatar small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.page-compliance{display:flex;justify-content:center;gap:12px;flex-wrap:wrap;padding:18px 24px 22px;color:var(--muted);font-size:.72rem;line-height:1.45;text-align:center}.page-compliance span+span::before{content:"·";margin-right:12px}.welcome-modal-content{display:grid;justify-items:stretch;gap:12px;text-align:left}.welcome-school-logo{width:88px;height:88px;object-fit:contain}.welcome-start-button{min-width:180px}@media(max-width:820px){.fixed-sidebar{position:static;width:auto;height:auto;overflow:visible}.fixed-sidebar-content{margin-left:0}.school-brand{justify-content:flex-start}}
 </style>

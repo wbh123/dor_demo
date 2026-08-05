@@ -61,7 +61,8 @@ for token in ("已配置国家或地区", "添加国家或地区", "availableCou
 require(country_editor, "未配置国家或地区自动使用英语欢迎语", "country editor must describe the English fallback without presenting the United States as a language")
 
 shell = read("frontend/src/layouts/AppShell.vue")
-require(shell, "'/assert/logo-only.png'", "navigation must use the fixed /assert/logo-only.png asset")
+require(shell, "${publicBase}assert/logo-only.png", "navigation must use a BASE_URL-safe public emblem asset")
+require(shell, "import.meta.env.BASE_URL", "navigation emblem must support non-root Vite deployment")
 require(shell, "school-brand-title", "system title must be displayed to the right of the emblem")
 require(shell, "logo-safe-layer", "emblem must be rendered above decorative overlays")
 forbid(shell, "logo-title-right.png", "navigation must not reference the missing combined-logo asset")
