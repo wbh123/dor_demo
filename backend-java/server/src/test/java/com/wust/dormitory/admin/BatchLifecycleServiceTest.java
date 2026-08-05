@@ -17,6 +17,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 class BatchLifecycleServiceTest {
@@ -64,5 +65,23 @@ class BatchLifecycleServiceTest {
         order.verify(entitlementSnapshotService).captureForBatch(12L);
         order.verify(adminService).changeBatchStatus(12L, "PUBLISHED", operator);
         verify(jdbc).update(anyString(), anyMap());
+    }
+
+    @Test
+    void repeatedPublishReturnsWithoutReacquiringLocksOrChangingStatus() {
+        when(jdbc.queryForList(anyString(), anyMap())).thenReturn(List.of(Map.of(
+                "id", 12L,
+                "batch_status", "PUBLISHED",
+                "selection_mode", "ROOM",
+                "separate_student_categories", 0)));
+
+        service.changeStatus(12L, "PUBLISHED", operator);
+
+        verifyNoInteractions(
+                batchScopeService,
+                roomLockService,
+                featureAccessService,
+                entitlementSnapshotService,
+                adminService);
     }
 }
