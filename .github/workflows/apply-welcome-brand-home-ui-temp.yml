@@ -1,0 +1,64 @@
+name: Apply Welcome Brand Home UI
+on:
+  push:
+    branches:
+      - fix/welcome-brand-home-ui-20260806
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened]
+permissions:
+  contents: write
+concurrency:
+  group: apply-welcome-brand-home-ui
+  cancel-in-progress: false
+jobs:
+  apply-and-verify:
+    if: github.actor != 'github-actions[bot]' && (github.event_name == 'push' || github.head_ref == 'fix/welcome-brand-home-ui-20260806')
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: fix/welcome-brand-home-ui-20260806
+          fetch-depth: 0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Reconstruct and verify exact patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo 'e755444d52774f205202d455f8187678afd015e935c4596adb037c133d16102f  scripts/ci/welcome-brand-home-ui/patch.b64' | sha256sum -c -
+          base64 -d scripts/ci/welcome-brand-home-ui/patch.b64 | gzip -dc > /tmp/welcome-brand-home-ui.patch
+          echo 'fc4a11096230ad49ba4844429c86988022a305ec5f5ef7d6b2290e0d287010bf  /tmp/welcome-brand-home-ui.patch' | sha256sum -c -
+      - name: Confirm RED baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q '<RouterView />' frontend/src/layouts/AppShell.vue
+          grep -q "VITE_INSTITUTION_NAME || '示例" frontend/src/views/LoginView.vue
+          ! grep -q 'test_admin_data_render.mjs' scripts/ci/run_frontend.sh
+      - name: Apply patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git apply --check /tmp/welcome-brand-home-ui.patch
+          git apply /tmp/welcome-brand-home-ui.patch
+          git diff --check
+      - name: Run real frontend render and build gates
+        run: bash scripts/ci/run_frontend.sh
+      - name: Remove temporary delivery files
+        run: |
+          rm -rf scripts/ci/welcome-brand-home-ui
+          rm -f .github/workflows/apply-welcome-brand-home-ui-temp.yml
+      - name: Commit formal source
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A
+          git diff --cached --check
+          git commit -m 'fix: 修复欢迎遮罩优先级与学生首页关键展示'
+          git push origin HEAD:fix/welcome-brand-home-ui-20260806
