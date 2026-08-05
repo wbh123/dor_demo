@@ -136,20 +136,20 @@ async function saveChange() {
               <tr v-for="row in group.rows" :key="String(row.feature_code)">
                 <td><strong>{{ row.feature_name }}</strong><small>{{ row.feature_code }}</small></td>
                 <td>{{ categoryLabel(row) }}</td>
-                <td><span class="state-chip" :class="row.systemGranted ? 'enabled' : 'blocked'">{{ row.systemGranted ? '已授权' : '未授权' }}</span></td>
-                <td>{{ row.schoolEnabled ? '已启用' : '已关闭' }}</td>
+                <td><span class="state-chip" :class="Boolean(row.systemGranted) ? 'enabled' : 'blocked'">{{ Boolean(row.systemGranted) ? '已授权' : '未授权' }}</span></td>
+                <td>{{ Boolean(row.schoolEnabled) ? '已启用' : '已关闭' }}</td>
                 <td><span class="state-chip" :class="statusClass(row)">{{ statusText(row) }}</span></td>
-                <td>{{ row.school_controllable ? '学校可控制' : '系统统一控制' }}</td>
+                <td>{{ Boolean(row.school_controllable) ? '学校可控制' : '系统统一控制' }}</td>
                 <td>{{ riskLabel(row) }}</td>
                 <td><span>{{ row.updated_at || '尚未单独修改' }}</span><small v-if="row.updated_by_name">{{ row.updated_by_name }}</small></td>
                 <td>
                   <button
                     v-if="canChange(row)"
                     class="button small"
-                    :class="row.schoolEnabled ? 'danger-soft' : 'primary'"
-                    :disabled="!row.enabled_in_program && !row.schoolEnabled"
+                    :class="Boolean(row.schoolEnabled) ? 'danger-soft' : 'primary'"
+                    :disabled="!Boolean(row.enabled_in_program) && !Boolean(row.schoolEnabled)"
                     @click="openChange(row, !Boolean(row.schoolEnabled))"
-                  >{{ row.schoolEnabled ? '关闭' : '启用' }}</button>
+                  >{{ Boolean(row.schoolEnabled) ? '关闭' : '启用' }}</button>
                   <span v-else class="muted-text">不可修改</span>
                 </td>
               </tr>
