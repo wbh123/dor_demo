@@ -37,6 +37,23 @@ jobs:
           distribution: temurin
           java-version: '21'
           cache: maven
+      - name: Normalize patch script quoting
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('scripts/ci/apply_requested_residency_governance_fixes.py')
+          lines = path.read_text(encoding='utf-8').splitlines(keepends=True)
+          fixed = 0
+          for index, line in enumerate(lines):
+              stripped = line.strip()
+              if stripped.startswith("'<div v-if=\"canAuditQuery\"") and 'selectedAudit.error_code' in stripped:
+                  assert stripped.endswith("',")
+                  lines[index] = '    """' + stripped[1:-2] + '""",\n'
+                  fixed += 1
+          assert fixed == 1, fixed
+          path.write_text(''.join(lines), encoding='utf-8')
+          PY
+          python -m py_compile scripts/ci/apply_requested_residency_governance_fixes.py
       - name: Apply requested fixes
         run: python scripts/ci/apply_requested_residency_governance_fixes.py
       - name: Run focused regression contract
