@@ -30,7 +30,6 @@ const {
   locale,
   isChinese,
   t,
-  subtitle,
   countryName,
   applyNationalityLocale,
   translateError,
