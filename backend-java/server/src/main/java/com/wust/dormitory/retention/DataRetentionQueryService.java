@@ -136,7 +136,7 @@ public class DataRetentionQueryService {
         counts.put(ACTIVE_RESIDENCY, scalar("SELECT COUNT(*) FROM room_assignment WHERE assignment_status='ACTIVE'", new MapSqlParameterSource()));
         counts.put(ACTIVE_BATCH, scalar("SELECT COUNT(*) FROM selection_batch WHERE batch_status IN ('DRAFT','PUBLISHED','OPEN','PAUSED','CLOSED','ALLOCATING')", new MapSqlParameterSource()));
         counts.put(PENDING_ROOM_CHANGE, scalar("SELECT COUNT(*) FROM room_change_request WHERE request_status NOT IN ('EXECUTED','REJECTED','CANCELLED')", new MapSqlParameterSource()));
-        counts.put(PENDING_EXCHANGE, scalar("SELECT COUNT(*) FROM room_exchange_request WHERE exchange_status NOT IN ('EXECUTED','REJECTED','CANCELLED')", new MapSqlParameterSource()));
+        counts.put(PENDING_EXCHANGE, scalar("SELECT COUNT(*) FROM room_exchange_request WHERE request_status NOT IN ('EXECUTED','REJECTED','CANCELLED')", new MapSqlParameterSource()));
         counts.put(PENDING_WAITLIST, scalar("SELECT COUNT(*) FROM waitlist_entry WHERE entry_status IN ('WAITING','OFFERED')", new MapSqlParameterSource()));
         counts.put(ACTIVE_ENTITLEMENT, scalar("SELECT COUNT(*) FROM service_subscription_revision WHERE is_current=1", new MapSqlParameterSource()));
         counts.put(PENDING_EXPORT, scalar("SELECT COUNT(*) FROM export_task WHERE task_status IN ('QUEUED','RUNNING')", new MapSqlParameterSource()));
