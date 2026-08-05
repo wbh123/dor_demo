@@ -2,6 +2,8 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+python3 "$ROOT_DIR/scripts/ci/test_backend_layering.py"
+python3 "$ROOT_DIR/scripts/ci/test_no_embedded_sql.py"
 python3 "$ROOT_DIR/scripts/ci/test_openapi_relative_refs.py"
 python3 "$ROOT_DIR/scripts/ci/validate_system_contracts_v25.py" "$ROOT_DIR"
 python3 "$ROOT_DIR/scripts/ci/test_residency_building_alias.py" "$ROOT_DIR"
@@ -22,7 +24,5 @@ python3 "$ROOT_DIR/scripts/ci/test_governance_openapi.py" "$ROOT_DIR"
 python3 "$ROOT_DIR/scripts/ci/test_governance_schema_alignment.py" "$ROOT_DIR"
 
 python3 "$ROOT_DIR/scripts/ci/test_dormitory_login_preference_ui.py"
-
 python3 "$ROOT_DIR/scripts/ci/test_building_floor_name_contract.py"
-
 python3 "$ROOT_DIR/scripts/ci/test_room_pagination_and_exchange_search.py" "$ROOT_DIR"
