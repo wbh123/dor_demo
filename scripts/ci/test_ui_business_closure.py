@@ -111,8 +111,11 @@ require(
 require("/api/v1/auth/password" in openapi_root, "school administrator password endpoint is missing from the root OpenAPI contract")
 require("admin/profile/password" in router, "school administrator password route is missing")
 require((ROOT / "frontend/src/views/admin/AdminPasswordView.vue").is_file(), "school administrator password page is missing")
-for requirement in ("12至72位", "包含大写字母", "包含小写字母", "包含数字", "包含特殊字符"):
-    require(requirement in admin_password, f"school administrator password page misses policy hint: {requirement}")
+for requirement in ("4至72位", "测试阶段", "暂不强制"):
+    require(requirement in admin_password, f"school administrator password page misses temporary policy hint: {requirement}")
+for obsolete_requirement in ("12至72位", "包含大写字母", "包含小写字母", "包含特殊字符"):
+    require(obsolete_requirement not in admin_password,
+            f"school administrator password page still exposes obsolete strict policy: {obsolete_requirement}")
 
 if errors:
     print("UI and business closure contract failed:", file=sys.stderr)
