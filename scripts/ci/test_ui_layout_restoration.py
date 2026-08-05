@@ -27,6 +27,8 @@ require("layout-relative-reference" not in layout,
         "the two redundant room-layout reference bubbles are still rendered")
 for label in ("旋转90°", "上下铺", "上床下桌", "单人床"):
     require(label in layout, f"bed card is missing the {label} action")
+require(layout.count('@click.stop="setType') == 3 and layout.count('@click.stop="rotate(unit)"') == 1,
+        "each editable bed card must expose exactly one rotate action and three bed-type actions")
 for forbidden in ("靠门", "靠窗", "前移", "后移", "恢复标准2×2布局"):
     require(forbidden not in layout, f"room layout editor still exposes the forbidden {forbidden} action")
 require("unit-list" not in layout and "type-buttons" not in layout,
