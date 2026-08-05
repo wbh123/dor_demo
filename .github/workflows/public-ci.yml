@@ -10,7 +10,7 @@ on:
       - main
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: public-ci-${{ github.ref }}
@@ -19,12 +19,7 @@ concurrency:
 jobs:
   requested-fixes:
     name: Apply and verify requested residency governance fixes
-    if: >-
-      github.actor != 'github-actions[bot]' &&
-      ((github.event_name == 'push' && github.ref_name == 'fix/student-residency-governance-ui') ||
-       (github.event_name == 'pull_request' && github.head_ref == 'fix/student-residency-governance-ui'))
-    permissions:
-      contents: write
+    if: github.event_name == 'push' && github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
