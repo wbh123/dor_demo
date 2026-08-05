@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: Wust Dormitory Select 学生端接口
-  version: 1.2.0
+  version: 1.3.0
 paths:
   /api/v1/student/profile:
     get:
@@ -154,10 +154,29 @@ paths:
     get:
       tags: [Student]
       operationId: getRandomRecommendation
+      deprecated: true
       security: [{ bearerAuth: [] }]
       parameters: [{ $ref: '#/components/parameters/BatchIdPath' }]
       responses:
         '200': { $ref: '#/components/responses/ObjectSuccess' }
+
+  /api/v1/student/batches/{batchId}/recommendations:
+    post:
+      tags: [StudentRecommendation]
+      operationId: createStudentRecommendation
+      summary: 按批次允许的推荐方式生成幂等推荐结果
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/BatchIdPath' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RecommendationRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/ObjectSuccess' }
+        '400': { $ref: '#/components/responses/ErrorResponse' }
+        '403': { $ref: '#/components/responses/ErrorResponse' }
+        '409': { $ref: '#/components/responses/ErrorResponse' }
 
   /api/v1/student/batches/{batchId}/assignment:
     get:
@@ -352,6 +371,20 @@ components:
           minLength: 6
           maxLength: 32
           pattern: '^\+?[0-9][0-9 -]{5,30}$'
+
+    RecommendationRequest:
+      type: object
+      required: [strategy, clientRequestId]
+      additionalProperties: false
+      properties:
+        strategy:
+          type: string
+          enum: [BEST_MATCH, TRUE_RANDOM, MATCH_WEIGHTED_RANDOM]
+        clientRequestId:
+          type: string
+          minLength: 8
+          maxLength: 128
+          pattern: '^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$'
 
     HoldTokenRequest:
       type: object
