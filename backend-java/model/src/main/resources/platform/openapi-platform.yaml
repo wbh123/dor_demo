@@ -249,7 +249,7 @@ components:
       required: [username, password]
       properties:
         username: { type: string, maxLength: 64 }
-        password: { type: string, minLength: 1, maxLength: 128 }
+        password: { type: string }
     PlatformLoginResponse:
       type: object
       required: [accessToken, expiresInSeconds, user]
@@ -270,7 +270,7 @@ components:
       required: [currentPassword, newPassword]
       properties:
         currentPassword: { type: string }
-        newPassword: { type: string, minLength: 12, maxLength: 128 }
+        newPassword: { type: string }
     PlanCreateRequest:
       type: object
       required: [planCode, planName, revisionName, features, quotas, reason]
