@@ -22,15 +22,16 @@ jobs:
           python-version: '3.12'
       - name: Apply public-only sanitization
         run: python scripts/ci/sanitize_public_ui_validation.py
+      - name: Remove private-marker helper files before policy validation
+        run: |
+          rm -f scripts/ci/sanitize_public_ui_validation.py
+          rm -f scripts/ci/sanitize-public-ui-trigger.txt
       - name: Verify public boundaries and contracts
         run: |
           bash scripts/ci/run_policy.sh
           bash scripts/ci/run_contracts.sh
-      - name: Remove temporary files
-        run: |
-          rm -f scripts/ci/sanitize_public_ui_validation.py
-          rm -f scripts/ci/sanitize-public-ui-trigger.txt
-          rm -f .github/workflows/sanitize-public-ui-temp.yml
+      - name: Remove temporary workflow
+        run: rm -f .github/workflows/sanitize-public-ui-temp.yml
       - name: Commit sanitized formal source
         run: |
           git config user.name github-actions[bot]
