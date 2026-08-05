@@ -272,7 +272,11 @@ public class ResidencyService {
             throw new BusinessException("RESIDENCY_NOT_ACTIVE", "在住记录已经结束");
         }
         long roomId = ((Number) before.get("room_id")).longValue();
-        policy.requireAvailableBed(roomId, bedId);
+        Long previousBedId = nullableLong(before.get("bed_id"));
+        if (previousBedId != null && previousBedId == bedId) {
+            return residency(residencyId);
+        }
+        requireBedAvailableForResidency(roomId, bedId, residencyId);
         jdbc.update("""
                 UPDATE room_assignment
                 SET bed_id=:bedId,
@@ -280,16 +284,17 @@ public class ResidencyService {
                     updated_at=CURRENT_TIMESTAMP(3)
                 WHERE id=:id
                 """, Map.of("bedId", bedId, "id", residencyId));
+        Map<String, Object> after = residency(residencyId);
         appendHistory(
                 residencyId,
                 ((Number) before.get("student_id")).longValue(),
                 roomId,
                 bedId,
-                before.get("bed_id") == null ? "BED_CONFIRMED" : "BED_CHANGED",
+                previousBedId == null ? "BED_CONFIRMED" : "BED_CHANGED",
                 operator.userId(),
                 reason,
                 before,
-                residency(residencyId));
+                after);
         auditService.success(
                 operator,
                 "RESIDENCY_BED_CONFIRM",
@@ -297,8 +302,8 @@ public class ResidencyService {
                 residencyId,
                 requiredReason(reason),
                 before,
-                residency(residencyId));
-        return residency(residencyId);
+                after);
+        return after;
     }
 
     @Transactional
@@ -337,16 +342,17 @@ public class ResidencyService {
                     end_reason=:reason, updated_at=CURRENT_TIMESTAMP(3)
                 WHERE id=:id
                 """, Map.of("reason", requiredReason(reason), "id", residencyId));
+        Map<String, Object> after = residency(residencyId);
         appendHistory(
                 residencyId,
                 ((Number) before.get("student_id")).longValue(),
                 ((Number) before.get("room_id")).longValue(),
-                before.get("bed_id") == null ? null : ((Number) before.get("bed_id")).longValue(),
+                nullableLong(before.get("bed_id")),
                 "RESIDENCY_ENDED",
                 operator.userId(),
                 reason,
                 before,
-                residency(residencyId));
+                after);
         auditService.success(
                 operator,
                 "RESIDENCY_END",
@@ -354,8 +360,8 @@ public class ResidencyService {
                 residencyId,
                 requiredReason(reason),
                 before,
-                residency(residencyId));
-        return residency(residencyId);
+                after);
+        return after;
     }
 
     public Map<String, Object> residency(long residencyId) {
@@ -372,6 +378,57 @@ public class ResidencyService {
                 LEFT JOIN bed b ON b.id=ra.bed_id
                 WHERE ra.id=:id
                 """, Map.of("id", residencyId));
+    }
+
+
+    private void requireBedAvailableForResidency(
+            long roomId,
+            long bedId,
+            long residencyId) {
+        List<Map<String, Object>> beds = jdbc.queryForList("""
+                SELECT id, room_id, operational_status
+                FROM bed
+                WHERE id=:bedId
+                FOR UPDATE
+                """, Map.of("bedId", bedId));
+        if (beds.isEmpty()) {
+            throw new BusinessException(
+                    "BED_NOT_FOUND",
+                    "床位不存在",
+                    HttpStatus.NOT_FOUND);
+        }
+        Map<String, Object> bed = beds.getFirst();
+        if (((Number) bed.get("room_id")).longValue() != roomId) {
+            throw new BusinessException(
+                    "BED_NOT_IN_RESIDENCY_ROOM",
+                    "所选床位不属于学生当前寝室",
+                    HttpStatus.CONFLICT);
+        }
+        if (!"ENABLED".equals(String.valueOf(bed.get("operational_status")))) {
+            throw new BusinessException(
+                    "BED_NOT_AVAILABLE",
+                    "所选床位当前不可用",
+                    HttpStatus.CONFLICT);
+        }
+        Integer occupied = jdbc.queryForObject("""
+                SELECT COUNT(*)
+                FROM room_assignment
+                WHERE bed_id=:bedId
+                  AND assignment_status='ACTIVE'
+                  AND id<>:residencyId
+                """, new MapSqlParameterSource()
+                .addValue("bedId", bedId)
+                .addValue("residencyId", residencyId), Integer.class);
+        if (occupied != null && occupied > 0) {
+            throw new BusinessException(
+                    "BED_ALREADY_OCCUPIED",
+                    "所选床位已被其他在住学生占用",
+                    HttpStatus.CONFLICT);
+        }
+    }
+
+    private Long nullableLong(Object value) {
+        return value == null ? null : ((Number) value).longValue();
     }
 
     private Map<String, Object> residencyForUpdate(long residencyId) {
