@@ -93,13 +93,8 @@ public class AuthService {
         if (user == null || !"ADMIN".equals(user.userType())) {
             throw new BusinessException("ADMIN_PASSWORD_FORBIDDEN", "只有学校管理员可以在此修改密码", HttpStatus.FORBIDDEN);
         }
-        if (newPassword == null || newPassword.length() < 12 || newPassword.length() > 72
-                || !newPassword.matches(".*[A-Z].*")
-                || !newPassword.matches(".*[a-z].*")
-                || !newPassword.matches(".*[0-9].*")
-                || !newPassword.matches(".*[^A-Za-z0-9].*")) {
-            throw new BusinessException("PASSWORD_POLICY_INVALID",
-                    "新密码需为12至72位，并同时包含大写字母、小写字母、数字和特殊字符");
+        if (newPassword == null || newPassword.length() < 4 || newPassword.length() > 72) {
+            throw new BusinessException("PASSWORD_POLICY_INVALID", "新密码暂时要求为4至72位");
         }
         String hash = jdbc.queryForObject("SELECT password_hash FROM app_user WHERE id=:id",
                 Map.of("id", user.userId()), String.class);
