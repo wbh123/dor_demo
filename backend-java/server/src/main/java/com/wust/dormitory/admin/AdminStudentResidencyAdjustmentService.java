@@ -127,7 +127,7 @@ public class AdminStudentResidencyAdjustmentService {
             Long currentBedId) {
         return jdbc.queryForList("""
                 SELECT bed.id AS bed_id, bed.room_id, bed.bed_code, bed.bed_type,
-                       bed.position_index, bed.layout_x, bed.layout_z, bed.rotation_degrees,
+                       bed.position_index, layout.layout_x, layout.layout_z, layout.rotation_degrees,
                        bed.operational_status, room.room_number, room.capacity, room.resident_scope,
                        floor.floor_number,
                        building.id AS building_id, building.building_code,
@@ -135,6 +135,7 @@ public class AdminStudentResidencyAdjustmentService {
                        CONCAT(building.building_name, ' ', room.room_number, ' · ', bed.bed_code)
                            AS display_name
                 FROM bed
+                LEFT JOIN room_bed_layout layout ON layout.bed_id=bed.id
                 JOIN room ON room.id=bed.room_id
                 JOIN dormitory_floor floor ON floor.id=room.floor_id
                 JOIN dormitory_building building ON building.id=floor.building_id
