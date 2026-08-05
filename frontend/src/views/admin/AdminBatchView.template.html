@@ -20,10 +20,10 @@
           <strong>选择床位</strong><span>学生进入寝室后选择系统确认真实空闲的具体床位。</span><small>{{ bedModeAuthorized ? '已授权' : '当前服务未开通' }}</small>
         </button>
       </div>
-      <label class="separation-switch">
+      <div class="separation-switch">
         <button type="button" role="switch" :aria-checked="form.separateStudentCategories" :class="{ checked: form.separateStudentCategories }" @click="form.separateStudentCategories = !form.separateStudentCategories"><span /></button>
         <div><strong>国内生与国际生分开选寝</strong><p>开启后仅允许国内生使用国内生专用宿舍、国际生使用国际生专用宿舍，混住宿舍不进入本批次。</p></div>
-      </label>
+      </div>
       <div class="form-grid three-column">
         <label><span>批次编号</span><input v-model.trim="form.batchCode" class="input" required maxlength="32" /></label>
         <label><span>批次名称</span><input v-model.trim="form.batchName" class="input" required maxlength="128" /></label>

@@ -92,7 +92,7 @@ async function submit() {
     :description="description"
     :busy="submitting"
     :prevent-close="submitting"
-    size="default"
+    size="compact"
     @close="emit('close')"
   >
     <div class="confirm-dialog-content" :class="`confirm-dialog--${variant}`">
