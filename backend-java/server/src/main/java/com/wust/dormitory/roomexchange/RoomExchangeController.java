@@ -22,10 +22,10 @@ public class RoomExchangeController implements RoomExchangeApi {
     }
 
     @Override
-    public ResponseEntity<ListSuccessResponse> listRoomExchangeCandidates() {
+    public ResponseEntity<ListSuccessResponse> listRoomExchangeCandidates(String studentNumber) {
         CurrentUser student = SecurityUsers.requireStudent();
         return ResponseEntity.ok(ResponseFactory.list(
-                service.candidates(student.studentId())));
+                service.candidates(student.studentId(), studentNumber)));
     }
 
     @Override

@@ -50,13 +50,14 @@ public class RoomExchangeService {
                 "requiresApproval", "APPROVAL_REQUIRED".equals(mode));
     }
 
-    public List<Map<String, Object>> candidates(long studentId) {
+    public List<Map<String, Object>> candidates(long studentId, String studentNumber) {
         if ("DISABLED".equals(currentMode())) {
             throw new BusinessException(
                     "ROOM_EXCHANGE_DISABLED",
                     "学校当前未开放学生寝室交换",
                     HttpStatus.CONFLICT);
         }
+        String normalizedStudentNumber = requiredStudentNumber(studentNumber);
         Map<String, Object> source = activeResidency(studentId, false);
         Map<String, Object> sourceStudent = residencyPolicy.student(studentId);
         Map<String, Object> sourceRoom = residencyPolicy.room(number(source.get("room_id")), false);
@@ -81,13 +82,16 @@ public class RoomExchangeService {
                   ON participant_lock.student_id=target.id
                 WHERE target.id<>:studentId
                   AND target.gender=:gender
+                  AND target.student_number LIKE :studentNumber ESCAPE '\\'
                   AND participant_lock.student_id IS NULL
                   AND room.operational_status='ENABLED'
                 ORDER BY building.building_code, floor.floor_number,
                          room.room_number, target.student_number
+                LIMIT 20
                 """, new MapSqlParameterSource()
                 .addValue("studentId", studentId)
-                .addValue("gender", sourceStudent.get("gender")))
+                .addValue("gender", sourceStudent.get("gender"))
+                .addValue("studentNumber", "%" + escapeLikePattern(normalizedStudentNumber) + "%"))
                 .stream()
                 .filter(candidate -> compatible(
                         sourceStudent,
@@ -604,6 +608,23 @@ public class RoomExchangeService {
                     "寝室交换当前状态不允许该操作",
                     HttpStatus.CONFLICT);
         }
+    }
+
+    private String requiredStudentNumber(String studentNumber) {
+        String normalized = studentNumber == null ? "" : studentNumber.trim();
+        if (normalized.isEmpty() || normalized.length() > 32) {
+            throw new BusinessException(
+                    "ROOM_EXCHANGE_STUDENT_NUMBER_INVALID",
+                    "请输入不超过32个字符的完整或部分学号");
+        }
+        return normalized;
+    }
+
+    private String escapeLikePattern(String value) {
+        return value
+                .replace("\\", "\\\\")
+                .replace("%", "\\%")
+                .replace("_", "\\_");
     }
 
     private String requiredReason(String reason) {

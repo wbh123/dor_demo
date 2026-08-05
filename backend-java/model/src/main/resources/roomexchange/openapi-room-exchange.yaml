@@ -7,8 +7,17 @@ paths:
     get:
       tags: [RoomExchange]
       operationId: listRoomExchangeCandidates
-      summary: 查询可发起交换的在住学生
+      summary: 按完整或部分学号查询可发起交换的在住学生
       security: [{ bearerAuth: [] }]
+      parameters:
+        - name: studentNumber
+          in: query
+          required: true
+          description: 完整或部分学号；不支持姓名查询
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 32
       responses:
         '200': { $ref: '#/components/responses/ListSuccess' }
         '409': { $ref: '#/components/responses/ErrorResponse' }
