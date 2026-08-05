@@ -1,0 +1,97 @@
+  <div class="content-column">
+    <div class="page-title">
+      <span class="eyebrow">SELECTION OPERATIONS</span>
+      <h2>选寝批次与统一分配</h2>
+      <p>创建草稿后先选择参与学生与可选宿舍，再执行发布预检。选床模式会阻止包含未确认实际床位住户的宿舍发布。</p>
+    </div>
+    <p v-if="error" class="alert error">{{ error }}</p>
+    <p v-if="message" class="alert success">{{ message }}</p>
+
+    <section class="panel">
+      <div class="section-head">
+        <div><span class="eyebrow">NEW BATCH</span><h3>创建选寝批次</h3></div>
+      </div>
+      <form class="batch-create-form" @submit.prevent="createBatch">
+        <div class="mode-card-grid">
+          <button type="button" class="mode-card" :class="{ selected: form.selectionMode === 'ROOM' }" @click="form.selectionMode = 'ROOM'">
+            <strong>选择寝室</strong><span>学生只确定寝室归属，具体床位由入住成员自行商议。</span><small>基础模式</small>
+          </button>
+          <button type="button" class="mode-card" :class="{ selected: form.selectionMode === 'BED', disabled: !bedModeAuthorized }" :disabled="!bedModeAuthorized" @click="form.selectionMode = 'BED'">
+            <strong>选择床位</strong><span>学生进入寝室后选择系统确认真实空闲的具体床位。</span><small>{{ bedModeAuthorized ? '已授权' : '当前服务未开通' }}</small>
+          </button>
+        </div>
+        <label class="separation-switch">
+          <button type="button" role="switch" :aria-checked="form.separateStudentCategories" :class="{ checked: form.separateStudentCategories }" @click="form.separateStudentCategories = !form.separateStudentCategories"><span /></button>
+          <div><strong>国内生与国际生分开选寝</strong><p>开启后仅允许国内生使用国内生专用宿舍、国际生使用国际生专用宿舍，混住宿舍不进入本批次。</p></div>
+        </label>
+        <div class="form-grid three-column">
+          <label><span>批次编号</span><input v-model.trim="form.batchCode" class="input" required maxlength="32" /></label>
+          <label><span>批次名称</span><input v-model.trim="form.batchName" class="input" required maxlength="128" /></label>
+          <label><span>规则模板</span><select v-model.number="form.ruleTemplateId" class="input" required><option :value="0" disabled>请选择</option><option v-for="item in ruleTemplates" :key="String(item.id)" :value="Number(item.id)">{{ item.rule_name }} · 修订{{ item.revision }}</option></select></label>
+          <label><span>开始时间</span><input v-model="form.startAt" class="input" type="datetime-local" required /><small>请使用24小时制，例如 18:30</small></label>
+          <label><span>结束时间</span><input v-model="form.endAt" class="input" type="datetime-local" required /><small>请使用24小时制，例如 21:00</small></label>
+          <div class="rule-summary"><strong>规则摘要</strong><span>{{ ruleTemplateSummary }}</span></div>
+        </div>
+        <button class="button primary">创建草稿批次</button>
+      </form>
+    </section>
+
+    <section class="panel">
+      <div class="section-head"><div><span class="eyebrow">BATCH LIST</span><h3>批次管理</h3></div></div>
+      <div class="batch-list">
+        <article v-for="batch in batches" :key="String(batch.id)" class="batch-card">
+          <header>
+            <div><div class="badge-row"><span class="status-chip compact">{{ statusText(batch.batch_status) }}</span><span class="status-chip compact mode">{{ modeText(batch.selection_mode) }}</span><span v-if="batch.separate_student_categories" class="status-chip compact category">国内/国际隔离</span></div><h3>{{ batch.batch_name }}</h3><p>{{ batch.batch_code }}</p></div>
+            <div class="batch-counts"><strong>{{ batch.eligible_count ?? 0 }}</strong><span>已选参与学生</span></div>
+          </header>
+          <div class="batch-facts"><span>寝室结果 {{ batch.room_assigned_count ?? 0 }}</span><span>床位结果 {{ batch.bed_assigned_count ?? batch.assigned_count ?? 0 }}</span><span>活动锁定宿舍 {{ batch.locked_room_count ?? 0 }}</span><span v-if="Number(batch.unconfirmed_bed_resident_count ?? 0) > 0" class="warn">{{ batch.unconfirmed_bed_resident_count }}人待确认床位</span></div>
+          <div class="button-row wrap">
+            <button v-if="batch.batch_status === 'DRAFT'" class="button secondary small" @click="openScope(batch)">配置参与范围</button>
+            <button class="button ghost small" @click="preflight(batch)">宿舍预检</button>
+            <button class="button ghost small" @click="openCopy(batch)">复制配置</button>
+            <button v-for="target in nextActions(batch.batch_status)" :key="target" class="button small" :class="target === 'CANCELLED' ? 'danger' : 'primary'" @click="changeStatus(batch, target)">{{ actionText(target) }}</button>
+            <button v-if="['CLOSED', 'ALLOCATING'].includes(String(batch.batch_status))" class="button secondary small" @click="previewAllocation(batch)">统一分配预演</button>
+            <button class="button ghost small" @click="download(batch)">导出结果</button>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <div v-if="scopeDialog" class="modal-overlay" @click.self="closeScope">
+      <section class="modal-card scope-dialog">
+        <header class="section-head split-title scope-sticky-header"><div><span class="eyebrow">BATCH SCOPE</span><h3>{{ scopeBatch?.batch_name }} · 参与范围</h3><p>通过筛选批量选择，最终仍保存精确学生和宿舍清单。</p></div><div class="button-row scope-floating-actions"><button class="button ghost small" :disabled="scopeSaving" @click="closeScope">关闭</button><button class="button primary" :disabled="scopeSaving" @click="saveScope">{{ scopeSaving ? '保存中…' : publishAfterScope ? '保存并继续发布' : '保存参与范围' }}</button></div></header>
+        <p v-if="scopeLoading" class="empty-state">正在加载学生与宿舍…</p>
+        <template v-else>
+          <div class="scope-summary"><article><span>已选学生</span><strong>{{ selectedStudentIds.length }}</strong></article><article><span>已选宿舍</span><strong>{{ selectedRoomIds.length }}</strong></article></div>
+          <div class="scope-grid">
+            <section class="scope-column">
+              <header><div><strong>参与学生</strong><small>按学号、姓名或专业筛选</small></div><div class="button-row"><button class="button ghost small" @click="selectAllStudents">全选当前结果</button><button class="button ghost small" @click="selectedStudentIds = []">清空</button></div></header>
+              <div class="scope-filter-grid"><input v-model.trim="studentFilter" class="input span-2" placeholder="搜索学号、姓名或专业" /><select v-model="studentGenderFilter" class="input"><option value="">全部性别</option><option value="M">男生</option><option value="F">女生</option></select><select v-model="studentCategoryFilter" class="input"><option value="">国内外不限</option><option value="DOMESTIC">国内生</option><option value="INTERNATIONAL">国际生</option></select><select v-model="studentDegreeFilter" class="input"><option value="">培养层次不限</option><option value="UNDERGRADUATE">本科生</option><option value="MASTER">硕士生</option><option value="DOCTOR">博士生</option><option value="MASTER_DOCTOR">硕博生</option></select><select v-model="studentMajorFilter" class="input"><option value="">全部专业</option><option v-for="major in scopeMajorOptions" :key="major.id" :value="major.id">{{ major.label }}</option></select><select v-model="studentGradeFilter" class="input span-2"><option value="">全部年级</option><option v-for="grade in scopeGradeOptions" :key="grade" :value="grade">{{ grade }}级</option></select></div>
+              <div class="scope-options"><label v-for="student in filteredStudents" :key="String(student.id)" class="scope-option"><input type="checkbox" :checked="selectedStudentIds.includes(Number(student.id))" @change="toggleStudent(Number(student.id))" /><div><strong>{{ student.student_number }} · {{ student.student_name }}</strong><span>{{ student.major_name }} · {{ student.gender === 'M' ? '男' : '女' }} · {{ student.student_category === 'INTERNATIONAL' ? '国际生' : '国内生' }}</span></div></label></div>
+            </section>
+            <section class="scope-column">
+              <header><div><strong>可选宿舍</strong><small>停用或维护中的宿舍不可选择</small></div><div class="button-row"><button class="button ghost small" @click="selectAllRooms">全选当前可用</button><button class="button ghost small" @click="selectedRoomIds = []">清空</button></div></header>
+              <div class="scope-filter-grid"><input v-model.trim="roomFilter" class="input span-2" placeholder="搜索楼栋、楼层或房间号" /><select v-model="roomGenderFilter" class="input"><option value="">全部性别</option><option value="M">男寝</option><option value="F">女寝</option></select><select v-model="roomScopeFilter" class="input"><option value="">国内外不限</option><option value="DOMESTIC_ONLY">国内生宿舍</option><option value="INTERNATIONAL_ONLY">国际生宿舍</option><option value="MIXED">混住宿舍</option></select><select v-model="roomBuildingFilter" class="input"><option value="">全部楼栋</option><option v-for="building in scopeBuildingOptions" :key="building.id" :value="building.id">{{ building.label }}</option></select><select v-model="roomFloorFilter" class="input"><option value="">全部楼层</option><option v-for="floor in scopeFloorOptions" :key="floor" :value="floor">{{ floor }}层</option></select></div>
+              <div class="scope-options"><label v-for="room in filteredRooms" :key="String(room.id)" class="scope-option" :class="{ disabled: !room.selectable }"><input type="checkbox" :disabled="!room.selectable" :checked="selectedRoomIds.includes(Number(room.id))" @change="toggleRoom(Number(room.id))" /><div><strong>{{ room.building_name }} {{ room.room_number }}</strong><span>{{ room.floor_number }}层 · 容量{{ room.capacity }} · {{ room.gender_restriction === 'M' ? '男寝' : '女寝' }} · {{ room.operational_status }}</span></div></label></div>
+            </section>
+          </div>
+          <div class="scope-footer"><span>{{ publishAfterScope ? '保存后将自动执行宿舍预检并发布。' : '草稿阶段可以反复调整范围。保存按钮固定在右上方。' }}</span></div>
+        </template>
+      </section>
+    </div>
+
+    <div v-if="preflightBatch && roomPreflight" class="modal-overlay" @click.self="preflightBatch = null; roomPreflight = null">
+      <section class="modal-card preflight-dialog">
+        <header class="section-head split-title"><div><span class="eyebrow">ROOM PREFLIGHT</span><h3>{{ preflightBatch.batch_name }} · 宿舍发布预检</h3><p>可用容量{{ roomPreflight.availableCapacity }}，涉及{{ roomPreflight.roomCount }}间宿舍。</p></div><button class="button ghost small" @click="preflightBatch = null; roomPreflight = null">关闭</button></header>
+        <div class="preflight-summary" :class="{ pass: roomPreflight.publishable }"><strong>{{ roomPreflight.publishable ? '检查通过，可以发布' : Number(roomPreflight.roomCount ?? 0) === 0 ? '尚未选择任何宿舍' : `存在${preflightBlockers.length}间阻断宿舍` }}</strong><span>{{ Number(roomPreflight.roomCount ?? 0) === 0 ? '返回参与范围选择至少一间可用宿舍。' : '同一宿舍活动互斥；选床模式要求现实床位映射完整。' }}</span></div>
+        <div v-if="Number(roomPreflight.roomCount ?? 0) === 0 && preflightBatch.batch_status === 'DRAFT'" class="button-row preflight-action"><button class="button primary" @click="reopenScopeFromPreflight">配置参与范围</button></div>
+        <div class="preflight-room-grid"><article v-for="room in preflightRooms" :key="String(room.id)" :class="{ blocker: (room.issues ?? []).length > 0 }"><strong>{{ room.building_name }} {{ room.room_number }}</strong><span>在住{{ room.activeResidents }} · 剩余{{ room.remainingCapacity }}</span><small v-if="(room.issues ?? []).length">{{ issueText(room) }}</small><small v-else>符合发布条件</small></article></div>
+      </section>
+    </div>
+
+    <div v-if="publishConfirmation" class="modal-overlay publish-confirmation-overlay" @click.self="closePublishConfirmation"><section class="modal-card publish-confirmation-dialog"><span class="eyebrow">READY TO PUBLISH</span><h3>{{ publishConfirmation.batch_name }} 已完成发布准备</h3><p>参与学生范围和宿舍范围均已设置，宿舍预检已通过。可以直接发布，无需再次进入范围设置。</p><div class="publish-confirmation-facts"><span>参与学生 {{ publishConfirmation.eligible_count ?? 0 }} 人</span><span>宿舍 {{ publishPreflightSnapshot?.roomCount ?? 0 }} 间</span><span>可用容量 {{ publishPreflightSnapshot?.availableCapacity ?? 0 }}</span></div><div class="button-row dialog-actions"><button class="button ghost" type="button" :disabled="publishing" @click="closePublishConfirmation">暂不发布</button><button class="button primary" type="button" :disabled="publishing" @click="confirmPublish">{{ publishing ? '正在发布…' : '直接发布' }}</button></div></section></div>
+
+    <div v-if="copyDialog" class="modal-overlay" @click.self="closeCopy"><section class="modal-card copy-dialog"><header class="section-head split-title"><div><span class="eyebrow">COPY BATCH</span><h3>复制“{{ copySource?.batch_name }}”</h3><p>自动保留选择模式、类别隔离、规则模板和宿舍范围。</p></div><button class="button ghost small" @click="closeCopy">关闭</button></header><form class="form-grid two-column" @submit.prevent="copyBatch"><label><span>新批次编号</span><input v-model.trim="copyForm.batchCode" class="input" required /></label><label><span>新批次名称</span><input v-model.trim="copyForm.batchName" class="input" required /></label><label><span>开始时间</span><input v-model="copyForm.startAt" class="input" type="datetime-local" required /><small>24小时制</small></label><label><span>结束时间</span><input v-model="copyForm.endAt" class="input" type="datetime-local" required /><small>24小时制</small></label><label class="span-2"><span>复制原因</span><textarea v-model.trim="copyForm.reason" class="input" required rows="3" /></label><div class="button-row span-2"><button class="button ghost" type="button" @click="closeCopy">取消</button><button class="button primary" :disabled="copying">{{ copying ? '复制中…' : '创建草稿副本' }}</button></div></form></section></div>
+
+    <div v-if="allocationPreview" class="modal-overlay allocation-overlay" @click.self="allocationPreview = null; allocationBatchId = null"><section class="modal-card allocation-dialog"><header class="section-head split-title"><div><span class="eyebrow">ALLOCATION PREVIEW</span><h3>统一分配预演</h3></div><button class="button ghost small" @click="allocationPreview = null; allocationBatchId = null">关闭</button></header><div class="allocation-stats"><article><span>学生</span><strong>{{ allocationSummary.studentCount ?? 0 }}</strong></article><article><span>预计成功</span><strong>{{ allocationSummary.assignedCount ?? 0 }}</strong></article><article><span>未分配</span><strong>{{ allocationSummary.unassignedCount ?? 0 }}</strong></article></div><div v-if="unassignedStudents.length" class="table-wrap"><table><thead><tr><th>学号</th><th>姓名</th><th>原因</th></tr></thead><tbody><tr v-for="student in unassignedStudents" :key="String(student.studentId)"><td>{{ student.studentNumber }}</td><td>{{ student.studentName }}</td><td>{{ student.reason }}</td></tr></tbody></table></div><button v-if="allocationBatchId" class="button primary" @click="commitAllocation">确认执行统一分配</button></section></div>
+  </div>
