@@ -26,6 +26,7 @@ snapshot = read("backend-java/server/src/main/java/com/wust/dormitory/analytics/
 historical = read("backend-java/server/src/main/java/com/wust/dormitory/analytics/HistoricalAnalyticsService.java")
 lifecycle = read("backend-java/server/src/main/java/com/wust/dormitory/admin/BatchLifecycleService.java")
 audit = read("backend-java/server/src/main/java/com/wust/dormitory/audit/AuditQueryService.java")
+retention = read("backend-java/server/src/main/java/com/wust/dormitory/retention/DataRetentionQueryService.java")
 
 for forbidden in ("recommendation_log", "assignment_source"):
     require(forbidden not in snapshot, f"snapshot service still references nonexistent schema object: {forbidden}")
@@ -66,6 +67,10 @@ require("audit.ip_address=:networkAddress" in audit and "audit.ip_address AS net
         "advanced audit does not map the existing ip_address column")
 require("audit.network_address" not in audit,
         "advanced audit still references a nonexistent network_address column")
+require("FROM room_exchange_request WHERE request_status NOT IN" in retention,
+        "retention protection does not use the V23 room exchange request_status column")
+require("exchange_status" not in retention,
+        "retention protection still references nonexistent room_exchange_request.exchange_status")
 
 if errors:
     print("Governance schema alignment contract failed:", file=sys.stderr)
