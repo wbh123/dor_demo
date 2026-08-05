@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -68,6 +69,8 @@ class HistoricalAnalyticsServiceTest {
         verify(jdbc).queryForList(sql.capture(), any(MapSqlParameterSource.class));
         assertTrue(sql.getValue().contains("batch_analytics_student_fact fact"));
         assertTrue(sql.getValue().contains("fact.major_id=:majorId"));
+        assertTrue(sql.getValue().contains("ANY_VALUE(snapshot.metrics_json)"));
+        assertFalse(sql.getValue().contains("GROUP BY snapshot.metrics_json"));
         assertEquals(3L, response.get("sampleSize"));
         assertEquals(true, response.get("preferenceDimensionsSuppressed"));
         Map<?, ?> item = (Map<?, ?>) ((List<?>) response.get("items")).getFirst();
