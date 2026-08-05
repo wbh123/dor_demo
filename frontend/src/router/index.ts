@@ -38,6 +38,7 @@ const router = createRouter({
         { path: 'admin/operations', name: 'admin-operations', component: () => import('../views/admin/AdminOperationsView.vue'), meta: { role: 'ADMIN' } },
         { path: 'admin/anomalies', name: 'admin-anomalies', component: () => import('../views/admin/AdminAnomalyWorkbenchView.vue'), meta: { role: 'ADMIN' } },
         { path: 'admin/settings/features', name: 'admin-feature-settings', component: () => import('../views/admin/AdminFeatureSettingsView.vue'), meta: { role: 'ADMIN' } },
+        { path: 'admin/governance', name: 'admin-governance', component: () => import('../views/admin/AdminGovernanceView.vue'), meta: { role: 'ADMIN' } },
         { path: 'admin/profile/password', name: 'admin-password', component: () => import('../views/admin/AdminPasswordView.vue'), meta: { role: 'ADMIN' } },
       ],
     },

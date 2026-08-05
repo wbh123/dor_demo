@@ -3,6 +3,8 @@ import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { api } from '../api/client'
 import type { DataObject, ObjectSuccessResponse } from '../api/types'
+import AppModal from '../components/modal/AppModal.vue'
+import { useFeatureAccess } from '../composables/useFeatureAccess'
 import { useI18n, type LocaleCode } from '../i18n'
 import { useAuthStore } from '../stores/auth'
 
@@ -16,6 +18,16 @@ const operatorName = String(import.meta.env.VITE_OPERATOR_NAME || '运营单位�
 const icpRecord = String(import.meta.env.VITE_ICP_RECORD || 'ICP备案信息待填写')
 const logoOnly = '/assert/logo-only.png'
 const { locale, localeOptions, t, subtitle, setLocale, applyNationalityLocale, welcomeMessage, translateError } = useI18n()
+const { hasFeature } = useFeatureAccess()
+
+const governanceFeatureCodes = [
+  'P2_AUDIT_ADVANCED_QUERY', 'P2_AUDIT_EXPORT',
+  'P3_NOTIFICATION_TEMPLATE_VIEW', 'P3_NOTIFICATION_TEMPLATE_MANAGE',
+  'P3_NOTIFICATION_SEND', 'P3_NOTIFICATION_SCHEDULE', 'P3_NOTIFICATION_DELIVERY_STATUS',
+  'P3_HISTORICAL_DASHBOARD', 'P3_CROSS_BATCH_COMPARISON', 'P3_TREND_ANALYSIS',
+  'P3_CUSTOM_REPORT_EXPORT', 'P3_DATA_RETENTION_QUERY',
+]
+const governanceEnabled = computed(() => governanceFeatureCodes.some(hasFeature))
 
 const icons = {
   dashboard:'M3 3h8v8H3V3Zm10 0h8v5h-8V3ZM3 13h8v8H3v-8Zm10-3h8v11h-8V10Z',
@@ -31,6 +43,7 @@ const icons = {
   operations:'M3 20h18v2H3v-2Zm2-2V9h3v9H5Zm5 0V3h3v15h-3Zm5 0v-6h3v6h-3Z',
   importQuality:'M4 3h10l6 6v12H4V3Zm9 2H6v14h12v-9h-5V5Zm2 1.5V8h1.5L15 6.5ZM8 12h8v2H8v-2Zm0 4h6v2H8v-2Z',
   anomaly:'M12 2 2 20h20L12 2Zm0 5.2L18.6 18H5.4L12 7.2ZM11 10v4h2v-4h-2Zm0 5.5v2h2v-2h-2Z',
+  governance:'M4 3h16v4H4V3Zm0 7h7v11H4V10Zm10 0h6v5h-6v-5Zm0 8h6v3h-6v-3ZM6 5v0h12v0H6Zm0 7v7h3v-7H6Z',
   home:'m12 3 9 8h-3v10h-5v-6h-2v6H6V11H3l9-8Z',
   team:'M16 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM7 12a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Zm9 2c-3.31 0-6 1.79-6 4v3h12v-3c0-2.21-2.69-4-6-4ZM7 14c-2.76 0-5 1.57-5 3.5V21h6v-3c0-1.4.53-2.69 1.45-3.76A8.4 8.4 0 0 0 7 14Z',
 }
@@ -49,6 +62,7 @@ const links = computed(() => auth.isAdmin ? [
   {to:'/admin/waitlist',label:'候补管理',icon:icons.waitlist},
   {to:'/admin/operations',label:'运营与健康',icon:icons.operations},
   {to:'/admin/anomalies',label:'异常工作台',icon:icons.anomaly},
+  ...(governanceEnabled.value ? [{to:'/admin/governance',label:'审计通知与分析',icon:icons.governance}] : []),
 ] : [
   {to:'/student',label:'选寝首页',icon:icons.home},
   {to:'/student/teams',label:'我的队伍',icon:icons.team},
@@ -119,22 +133,28 @@ async function logout() {
       <section class="page-container" :class="{ 'student-page-container': auth.isStudent, 'admin-page-container': auth.isAdmin }"><RouterView /></section>
       <footer class="page-compliance"><span>{{ operatorName }}</span><span>{{ icpRecord }}</span></footer>
     </main>
-    <Transition name="welcome-pop">
-      <div v-if="auth.welcomeRequired" class="welcome-overlay" role="presentation">
-        <section class="welcome-dialog" role="dialog" aria-modal="true" aria-labelledby="student-welcome-title">
-          <div class="welcome-glow welcome-glow-one" /><div class="welcome-glow welcome-glow-two" />
-          <img class="welcome-school-logo logo-safe-layer" :src="logoOnly" alt="" aria-hidden="true" />
-          <span class="eyebrow">{{ subtitle('欢迎来到校园', 'WELCOME TO CAMPUS') }}</span>
-          <h2 id="student-welcome-title">{{ t('welcome.title') }}</h2>
-          <p>{{ welcomeText }}</p>
-          <p v-if="welcomeError" class="alert error">{{ welcomeError }}</p>
-          <button class="button primary welcome-start-button" :disabled="auth.welcomeAcknowledging" @click="acknowledgeWelcome">{{ auth.welcomeAcknowledging ? '正在进入…' : t('welcome.start') }}</button>
-        </section>
+
+    <AppModal
+      :open="auth.welcomeRequired"
+      :title="t('welcome.title')"
+      :description="welcomeText"
+      :close-on-backdrop="false"
+      :close-on-escape="false"
+      prevent-close
+      size="default"
+    >
+      <div class="welcome-modal-content">
+        <img class="welcome-school-logo logo-safe-layer" :src="logoOnly" alt="" aria-hidden="true" />
+        <span class="eyebrow">{{ subtitle('欢迎来到校园', 'WELCOME TO CAMPUS') }}</span>
+        <p v-if="welcomeError" class="alert error">{{ welcomeError }}</p>
       </div>
-    </Transition>
+      <template #footer>
+        <button class="button primary welcome-start-button" :disabled="auth.welcomeAcknowledging" @click="acknowledgeWelcome">{{ auth.welcomeAcknowledging ? '正在进入…' : t('welcome.start') }}</button>
+      </template>
+    </AppModal>
   </div>
 </template>
 
 <style scoped>
-.fixed-navigation-shell{display:block;min-height:100vh}.fixed-sidebar{position:fixed;inset:0 auto 0 0;display:flex;flex-direction:column;width:260px;height:100vh;overflow:hidden;z-index:30}.fixed-sidebar .nav-list{min-height:0;overflow-y:auto;scrollbar-width:none}.fixed-sidebar .nav-list::-webkit-scrollbar{display:none}.fixed-sidebar .sidebar-foot{flex:0 0 auto}.sidebar-action-link{text-decoration:none;text-align:center}.fixed-sidebar-content{display:flex;flex-direction:column;min-height:100vh;margin-left:260px}.fixed-sidebar-content>.page-container{flex:1 0 auto}.school-brand{position:relative;z-index:5;isolation:isolate;display:flex;align-items:center;gap:11px;min-height:62px;padding:9px 12px;overflow:visible;background:linear-gradient(180deg,rgba(17,45,96,.98),rgba(17,45,96,.92))}.school-brand::before,.school-brand::after,.welcome-dialog::before,.welcome-dialog::after{pointer-events:none;z-index:0}.logo-safe-layer{position:relative;z-index:3;isolation:isolate}.school-brand-logo{position:relative;z-index:9;flex:0 0 auto;width:46px;height:46px;object-fit:contain;filter:drop-shadow(0 3px 8px rgba(0,0,0,.22))}.school-brand-title{position:relative;z-index:2;display:grid;gap:2px;min-width:0;text-align:left}.school-brand-title strong,.school-brand-title small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.school-brand-title strong{font-size:.92rem}.school-brand-title small{color:#91a8d5;font-size:.66rem}.admin-page-container{padding-top:22px}.account-card-without-avatar{padding:14px 16px}.account-card-without-avatar>div{min-width:0}.account-card-without-avatar strong,.account-card-without-avatar small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.page-compliance{display:flex;justify-content:center;gap:12px;flex-wrap:wrap;padding:18px 24px 22px;color:var(--muted);font-size:.72rem;line-height:1.45;text-align:center}.page-compliance span+span::before{content:"·";margin-right:12px}.welcome-dialog{position:relative;isolation:isolate}.welcome-school-logo{width:72px;height:72px;object-fit:contain;margin:0 auto 12px}@media(max-width:820px){.fixed-sidebar{position:static;width:auto;height:auto;overflow:visible}.fixed-sidebar-content{margin-left:0}.school-brand{justify-content:flex-start}}
+.fixed-navigation-shell{display:block;min-height:100vh}.fixed-sidebar{position:fixed;inset:0 auto 0 0;display:flex;flex-direction:column;width:260px;height:100vh;overflow:hidden;z-index:30}.fixed-sidebar .nav-list{min-height:0;overflow-y:auto;scrollbar-width:none}.fixed-sidebar .nav-list::-webkit-scrollbar{display:none}.fixed-sidebar .sidebar-foot{flex:0 0 auto}.sidebar-action-link{text-decoration:none;text-align:center}.fixed-sidebar-content{display:flex;flex-direction:column;min-height:100vh;margin-left:260px}.fixed-sidebar-content>.page-container{flex:1 0 auto}.school-brand{position:relative;z-index:5;isolation:isolate;display:flex;align-items:center;gap:11px;min-height:62px;padding:9px 12px;overflow:visible;background:linear-gradient(180deg,rgba(17,45,96,.98),rgba(17,45,96,.92))}.school-brand::before,.school-brand::after{pointer-events:none;z-index:0}.logo-safe-layer{position:relative;z-index:3;isolation:isolate}.school-brand-logo{position:relative;z-index:9;flex:0 0 auto;width:46px;height:46px;object-fit:contain;filter:drop-shadow(0 3px 8px rgba(0,0,0,.22))}.school-brand-title{position:relative;z-index:2;display:grid;gap:2px;min-width:0;text-align:left}.school-brand-title strong,.school-brand-title small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.school-brand-title strong{font-size:.92rem}.school-brand-title small{color:#91a8d5;font-size:.66rem}.admin-page-container{padding-top:22px}.account-card-without-avatar{padding:14px 16px}.account-card-without-avatar>div{min-width:0}.account-card-without-avatar strong,.account-card-without-avatar small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.page-compliance{display:flex;justify-content:center;gap:12px;flex-wrap:wrap;padding:18px 24px 22px;color:var(--muted);font-size:.72rem;line-height:1.45;text-align:center}.page-compliance span+span::before{content:"·";margin-right:12px}.welcome-modal-content{display:grid;justify-items:center;gap:12px;text-align:center}.welcome-school-logo{width:72px;height:72px;object-fit:contain}.welcome-start-button{min-width:180px}@media(max-width:820px){.fixed-sidebar{position:static;width:auto;height:auto;overflow:visible}.fixed-sidebar-content{margin-left:0}.school-brand{justify-content:flex-start}}
 </style>
