@@ -22,6 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -76,6 +77,20 @@ class DataRetentionQueryServiceTest {
         assertTrue(policyJson.startsWith("{"));
         assertTrue(simulationJson.startsWith("{"));
         assertEquals("年度数据治理检查", parameters.getValue().getValue("reason"));
+    }
+
+    @Test
+    void exchangeProtectionUsesTheActualRequestStatusColumn() {
+        service.simulate();
+
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+        verify(jdbc, atLeastOnce()).queryForObject(
+                sql.capture(), any(MapSqlParameterSource.class), any(Class.class));
+        assertTrue(sql.getAllValues().stream().anyMatch(value ->
+                value.contains("FROM room_exchange_request")
+                        && value.contains("request_status NOT IN")));
+        assertFalse(sql.getAllValues().stream().anyMatch(value ->
+                value.contains("exchange_status")));
     }
 
     @Test
