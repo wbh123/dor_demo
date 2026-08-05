@@ -1,0 +1,49 @@
+name: Private Migration Bundle V2
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Package verified governance source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --name-only 2418509834af1ca4196e833eab1ffa0cff92eb53 HEAD \
+            | grep -v '^\.github/workflows/private-migration-bundle-v2.yml$' \
+            > /tmp/governance-files.txt
+          test "$(wc -l < /tmp/governance-files.txt)" -ge 45
+          while IFS= read -r path; do
+            test -f "$path" || { echo "Missing $path" >&2; exit 1; }
+            case "$path" in
+              *.sql|backend-java/docs/sql/*|backend-java/server/src/main/resources/db/migration/*)
+                echo "Database content is forbidden in the public migration bundle: $path" >&2
+                exit 1
+                ;;
+            esac
+          done < /tmp/governance-files.txt
+          tar -czf governance-source.tar.gz -T /tmp/governance-files.txt
+          sha256sum governance-source.tar.gz > governance-source.tar.gz.sha256
+          cp /tmp/governance-files.txt governance-files.txt
+
+      - name: Upload migration bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: governance-source-${{ github.sha }}
+          path: |
+            governance-source.tar.gz
+            governance-source.tar.gz.sha256
+            governance-files.txt
+          if-no-files-found: error
+          retention-days: 1
