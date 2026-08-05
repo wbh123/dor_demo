@@ -38,8 +38,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          test ! -e backend-java/server/src/test/java/com/wust/dormitory/residency/ResidencyServiceTest.java
+          grep -q 'policy.requireAvailableBed(roomId, bedId);' backend-java/server/src/main/java/com/wust/dormitory/residency/ResidencyService.java
           ! grep -q 'requireBedAvailableForResidency' backend-java/server/src/main/java/com/wust/dormitory/residency/ResidencyService.java
+          ! grep -q 'confirmBedRejectsBedFromAnotherRoom' backend-java/server/src/test/java/com/wust/dormitory/residency/ResidencyServiceTest.java
       - name: Apply patch
         shell: bash
         run: |
