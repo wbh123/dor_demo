@@ -1,0 +1,90 @@
+name: Private Migration Bundle
+
+on:
+  push:
+    branches:
+      - chore/private-migration-bundle
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Package verified governance source
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > /tmp/governance-files.txt <<'EOF'
+          backend-java/model/src/main/resources/admin/openapi-governance.yaml
+          backend-java/model/src/main/resources/openapi-interface.yaml
+          backend-java/server/src/main/java/com/wust/dormitory/admin/AdminGovernanceController.java
+          backend-java/server/src/main/java/com/wust/dormitory/admin/BatchLifecycleService.java
+          backend-java/server/src/main/java/com/wust/dormitory/analytics/BatchAnalyticsSnapshotService.java
+          backend-java/server/src/main/java/com/wust/dormitory/analytics/HistoricalAnalyticsService.java
+          backend-java/server/src/main/java/com/wust/dormitory/analytics/MetricDefinition.java
+          backend-java/server/src/main/java/com/wust/dormitory/audit/AuditExportService.java
+          backend-java/server/src/main/java/com/wust/dormitory/audit/AuditQueryService.java
+          backend-java/server/src/main/java/com/wust/dormitory/export/ExportTaskService.java
+          backend-java/server/src/main/java/com/wust/dormitory/notification/NotificationChannel.java
+          backend-java/server/src/main/java/com/wust/dormitory/notification/NotificationDispatchService.java
+          backend-java/server/src/main/java/com/wust/dormitory/notification/NotificationRecipientResolver.java
+          backend-java/server/src/main/java/com/wust/dormitory/notification/NotificationService.java
+          backend-java/server/src/main/java/com/wust/dormitory/notification/NotificationTemplateService.java
+          backend-java/server/src/main/java/com/wust/dormitory/report/ReportBuilderService.java
+          backend-java/server/src/main/java/com/wust/dormitory/retention/DataRetentionQueryService.java
+          backend-java/server/src/main/java/com/wust/dormitory/security/SensitiveAccessLevel.java
+          backend-java/server/src/main/java/com/wust/dormitory/security/SensitiveDataPolicyService.java
+          backend-java/server/src/main/java/com/wust/dormitory/security/SensitiveField.java
+          backend-java/server/src/main/java/com/wust/dormitory/subscription/FeatureCodes.java
+          backend-java/server/src/main/java/com/wust/dormitory/subscription/QuotaCodes.java
+          backend-java/server/src/test/java/com/wust/dormitory/admin/BatchLifecycleServiceTest.java
+          backend-java/server/src/test/java/com/wust/dormitory/analytics/BatchAnalyticsSnapshotServiceTest.java
+          backend-java/server/src/test/java/com/wust/dormitory/analytics/HistoricalAnalyticsServiceTest.java
+          backend-java/server/src/test/java/com/wust/dormitory/audit/AuditQueryServiceTest.java
+          backend-java/server/src/test/java/com/wust/dormitory/notification/NotificationDispatchServiceTest.java
+          backend-java/server/src/test/java/com/wust/dormitory/notification/NotificationTemplateServiceTest.java
+          backend-java/server/src/test/java/com/wust/dormitory/report/ReportBuilderServiceTest.java
+          backend-java/server/src/test/java/com/wust/dormitory/retention/DataRetentionQueryServiceTest.java
+          backend-java/server/src/test/java/com/wust/dormitory/security/SensitiveDataPolicyServiceTest.java
+          frontend/src/components/admin/AnalyticsFilterBar.vue
+          frontend/src/components/admin/AuditFilterBar.vue
+          frontend/src/components/admin/ExportTaskPanel.vue
+          frontend/src/components/admin/MetricDefinitionPopover.vue
+          frontend/src/components/admin/NotificationTemplateEditor.vue
+          frontend/src/components/admin/RecipientSelector.vue
+          frontend/src/components/admin/ReportBuilder.vue
+          frontend/src/layouts/AppShell.vue
+          frontend/src/router/index.ts
+          frontend/src/views/admin/AdminGovernanceView.vue
+          scripts/ci/run_contracts.sh
+          scripts/ci/test_audit_notification_analytics.py
+          scripts/ci/test_governance_openapi.py
+          scripts/ci/test_governance_schema_alignment.py
+          EOF
+          sed -i 's/^          //' /tmp/governance-files.txt
+          while IFS= read -r path; do
+            test -f "$path" || { echo "Missing $path" >&2; exit 1; }
+            case "$path" in
+              *.sql|backend-java/docs/sql/*|backend-java/server/src/main/resources/db/migration/*)
+                echo "Database content is forbidden in the public migration bundle: $path" >&2
+                exit 1
+                ;;
+            esac
+          done < /tmp/governance-files.txt
+          tar -czf governance-source.tar.gz -T /tmp/governance-files.txt
+          sha256sum governance-source.tar.gz > governance-source.tar.gz.sha256
+
+      - name: Upload migration bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: governance-source-${{ github.sha }}
+          path: |
+            governance-source.tar.gz
+            governance-source.tar.gz.sha256
+          if-no-files-found: error
+          retention-days: 1
