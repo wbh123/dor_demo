@@ -1,10 +1,13 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { api } from '../../api/client'
 import type { DataObject, ListSuccessResponse, ObjectSuccessResponse } from '../../api/types'
 import { useFeatureAccess } from '../../composables/useFeatureAccess'
 import { useI18n } from '../../i18n'
+
+type RecommendationStrategy = 'BEST_MATCH' | 'TRUE_RANDOM' | 'MATCH_WEIGHTED_RANDOM'
+interface RecommendationOption { value: RecommendationStrategy; label: string }
 
 const route = useRoute()
 const router = useRouter()
@@ -24,9 +27,12 @@ const pendingPreferenceAction = ref<null | (() => void)>(null)
 const loading = ref(true)
 const preparingPersonalSelection = ref(false)
 const selectingRoomId = ref<number | null>(null)
+const recommending = ref(false)
 const error = ref('')
 const message = ref('')
-const randomResult = ref<DataObject | null>(null)
+const recommendationResult = ref<DataObject | null>(null)
+const recommendationStrategy = ref<RecommendationStrategy>('BEST_MATCH')
+const recommendationRequestId = ref('')
 const keyword = ref('')
 const floorFilter = ref('')
 const minimumAvailableBeds = ref(0)
@@ -34,7 +40,35 @@ const { t, subtitle, translateError } = useI18n()
 
 const selectionMode = computed(() => String(rooms.value[0]?.selectionMode ?? 'BED'))
 const isRoomMode = computed(() => selectionMode.value === 'ROOM')
-const recommendationEnabled = computed(() => hasFeature('P2_ROOM_RECOMMENDATION'))
+const batchAllowedRecommendationStrategies = computed<RecommendationStrategy[]>(() => {
+  const configured = rooms.value[0]?.allowedRecommendationStrategies
+  if (!Array.isArray(configured) || configured.length === 0) {
+    return ['BEST_MATCH', 'TRUE_RANDOM', 'MATCH_WEIGHTED_RANDOM']
+  }
+  return configured
+    .map(String)
+    .filter((value): value is RecommendationStrategy =>
+      ['BEST_MATCH', 'TRUE_RANDOM', 'MATCH_WEIGHTED_RANDOM'].includes(value))
+})
+const recommendationOptions = computed<RecommendationOption[]>(() => {
+  const allowed = new Set(batchAllowedRecommendationStrategies.value)
+  const options: RecommendationOption[] = []
+  if (allowed.has('BEST_MATCH') && hasFeature('P2_ROOM_RECOMMENDATION')) {
+    options.push({ value: 'BEST_MATCH', label: '最匹配' })
+  }
+  if (allowed.has('TRUE_RANDOM') && hasFeature('P1_RANDOM_RECOMMENDATION')) {
+    options.push({ value: 'TRUE_RANDOM', label: '随机看看' })
+  }
+  if (allowed.has('MATCH_WEIGHTED_RANDOM') && hasFeature('P2_ROOM_RECOMMENDATION')) {
+    options.push({ value: 'MATCH_WEIGHTED_RANDOM', label: '按匹配度随机' })
+  }
+  return options
+})
+const recommendationEnabled = computed(() => recommendationOptions.value.length > 0)
+const recommendationButtonLabel = computed(() => {
+  const selected = recommendationOptions.value.find((item) => item.value === recommendationStrategy.value)
+  return selected?.label ?? '帮我推荐一个'
+})
 const floorOptions = computed(() => [...new Set(rooms.value.map((room) => Number(room.floor_number)))].filter(Number.isFinite).sort((a,b)=>a-b))
 const filteredRooms = computed(() => {
   const term = keyword.value.trim().toLowerCase()
@@ -46,6 +80,10 @@ const filteredRooms = computed(() => {
   })
 })
 
+watch(recommendationStrategy, () => {
+  recommendationRequestId.value = ''
+  recommendationResult.value = null
+})
 onMounted(initialize)
 
 async function initialize() {
@@ -78,17 +116,39 @@ async function load() {
     ])
     rooms.value = (roomResponse.data.data ?? []) as DataObject[]
     selectionReadiness.value = (readinessResponse.data.data ?? {}) as DataObject
+    synchronizeRecommendationStrategy()
   } catch (reason) { error.value = translateError(reason) }
   finally { loading.value = false }
 }
 
-async function randomRecommend() {
-  if (!recommendationEnabled.value) return
+function synchronizeRecommendationStrategy() {
+  const options = recommendationOptions.value
+  if (options.length === 0) return
+  const configuredDefault = String(rooms.value[0]?.defaultRecommendationStrategy ?? '') as RecommendationStrategy
+  if (options.some((item) => item.value === configuredDefault)) {
+    recommendationStrategy.value = configuredDefault
+    return
+  }
+  if (!options.some((item) => item.value === recommendationStrategy.value)) {
+    recommendationStrategy.value = options[0].value
+  }
+}
+
+async function requestRecommendation() {
+  if (!recommendationEnabled.value || recommending.value) return
   error.value = ''
+  recommending.value = true
+  const clientRequestId = recommendationRequestId.value || crypto.randomUUID()
+  recommendationRequestId.value = clientRequestId
   try {
-    const response = await api.get<ObjectSuccessResponse>(`/api/v1/student/batches/${batchId}/random-recommendation`)
-    randomResult.value = (response.data.data ?? {}) as DataObject
+    const response = await api.post<ObjectSuccessResponse>(
+      `/api/v1/student/batches/${batchId}/recommendations`,
+      { strategy: recommendationStrategy.value, clientRequestId },
+    )
+    recommendationResult.value = (response.data.data ?? {}) as DataObject
+    recommendationRequestId.value = ''
   } catch (reason) { error.value = translateError(reason) }
+  finally { recommending.value = false }
 }
 
 function withPreferenceCheck(action: () => void) {
@@ -163,11 +223,16 @@ function missingPreferenceCount(room: DataObject) { return Number(room.missingPr
   <div class="content-column">
     <div class="page-title split-title">
       <div><span class="eyebrow">{{ subtitle('宿舍匹配', 'ROOM MATCHING') }}</span><h2>{{ isTeamMode ? `为${memberCount}人队伍${isRoomMode?'选择寝室':'选择床位'}` : isRoomMode ? '选择寝室' : '选择宿舍床位' }}</h2><p v-if="isRoomMode">选择成功后只确定寝室归属，不显示或分配具体床位；入住成员自行协商实际床位。</p><p v-else>房间按偏好接近程度排序，进入房间后可直接点击三维图像中的床位进行选择。</p></div>
-      <button v-if="!isTeamMode && recommendationEnabled" class="button accent" @click="randomRecommend">帮我推荐一个</button>
+      <div v-if="!isTeamMode && recommendationEnabled" class="recommendation-actions">
+        <select v-if="recommendationOptions.length > 1" v-model="recommendationStrategy" class="input recommendation-strategy-select" aria-label="推荐方式">
+          <option v-for="option in recommendationOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
+        </select>
+        <button class="button accent" :disabled="recommending" @click="requestRecommendation">{{ recommending ? '正在推荐…' : recommendationButtonLabel }}</button>
+      </div>
     </div>
     <p v-if="error" class="alert error">{{ error }}</p><p v-if="message" class="alert success">{{ message }}</p>
 
-    <section v-if="randomResult" class="panel recommendation-card"><div><span class="eyebrow">推荐结果</span><h3>{{ randomResult.selectionMode === 'ROOM' ? '已找到推荐寝室' : '已找到推荐床位' }}</h3><p>{{ randomResult.explanation }}</p></div><button class="button primary" @click="openRoom((randomResult.room as DataObject))">{{ randomResult.selectionMode === 'ROOM' ? '选择推荐寝室' : '查看推荐房间' }}</button></section>
+    <section v-if="recommendationResult" class="panel recommendation-card"><div><span class="eyebrow">{{ recommendationResult.strategyName || '推荐结果' }}</span><h3>{{ recommendationResult.selectionMode === 'ROOM' ? '已找到推荐寝室' : '已找到推荐床位' }}</h3><p v-if="recommendationResult.explanation">{{ recommendationResult.explanation }}</p><p v-else>推荐结果已按照当前批次允许的方式生成。</p></div><button class="button primary" @click="openRoom((recommendationResult.room as DataObject))">{{ recommendationResult.selectionMode === 'ROOM' ? '选择推荐寝室' : '查看推荐房间' }}</button></section>
 
     <section class="panel filter-bar room-filter-bar">
       <label class="search-field room-filter-search"><span>搜索房间</span><input v-model="keyword" class="input" placeholder="输入楼栋或房间号" /></label>
@@ -179,9 +244,9 @@ function missingPreferenceCount(room: DataObject) { return Number(room.missingPr
     <p v-if="loading" class="panel empty-state">正在计算候选宿舍…</p><p v-else-if="filteredRooms.length===0" class="panel empty-state">当前没有符合筛选条件的房间。</p>
     <div v-else class="room-grid compact-room-grid" :class="{ 'room-grid-room-mode': isRoomMode }">
       <article v-for="room in filteredRooms" :key="String(room.id)" class="panel room-card" :class="{ 'room-card-compact': isRoomMode }">
-        <div class="room-card-head"><div><span class="eyebrow">{{ room.building_name }}</span><h3>{{ room.room_number }}室</h3></div><span v-if="recommendationEnabled" class="score-ring score-ring-with-label"><small>匹配度</small><strong>{{ Number(room.matchScore).toFixed(0) }}分</strong></span></div>
+        <div class="room-card-head"><div><span class="eyebrow">{{ room.building_name }}</span><h3>{{ room.room_number }}室</h3></div><span v-if="hasFeature('P2_ROOM_RECOMMENDATION')" class="score-ring score-ring-with-label"><small>匹配度</small><strong>{{ Number(room.matchScore).toFixed(0) }}分</strong></span></div>
         <div class="room-facts"><span>{{ roomType(room.room_type) }}</span><span>剩余{{ room.availableCount }}{{ isRoomMode?'个名额':'张床位' }}</span><span>{{ room.floor_number }}层</span></div>
-        <div class="roommate-summary"><div class="roommate-summary-head"><strong>当前在住与偏好</strong><span>{{ roommateCount(room)>0?`已有${roommateCount(room)}人`:'当前空房' }}</span></div><div v-if="missingPreferenceCount(room)>0" class="tag-row"><span class="tag warning">{{ missingPreferenceCount(room) }}名同学未填写偏好</span></div><div v-if="recommendationEnabled && recommendationReasons(room).length" class="tag-row"><span v-for="tag in recommendationReasons(room)" :key="tag" class="tag positive">{{ tag }}</span></div><div v-if="conflictReasons(room).length" class="tag-row"><span v-for="tag in conflictReasons(room)" :key="tag" class="tag warning">{{ tag }}</span></div></div>
+        <div class="roommate-summary"><div class="roommate-summary-head"><strong>当前在住与偏好</strong><span>{{ roommateCount(room)>0?`已有${roommateCount(room)}人`:'当前空房' }}</span></div><div v-if="missingPreferenceCount(room)>0" class="tag-row"><span class="tag warning">{{ missingPreferenceCount(room) }}名同学未填写偏好</span></div><div v-if="hasFeature('P2_ROOM_RECOMMENDATION') && recommendationReasons(room).length" class="tag-row"><span v-for="tag in recommendationReasons(room)" :key="tag" class="tag positive">{{ tag }}</span></div><div v-if="conflictReasons(room).length" class="tag-row"><span v-for="tag in conflictReasons(room)" :key="tag" class="tag warning">{{ tag }}</span></div></div>
         <button class="button primary full" :disabled="selectingRoomId===Number(room.id)" @click="openRoom(room)">{{ selectingRoomId===Number(room.id)?'正在确认…':isRoomMode?(isTeamMode?'队伍选择此寝室':'选择此寝室'):(isTeamMode?'选择队伍床位':'查看床位布局') }}</button>
       </article>
     </div>
@@ -197,6 +262,8 @@ function missingPreferenceCount(room: DataObject) { return Number(room.missingPr
 </template>
 
 <style scoped>
+.recommendation-actions { display: flex; align-items: center; justify-content: flex-end; gap: 10px; flex-wrap: wrap; }
+.recommendation-strategy-select { width: auto; min-width: 150px; }
 .score-ring-with-label { display: grid; place-items: center; min-width: 78px; min-height: 78px; padding: 7px; text-align: center; line-height: 1.1; }
 .score-ring-with-label small { display: block; font-size: 11px; font-weight: 600; opacity: .76; }
 .score-ring-with-label strong { display: block; margin-top: 3px; font-size: 17px; }
@@ -217,5 +284,5 @@ function missingPreferenceCount(room: DataObject) { return Number(room.missingPr
 .selection-success-dialog { text-align: center; width: min(560px, calc(100vw - 60px)); }
 .selection-success-dialog .room-selection-notice { margin-top: 20px; text-align: left; }
 .success-symbol { width: 64px; height: 64px; display: grid; place-items: center; margin: 0 auto 14px; border-radius: 50%; color: #fff; background: #19a278; font-size: 30px; font-weight: 800; box-shadow: 0 12px 28px rgba(25,162,120,.28); }
-@media (max-width: 640px) { .room-selection-overlay { padding: 10px; }.room-selection-dialog { width: 100%; padding: 18px; border-radius: 22px; }.room-selection-summary { grid-template-columns: 1fr; } }
+@media (max-width: 640px) { .recommendation-actions { width: 100%; justify-content: stretch; }.recommendation-strategy-select,.recommendation-actions .button { width: 100%; }.room-selection-overlay { padding: 10px; }.room-selection-dialog { width: 100%; padding: 18px; border-radius: 22px; }.room-selection-summary { grid-template-columns: 1fr; } }
 </style>
