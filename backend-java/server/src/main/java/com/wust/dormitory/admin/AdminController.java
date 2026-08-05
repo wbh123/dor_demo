@@ -12,6 +12,7 @@ import com.wust.dormitory.model.dto.AssignmentAdjustmentRequest;
 import com.wust.dormitory.model.dto.BatchCopyRequest;
 import com.wust.dormitory.model.dto.BatchEnrollmentRequest;
 import com.wust.dormitory.model.dto.BatchRequest;
+import com.wust.dormitory.model.dto.BuildingRequest;
 import com.wust.dormitory.model.dto.DirectResidencyAssignmentRequest;
 import com.wust.dormitory.model.dto.ListSuccessResponse;
 import com.wust.dormitory.model.dto.MajorRequest;
@@ -21,6 +22,7 @@ import com.wust.dormitory.model.dto.ObjectSuccessResponse;
 import com.wust.dormitory.model.dto.ResidencyEndRequest;
 import com.wust.dormitory.model.dto.RoomBedLayoutItem;
 import com.wust.dormitory.model.dto.RoomBedLayoutRequest;
+import com.wust.dormitory.model.dto.RoomCreateRequest;
 import com.wust.dormitory.model.dto.RoomRequest;
 import com.wust.dormitory.model.dto.StudentRequest;
 import com.wust.dormitory.model.dto.VoidSuccessResponse;
@@ -225,7 +227,22 @@ public class AdminController implements AdminApi {
 
     @Override
     public ResponseEntity<ListSuccessResponse> listBuildings() {
-        return ResponseEntity.ok(ResponseFactory.list(adminService.buildings()));
+        return ResponseEntity.ok(ResponseFactory.list(roomManagementService.buildings()));
+    }
+
+    @Override
+    public ResponseEntity<ObjectSuccessResponse> createBuilding(BuildingRequest request) {
+        long id = roomManagementService.createBuilding(
+                new RoomManagementService.BuildingCommand(
+                        request.getBuildingCode(),
+                        request.getBuildingName(),
+                        request.getGender().getValue(),
+                        request.getEducationLevelScope().getValue(),
+                        request.getResidentScope().getValue(),
+                        request.getFloorCount(),
+                        request.getReason()),
+                SecurityUsers.requireAdmin());
+        return ResponseEntity.ok(ResponseFactory.object(Map.of("id", id)));
     }
 
     @Override
@@ -235,10 +252,29 @@ public class AdminController implements AdminApi {
     }
 
     @Override
+    public ResponseEntity<ObjectSuccessResponse> createRoom(RoomCreateRequest request) {
+        long id = roomManagementService.createRoom(
+                new RoomManagementService.RoomCreateCommand(
+                        request.getBuildingId(),
+                        request.getFloorNumber(),
+                        request.getRoomNumber(),
+                        request.getCapacity(),
+                        request.getGender().getValue(),
+                        request.getEducationLevelScope().getValue(),
+                        request.getResidentScope().getValue(),
+                        request.getOperationalStatus().getValue(),
+                        request.getRemark(),
+                        request.getReason()),
+                SecurityUsers.requireAdmin());
+        return ResponseEntity.ok(ResponseFactory.object(Map.of("id", id)));
+    }
+
+    @Override
     public ResponseEntity<VoidSuccessResponse> updateRoom(Long roomId, RoomRequest request) {
         roomManagementService.updateRoom(roomId, new RoomManagementService.RoomCommand(
                 request.getCapacity(),
                 request.getGender(),
+                request.getEducationLevelScope().getValue(),
                 request.getResidentScope().getValue(),
                 request.getOperationalStatus(),
                 request.getRemark(),

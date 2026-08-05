@@ -3,6 +3,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { api } from '../../api/client'
 import type { DataObject, ObjectSuccessResponse } from '../../api/types'
+import { useI18n } from '../../i18n'
 
 interface PreferenceChoice {
   token: string
@@ -12,6 +13,7 @@ interface PreferenceChoice {
 
 const route = useRoute()
 const router = useRouter()
+const { t, locale } = useI18n()
 const batchId = Number(route.params.batchId || 0)
 const globalMode = computed(() => !batchId)
 const batch = ref<DataObject>({})
@@ -36,6 +38,19 @@ const answeredCount = computed(() =>
   }).length,
 )
 const canSave = computed(() => globalMode.value || ['PUBLISHED', 'OPEN'].includes(String(batch.value.batch_status)))
+
+const questionTitles: Record<string, [string, string]> = {
+  SLEEP_TIME: ['入睡时间', 'Sleep time'], WAKE_TIME: ['起床时间', 'Wake-up time'],
+  NAP_HABIT: ['午休习惯', 'Nap habit'], SLEEP_SENSITIVITY: ['睡眠敏感度', 'Sleep sensitivity'],
+  NOISE_TOLERANCE: ['噪声接受度', 'Noise tolerance'], CLEANING_FREQUENCY: ['清洁频率', 'Cleaning frequency'],
+  TIDINESS_REQUIREMENT: ['整洁要求', 'Tidiness requirement'], SUMMER_AC_OVERNIGHT: ['夏季整夜空调', 'Overnight summer air conditioning'],
+  SUMMER_AC_TEMPERATURE: ['夏季制冷温度', 'Summer cooling temperature'], WINTER_HEATING_ACCEPTANCE: ['冬季空调制热', 'Winter heating'],
+  WINTER_HEATING_TEMPERATURE: ['冬季制热温度', 'Winter heating temperature'], AFTER_LIGHTS_ACTIVITY: ['熄灯后活动', 'After-lights activity'],
+  ALARM_SNOOZE: ['闹钟习惯', 'Alarm habit'], STRONG_FOOD_ODOR_ACCEPTANCE: ['重气味食物', 'Strong food odors'],
+  VENTILATION: ['通风偏好', 'Ventilation preference'], STUDY_FREQUENCY: ['宿舍学习', 'Studying in the room'],
+  GAMING_VOICE: ['游戏语音', 'Gaming voice chat'], SOCIAL_ACTIVITY: ['社交活跃度', 'Social activity'],
+  SMOKING_ACCEPTANCE: ['室友吸烟', 'Roommate smoking'], BED_PREFERENCE: ['床位偏好', 'Bed preference'],
+}
 
 const questionDetails: Record<string, string> = {
   SLEEP_TIME: '填写平时大多数工作日真正准备入睡的时间，而不是上床刷手机的时间。',
@@ -73,14 +88,21 @@ const detailedScaleLabels: Record<string, string[]> = {
   SOCIAL_ACTIVITY: ['基本不邀请同学来寝室', '偶尔短暂停留', '每周有少量来访', '经常聊天或聚餐', '寝室社交活动非常频繁'],
 }
 
+function local(zh: string, en: string) { return locale.value === 'zh-CN' ? zh : en }
+
+function questionTitle(question: DataObject) {
+  const pair = questionTitles[String(question.question_code)]
+  return pair ? local(pair[0], pair[1]) : t(String(question.question_text))
+}
+
 function questionDetail(question: DataObject) {
-  return questionDetails[String(question.question_code)] ?? '请按照最近一段时间真实、稳定的生活习惯选择。'
+  return t(questionDetails[String(question.question_code)] ?? '请按照最近一段时间真实、稳定的生活习惯选择。')
 }
 
 function refinedChoiceLabel(question: DataObject, payload: unknown, original: string) {
   const labels = detailedScaleLabels[String(question.question_code)]
   const index = Number(payload) - 1
-  return labels && Number.isInteger(index) && labels[index] ? labels[index] : original
+  return t(labels && Number.isInteger(index) && labels[index] ? labels[index] : original)
 }
 
 onMounted(load)
@@ -111,7 +133,7 @@ async function load() {
       answers[String(question.question_code)] = normalizeSavedAnswer(question, parsed)
     }
   } catch (reason) {
-    error.value = reason instanceof Error ? reason.message : '个人偏好加载失败'
+    error.value = reason instanceof Error ? reason.message : local('个人偏好加载失败', 'Failed to load preferences')
   } finally {
     loading.value = false
   }
@@ -119,11 +141,11 @@ async function load() {
 
 async function submit() {
   if (!canSave.value) {
-    error.value = '当前活动暂不允许修改个人偏好。'
+    error.value = local('当前活动暂不允许修改个人偏好。', 'Preferences cannot be changed for the current activity.')
     return
   }
   if (!completed.value) {
-    error.value = '请完成所有必填的个人偏好。'
+    error.value = local('请完成所有必填的个人偏好。', 'Please complete all required preference questions.')
     return
   }
   saving.value = true
@@ -138,13 +160,13 @@ async function submit() {
     }
     if (globalMode.value) await api.put('/api/v1/student/preferences', payload)
     else await api.post(`/api/v1/student/batches/${batchId}/questionnaire`, payload)
-    message.value = '个人偏好已保存，后续批次会自动使用这份偏好。'
+    message.value = local('个人偏好已保存，后续批次会自动使用这份偏好。', 'Your preferences have been saved and will be reused in future selection periods.')
     window.setTimeout(() => {
       void router.push(!globalMode.value && String(batch.value.batch_status) === 'OPEN'
         ? `/student/batches/${batchId}/rooms` : '/student')
     }, 600)
   } catch (reason) {
-    error.value = reason instanceof Error ? reason.message : '提交失败'
+    error.value = reason instanceof Error ? reason.message : local('提交失败', 'Submission failed')
   } finally {
     saving.value = false
   }
@@ -228,7 +250,7 @@ function fallbackChoices(
   return values.map(([payload, label], index) => ({
     token: choiceToken(question, `VALUE_${String(payload)}`, index),
     payload,
-    label,
+    label: t(label),
   }))
 }
 
@@ -260,17 +282,13 @@ function questionMax(_question: DataObject) { return 30 }
 <template>
   <div class="content-column questionnaire-wide">
     <div class="page-title">
-      <div>
-        <span class="eyebrow">PERSONAL PREFERENCES</span>
-        <h2>个人偏好</h2>
-        <p>{{ globalMode ? '即使当前没有开放批次，也可以提前设置；后续选寝将自动使用。' : '这些信息只用于寻找相处习惯更接近的室友，不用于评价个人品质。' }}</p>
-      </div>
+      <h2>{{ local('个人偏好', 'Personal preferences') }}</h2>
       <span class="progress-pill">{{ answeredCount }}/{{ visibleQuestions.length }}</span>
     </div>
 
-    <p v-if="loading" class="panel empty-state">正在加载个人偏好…</p>
+    <p v-if="loading" class="panel empty-state">{{ local('正在加载个人偏好…', 'Loading preferences…') }}</p>
     <p v-else-if="error && questions.length === 0" class="alert error">{{ error }}</p>
-    <p v-else-if="!canSave" class="alert">当前活动暂时不能修改个人偏好，你仍可查看已经填写的内容。</p>
+    <p v-else-if="!canSave" class="alert">{{ local('当前活动暂时不能修改个人偏好，你仍可查看已经填写的内容。', 'Preferences cannot be changed for this activity, but you can still review your saved answers.') }}</p>
 
     <form v-if="!loading" class="question-list" @submit.prevent="submit">
       <article
@@ -280,8 +298,8 @@ function questionMax(_question: DataObject) { return 30 }
       >
         <div class="question-number">{{ String(index + 1).padStart(2, '0') }}</div>
         <div class="question-body">
-          <h3>{{ question.question_text }}</h3>
-          <p class="question-detail">{{ questionDetail(question) }}</p><p class="question-required">{{ isRequired(question) ? '必填' : '选填' }}</p>
+          <h3>{{ questionTitle(question) }}</h3>
+          <p class="question-detail">{{ questionDetail(question) }}</p><p class="question-required">{{ isRequired(question) ? local('必填', 'Required') : local('选填', 'Optional') }}</p>
 
           <input
             v-if="question.question_type === 'TIME'"
@@ -291,7 +309,7 @@ function questionMax(_question: DataObject) { return 30 }
             :disabled="!canSave"
             :required="isRequired(question)"
           />
-          <small v-if="question.question_type === 'TIME'" class="question-hint">请使用24小时制，例如23:30。</small>
+          <small v-if="question.question_type === 'TIME'" class="question-hint">{{ local('请使用24小时制，例如23:30。', 'Use 24-hour time, for example 23:30.') }}</small>
           <label v-else-if="question.question_type === 'INTEGER'" class="temperature-input">
             <input
               v-model.number="answers[String(question.question_code)]"
@@ -323,9 +341,9 @@ function questionMax(_question: DataObject) { return 30 }
       <p v-if="error" class="alert error">{{ error }}</p>
       <p v-if="message" class="alert success">{{ message }}</p>
       <div class="sticky-actions">
-        <button type="button" class="button ghost" @click="router.push('/student')">返回首页</button>
+        <button type="button" class="button ghost" @click="router.push('/student')">{{ local('返回首页', 'Back to home') }}</button>
         <button class="button primary" :disabled="saving || !completed || !canSave">
-          {{ saving ? '正在保存…' : '保存个人偏好' }}
+          {{ saving ? local('正在保存…', 'Saving…') : local('保存个人偏好', 'Save preferences') }}
         </button>
       </div>
     </form>

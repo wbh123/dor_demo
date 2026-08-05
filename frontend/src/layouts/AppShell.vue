@@ -14,8 +14,10 @@ const welcomeError = ref('')
 const institutionName = String(import.meta.env.VITE_INSTITUTION_NAME || '示例大学')
 const productName = String(import.meta.env.VITE_APP_TITLE || `${institutionName}选寝`)
 const productSubtitle = String(import.meta.env.VITE_APP_SUBTITLE || '宿舍智能选择系统')
-const operatorName = String(import.meta.env.VITE_OPERATOR_NAME || '运营单位信息待填写')
-const icpRecord = String(import.meta.env.VITE_ICP_RECORD || 'ICP备案信息待填写')
+const operatorName = String(import.meta.env.VITE_OPERATOR_NAME || '')
+const icpRecord = String(import.meta.env.VITE_ICP_RECORD || '')
+const showOperatorInfo = String(import.meta.env.VITE_SHOW_OPERATOR_INFO || 'false').toLowerCase() === 'true' && Boolean(operatorName.trim())
+const showIcpRecord = String(import.meta.env.VITE_SHOW_ICP_RECORD || 'false').toLowerCase() === 'true' && Boolean(icpRecord.trim())
 const logoOnly = '/assert/logo-only.png'
 const { locale, localeOptions, t, subtitle, setLocale, applyNationalityLocale, welcomeMessage, translateError } = useI18n()
 const { hasFeature } = useFeatureAccess()
@@ -50,19 +52,19 @@ const icons = {
 
 const links = computed(() => auth.isAdmin ? [
   {to:'/admin',label:'工作台',icon:icons.dashboard},
-  {to:'/admin/data',label:'专业与学生',icon:icons.students},
-  {to:'/admin/import-quality',label:'导入质量',icon:icons.importQuality},
+  {to:'/admin/data',label:'学生与专业',icon:icons.students},
   {to:'/admin/dormitories',label:'宿舍资源',icon:icons.dormitory},
-  {to:'/admin/residencies',label:'在住与床位核查',icon:icons.assignment},
-  {to:'/admin/matching',label:'匹配规则',icon:icons.matching},
-  {to:'/admin/rule-templates',label:'批次规则',icon:icons.rules},
+  {to:'/admin/import-quality',label:'数据导入',icon:icons.importQuality},
+  {to:'/admin/matching',label:'匹配方案',icon:icons.matching},
+  {to:'/admin/rule-templates',label:'选寝规则',icon:icons.rules},
   {to:'/admin/batches',label:'选寝批次',icon:icons.calendar},
-  {to:'/admin/assignments',label:'分配与调整',icon:icons.assignment},
-  {to:'/admin/room-change',label:'换寝管理',icon:icons.change},
+  {to:'/admin/assignments',label:'分配管理',icon:icons.assignment},
+  {to:'/admin/residencies',label:'在住管理',icon:icons.assignment},
   {to:'/admin/waitlist',label:'候补管理',icon:icons.waitlist},
-  {to:'/admin/operations',label:'运营与健康',icon:icons.operations},
-  {to:'/admin/anomalies',label:'异常工作台',icon:icons.anomaly},
-  ...(governanceEnabled.value ? [{to:'/admin/governance',label:'审计通知与分析',icon:icons.governance}] : []),
+  {to:'/admin/room-change',label:'换寝与交换',icon:icons.change},
+  {to:'/admin/anomalies',label:'异常处理',icon:icons.anomaly},
+  {to:'/admin/operations',label:'运营监控',icon:icons.operations},
+  ...(governanceEnabled.value ? [{to:'/admin/governance',label:'治理中心',icon:icons.governance}] : []),
 ] : [
   {to:'/student',label:'选寝首页',icon:icons.home},
   {to:'/student/teams',label:'我的队伍',icon:icons.team},
@@ -131,7 +133,7 @@ async function logout() {
     </aside>
     <main class="main-content fixed-sidebar-content" :class="{ 'student-main-content': auth.isStudent }">
       <section class="page-container" :class="{ 'student-page-container': auth.isStudent, 'admin-page-container': auth.isAdmin }"><RouterView /></section>
-      <footer class="page-compliance"><span>{{ operatorName }}</span><span>{{ icpRecord }}</span></footer>
+      <footer v-if="showOperatorInfo || showIcpRecord" class="page-compliance"><span v-if="showOperatorInfo">{{ operatorName }}</span><span v-if="showIcpRecord">{{ icpRecord }}</span></footer>
     </main>
 
     <AppModal
@@ -156,5 +158,5 @@ async function logout() {
 </template>
 
 <style scoped>
-.fixed-navigation-shell{display:block;min-height:100vh}.fixed-sidebar{position:fixed;inset:0 auto 0 0;display:flex;flex-direction:column;width:260px;height:100vh;overflow:hidden;z-index:30}.fixed-sidebar .nav-list{min-height:0;overflow-y:auto;scrollbar-width:none}.fixed-sidebar .nav-list::-webkit-scrollbar{display:none}.fixed-sidebar .sidebar-foot{flex:0 0 auto}.sidebar-action-link{text-decoration:none;text-align:center}.fixed-sidebar-content{display:flex;flex-direction:column;min-height:100vh;margin-left:260px}.fixed-sidebar-content>.page-container{flex:1 0 auto}.school-brand{position:relative;z-index:5;isolation:isolate;display:flex;align-items:center;gap:11px;min-height:62px;padding:9px 12px;overflow:visible;background:linear-gradient(180deg,rgba(17,45,96,.98),rgba(17,45,96,.92))}.school-brand::before,.school-brand::after{pointer-events:none;z-index:0}.logo-safe-layer{position:relative;z-index:3;isolation:isolate}.school-brand-logo{position:relative;z-index:9;flex:0 0 auto;width:46px;height:46px;object-fit:contain;filter:drop-shadow(0 3px 8px rgba(0,0,0,.22))}.school-brand-title{position:relative;z-index:2;display:grid;gap:2px;min-width:0;text-align:left}.school-brand-title strong,.school-brand-title small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.school-brand-title strong{font-size:.92rem}.school-brand-title small{color:#91a8d5;font-size:.66rem}.admin-page-container{padding-top:22px}.account-card-without-avatar{padding:14px 16px}.account-card-without-avatar>div{min-width:0}.account-card-without-avatar strong,.account-card-without-avatar small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.page-compliance{display:flex;justify-content:center;gap:12px;flex-wrap:wrap;padding:18px 24px 22px;color:var(--muted);font-size:.72rem;line-height:1.45;text-align:center}.page-compliance span+span::before{content:"·";margin-right:12px}.welcome-modal-content{display:grid;justify-items:center;gap:12px;text-align:center}.welcome-school-logo{width:72px;height:72px;object-fit:contain}.welcome-start-button{min-width:180px}@media(max-width:820px){.fixed-sidebar{position:static;width:auto;height:auto;overflow:visible}.fixed-sidebar-content{margin-left:0}.school-brand{justify-content:flex-start}}
+.fixed-navigation-shell{display:block;min-height:100vh}.fixed-sidebar{position:fixed;inset:0 auto 0 0;display:flex;flex-direction:column;width:260px;height:100vh;overflow:hidden;z-index:30}.fixed-sidebar .nav-list{min-height:0;overflow-y:auto;scrollbar-width:none}.fixed-sidebar .nav-list::-webkit-scrollbar{display:none}.fixed-sidebar .sidebar-foot{flex:0 0 auto}.sidebar-action-link{text-decoration:none;text-align:center}.fixed-sidebar-content{display:flex;flex-direction:column;min-height:100vh;margin-left:260px}.fixed-sidebar-content>.page-container{flex:1 0 auto}.school-brand{position:relative;z-index:5;isolation:isolate;display:flex;align-items:center;gap:11px;min-height:62px;padding:9px 12px;overflow:visible;background:linear-gradient(180deg,rgba(17,45,96,.98),rgba(17,45,96,.92))}.school-brand::before,.school-brand::after{pointer-events:none;z-index:0}.logo-safe-layer{position:relative;z-index:3;isolation:isolate}.school-brand-logo{position:relative;z-index:9;flex:0 0 auto;width:52px;height:52px;object-fit:contain;filter:drop-shadow(0 3px 8px rgba(0,0,0,.22))}.school-brand-title{position:relative;z-index:2;display:grid;gap:2px;min-width:0;text-align:left}.school-brand-title strong,.school-brand-title small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.school-brand-title strong{font-size:.92rem}.school-brand-title small{color:#91a8d5;font-size:.66rem}.admin-page-container{padding-top:22px}.account-card-without-avatar{padding:14px 16px}.account-card-without-avatar>div{min-width:0}.account-card-without-avatar strong,.account-card-without-avatar small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.page-compliance{display:flex;justify-content:center;gap:12px;flex-wrap:wrap;padding:18px 24px 22px;color:var(--muted);font-size:.72rem;line-height:1.45;text-align:center}.page-compliance span+span::before{content:"·";margin-right:12px}.welcome-modal-content{display:grid;justify-items:center;gap:12px;text-align:center}.welcome-school-logo{width:72px;height:72px;object-fit:contain}.welcome-start-button{min-width:180px}@media(max-width:820px){.fixed-sidebar{position:static;width:auto;height:auto;overflow:visible}.fixed-sidebar-content{margin-left:0}.school-brand{justify-content:flex-start}}
 </style>

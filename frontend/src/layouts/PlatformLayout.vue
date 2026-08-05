@@ -5,8 +5,10 @@ import { usePlatformSession } from '../platform/session'
 const router = useRouter()
 const { state, clearSession } = usePlatformSession()
 const institutionName = String(import.meta.env.VITE_INSTITUTION_NAME || '示例大学')
-const operatorName = String(import.meta.env.VITE_OPERATOR_NAME || '运营单位信息待填写')
-const icpRecord = String(import.meta.env.VITE_ICP_RECORD || 'ICP备案信息待填写')
+const operatorName = String(import.meta.env.VITE_OPERATOR_NAME || '')
+const icpRecord = String(import.meta.env.VITE_ICP_RECORD || '')
+const showOperatorInfo = String(import.meta.env.VITE_SHOW_OPERATOR_INFO || 'false').toLowerCase() === 'true' && Boolean(operatorName.trim())
+const showIcpRecord = String(import.meta.env.VITE_SHOW_ICP_RECORD || 'false').toLowerCase() === 'true' && Boolean(icpRecord.trim())
 
 function logout() {
   clearSession()
@@ -32,7 +34,7 @@ function logout() {
     <main class="platform-main">
       <header><div><strong>{{ state.user?.displayName }}</strong><span>{{ institutionName }}系统服务管理</span></div><span class="single-customer-badge">单客户运行</span></header>
       <RouterView />
-      <footer class="platform-page-compliance"><span>{{ operatorName }}</span><span>{{ icpRecord }}</span></footer>
+      <footer v-if="showOperatorInfo || showIcpRecord" class="platform-page-compliance"><span v-if="showOperatorInfo">{{ operatorName }}</span><span v-if="showIcpRecord">{{ icpRecord }}</span></footer>
     </main>
   </div>
 </template>

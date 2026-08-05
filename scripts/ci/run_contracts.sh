@@ -20,3 +20,5 @@ python3 "$ROOT_DIR/scripts/ci/test_entitlement_recommendation_concurrency.py" "$
 python3 "$ROOT_DIR/scripts/ci/test_audit_notification_analytics.py" "$ROOT_DIR"
 python3 "$ROOT_DIR/scripts/ci/test_governance_openapi.py" "$ROOT_DIR"
 python3 "$ROOT_DIR/scripts/ci/test_governance_schema_alignment.py" "$ROOT_DIR"
+
+python3 "$ROOT_DIR/scripts/ci/test_dormitory_login_preference_ui.py"
