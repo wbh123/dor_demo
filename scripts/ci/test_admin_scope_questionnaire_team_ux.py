@@ -96,10 +96,11 @@ require(batch_scope, (
 scope_styles = read("frontend/src/admin-density-refinement.css")
 require(scope_styles, (
     ".scope-filter-grid .input",
-    "height: 42px",
+    "height: 36px",
+    "grid-template-columns: repeat(4",
     ".scope-option.disabled::after",
     "活动互斥或房间不可用",
-), "scope filter height and conflict label styles are incomplete")
+), "scope filter compact height, columns and conflict label styles are incomplete")
 
 preference = read("backend-java/server/src/main/java/com/wust/dormitory/student/StudentPreferenceService.java")
 require(preference, (
