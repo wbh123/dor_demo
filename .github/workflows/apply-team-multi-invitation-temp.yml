@@ -61,10 +61,16 @@ jobs:
           from pathlib import Path
           path = Path('backend-java/server/src/test/java/com/wust/dormitory/student/TeamInvitationConcurrencyServiceTest.java')
           text = path.read_text(encoding='utf-8')
-          old = '.thenReturn(0, 1);'
-          assert text.count(old) == 2, 'expected two inviter/invitee/occupancy stub sequences'
-          text = text.replace(old, '.thenReturn(0, 0, 1);')
-          path.write_text(text, encoding='utf-8')
+          old = """        when(jdbc.queryForObject(anyString(), any(MapSqlParameterSource.class), eq(Integer.class)))
+                .thenReturn(0, 1);
+        when(jdbc.queryForList(anyString(), anyMap()))
+"""
+          new = """        when(jdbc.queryForObject(anyString(), any(MapSqlParameterSource.class), eq(Integer.class)))
+                .thenReturn(0, 0, 1);
+        when(jdbc.queryForList(anyString(), anyMap()))
+"""
+          assert text.count(old) == 1, 'expected one duplicate-invitation MapSqlParameterSource stub sequence'
+          path.write_text(text.replace(old, new, 1), encoding='utf-8')
           PY
           git diff --check
       - name: Export applied source for review
