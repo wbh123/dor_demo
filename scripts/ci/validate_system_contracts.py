@@ -240,11 +240,11 @@ def validate_layout_and_selection_regressions(errors: list[str]) -> None:
         errors,
     )
     require(
-        "恢复标准2×2布局" in editor
+        "恢复标准2×2布局" not in editor
         and "new DefaultPlacement(-2.35, -1.65, 0)" in read(
             "backend-java/server/src/main/java/com/wust/dormitory/admin/RoomLayoutService.java"
         ),
-        "standard horizontal 2x2 default layout is not preserved",
+        "standard horizontal 2x2 backend default layout is not preserved or the removed reset button returned",
         errors,
     )
     require(
