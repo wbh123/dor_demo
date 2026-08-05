@@ -12,6 +12,7 @@ public final class QuotaCodes {
     public static final String MAX_BEDS = "MAX_BEDS";
     public static final String MAX_BATCHES_PER_YEAR = "MAX_BATCHES_PER_YEAR";
     public static final String MAX_CONCURRENT_ACTIVE_BATCHES = "MAX_CONCURRENT_ACTIVE_BATCHES";
+    public static final String MAX_CONCURRENT_SELECTION_USERS = "MAX_CONCURRENT_SELECTION_USERS";
     public static final String MAX_IMPORT_ROWS_PER_JOB = "MAX_IMPORT_ROWS_PER_JOB";
     public static final String MAX_EXPORT_ROWS_PER_JOB = "MAX_EXPORT_ROWS_PER_JOB";
 }
