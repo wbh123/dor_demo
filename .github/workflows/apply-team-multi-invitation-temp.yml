@@ -55,6 +55,18 @@ jobs:
           git apply --check /tmp/team-multi-invitation.patch
           git apply /tmp/team-multi-invitation.patch
           git diff --check
+      - name: Correct deterministic database test stubs
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('backend-java/server/src/test/java/com/wust/dormitory/student/TeamInvitationConcurrencyServiceTest.java')
+          text = path.read_text(encoding='utf-8')
+          old = '.thenReturn(0, 1);'
+          assert text.count(old) == 2, 'expected two inviter/invitee/occupancy stub sequences'
+          text = text.replace(old, '.thenReturn(0, 0, 1);')
+          path.write_text(text, encoding='utf-8')
+          PY
+          git diff --check
       - name: Export applied source for review
         uses: actions/upload-artifact@v4
         with:
