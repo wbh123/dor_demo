@@ -27,6 +27,9 @@ jobs:
           distribution: temurin
           java-version: '21'
           cache: maven
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
       - name: Reconstruct and verify exact patch
         shell: bash
         run: |
@@ -35,12 +38,16 @@ jobs:
           base64 -d scripts/ci/team-multi-invitation/patch.b64 | gzip -dc > /tmp/team-multi-invitation.patch
           echo '509d38b945621872ec5482921fc8a52dc11ef916ab75b30f33ab49c716fdd2f8  /tmp/team-multi-invitation.patch' | sha256sum -c -
       - name: Confirm RED baseline
-        shell: bash
         run: |
-          set -euo pipefail
-          grep -q 'AND active_marker=1' backend-java/server/src/main/java/com/wust/dormitory/student/TeamService.java
-          ! grep -q 'TEAM_INVITATION_PENDING_DUPLICATE' backend-java/server/src/main/java/com/wust/dormitory/student/TeamService.java
-          ! test -e backend-java/server/src/test/java/com/wust/dormitory/student/TeamInvitationConcurrencyServiceTest.java
+          python - <<'PY'
+          from pathlib import Path
+          service = Path('backend-java/server/src/main/java/com/wust/dormitory/student/TeamService.java').read_text(encoding='utf-8')
+          test_file = Path('backend-java/server/src/test/java/com/wust/dormitory/student/TeamInvitationConcurrencyServiceTest.java')
+          assert 'active_marker=1' in service, 'baseline no longer contains broad active-marker membership check'
+          assert 'TEAM_INVITATION_PENDING_DUPLICATE' not in service, 'production fix already present before patch'
+          assert not test_file.exists(), 'new concurrency regression test already exists before patch'
+          print('RED confirmed: pending INVITED membership still blocks other teams.')
+          PY
       - name: Apply patch
         shell: bash
         run: |
