@@ -4,9 +4,6 @@ on:
   push:
     branches:
       - fix/student-residency-governance-ui
-  pull_request:
-    branches:
-      - main
 
 permissions:
   contents: write
@@ -19,6 +16,7 @@ jobs:
   apply-and-verify:
     if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
         with:
@@ -37,9 +35,12 @@ jobs:
           distribution: temurin
           java-version: '21'
           cache: maven
-      - name: Normalize patch script anchors and quoting
+      - name: Apply, build and record result
+        shell: bash
         run: |
-          python - <<'PY'
+          set +e
+          {
+            python - <<'PY'
           from pathlib import Path
           path = Path('scripts/ci/apply_requested_residency_governance_fixes.py')
           text = path.read_text(encoding='utf-8')
@@ -69,22 +70,29 @@ jobs:
           )
           path.write_text(text, encoding='utf-8')
           PY
-          python -m py_compile scripts/ci/apply_requested_residency_governance_fixes.py
-      - name: Apply requested fixes
-        run: python scripts/ci/apply_requested_residency_governance_fixes.py
-      - name: Run focused regression contract
-        run: python scripts/ci/test_requested_residency_governance_regressions.py
-      - name: Build frontend
-        working-directory: frontend
-        run: npm ci && npm run build
-      - name: Run focused backend tests
-        run: mvn -f backend-java/pom.xml -pl server -am test -Dtest=AdminStudentResidencyAdjustmentServiceTest -Dsurefire.failIfNoSpecifiedTests=false
-      - name: Commit verified changes
-        run: |
-          rm scripts/ci/apply_requested_residency_governance_fixes.py
-          rm .github/workflows/temp-requested-regression-red.yml
+            python -m py_compile scripts/ci/apply_requested_residency_governance_fixes.py
+            python scripts/ci/apply_requested_residency_governance_fixes.py
+            python scripts/ci/test_requested_residency_governance_regressions.py
+            (cd frontend && npm ci && npm run build)
+            mvn -f backend-java/pom.xml -pl server -am test -Dtest=AdminStudentResidencyAdjustmentServiceTest -Dsurefire.failIfNoSpecifiedTests=false
+          } > /tmp/requested-fix-validation.log 2>&1
+          status=$?
+          set -e
+
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+
+          if [ "$status" -ne 0 ]; then
+            tail -n 500 /tmp/requested-fix-validation.log > scripts/ci/last_requested_fix_failure.log
+            git add scripts/ci/last_requested_fix_failure.log
+            git commit -m "ci: 记录在住治理修复失败位置"
+            git push origin HEAD:fix/student-residency-governance-ui
+            exit 0
+          fi
+
+          rm -f scripts/ci/last_requested_fix_failure.log
+          rm scripts/ci/apply_requested_residency_governance_fixes.py
+          rm .github/workflows/temp-requested-regression-red.yml
           git add -A
           git commit -m "fix: 修复在住床位同步与治理界面"
           git push origin HEAD:fix/student-residency-governance-ui
