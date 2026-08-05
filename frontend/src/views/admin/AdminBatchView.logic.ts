@@ -3,6 +3,11 @@ import { computed, nextTick, onMounted, reactive, ref } from 'vue'
 import { api } from '../../api/client'
 import type { DataObject, ListSuccessResponse, ObjectSuccessResponse } from '../../api/types'
 import { useFeatureAccess } from '../../composables/useFeatureAccess'
+import {
+  isPublishFlowBusy,
+  transitionPublishFlow,
+  type PublishFlowState,
+} from './batchPublishFlow'
 
 export function useAdminBatchView() {
   const { hasFeature } = useFeatureAccess()
@@ -22,7 +27,6 @@ export function useAdminBatchView() {
 
   const scopeDialog = ref(false)
   const scopeLoading = ref(false)
-  const scopeSaving = ref(false)
   const scopeBatch = ref<DataObject | null>(null)
   const scopeData = ref<DataObject | null>(null)
   const selectedStudentIds = ref<number[]>([])
@@ -41,7 +45,7 @@ export function useAdminBatchView() {
   const publishAfterScope = ref(false)
   const publishConfirmation = ref<DataObject | null>(null)
   const publishPreflightSnapshot = ref<DataObject | null>(null)
-  const publishing = ref(false)
+  const publishFlowState = ref<PublishFlowState>('IDLE')
 
   const form = reactive({
     batchCode: '',
@@ -60,6 +64,11 @@ export function useAdminBatchView() {
     reason: '',
   })
 
+  const publishFlowBusy = computed(() => isPublishFlowBusy(publishFlowState.value))
+  const creatingDraft = computed(() => publishFlowState.value === 'CREATING_DRAFT')
+  const scopeSaving = computed(() => publishFlowState.value === 'SAVING_SCOPE')
+  const runningPreflight = computed(() => publishFlowState.value === 'RUNNING_PREFLIGHT')
+  const publishing = computed(() => publishFlowState.value === 'PUBLISHING')
   const bedModeAuthorized = computed(() => hasFeature('P2_BED_SELECTION_MODE'))
   const selectedRuleTemplate = computed(() =>
     ruleTemplates.value.find((item) => Number(item.id) === Number(form.ruleTemplateId)) ?? null,
@@ -75,6 +84,7 @@ export function useAdminBatchView() {
   })
   const preflightRooms = computed(() => (roomPreflight.value?.rooms ?? []) as DataObject[])
   const preflightBlockers = computed(() => (roomPreflight.value?.blockers ?? []) as DataObject[])
+  const preflightMissingSteps = computed(() => (roomPreflight.value?.missingSteps ?? []) as string[])
   const allocationSummary = computed(() => (allocationPreview.value?.summary ?? {}) as DataObject)
   const unassignedStudents = computed(() => (allocationPreview.value?.unassigned ?? []) as DataObject[])
   const scopeStudents = computed(() => (scopeData.value?.students ?? []) as DataObject[])
@@ -83,7 +93,7 @@ export function useAdminBatchView() {
   const scopeMajorOptions = computed(() => [...new Map(scopeStudents.value.map((student) => [String(student.major_id), { id: String(student.major_id), label: `${student.major_code} · ${student.major_name}` }])).values()])
   const scopeGradeOptions = computed(() => [...new Set(scopeStudents.value.map((student) => String(student.grade_year ?? '')).filter(Boolean))].sort())
   const scopeBuildingOptions = computed(() => [...new Map(scopeRooms.value.map((room) => [String(room.building_id), { id: String(room.building_id), label: String(room.building_name) }])).values()])
-  const scopeFloorOptions = computed(() => [...new Set(scopeRooms.value.map((room) => String(room.floor_number ?? '')).filter(Boolean))].sort((a,b)=>Number(a)-Number(b)))
+  const scopeFloorOptions = computed(() => [...new Set(scopeRooms.value.map((room) => String(room.floor_number ?? '')).filter(Boolean))].sort((a, b) => Number(a) - Number(b)))
 
   const filteredStudents = computed(() => {
     const keyword = studentFilter.value.trim().toLowerCase()
@@ -112,53 +122,88 @@ export function useAdminBatchView() {
 
   onMounted(load)
 
+  function movePublishFlow(next: PublishFlowState) {
+    publishFlowState.value = transitionPublishFlow(publishFlowState.value, next)
+  }
+
+  function recoverPublishFlow() {
+    if (publishFlowState.value === 'FAILED' || publishFlowState.value === 'SUCCEEDED') {
+      movePublishFlow('IDLE')
+    }
+  }
+
   async function load() {
-    error.value = ''
     try {
       const [batchResponse, templateResponse] = await Promise.all([
         api.get<ListSuccessResponse>('/api/v1/admin/batches'),
         api.get<ListSuccessResponse>('/api/v1/admin/batch-rule-templates'),
       ])
       batches.value = (batchResponse.data.data ?? []) as DataObject[]
-      ruleTemplates.value = ((templateResponse.data.data ?? []) as DataObject[]).filter((item) =>
-        Boolean(item.enabled),
-      )
+      ruleTemplates.value = ((templateResponse.data.data ?? []) as DataObject[]).filter((item) => Boolean(item.enabled))
       if (!ruleTemplates.value.some((item) => Number(item.id) === form.ruleTemplateId)) {
-        const defaultTemplate =
-          ruleTemplates.value.find((item) => Boolean(item.is_default)) ?? ruleTemplates.value[0]
+        const defaultTemplate = ruleTemplates.value.find((item) => Boolean(item.is_default)) ?? ruleTemplates.value[0]
         form.ruleTemplateId = Number(defaultTemplate?.id ?? 0)
       }
-      if (!bedModeAuthorized.value && form.selectionMode === 'BED') {
-        form.selectionMode = 'ROOM'
-      }
+      if (!bedModeAuthorized.value && form.selectionMode === 'BED') form.selectionMode = 'ROOM'
     } catch (reason) {
       error.value = reason instanceof Error ? reason.message : '批次加载失败'
+      throw reason
     }
   }
 
   async function createBatch() {
+    if (publishFlowBusy.value) return
+    recoverPublishFlow()
     error.value = ''
     message.value = ''
     if (form.selectionMode === 'BED' && !bedModeAuthorized.value) {
       error.value = '当前服务未开放选择床位模式。'
       return
     }
+
+    const submitted = { ...form }
+    movePublishFlow('CREATING_DRAFT')
+    let createdBatch: DataObject | null = null
     try {
-      await api.post('/api/v1/admin/batches', {
-        batchCode: form.batchCode,
-        batchName: form.batchName,
-        startAt: new Date(form.startAt).toISOString(),
-        endAt: new Date(form.endAt).toISOString(),
-        ruleTemplateId: form.ruleTemplateId,
-        selectionMode: form.selectionMode,
-        separateStudentCategories: form.separateStudentCategories,
+      const response = await api.post<ObjectSuccessResponse>('/api/v1/admin/batches', {
+        batchCode: submitted.batchCode,
+        batchName: submitted.batchName,
+        startAt: new Date(submitted.startAt).toISOString(),
+        endAt: new Date(submitted.endAt).toISOString(),
+        ruleTemplateId: submitted.ruleTemplateId,
+        selectionMode: submitted.selectionMode,
+        separateStudentCategories: submitted.separateStudentCategories,
       })
-      message.value = `批次已创建为草稿，模式为${modeText(form.selectionMode)}。请配置参与学生与宿舍范围。`
+      const created = (response.data.data ?? {}) as DataObject
+      const batchId = Number(created.id)
+      if (!Number.isInteger(batchId) || batchId <= 0) {
+        throw new Error('批次创建成功，但服务端没有返回有效批次编号。')
+      }
+      createdBatch = {
+        ...created,
+        id: batchId,
+        batch_code: submitted.batchCode,
+        batch_name: submitted.batchName,
+        batch_status: 'DRAFT',
+        selection_mode: submitted.selectionMode,
+        separate_student_categories: submitted.separateStudentCategories,
+        start_at: submitted.startAt,
+        end_at: submitted.endAt,
+        eligible_count: 0,
+      }
       form.batchCode = ''
       form.batchName = ''
+      movePublishFlow('IDLE')
       await load()
+      createdBatch = batches.value.find((item) => Number(item.id) === batchId) ?? createdBatch
+      message.value = `草稿“${submitted.batchName}”已创建，请在当前窗口配置参与学生和宿舍。`
+      await openScope(createdBatch)
     } catch (reason) {
+      if (publishFlowState.value === 'CREATING_DRAFT') movePublishFlow('FAILED')
       error.value = reason instanceof Error ? reason.message : '批次创建失败'
+      if (createdBatch) {
+        message.value = '草稿已经创建，范围加载失败时可从批次列表继续配置，不要重复创建。'
+      }
     }
   }
 
@@ -169,14 +214,11 @@ export function useAdminBatchView() {
     scopeData.value = null
     selectedStudentIds.value = []
     selectedRoomIds.value = []
-    studentFilter.value = ''; studentGenderFilter.value = ''; studentCategoryFilter.value = ''; studentDegreeFilter.value = ''; studentMajorFilter.value = ''; studentGradeFilter.value = ''
-    roomFilter.value = ''; roomGenderFilter.value = ''; roomScopeFilter.value = ''; roomBuildingFilter.value = ''; roomFloorFilter.value = ''
+    resetScopeFilters()
     publishAfterScope.value = continuePublish
     error.value = ''
     try {
-      const response = await api.get<ObjectSuccessResponse>(
-        `/api/v1/admin/batches/${Number(batch.id)}/scope`,
-      )
+      const response = await api.get<ObjectSuccessResponse>(`/api/v1/admin/batches/${Number(batch.id)}/scope`)
       const data = (response.data.data ?? {}) as DataObject
       scopeData.value = data
       selectedStudentIds.value = ((data.students ?? []) as DataObject[])
@@ -193,8 +235,23 @@ export function useAdminBatchView() {
     }
   }
 
+  function resetScopeFilters() {
+    studentFilter.value = ''
+    studentGenderFilter.value = ''
+    studentCategoryFilter.value = ''
+    studentDegreeFilter.value = ''
+    studentMajorFilter.value = ''
+    studentGradeFilter.value = ''
+    roomFilter.value = ''
+    roomGenderFilter.value = ''
+    roomScopeFilter.value = ''
+    roomBuildingFilter.value = ''
+    roomFloorFilter.value = ''
+  }
+
   function closeScope() {
-    if (scopeSaving.value) return
+    if (publishFlowBusy.value || publishFlowState.value === 'WAITING_CONFIRMATION') return
+    recoverPublishFlow()
     resetScopeDialog()
   }
 
@@ -214,18 +271,13 @@ export function useAdminBatchView() {
   }
 
   function selectAllStudents() {
-    selectedStudentIds.value = uniqueIds([
-      ...selectedStudentIds.value,
-      ...filteredStudents.value.map((student) => Number(student.id)),
-    ])
+    selectedStudentIds.value = uniqueIds([...selectedStudentIds.value, ...filteredStudents.value.map((student) => Number(student.id))])
   }
 
   function selectAllRooms() {
     selectedRoomIds.value = uniqueIds([
       ...selectedRoomIds.value,
-      ...filteredRooms.value
-        .filter((room) => Boolean(room.selectable))
-        .map((room) => Number(room.id)),
+      ...filteredRooms.value.filter((room) => Boolean(room.selectable)).map((room) => Number(room.id)),
     ])
   }
 
@@ -239,58 +291,118 @@ export function useAdminBatchView() {
 
   async function saveScope() {
     const batch = scopeBatch.value
-    if (!batch) return
-    if (publishAfterScope.value && selectedStudentIds.value.length === 0) {
-      error.value = '发布前至少选择一名参与学生。'
-      return
-    }
-    if (publishAfterScope.value && selectedRoomIds.value.length === 0) {
-      error.value = '发布前至少选择一间可选宿舍。'
-      return
-    }
-
-    const continuePublish = publishAfterScope.value
-    scopeSaving.value = true
+    if (!batch || publishFlowBusy.value) return
+    recoverPublishFlow()
+    movePublishFlow('SAVING_SCOPE')
     error.value = ''
     try {
-      await api.put(`/api/v1/admin/batches/${Number(batch.id)}/scope`, {
-        studentIds: selectedStudentIds.value,
-        roomIds: selectedRoomIds.value,
-      })
+      await persistScope(batch)
+      movePublishFlow('SUCCEEDED')
       message.value = `已保存${selectedStudentIds.value.length}名学生和${selectedRoomIds.value.length}间宿舍。`
-      scopeSaving.value = false
-      resetScopeDialog()
       await load()
-      if (continuePublish) {
-        await preparePublish(batch)
-      }
+      movePublishFlow('IDLE')
+      resetScopeDialog()
     } catch (reason) {
+      movePublishFlow('FAILED')
       error.value = reason instanceof Error ? reason.message : '批次范围保存失败'
-    } finally {
-      scopeSaving.value = false
     }
   }
 
+  async function saveScopeAndContinuePublish() {
+    const batch = scopeBatch.value
+    if (!batch || publishFlowBusy.value) return
+    recoverPublishFlow()
+    const missingSteps: string[] = []
+    if (selectedStudentIds.value.length === 0) missingSteps.push('至少选择一名参与学生')
+    if (selectedRoomIds.value.length === 0) missingSteps.push('至少选择一间可选宿舍')
+    if (missingSteps.length) {
+      roomPreflight.value = {
+        publishable: false,
+        roomCount: selectedRoomIds.value.length,
+        availableCapacity: 0,
+        rooms: [],
+        blockers: [],
+        missingSteps,
+        completedSteps: ['草稿已创建', '批次规则已绑定'],
+      }
+      preflightBatch.value = batch
+      movePublishFlow('FAILED')
+      return
+    }
+
+    movePublishFlow('SAVING_SCOPE')
+    error.value = ''
+    try {
+      await persistScope(batch)
+      message.value = `范围已保存：${selectedStudentIds.value.length}名学生、${selectedRoomIds.value.length}间宿舍。`
+      movePublishFlow('RUNNING_PREFLIGHT')
+      const snapshot = await requestPreflight(batch)
+      if (!Boolean(snapshot.publishable)) {
+        roomPreflight.value = {
+          ...snapshot,
+          missingSteps: buildPreflightMissingSteps(snapshot),
+          completedSteps: ['草稿已创建', '参与学生范围已保存', '宿舍范围已保存', '批次规则已绑定'],
+        }
+        preflightBatch.value = batch
+        movePublishFlow('FAILED')
+        return
+      }
+      await openPublishConfirmationAfterPreflight(batch, snapshot)
+    } catch (reason) {
+      if (publishFlowState.value === 'SAVING_SCOPE' || publishFlowState.value === 'RUNNING_PREFLIGHT') {
+        movePublishFlow('FAILED')
+      }
+      error.value = reason instanceof Error ? reason.message : '保存范围并执行发布预检失败'
+    }
+  }
+
+  async function persistScope(batch: DataObject) {
+    await api.put(`/api/v1/admin/batches/${Number(batch.id)}/scope`, {
+      studentIds: selectedStudentIds.value,
+      roomIds: selectedRoomIds.value,
+    })
+  }
+
+  async function requestPreflight(batch: DataObject) {
+    const response = await api.get<ObjectSuccessResponse>(`/api/v1/admin/batches/${Number(batch.id)}/room-preflight`)
+    return (response.data.data ?? {}) as DataObject
+  }
+
+  function buildPreflightMissingSteps(snapshot: DataObject) {
+    const steps: string[] = []
+    if (Number(snapshot.roomCount ?? 0) === 0) steps.push('选择至少一间可用宿舍')
+    if ((snapshot.blockers ?? []).length > 0) steps.push('处理阻断发布的宿舍状态或床位映射问题')
+    if (!steps.length) steps.push('根据预检提示完成剩余发布准备')
+    return steps
+  }
+
   async function preflight(batch: DataObject) {
+    if (publishFlowBusy.value) return
+    recoverPublishFlow()
     error.value = ''
     preflightBatch.value = batch
+    movePublishFlow('RUNNING_PREFLIGHT')
     try {
-      const response = await api.get<ObjectSuccessResponse>(
-        `/api/v1/admin/batches/${Number(batch.id)}/room-preflight`,
-      )
-      roomPreflight.value = (response.data.data ?? {}) as DataObject
+      roomPreflight.value = await requestPreflight(batch)
+      movePublishFlow('IDLE')
     } catch (reason) {
+      movePublishFlow('FAILED')
       error.value = reason instanceof Error ? reason.message : '发布预检失败'
     }
   }
 
-  async function reopenScopeFromPreflight() {
-    const batch = preflightBatch.value
+  function closePreflight() {
+    if (runningPreflight.value) return
     preflightBatch.value = null
     roomPreflight.value = null
-    if (batch) {
-      await openScope(batch)
-    }
+    recoverPublishFlow()
+  }
+
+  async function reopenScopeFromPreflight() {
+    const batch = preflightBatch.value
+    closePreflight()
+    if (scopeDialog.value) return
+    if (batch) await openScope(batch, true)
   }
 
   async function openPublishConfirmationAfterPreflight(batch: DataObject, snapshot: DataObject) {
@@ -299,41 +411,54 @@ export function useAdminBatchView() {
     await nextTick()
     publishPreflightSnapshot.value = snapshot
     publishConfirmation.value = batch
+    movePublishFlow('WAITING_CONFIRMATION')
   }
 
   function closePublishConfirmation() {
     if (publishing.value) return
     publishConfirmation.value = null
     publishPreflightSnapshot.value = null
+    if (publishFlowState.value === 'WAITING_CONFIRMATION' || publishFlowState.value === 'FAILED') {
+      movePublishFlow('IDLE')
+    }
   }
 
   async function preparePublish(batch: DataObject) {
+    if (publishFlowBusy.value) return
+    recoverPublishFlow()
     error.value = ''
     publishConfirmation.value = null
     publishPreflightSnapshot.value = null
+    if (['PUBLISHED', 'OPEN', 'PAUSED'].includes(String(batch.batch_status))) {
+      message.value = '该批次已经发布，无需重复操作。'
+      return
+    }
     if (Number(batch.eligible_count ?? 0) === 0) {
       await openScope(batch, true)
       return
     }
+
+    movePublishFlow('RUNNING_PREFLIGHT')
     try {
-      const response = await api.get<ObjectSuccessResponse>(
-        `/api/v1/admin/batches/${Number(batch.id)}/room-preflight`,
-      )
-      roomPreflight.value = (response.data.data ?? {}) as DataObject
-      preflightBatch.value = batch
-      if (Number(roomPreflight.value.roomCount ?? 0) === 0) {
-        roomPreflight.value = null
-        preflightBatch.value = null
+      const snapshot = await requestPreflight(batch)
+      if (Number(snapshot.roomCount ?? 0) === 0) {
+        movePublishFlow('IDLE')
         await openScope(batch, true)
         return
       }
-      if (!Boolean(roomPreflight.value.publishable)) {
-        error.value = '发布前检查未通过，请处理阻断宿舍后重试。'
+      if (!Boolean(snapshot.publishable)) {
+        roomPreflight.value = {
+          ...snapshot,
+          missingSteps: buildPreflightMissingSteps(snapshot),
+          completedSteps: ['草稿已创建', '参与学生范围已保存', '宿舍范围已保存', '批次规则已绑定'],
+        }
+        preflightBatch.value = batch
+        movePublishFlow('FAILED')
         return
       }
-      const snapshot = { ...roomPreflight.value }
       await openPublishConfirmationAfterPreflight(batch, snapshot)
     } catch (reason) {
+      movePublishFlow('FAILED')
       error.value = reason instanceof Error ? reason.message : '批次发布预检失败'
     }
   }
@@ -341,21 +466,44 @@ export function useAdminBatchView() {
   async function confirmPublish() {
     const batch = publishConfirmation.value
     if (!batch || publishing.value) return
-    publishing.value = true
+    if (publishFlowState.value === 'FAILED') movePublishFlow('PUBLISHING')
+    else movePublishFlow('PUBLISHING')
     error.value = ''
     try {
       await api.post(`/api/v1/admin/batches/${Number(batch.id)}/status/PUBLISHED`)
-      message.value = '批次已发布。'
-      publishConfirmation.value = null
-      publishPreflightSnapshot.value = null
-      roomPreflight.value = null
-      preflightBatch.value = null
-      await load()
+      await completePublishedFlow(batch)
     } catch (reason) {
-      error.value = reason instanceof Error ? reason.message : '批次发布失败'
-    } finally {
-      publishing.value = false
+      if (await reconcilePublishedState(Number(batch.id))) {
+        await completePublishedFlow(batch)
+        return
+      }
+      movePublishFlow('FAILED')
+      const failure = reason instanceof Error ? reason : new Error('批次发布失败')
+      error.value = failure.message
+      throw failure
     }
+  }
+
+  async function reconcilePublishedState(batchId: number) {
+    try {
+      await load()
+      const actual = batches.value.find((item) => Number(item.id) === batchId)
+      return Boolean(actual && ['PUBLISHED', 'OPEN', 'PAUSED'].includes(String(actual.batch_status)))
+    } catch {
+      return false
+    }
+  }
+
+  async function completePublishedFlow(batch: DataObject) {
+    movePublishFlow('SUCCEEDED')
+    message.value = `批次“${batch.batch_name}”已发布。`
+    publishConfirmation.value = null
+    publishPreflightSnapshot.value = null
+    roomPreflight.value = null
+    preflightBatch.value = null
+    resetScopeDialog()
+    await load()
+    movePublishFlow('IDLE')
   }
 
   async function changeStatus(batch: DataObject, target: string) {
@@ -374,13 +522,7 @@ export function useAdminBatchView() {
   function openCopy(batch: DataObject) {
     copySource.value = batch
     copyDialog.value = true
-    Object.assign(copyForm, {
-      batchCode: '',
-      batchName: '',
-      startAt: '',
-      endAt: '',
-      reason: '',
-    })
+    Object.assign(copyForm, { batchCode: '', batchName: '', startAt: '', endAt: '', reason: '' })
   }
 
   function closeCopy() {
@@ -414,10 +556,7 @@ export function useAdminBatchView() {
 
   async function previewAllocation(batch: DataObject) {
     try {
-      const response = await api.get<ObjectSuccessResponse>(
-        `/api/v1/admin/batches/${Number(batch.id)}/allocation/preview`,
-        { params: { randomSeed: 20260801 } },
-      )
+      const response = await api.get<ObjectSuccessResponse>(`/api/v1/admin/batches/${Number(batch.id)}/allocation/preview`, { params: { randomSeed: 20260801 } })
       allocationPreview.value = (response.data.data ?? {}) as DataObject
       allocationBatchId.value = Number(batch.id)
     } catch (reason) {
@@ -428,17 +567,16 @@ export function useAdminBatchView() {
   async function commitAllocation() {
     if (!allocationBatchId.value) return
     try {
-      const response = await api.post<ObjectSuccessResponse>(
-        `/api/v1/admin/batches/${allocationBatchId.value}/allocation/commit`,
-        { randomSeed: 20260801, idempotencyKey: crypto.randomUUID() },
-      )
+      const response = await api.post<ObjectSuccessResponse>(`/api/v1/admin/batches/${allocationBatchId.value}/allocation/commit`, {
+        randomSeed: 20260801,
+        idempotencyKey: crypto.randomUUID(),
+      })
       const result = (response.data.data ?? {}) as DataObject
       allocationPreview.value = { summary: result.summary ?? {}, unassigned: result.unassigned ?? [] }
       allocationBatchId.value = null
-      message.value =
-        Number(((result.summary ?? {}) as DataObject).unassignedCount ?? 0) > 0
-          ? '统一分配已执行，仍有未分配学生需要处理。'
-          : '统一分配已完成。'
+      message.value = Number(((result.summary ?? {}) as DataObject).unassignedCount ?? 0) > 0
+        ? '统一分配已执行，仍有未分配学生需要处理。'
+        : '统一分配已完成。'
       await load()
     } catch (reason) {
       error.value = reason instanceof Error ? reason.message : '统一分配执行失败'
@@ -447,9 +585,7 @@ export function useAdminBatchView() {
 
   async function download(batch: DataObject) {
     try {
-      const response = await api.get(`/api/v1/admin/batches/${Number(batch.id)}/assignments.csv`, {
-        responseType: 'blob',
-      })
+      const response = await api.get(`/api/v1/admin/batches/${Number(batch.id)}/assignments.csv`, { responseType: 'blob' })
       const url = URL.createObjectURL(response.data)
       const link = document.createElement('a')
       link.href = url
@@ -473,16 +609,14 @@ export function useAdminBatchView() {
   }
 
   function nextActions(status: unknown) {
-    return (
-      {
-        DRAFT: ['PUBLISHED', 'CANCELLED'],
-        PUBLISHED: ['OPEN', 'CANCELLED'],
-        OPEN: ['PAUSED', 'CLOSED'],
-        PAUSED: ['OPEN', 'CLOSED'],
-        CLOSED: ['ALLOCATING', 'FINISHED'],
-        ALLOCATING: ['FINISHED', 'CLOSED'],
-      } as Record<string, string[]>
-    )[String(status)] ?? []
+    return ({
+      DRAFT: ['PUBLISHED', 'CANCELLED'],
+      PUBLISHED: ['OPEN', 'CANCELLED'],
+      OPEN: ['PAUSED', 'CLOSED'],
+      PAUSED: ['OPEN', 'CLOSED'],
+      CLOSED: ['ALLOCATING', 'FINISHED'],
+      ALLOCATING: ['FINISHED', 'CLOSED'],
+    } as Record<string, string[]>)[String(status)] ?? []
   }
 
   function modeText(value: unknown) {
@@ -490,47 +624,36 @@ export function useAdminBatchView() {
   }
 
   function statusText(value: unknown) {
-    return (
-      {
-        DRAFT: '草稿',
-        PUBLISHED: '已发布',
-        OPEN: '选寝中',
-        PAUSED: '已暂停',
-        CLOSED: '已关闭',
-        ALLOCATING: '分配中',
-        FINISHED: '已完成',
-        CANCELLED: '已取消',
-      } as Record<string, string>
-    )[String(value)] ?? String(value)
+    return ({
+      DRAFT: '草稿', PUBLISHED: '已发布', OPEN: '选寝中', PAUSED: '已暂停',
+      CLOSED: '已关闭', ALLOCATING: '分配中', FINISHED: '已完成', CANCELLED: '已取消',
+    } as Record<string, string>)[String(value)] ?? String(value)
   }
 
   function actionText(value: string) {
-    return (
-      {
-        PUBLISHED: '发布活动',
-        OPEN: '开放选择',
-        PAUSED: '暂停选择',
-        CLOSED: '结束选择',
-        ALLOCATING: '进入统一分配',
-        FINISHED: '标记完成',
-        CANCELLED: '取消批次',
-      } as Record<string, string>
-    )[value] ?? value
+    return ({
+      PUBLISHED: '发布活动', OPEN: '开放选择', PAUSED: '暂停选择', CLOSED: '结束选择',
+      ALLOCATING: '进入统一分配', FINISHED: '标记完成', CANCELLED: '取消批次',
+    } as Record<string, string>)[value] ?? value
   }
 
   function issueText(room: DataObject) {
-    const issues = (room.issues ?? []) as DataObject[]
-    return issues.map((item) => String(item.message)).join('；')
+    return ((room.issues ?? []) as DataObject[]).map((item) => String(item.message)).join('；')
+  }
+
+  function formatDateTime(value: unknown) {
+    if (!value) return '未设置'
+    const date = new Date(String(value))
+    return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString('zh-CN', { hour12: false })
+  }
+
+  function batchRuleSummary(batch: DataObject) {
+    const team = Boolean(batch.allow_team) ? `允许${batch.team_min_size ?? 2}—${batch.team_max_size ?? '-'}人组队` : '不允许组队'
+    const random = Boolean(batch.allow_student_random) ? '允许随机推荐' : '不允许随机推荐'
+    return `${team}；${random}；临时占用${batch.hold_duration_seconds ?? '-'}秒。`
   }
 
   return {
-    computed,
-    nextTick,
-    onMounted,
-    reactive,
-    ref,
-    api,
-    useFeatureAccess,
     hasFeature,
     batches,
     ruleTemplates,
@@ -540,6 +663,9 @@ export function useAdminBatchView() {
     allocationBatchId,
     roomPreflight,
     preflightBatch,
+    preflightRooms,
+    preflightBlockers,
+    preflightMissingSteps,
     copyDialog,
     copying,
     copySource,
@@ -564,14 +690,16 @@ export function useAdminBatchView() {
     publishAfterScope,
     publishConfirmation,
     publishPreflightSnapshot,
+    publishFlowState,
+    publishFlowBusy,
+    creatingDraft,
+    runningPreflight,
     publishing,
     form,
     copyForm,
     bedModeAuthorized,
     selectedRuleTemplate,
     ruleTemplateSummary,
-    preflightRooms,
-    preflightBlockers,
     allocationSummary,
     unassignedStudents,
     scopeStudents,
@@ -594,12 +722,14 @@ export function useAdminBatchView() {
     toggleId,
     uniqueIds,
     saveScope,
+    saveScopeAndContinuePublish,
     preflight,
+    closePreflight,
     reopenScopeFromPreflight,
-    openPublishConfirmationAfterPreflight,
     closePublishConfirmation,
     preparePublish,
     confirmPublish,
+    reconcilePublishedState,
     changeStatus,
     openCopy,
     closeCopy,
@@ -612,6 +742,8 @@ export function useAdminBatchView() {
     modeText,
     statusText,
     actionText,
-    issueText
+    issueText,
+    formatDateTime,
+    batchRuleSummary,
   }
 }
