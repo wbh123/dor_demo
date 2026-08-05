@@ -54,6 +54,11 @@ public final class FeatureCodes {
     public static final String P2_ALLOCATION_LOCAL_SWAP="P2_ALLOCATION_LOCAL_SWAP";
     public static final String P2_FAIRNESS_COMPARISON="P2_FAIRNESS_COMPARISON";
     public static final String P2_ALLOCATION_EXPERIMENT_EXPORT="P2_ALLOCATION_EXPERIMENT_EXPORT";
+    public static final String P2_SENSITIVE_DATA_VIEW="P2_SENSITIVE_DATA_VIEW";
+    public static final String P2_SENSITIVE_DATA_EXPORT="P2_SENSITIVE_DATA_EXPORT";
+    public static final String P2_EXPORT_DESENSITIZATION="P2_EXPORT_DESENSITIZATION";
+    public static final String P2_AUDIT_ADVANCED_QUERY="P2_AUDIT_ADVANCED_QUERY";
+    public static final String P2_AUDIT_EXPORT="P2_AUDIT_EXPORT";
     public static final String P3_ROOM_CHANGE_REQUEST="P3_ROOM_CHANGE_REQUEST";
     public static final String P3_ROOM_CHANGE_REVIEW="P3_ROOM_CHANGE_REVIEW";
     public static final String P3_ROOM_CHANGE_APPROVE="P3_ROOM_CHANGE_APPROVE";
@@ -68,4 +73,15 @@ public final class FeatureCodes {
     public static final String P3_WAITLIST_MANAGE="P3_WAITLIST_MANAGE";
     public static final String P3_WAITLIST_ASSIGN="P3_WAITLIST_ASSIGN";
     public static final String P3_WAITLIST_HISTORY="P3_WAITLIST_HISTORY";
+    public static final String P3_NOTIFICATION_TEMPLATE_VIEW="P3_NOTIFICATION_TEMPLATE_VIEW";
+    public static final String P3_NOTIFICATION_TEMPLATE_MANAGE="P3_NOTIFICATION_TEMPLATE_MANAGE";
+    public static final String P3_NOTIFICATION_SEND="P3_NOTIFICATION_SEND";
+    public static final String P3_NOTIFICATION_SCHEDULE="P3_NOTIFICATION_SCHEDULE";
+    public static final String P3_NOTIFICATION_DELIVERY_STATUS="P3_NOTIFICATION_DELIVERY_STATUS";
+    public static final String P3_NOTIFICATION_CHANNEL_CONFIGURE="P3_NOTIFICATION_CHANNEL_CONFIGURE";
+    public static final String P3_HISTORICAL_DASHBOARD="P3_HISTORICAL_DASHBOARD";
+    public static final String P3_CROSS_BATCH_COMPARISON="P3_CROSS_BATCH_COMPARISON";
+    public static final String P3_TREND_ANALYSIS="P3_TREND_ANALYSIS";
+    public static final String P3_CUSTOM_REPORT_EXPORT="P3_CUSTOM_REPORT_EXPORT";
+    public static final String P3_DATA_RETENTION_QUERY="P3_DATA_RETENTION_QUERY";
 }

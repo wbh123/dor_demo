@@ -1,0 +1,371 @@
+openapi: 3.0.3
+info:
+  title: 学校治理中心接口
+  version: 1.0.0
+paths:
+  /api/v1/admin/governance/audit/query:
+    post:
+      tags: [Governance]
+      operationId: queryAdvancedAudit
+      summary: 按白名单条件查询学校业务审计
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AuditQueryRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/ObjectSuccess' }
+  /api/v1/admin/governance/audit/export:
+    post:
+      tags: [Governance]
+      operationId: createAuditExportTask
+      summary: 创建脱敏或授权完整审计异步导出任务
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AuditExportRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/ObjectSuccess' }
+  /api/v1/admin/governance/exports:
+    get:
+      tags: [Governance]
+      operationId: listGovernanceExportTasks
+      summary: 查询审计和报表共用的异步导出任务
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }
+        - { name: size, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 20 } }
+      responses:
+        '200': { $ref: '#/components/responses/ListSuccess' }
+  /api/v1/admin/governance/exports/{taskId}/cancel:
+    post:
+      tags: [Governance]
+      operationId: cancelGovernanceExportTask
+      summary: 取消尚未完成的异步导出任务
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: taskId, in: path, required: true, schema: { type: integer, format: int64, minimum: 1 } }
+      responses:
+        '200': { $ref: '#/components/responses/ObjectSuccess' }
+  /api/v1/admin/governance/notifications/templates:
+    get:
+      tags: [Governance]
+      operationId: listNotificationTemplates
+      summary: 查询当前通知模板修订
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { $ref: '#/components/responses/ListSuccess' }
+  /api/v1/admin/governance/notifications/templates/revisions:
+    post:
+      tags: [Governance]
+      operationId: createNotificationTemplateRevision
+      summary: 创建不可变通知模板修订
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NotificationTemplateRevisionRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/ObjectSuccess' }
+  /api/v1/admin/governance/notifications/preflight:
+    post:
+      tags: [Governance]
+      operationId: previewNotificationRecipients
+      summary: 预检站内通知人数和内容
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NotificationSendRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/ObjectSuccess' }
+  /api/v1/admin/governance/notifications/schedule:
+    post:
+      tags: [Governance]
+      operationId: scheduleInAppNotification
+      summary: 创建立即或定时站内通知数据库任务
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NotificationSendRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/ObjectSuccess' }
+  /api/v1/admin/governance/notifications/status:
+    get:
+      tags: [Governance]
+      operationId: listNotificationDeliveryStatus
+      summary: 查询站内通知任务和投递状态
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }
+        - { name: size, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 20 } }
+      responses:
+        '200': { $ref: '#/components/responses/ListSuccess' }
+  /api/v1/admin/governance/notifications/{taskId}/cancel:
+    post:
+      tags: [Governance]
+      operationId: cancelScheduledNotification
+      summary: 取消尚未开始的定时站内通知
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: taskId, in: path, required: true, schema: { type: integer, format: int64, minimum: 1 } }
+      responses:
+        '200': { $ref: '#/components/responses/ObjectSuccess' }
+  /api/v1/admin/governance/analytics/definitions:
+    get:
+      tags: [Governance]
+      operationId: listMetricDefinitions
+      summary: 查询历史分析指标口径
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { $ref: '#/components/responses/ObjectSuccess' }
+  /api/v1/admin/governance/analytics/batches/{batchId}/snapshot:
+    post:
+      tags: [Governance]
+      operationId: createBatchAnalyticsSnapshot
+      summary: 为已完成批次创建不可变统计快照
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: batchId, in: path, required: true, schema: { type: integer, format: int64, minimum: 1 } }
+      responses:
+        '200': { $ref: '#/components/responses/ObjectSuccess' }
+  /api/v1/admin/governance/analytics/dashboard:
+    post:
+      tags: [Governance]
+      operationId: queryHistoricalDashboard
+      summary: 查询历史批次看板
+      security: [{ bearerAuth: [] }]
+      requestBody: { $ref: '#/components/requestBodies/AnalyticsFilter' }
+      responses:
+        '200': { $ref: '#/components/responses/ObjectSuccess' }
+  /api/v1/admin/governance/analytics/comparison:
+    post:
+      tags: [Governance]
+      operationId: compareHistoricalBatches
+      summary: 按白名单维度比较多个批次
+      security: [{ bearerAuth: [] }]
+      requestBody: { $ref: '#/components/requestBodies/AnalyticsFilter' }
+      responses:
+        '200': { $ref: '#/components/responses/ObjectSuccess' }
+  /api/v1/admin/governance/analytics/trend:
+    post:
+      tags: [Governance]
+      operationId: queryHistoricalTrend
+      summary: 查询批次历史趋势
+      security: [{ bearerAuth: [] }]
+      requestBody: { $ref: '#/components/requestBodies/AnalyticsFilter' }
+      responses:
+        '200': { $ref: '#/components/responses/ObjectSuccess' }
+  /api/v1/admin/governance/reports/metadata:
+    get:
+      tags: [Governance]
+      operationId: getReportBuilderMetadata
+      summary: 查询报表字段、筛选、排序和指标白名单
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { $ref: '#/components/responses/ObjectSuccess' }
+  /api/v1/admin/governance/reports/templates:
+    get:
+      tags: [Governance]
+      operationId: listReportTemplates
+      summary: 查询保存的报表模板
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { $ref: '#/components/responses/ListSuccess' }
+    post:
+      tags: [Governance]
+      operationId: saveReportTemplate
+      summary: 保存仅使用白名单字段的报表模板
+      security: [{ bearerAuth: [] }]
+      requestBody: { $ref: '#/components/requestBodies/ReportTemplate' }
+      responses:
+        '200': { $ref: '#/components/responses/ObjectSuccess' }
+  /api/v1/admin/governance/reports/export:
+    post:
+      tags: [Governance]
+      operationId: createCustomReportExportTask
+      summary: 创建自定义报表异步生成任务
+      security: [{ bearerAuth: [] }]
+      requestBody: { $ref: '#/components/requestBodies/ReportTemplate' }
+      responses:
+        '200': { $ref: '#/components/responses/ObjectSuccess' }
+  /api/v1/admin/governance/retention/policy:
+    get:
+      tags: [Governance]
+      operationId: getDataRetentionPolicy
+      summary: 查询数据和审计保留策略
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { $ref: '#/components/responses/ObjectSuccess' }
+  /api/v1/admin/governance/retention/statistics:
+    get:
+      tags: [Governance]
+      operationId: getExpiringDataStatistics
+      summary: 查询到期数据统计
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { $ref: '#/components/responses/ObjectSuccess' }
+  /api/v1/admin/governance/retention/simulate:
+    get:
+      tags: [Governance]
+      operationId: simulateDataRetentionCleanup
+      summary: 模拟清理并展示受保护数据
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { $ref: '#/components/responses/ObjectSuccess' }
+  /api/v1/admin/governance/retention/preflight:
+    post:
+      tags: [Governance]
+      operationId: createDataRetentionPreflight
+      summary: 记录不执行删除的数据保留清理预检
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReasonRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/ObjectSuccess' }
+components:
+  requestBodies:
+    AnalyticsFilter:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/AnalyticsFilterRequest' }
+    ReportTemplate:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ReportTemplateRequest' }
+  schemas:
+    AuditQueryRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        occurredFrom: { type: string, format: date-time, nullable: true }
+        occurredTo: { type: string, format: date-time, nullable: true }
+        operatorId: { type: integer, format: int64, nullable: true }
+        operatorRole: { type: string }
+        module: { type: string }
+        actionType: { type: string }
+        targetType: { type: string }
+        targetId: { type: string }
+        success: { type: boolean, nullable: true }
+        errorCode: { type: string }
+        requestId: { type: string }
+        networkAddress: { type: string }
+        keyword: { type: string }
+        page: { type: integer, minimum: 1, default: 1 }
+        size: { type: integer, minimum: 1, maximum: 200, default: 20 }
+    AuditExportRequest:
+      type: object
+      additionalProperties: false
+      required: [query, includeSensitiveData, reason]
+      properties:
+        query: { $ref: '#/components/schemas/AuditQueryRequest' }
+        includeSensitiveData: { type: boolean }
+        reason: { type: string, minLength: 2, maxLength: 500 }
+    NotificationTemplateRevisionRequest:
+      type: object
+      additionalProperties: false
+      required: [templateCode, templateName, titleZhCn, contentZhCn, titleEnUs, contentEnUs, enabled, creationReason]
+      properties:
+        templateId: { type: integer, format: int64, nullable: true }
+        templateCode: { type: string, maxLength: 64 }
+        templateName: { type: string, maxLength: 128 }
+        titleZhCn: { type: string, maxLength: 200 }
+        contentZhCn: { type: string, maxLength: 4000 }
+        titleEnUs: { type: string, maxLength: 200 }
+        contentEnUs: { type: string, maxLength: 4000 }
+        enabled: { type: boolean }
+        creationReason: { type: string, minLength: 2, maxLength: 500 }
+    RecipientCriteria:
+      type: object
+      additionalProperties: false
+      properties:
+        studentIds: { type: array, items: { type: integer, format: int64 } }
+        batchId: { type: integer, format: int64, nullable: true }
+        majorId: { type: integer, format: int64, nullable: true }
+        gradeYear: { type: integer, nullable: true }
+        degreeLevel: { type: string }
+        studentCategory: { type: string }
+        buildingId: { type: integer, format: int64, nullable: true }
+        unselectedOnly: { type: boolean, default: false }
+        pendingReviewOnly: { type: boolean, default: false }
+    NotificationSendRequest:
+      type: object
+      additionalProperties: false
+      required: [criteria, templateRevisionId, variables, reason]
+      properties:
+        criteria: { $ref: '#/components/schemas/RecipientCriteria' }
+        templateRevisionId: { type: integer, format: int64, minimum: 1 }
+        variables:
+          type: object
+          additionalProperties: { type: string }
+        scheduledAt: { type: string, format: date-time, nullable: true }
+        zoneId: { type: string, default: Asia/Shanghai }
+        reason: { type: string, minLength: 2, maxLength: 500 }
+    AnalyticsFilterRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        academicYear: { type: integer, nullable: true }
+        batchId: { type: integer, format: int64, nullable: true }
+        majorId: { type: integer, format: int64, nullable: true }
+        gradeYear: { type: integer, nullable: true }
+        degreeLevel: { type: string }
+        studentCategory: { type: string }
+        campusId: { type: integer, format: int64, nullable: true }
+        buildingId: { type: integer, format: int64, nullable: true }
+        roomType: { type: string }
+    ReportDefinition:
+      type: object
+      additionalProperties: false
+      required: [name, fields, filters, sorts, metrics, locale]
+      properties:
+        name: { type: string, maxLength: 128 }
+        fields: { type: array, items: { type: string } }
+        filters:
+          type: object
+          additionalProperties: true
+        sorts: { type: array, items: { type: string } }
+        metrics: { type: array, items: { type: string } }
+        locale: { type: string, enum: [zh-CN, en-US] }
+    ReportTemplateRequest:
+      type: object
+      additionalProperties: false
+      required: [definition, reason]
+      properties:
+        templateId: { type: integer, format: int64, nullable: true }
+        definition: { $ref: '#/components/schemas/ReportDefinition' }
+        reason: { type: string, minLength: 2, maxLength: 500 }
+    ReasonRequest:
+      type: object
+      additionalProperties: false
+      required: [reason]
+      properties:
+        reason: { type: string, minLength: 2, maxLength: 500 }
+  responses:
+    ObjectSuccess:
+      description: 操作成功
+      content:
+        application/json:
+          schema: { $ref: '../common-response/openapi-common-response.yaml#/components/schemas/ObjectSuccessResponse' }
+    ListSuccess:
+      description: 查询成功
+      content:
+        application/json:
+          schema: { $ref: '../common-response/openapi-common-response.yaml#/components/schemas/ListSuccessResponse' }
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

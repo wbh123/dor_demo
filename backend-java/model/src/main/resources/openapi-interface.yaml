@@ -23,6 +23,10 @@ paths:
     $ref: 'admin/openapi-admin.yaml#/paths/~1api~1v1~1admin~1dashboard'
   /api/v1/admin/settings/student-welcome:
     $ref: 'admin/openapi-system-setting.yaml#/paths/~1api~1v1~1admin~1settings~1student-welcome'
+  /api/v1/admin/settings/features:
+    $ref: 'admin/openapi-school-feature-setting.yaml#/paths/~1api~1v1~1admin~1settings~1features'
+  /api/v1/admin/settings/features/{featureCode}:
+    $ref: 'admin/openapi-school-feature-setting.yaml#/paths/~1api~1v1~1admin~1settings~1features~1{featureCode}'
   /api/v1/admin/majors:
     $ref: 'admin/openapi-admin.yaml#/paths/~1api~1v1~1admin~1majors'
   /api/v1/admin/majors/{id}:
@@ -89,6 +93,50 @@ paths:
     $ref: 'admin/openapi-assignment-adjustment.yaml#/paths/~1api~1v1~1admin~1assignments~1{assignmentId}~1adjust'
   /api/v1/admin/audit-logs:
     $ref: 'admin/openapi-admin.yaml#/paths/~1api~1v1~1admin~1audit-logs'
+  /api/v1/admin/governance/audit/query:
+    $ref: 'admin/openapi-governance.yaml#/paths/~1api~1v1~1admin~1governance~1audit~1query'
+  /api/v1/admin/governance/audit/export:
+    $ref: 'admin/openapi-governance.yaml#/paths/~1api~1v1~1admin~1governance~1audit~1export'
+  /api/v1/admin/governance/exports:
+    $ref: 'admin/openapi-governance.yaml#/paths/~1api~1v1~1admin~1governance~1exports'
+  /api/v1/admin/governance/exports/{taskId}/cancel:
+    $ref: 'admin/openapi-governance.yaml#/paths/~1api~1v1~1admin~1governance~1exports~1{taskId}~1cancel'
+  /api/v1/admin/governance/notifications/templates:
+    $ref: 'admin/openapi-governance.yaml#/paths/~1api~1v1~1admin~1governance~1notifications~1templates'
+  /api/v1/admin/governance/notifications/templates/revisions:
+    $ref: 'admin/openapi-governance.yaml#/paths/~1api~1v1~1admin~1governance~1notifications~1templates~1revisions'
+  /api/v1/admin/governance/notifications/preflight:
+    $ref: 'admin/openapi-governance.yaml#/paths/~1api~1v1~1admin~1governance~1notifications~1preflight'
+  /api/v1/admin/governance/notifications/schedule:
+    $ref: 'admin/openapi-governance.yaml#/paths/~1api~1v1~1admin~1governance~1notifications~1schedule'
+  /api/v1/admin/governance/notifications/status:
+    $ref: 'admin/openapi-governance.yaml#/paths/~1api~1v1~1admin~1governance~1notifications~1status'
+  /api/v1/admin/governance/notifications/{taskId}/cancel:
+    $ref: 'admin/openapi-governance.yaml#/paths/~1api~1v1~1admin~1governance~1notifications~1{taskId}~1cancel'
+  /api/v1/admin/governance/analytics/definitions:
+    $ref: 'admin/openapi-governance.yaml#/paths/~1api~1v1~1admin~1governance~1analytics~1definitions'
+  /api/v1/admin/governance/analytics/batches/{batchId}/snapshot:
+    $ref: 'admin/openapi-governance.yaml#/paths/~1api~1v1~1admin~1governance~1analytics~1batches~1{batchId}~1snapshot'
+  /api/v1/admin/governance/analytics/dashboard:
+    $ref: 'admin/openapi-governance.yaml#/paths/~1api~1v1~1admin~1governance~1analytics~1dashboard'
+  /api/v1/admin/governance/analytics/comparison:
+    $ref: 'admin/openapi-governance.yaml#/paths/~1api~1v1~1admin~1governance~1analytics~1comparison'
+  /api/v1/admin/governance/analytics/trend:
+    $ref: 'admin/openapi-governance.yaml#/paths/~1api~1v1~1admin~1governance~1analytics~1trend'
+  /api/v1/admin/governance/reports/metadata:
+    $ref: 'admin/openapi-governance.yaml#/paths/~1api~1v1~1admin~1governance~1reports~1metadata'
+  /api/v1/admin/governance/reports/templates:
+    $ref: 'admin/openapi-governance.yaml#/paths/~1api~1v1~1admin~1governance~1reports~1templates'
+  /api/v1/admin/governance/reports/export:
+    $ref: 'admin/openapi-governance.yaml#/paths/~1api~1v1~1admin~1governance~1reports~1export'
+  /api/v1/admin/governance/retention/policy:
+    $ref: 'admin/openapi-governance.yaml#/paths/~1api~1v1~1admin~1governance~1retention~1policy'
+  /api/v1/admin/governance/retention/statistics:
+    $ref: 'admin/openapi-governance.yaml#/paths/~1api~1v1~1admin~1governance~1retention~1statistics'
+  /api/v1/admin/governance/retention/simulate:
+    $ref: 'admin/openapi-governance.yaml#/paths/~1api~1v1~1admin~1governance~1retention~1simulate'
+  /api/v1/admin/governance/retention/preflight:
+    $ref: 'admin/openapi-governance.yaml#/paths/~1api~1v1~1admin~1governance~1retention~1preflight'
   /api/v1/admin/batches/{batchId}/assignments.csv:
     $ref: 'admin/openapi-admin.yaml#/paths/~1api~1v1~1admin~1batches~1{batchId}~1assignments.csv'
   /api/v1/admin/import/students/template:
@@ -260,3 +308,35 @@ paths:
     $ref: 'platform/openapi-platform.yaml#/paths/~1api~1v1~1platform~1me'
   /api/v1/platform/password:
     $ref: 'platform/openapi-platform.yaml#/paths/~1api~1v1~1platform~1password'
+  /api/v1/platform/plans:
+    $ref: 'platform/openapi-platform.yaml#/paths/~1api~1v1~1platform~1plans'
+  /api/v1/platform/plans/revisions/{revisionId}:
+    $ref: 'platform/openapi-platform.yaml#/paths/~1api~1v1~1platform~1plans~1revisions~1{revisionId}'
+  /api/v1/platform/subscription:
+    $ref: 'platform/openapi-platform.yaml#/paths/~1api~1v1~1platform~1subscription'
+  /api/v1/platform/subscription/history:
+    $ref: 'platform/openapi-platform.yaml#/paths/~1api~1v1~1platform~1subscription~1history'
+  /api/v1/platform/subscription/preview:
+    $ref: 'platform/openapi-platform.yaml#/paths/~1api~1v1~1platform~1subscription~1preview'
+  /api/v1/platform/subscription/plan:
+    $ref: 'platform/openapi-platform.yaml#/paths/~1api~1v1~1platform~1subscription~1plan'
+  /api/v1/platform/subscription/status:
+    $ref: 'platform/openapi-platform.yaml#/paths/~1api~1v1~1platform~1subscription~1status'
+  /api/v1/platform/features:
+    $ref: 'platform/openapi-platform.yaml#/paths/~1api~1v1~1platform~1features'
+  /api/v1/platform/features/entitlements:
+    $ref: 'platform/openapi-platform.yaml#/paths/~1api~1v1~1platform~1features~1entitlements'
+  /api/v1/platform/features/{featureCode}/state:
+    $ref: 'platform/openapi-platform.yaml#/paths/~1api~1v1~1platform~1features~1{featureCode}~1state'
+  /api/v1/platform/features/batch-state:
+    $ref: 'platform/openapi-platform.yaml#/paths/~1api~1v1~1platform~1features~1batch-state'
+  /api/v1/platform/feature-overrides:
+    $ref: 'platform/openapi-platform.yaml#/paths/~1api~1v1~1platform~1feature-overrides'
+  /api/v1/platform/quotas:
+    $ref: 'platform/openapi-platform.yaml#/paths/~1api~1v1~1platform~1quotas'
+  /api/v1/platform/quota-overrides:
+    $ref: 'platform/openapi-platform.yaml#/paths/~1api~1v1~1platform~1quota-overrides'
+  /api/v1/platform/audit:
+    $ref: 'platform/openapi-platform.yaml#/paths/~1api~1v1~1platform~1audit'
+  /api/v1/platform/redis/clear:
+    $ref: 'platform/openapi-platform-redis.yaml#/paths/~1api~1v1~1platform~1redis~1clear'
