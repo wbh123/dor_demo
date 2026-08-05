@@ -7,6 +7,7 @@ import com.wust.dormitory.student.StudentPreferenceService;
 import com.wust.dormitory.subscription.FeatureAccessService;
 import com.wust.dormitory.subscription.FeatureCodes;
 import org.springframework.http.HttpStatus;
+import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,10 +35,9 @@ public class SelectionPolicyService {
     }
 
     public Map<String, Object> policy() {
-        ensure();
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("allowWithoutQuestionnaire", enabled(QUESTIONNAIRE_BYPASS));
-        result.put("allowStudentReselect", enabled(STUDENT_RESELECT));
+        result.put("allowWithoutQuestionnaire", settingEnabled(QUESTIONNAIRE_BYPASS, false));
+        result.put("allowStudentReselect", settingEnabled(STUDENT_RESELECT, false));
         result.put("directPreferenceWithoutBatchAllowed", directPreferenceWithoutBatchAllowed());
         result.put("questionnaireBypassFeatureEnabled", featureAccessService.has(FeatureCodes.P2_QUESTIONNAIRE_BYPASS_CONTROL));
         result.put("studentReselectFeatureEnabled", featureAccessService.has(FeatureCodes.P2_STUDENT_RESELECT_CONTROL));
@@ -60,10 +60,15 @@ public class SelectionPolicyService {
         if (reason == null || reason.isBlank()) {
             throw new BusinessException("POLICY_REASON_REQUIRED", "请填写策略修改原因");
         }
+        if (operator == null || !"ADMIN".equals(operator.userType())) {
+            throw new BusinessException("ADMIN_REQUIRED", "只有学校管理员可以修改选寝行为策略", HttpStatus.FORBIDDEN);
+        }
+
         Map<String, Object> before = policy();
-        write(QUESTIONNAIRE_BYPASS, allowWithoutQuestionnaire);
-        write(STUDENT_RESELECT, allowStudentReselect);
-        write(ALLOW_DIRECT_PREFERENCE_WITHOUT_BATCH, directPreferenceWithoutBatchAllowed);
+        upsertPolicySetting(QUESTIONNAIRE_BYPASS, allowWithoutQuestionnaire, operator.userId());
+        upsertPolicySetting(STUDENT_RESELECT, allowStudentReselect, operator.userId());
+        upsertPolicySetting(ALLOW_DIRECT_PREFERENCE_WITHOUT_BATCH,
+                directPreferenceWithoutBatchAllowed, operator.userId());
         Map<String, Object> after = policy();
         auditService.success(operator, "SELECTION_POLICY_UPDATE", "SYSTEM_SETTING", null,
                 reason.trim(), before, after);
@@ -71,12 +76,12 @@ public class SelectionPolicyService {
     }
 
     public boolean directPreferenceWithoutBatchAllowed() {
-        return enabled(ALLOW_DIRECT_PREFERENCE_WITHOUT_BATCH);
+        return settingEnabled(ALLOW_DIRECT_PREFERENCE_WITHOUT_BATCH, true);
     }
 
     public Map<String, Object> readiness(long batchId, long studentId) {
         boolean completed = preferenceService.completed(studentId) || hasBatchFeature(batchId, studentId);
-        boolean bypass = enabled(QUESTIONNAIRE_BYPASS)
+        boolean bypass = settingEnabled(QUESTIONNAIRE_BYPASS, false)
                 && featureAccessService.has(FeatureCodes.P2_QUESTIONNAIRE_BYPASS_CONTROL);
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("preferenceCompleted", completed);
@@ -99,7 +104,7 @@ public class SelectionPolicyService {
     }
 
     public boolean canStudentReselect() {
-        return enabled(STUDENT_RESELECT)
+        return settingEnabled(STUDENT_RESELECT, false)
                 && featureAccessService.has(FeatureCodes.P2_STUDENT_RESELECT_CONTROL);
     }
 
@@ -146,29 +151,23 @@ public class SelectionPolicyService {
         return version == null ? 0 : version;
     }
 
-    private boolean enabled(String key) {
-        ensure();
+    private boolean settingEnabled(String key, boolean defaultValue) {
         List<String> rows = jdbc.query("SELECT setting_value FROM system_setting WHERE setting_key=:key",
                 Map.of("key", key), (rs, n) -> rs.getString(1));
-        return !rows.isEmpty() && Boolean.parseBoolean(rows.getFirst());
+        return rows.isEmpty() ? defaultValue : Boolean.parseBoolean(rows.getFirst());
     }
 
-    private void write(String key, boolean value) {
-        jdbc.update("UPDATE system_setting SET setting_value=:value,version=version+1 WHERE setting_key=:key",
-                Map.of("key", key, "value", Boolean.toString(value)));
-    }
-
-    private void ensure() {
-        ensure(QUESTIONNAIRE_BYPASS, false);
-        ensure(STUDENT_RESELECT, false);
-        ensure(ALLOW_DIRECT_PREFERENCE_WITHOUT_BATCH, true);
-    }
-
-    private void ensure(String key, boolean defaultValue) {
+    private void upsertPolicySetting(String key, boolean value, long updatedBy) {
         jdbc.update("""
-                INSERT INTO system_setting(setting_key,setting_value,version)
-                VALUES (:key,:value,0)
-                ON DUPLICATE KEY UPDATE setting_key=VALUES(setting_key)
-                """, Map.of("key", key, "value", Boolean.toString(defaultValue)));
+                INSERT INTO system_setting(setting_key,setting_value,version,updated_by)
+                VALUES (:key,:value,1,:updatedBy)
+                ON DUPLICATE KEY UPDATE
+                    setting_value=VALUES(setting_value),
+                    version=version+1,
+                    updated_by=:updatedBy
+                """, new MapSqlParameterSource()
+                .addValue("key", key)
+                .addValue("value", Boolean.toString(value))
+                .addValue("updatedBy", updatedBy));
     }
 }
