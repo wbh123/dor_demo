@@ -2,6 +2,7 @@
 from pathlib import Path
 import unittest
 
+# 该契约覆盖本轮用户可见回归，并作为公开仓库完整构建前的聚焦门禁。
 ROOT = Path(__file__).resolve().parents[2]
 
 
