@@ -91,7 +91,7 @@ public class ConcurrentSelectionLeaseService {
         String token = UUID.randomUUID().toString();
         long now = Instant.now().toEpochMilli();
         long expiresAt = now + ttl.toMillis();
-        LeaseScriptResult result = execute(
+        LeaseScriptResult result = executeAcquireOrRenew(
                 ACQUIRE_SCRIPT,
                 studentId,
                 now,
@@ -111,7 +111,7 @@ public class ConcurrentSelectionLeaseService {
         requireTtl(ttl);
         long now = Instant.now().toEpochMilli();
         long expiresAt = now + ttl.toMillis();
-        LeaseScriptResult result = execute(
+        LeaseScriptResult result = executeAcquireOrRenew(
                 RENEW_SCRIPT,
                 studentId,
                 now,
@@ -130,17 +130,24 @@ public class ConcurrentSelectionLeaseService {
     public int release(long studentId, String token) {
         requiredToken(token);
         long now = Instant.now().toEpochMilli();
-        LeaseScriptResult result = execute(
-                RELEASE_SCRIPT,
-                studentId,
-                now,
-                now,
-                token,
-                Integer.MAX_VALUE);
-        return result.activeUsers();
+        DefaultRedisScript<String> script = new DefaultRedisScript<>(RELEASE_SCRIPT, String.class);
+        try {
+            String raw = redis.execute(
+                    script,
+                    List.of(activeUsersKey(), studentLeasesKey(studentId)),
+                    String.valueOf(now),
+                    String.valueOf(studentId),
+                    token);
+            if (raw == null) {
+                throw redisUnavailable();
+            }
+            return parseResult(raw, now).activeUsers();
+        } catch (RedisConnectionFailureException exception) {
+            throw redisUnavailable();
+        }
     }
 
-    private LeaseScriptResult execute(
+    private LeaseScriptResult executeAcquireOrRenew(
             String scriptText,
             long studentId,
             long now,
