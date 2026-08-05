@@ -104,7 +104,7 @@ components:
             type: string
         defaultRecommendationStrategy:
           type: string
-          enum: [BEST_MATCH, TRUE_RANDOM, MATCH_WEIGHTED_RANDOM]
+          description: 默认推荐方式；服务端会校验其属于允许方式集合。
         weightedRandomBaseWeight:
           type: number
           format: double
