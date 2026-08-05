@@ -34,8 +34,9 @@ require(reset_service, "cancelActiveRoomChanges", "complete reset must cancel ac
 
 admin_data = read("frontend/src/views/admin/AdminDataView.vue")
 forbid(admin_data, "window.scrollTo", "student editing must not jump to the top of the page")
-require(admin_data, "student-edit-overlay", "student editing must use a modal overlay")
-require(admin_data, "aria-labelledby=\"student-edit-title\"", "student edit dialog must be accessible")
+require(admin_data, "import AppModal", "student editing must use the common modal component")
+require(admin_data, ':open="Boolean(editingStudent)"', "student editing modal must follow editing state")
+require(admin_data, 'v-if="editingStudent" class="student-dialog"', "student edit content must keep a non-null state guard")
 
 room_list = read("frontend/src/views/student/RoomListView.vue")
 forbid(room_list, "{{ room.selectionHint }}", "ROOM cards must not repeat the room-only selection hint")

@@ -308,13 +308,24 @@ public class StudentService {
 
     public Map<String, Object> assignment(long batchId, CurrentUser user) {
         List<Map<String, Object>> rows = jdbc.queryForList("""
-                SELECT a.id, a.assignment_method, a.assigned_at, bed.id AS bed_id,
-                       bed.bed_code, bed.bed_type, r.id AS room_id, r.room_number,
-                       b.building_name, f.floor_number
-                FROM bed_assignment a JOIN bed ON bed.id=a.bed_id
-                JOIN room r ON r.id=bed.room_id JOIN dormitory_floor f ON f.id=r.floor_id
+                SELECT a.id, a.assignment_method, a.assigned_at,
+                       COALESCE(actual_bed.id, selected_bed.id) AS bed_id,
+                       COALESCE(actual_bed.bed_code, selected_bed.bed_code) AS bed_code,
+                       COALESCE(actual_bed.bed_type, selected_bed.bed_type) AS bed_type,
+                       r.id AS room_id, r.room_number, b.building_name, f.floor_number
+                FROM bed_assignment a
+                JOIN bed selected_bed ON selected_bed.id=a.bed_id
+                LEFT JOIN room_assignment current_residency
+                  ON current_residency.batch_id=a.batch_id
+                 AND current_residency.student_id=a.student_id
+                 AND current_residency.assignment_status='ACTIVE'
+                LEFT JOIN bed actual_bed ON actual_bed.id=current_residency.bed_id
+                JOIN room r ON r.id=COALESCE(actual_bed.room_id, selected_bed.room_id)
+                JOIN dormitory_floor f ON f.id=r.floor_id
                 JOIN dormitory_building b ON b.id=f.building_id
                 WHERE a.batch_id=:batchId AND a.student_id=:studentId
+                  AND a.assignment_status='ACTIVE'
+                ORDER BY a.assigned_at DESC, a.id DESC
                 """, new MapSqlParameterSource().addValue("batchId", batchId).addValue("studentId", user.studentId()));
         return rows.isEmpty() ? Map.of("assigned", false) : Map.of("assigned", true, "assignment", rows.getFirst());
     }

@@ -154,8 +154,12 @@ public class SelectionPolicyService {
     }
 
     private void write(String key, boolean value) {
-        jdbc.update("UPDATE system_setting SET setting_value=:value,version=version+1 WHERE setting_key=:key",
+        int updated = jdbc.update(
+                "UPDATE system_setting SET setting_value=:value,version=version+1 WHERE setting_key=:key",
                 Map.of("key", key, "value", Boolean.toString(value)));
+        if (updated == 0) {
+            ensure(key, value);
+        }
     }
 
     private void ensure() {

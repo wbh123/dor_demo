@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import AppModal from '../../components/modal/AppModal.vue'
 import { api } from '../../api/client'
 import type { DataObject, ObjectSuccessResponse } from '../../api/types'
 import { bedTypeLabel } from '../../utils/bedLabels'
@@ -187,13 +188,11 @@ function methodText(value: unknown) {
     </template>
     <AdminBedConfirmationView v-else embedded />
 
-    <div v-if="selected" class="modal-overlay" @click.self="closeDialog">
-      <section class="modal-card bed-confirm-dialog"><header class="section-head split-title"><div><span class="eyebrow">BED MAPPING</span><h3>{{ selected.student_name }} · {{ selected.building_name }} {{ selected.room_number }}</h3><p>点击学生现实中实际使用的床位。已被其他在住学生确认的床位不可选择。</p></div><button class="button ghost small" @click="closeDialog">关闭</button></header>
+    <AppModal :open="Boolean(selected)" size="wide" :busy="saving" @close="closeDialog"><div v-if="selected" class="bed-confirm-dialog"><header class="section-head split-title"><div><span class="eyebrow">BED MAPPING</span><h3>{{ selected.student_name }} · {{ selected.building_name }} {{ selected.room_number }}</h3><p>点击学生现实中实际使用的床位。已被其他在住学生确认的床位不可选择。</p></div><button class="button ghost small" @click="closeDialog">关闭</button></header>
         <div class="bed-card-grid"><button v-for="bed in availableBeds" :key="String(bed.id)" type="button" class="bed-card" :class="{ selected: selectedBedId === Number(bed.id) }" @click="selectedBedId = Number(bed.id)"><strong>{{ bed.bed_code }}</strong><span>{{ bedTypeLabel(bed.bed_type) }}</span><small>{{ selectedBedId === Number(bed.id) ? '已选择' : '可确认' }}</small></button></div>
         <label class="form-stack"><span>确认或调整原因</span><textarea v-model.trim="reason" class="input" required maxlength="500" rows="3" placeholder="例如：线下核对学生实际入住床位"></textarea></label>
         <div class="button-row dialog-actions"><button class="button ghost" type="button" @click="closeDialog">取消</button><button class="button primary" type="button" :disabled="!selectedBedId || !reason.trim() || saving" @click="saveBed">{{ saving ? '保存中…' : '确认实际床位' }}</button></div>
-      </section>
-    </div>
+      </div></AppModal>
   </div>
 </template>
 
