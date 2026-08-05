@@ -1,0 +1,49 @@
+name: Apply Team Multi Invitation Fix V2
+on:
+  push:
+    branches: [fix/team-multi-invitation-20260806]
+permissions:
+  contents: write
+jobs:
+  apply-and-verify:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: fix/team-multi-invitation-20260806
+          fetch-depth: 0
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Reconstruct patch
+        run: |
+          echo '524af1d4fd87c44da2c7b38a345fcd6b249fa2c73d954abba476945d8369287a  scripts/ci/team-multi-invitation/patch.b64' | sha256sum -c -
+          base64 -d scripts/ci/team-multi-invitation/patch.b64 | gzip -dc > /tmp/team.patch
+          echo '509d38b945621872ec5482921fc8a52dc11ef916ab75b30f33ab49c716fdd2f8  /tmp/team.patch' | sha256sum -c -
+      - name: Apply production and test patch
+        run: |
+          git apply --check /tmp/team.patch
+          git apply /tmp/team.patch
+          python -c "from pathlib import Path; p=Path('backend-java/server/src/test/java/com/wust/dormitory/student/TeamInvitationConcurrencyServiceTest.java'); s=p.read_text(); old='        when(jdbc.queryForObject(anyString(), any(MapSqlParameterSource.class), eq(Integer.class)))\n                .thenReturn(0, 1);\n        when(jdbc.queryForList(anyString(), anyMap()))\n'; new='        when(jdbc.queryForObject(anyString(), any(MapSqlParameterSource.class), eq(Integer.class)))\n                .thenReturn(0, 0, 1);\n        when(jdbc.queryForList(anyString(), anyMap()))\n'; assert s.count(old)==1; p.write_text(s.replace(old,new,1))"
+          git diff --check
+      - name: Run targeted Java tests
+        run: mvn -f backend-java/pom.xml -pl server -am -Dtest=TeamInvitationConcurrencyServiceTest -Dsurefire.failIfNoSpecifiedTests=false test
+      - name: Run cross-layer contracts
+        run: bash scripts/ci/run_contracts.sh
+      - name: Remove temporary delivery files
+        run: |
+          rm -rf scripts/ci/team-multi-invitation
+          rm -f .github/workflows/apply-team-multi-invitation-temp.yml
+          rm -f .github/workflows/apply-team-multi-invitation-v2-temp.yml
+      - name: Commit formal source
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A
+          git diff --cached --check
+          git commit -m 'fix: 支持同一学生接收多支队伍邀请'
+          git push origin HEAD:fix/team-multi-invitation-20260806
