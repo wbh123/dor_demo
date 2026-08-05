@@ -1,0 +1,61 @@
+name: Apply Residency Bed and End Fix
+on:
+  push:
+    branches:
+      - fix/residency-bed-end-20260806
+permissions:
+  contents: write
+concurrency:
+  group: apply-residency-bed-end-fix
+  cancel-in-progress: false
+jobs:
+  apply-and-verify:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: fix/residency-bed-end-20260806
+          fetch-depth: 0
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Reconstruct and verify exact patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo '0584ad8390071b4fedc09fd7b3f6e81cab68d58c786df0daefb2020e2de813d4  scripts/ci/residency-fix/patch.b64' | sha256sum -c -
+          base64 -d scripts/ci/residency-fix/patch.b64 | gzip -dc > /tmp/residency.patch
+          echo '29d357c702055673de10e20a7bfd2d6950add6180cb9224754ed128a28b671e0  /tmp/residency.patch' | sha256sum -c -
+      - name: Confirm RED baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          test ! -e backend-java/server/src/test/java/com/wust/dormitory/residency/ResidencyServiceTest.java
+          ! grep -q 'requireBedAvailableForResidency' backend-java/server/src/main/java/com/wust/dormitory/residency/ResidencyService.java
+      - name: Apply patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git apply --check /tmp/residency.patch
+          git apply /tmp/residency.patch
+          git diff --check
+      - name: Run targeted Java tests
+        run: mvn -f backend-java/pom.xml -pl server -am -Dtest=ResidencyServiceTest -Dsurefire.failIfNoSpecifiedTests=false test
+      - name: Run cross-layer contracts
+        run: bash scripts/ci/run_contracts.sh
+      - name: Remove temporary delivery files
+        run: |
+          rm -rf scripts/ci/residency-fix
+          rm -f .github/workflows/apply-residency-fix-temp.yml
+      - name: Commit formal source
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A
+          git diff --cached --check
+          git commit -m 'fix: 修复实际床位确认与退宿返回逻辑'
+          git push origin HEAD:fix/residency-bed-end-20260806
