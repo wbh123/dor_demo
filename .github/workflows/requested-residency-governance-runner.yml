@@ -14,13 +14,13 @@ concurrency:
 
 jobs:
   apply-and-verify:
-    if: github.head_ref == 'fix/student-residency-governance-ui'
+    if: startsWith(github.head_ref, 'fix/student-residency-governance-ui')
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
         with:
-          ref: fix/student-residency-governance-ui
+          ref: ${{ github.head_ref }}
           fetch-depth: 0
       - uses: actions/setup-python@v6
         with:
@@ -60,4 +60,4 @@ jobs:
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           git add -A
           git commit -m "fix: 修复在住床位同步与治理界面"
-          git push origin HEAD:fix/student-residency-governance-ui
+          git push origin HEAD:${{ github.head_ref }}
