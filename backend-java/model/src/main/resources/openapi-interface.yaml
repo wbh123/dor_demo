@@ -2,7 +2,7 @@ openapi: 3.0.3
 info:
   title: 示例大学学生宿舍智能选择系统接口
   description: 学生宿舍智能选择、业务管理与系统服务管理接口契约
-  version: 3.4.0
+  version: 3.5.0
 servers:
   - url: http://localhost:8080
 paths:
@@ -190,6 +190,8 @@ paths:
     $ref: 'student/openapi-student.yaml#/paths/~1api~1v1~1student~1batches~1{batchId}~1beds~1{bedId}~1confirm'
   /api/v1/student/batches/{batchId}/random-recommendation:
     $ref: 'student/openapi-student.yaml#/paths/~1api~1v1~1student~1batches~1{batchId}~1random-recommendation'
+  /api/v1/student/batches/{batchId}/recommendations:
+    $ref: 'student/openapi-student.yaml#/paths/~1api~1v1~1student~1batches~1{batchId}~1recommendations'
   /api/v1/student/batches/{batchId}/assignment:
     $ref: 'student/openapi-student.yaml#/paths/~1api~1v1~1student~1batches~1{batchId}~1assignment'
   /api/v1/student/teams:
@@ -258,35 +260,3 @@ paths:
     $ref: 'platform/openapi-platform.yaml#/paths/~1api~1v1~1platform~1me'
   /api/v1/platform/password:
     $ref: 'platform/openapi-platform.yaml#/paths/~1api~1v1~1platform~1password'
-  /api/v1/platform/plans:
-    $ref: 'platform/openapi-platform.yaml#/paths/~1api~1v1~1platform~1plans'
-  /api/v1/platform/plans/revisions/{revisionId}:
-    $ref: 'platform/openapi-platform.yaml#/paths/~1api~1v1~1platform~1plans~1revisions~1{revisionId}'
-  /api/v1/platform/subscription:
-    $ref: 'platform/openapi-platform.yaml#/paths/~1api~1v1~1platform~1subscription'
-  /api/v1/platform/subscription/history:
-    $ref: 'platform/openapi-platform.yaml#/paths/~1api~1v1~1platform~1subscription~1history'
-  /api/v1/platform/subscription/preview:
-    $ref: 'platform/openapi-platform.yaml#/paths/~1api~1v1~1platform~1subscription~1preview'
-  /api/v1/platform/subscription/plan:
-    $ref: 'platform/openapi-platform.yaml#/paths/~1api~1v1~1platform~1subscription~1plan'
-  /api/v1/platform/subscription/status:
-    $ref: 'platform/openapi-platform.yaml#/paths/~1api~1v1~1platform~1subscription~1status'
-  /api/v1/platform/features:
-    $ref: 'platform/openapi-platform.yaml#/paths/~1api~1v1~1platform~1features'
-  /api/v1/platform/features/entitlements:
-    $ref: 'platform/openapi-platform.yaml#/paths/~1api~1v1~1platform~1features~1entitlements'
-  /api/v1/platform/features/{featureCode}/state:
-    $ref: 'platform/openapi-platform.yaml#/paths/~1api~1v1~1platform~1features~1{featureCode}~1state'
-  /api/v1/platform/features/batch-state:
-    $ref: 'platform/openapi-platform.yaml#/paths/~1api~1v1~1platform~1features~1batch-state'
-  /api/v1/platform/feature-overrides:
-    $ref: 'platform/openapi-platform.yaml#/paths/~1api~1v1~1platform~1feature-overrides'
-  /api/v1/platform/quotas:
-    $ref: 'platform/openapi-platform.yaml#/paths/~1api~1v1~1platform~1quotas'
-  /api/v1/platform/quota-overrides:
-    $ref: 'platform/openapi-platform.yaml#/paths/~1api~1v1~1platform~1quota-overrides'
-  /api/v1/platform/audit:
-    $ref: 'platform/openapi-platform.yaml#/paths/~1api~1v1~1platform~1audit'
-  /api/v1/platform/redis/clear:
-    $ref: 'platform/openapi-platform-redis.yaml#/paths/~1api~1v1~1platform~1redis~1clear'
