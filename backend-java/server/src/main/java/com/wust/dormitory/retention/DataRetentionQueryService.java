@@ -132,7 +132,7 @@ public class DataRetentionQueryService {
 
     private Map<String, Long> protectedCounts() {
         Map<String, Long> counts = new LinkedHashMap<>();
-        counts.put(CURRENT_STUDENT, scalar("SELECT COUNT(*) FROM student WHERE student_status='ACTIVE'", new MapSqlParameterSource()));
+        counts.put(CURRENT_STUDENT, scalar("SELECT COUNT(*) FROM student", new MapSqlParameterSource()));
         counts.put(ACTIVE_RESIDENCY, scalar("SELECT COUNT(*) FROM room_assignment WHERE assignment_status='ACTIVE'", new MapSqlParameterSource()));
         counts.put(ACTIVE_BATCH, scalar("SELECT COUNT(*) FROM selection_batch WHERE batch_status IN ('DRAFT','PUBLISHED','OPEN','PAUSED','CLOSED','ALLOCATING')", new MapSqlParameterSource()));
         counts.put(PENDING_ROOM_CHANGE, scalar("SELECT COUNT(*) FROM room_change_request WHERE request_status NOT IN ('EXECUTED','REJECTED','CANCELLED')", new MapSqlParameterSource()));

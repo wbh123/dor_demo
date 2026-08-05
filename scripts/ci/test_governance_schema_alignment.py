@@ -54,6 +54,12 @@ require("room_change_request" in snapshot and "source_residency_id" in snapshot,
         "room-change metrics are not joined through the actual residency source")
 require("room_exchange_request" in snapshot and "initiator_residency_id" in snapshot,
         "exchange metrics are not joined through the actual participant residencies")
+require("student_status" not in snapshot,
+        "snapshot service still references nonexistent student.student_status")
+require("housing_eligibility" not in snapshot,
+        "snapshot service still references the student.housing_eligibility column removed by V3")
+require("operation_anomaly WHERE batch_id" not in snapshot,
+        "snapshot service still assumes operation_anomaly has a batch_id column")
 
 require("batch_analytics_student_fact" in historical,
         "historical filters still read mutable current student and residency tables")
@@ -71,6 +77,12 @@ require("FROM room_exchange_request WHERE request_status NOT IN" in retention,
         "retention protection does not use the V23 room exchange request_status column")
 require("exchange_status" not in retention,
         "retention protection still references nonexistent room_exchange_request.exchange_status")
+require("student_status" not in retention,
+        "retention protection still references nonexistent student.student_status")
+require("housing_eligibility" not in retention,
+        "retention protection still references the student.housing_eligibility column removed by V3")
+require("SELECT COUNT(*) FROM student" in retention,
+        "retention protection does not conservatively protect all current student records")
 
 if errors:
     print("Governance schema alignment contract failed:", file=sys.stderr)
