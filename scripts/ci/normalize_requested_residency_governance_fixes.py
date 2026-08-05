@@ -16,6 +16,29 @@ if text.count(old_layout_anchor) != 1:
     raise RuntimeError(f"住宿布局锚点数量异常：{text.count(old_layout_anchor)}")
 text = text.replace(old_layout_anchor, new_layout_anchor, 1)
 
+policy_start = text.index("# 3. 选寝策略采用")
+matching_start = text.index('matching = "frontend/src/views/admin/AdminMatchingView.vue"', policy_start)
+current_policy_patch = '''# 3. 选寝策略按当前服务结构采用 update-then-ensure；页面保留未展示的第三项策略值。
+replace_once(
+    "backend-java/server/src/main/java/com/wust/dormitory/selection/SelectionPolicyService.java",
+    """    private void write(String key, boolean value) {
+        jdbc.update(\"UPDATE system_setting SET setting_value=:value,version=version+1 WHERE setting_key=:key\",
+                Map.of(\"key\", key, \"value\", Boolean.toString(value)));
+    }
+""",
+    """    private void write(String key, boolean value) {
+        int updated = jdbc.update(
+                \"UPDATE system_setting SET setting_value=:value,version=version+1 WHERE setting_key=:key\",
+                Map.of(\"key\", key, \"value\", Boolean.toString(value)));
+        if (updated == 0) {
+            ensure(key, value);
+        }
+    }
+""",
+)
+'''
+text = text[:policy_start] + current_policy_patch + text[matching_start:]
+
 lines = text.splitlines(keepends=True)
 fixed_audit_literal = 0
 for index, line in enumerate(lines):
