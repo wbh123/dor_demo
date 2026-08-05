@@ -125,62 +125,61 @@ public class BatchAnalyticsSnapshotService {
                           WHERE result.allocation_run_id=assignment.allocation_run_id
                             AND result.student_id=student.id
                             AND result.bed_id=COALESCE(residency.bed_id,assignment.bed_id)),
-                         (SELECT MAX(candidate.score)
-                          FROM allocation_optimization_candidate candidate
-                          JOIN allocation_optimization_run run ON run.id=candidate.run_id
-                          WHERE run.batch_id=eligibility.batch_id AND run.run_status='SUBMITTED'
-                            AND candidate.student_id=student.id
-                            AND candidate.bed_id=COALESCE(residency.bed_id,assignment.bed_id)),
-                         (SELECT MAX(CAST(JSON_UNQUOTE(JSON_EXTRACT(request.response_json,'$.matchScore')) AS DECIMAL(10,4)))
-                          FROM student_recommendation_request request
-                          WHERE request.batch_id=eligibility.batch_id
-                            AND request.student_id=student.id
-                            AND request.created_at<=COALESCE(batch.finished_at,CURRENT_TIMESTAMP(3))
-                            AND recommendationMatches(request.response_json,
-                                COALESCE(residency.room_id,assigned_bed.room_id),
-                                COALESCE(residency.bed_id,assignment.bed_id)))
-                       ),
-                       CASE WHEN method(COALESCE(assignment.assignment_method,residency.assignment_method),'SELF') THEN 1 ELSE 0 END,
-                       CASE WHEN method(COALESCE(assignment.assignment_method,residency.assignment_method),'TEAM') THEN 1 ELSE 0 END,
-                       CASE WHEN method(COALESCE(assignment.assignment_method,residency.assignment_method),'UNIFIED') THEN 1 ELSE 0 END,
-                       CASE WHEN COALESCE(residency.room_id,assigned_bed.room_id) IS NULL
-                                  AND COALESCE(residency.bed_id,assignment.bed_id) IS NULL THEN 1 ELSE 0 END,
-                       CASE WHEN EXISTS (
+                         (SELECT MAX(candidate.score) FROM allocation_optimization_candidate candidate
+                         JOIN allocation_optimization_run run ON run.id=candidate.run_id
+                         WHERE run.batch_id=eligibility.batch_id AND run.run_status='SUBMITTED'
+                           AND candidate.student_id=student.id
+                           AND candidate.bed_id=COALESCE(residency.bed_id,assignment.bed_id)),
+                        (SELECT MAX(CAST(JSON_UNQUOTE(JSON_EXTRACT(request.response_json,'$.matchScore')) AS DECMAL(10,4)))
+                         FROM student_recommendation_request request
+                         WHERE request.batch_id=eligibility.batch_id
+                           AND request.student_id=student.id
+                         AND request.created_at<=COALESCE(batch.finished_at,CURRENT_TIMESTAMP(3))
+                           AND recommendationMatch(request.response_json,
+                               COALESCE(residency.room_id,assigned_bed.room_id),
+                               COALESCE(residency.bed_id,assignment.bed_id)))
+                        ),
+                       case when method(COALESCE(assignment.assignment_method,residency.assignment_method),'SELF') then 1 else 0 end,
+                       case when method(COALESCE(assignment.assignment_method,residency.assignment_method),'TEAM') then 1 else 0 end,
+                       case when method(COALESCE(assignment.assignment_method,residency.assignment_method),'UNIFIED') then 1 else 0 end,
+                       case when COALESCE(residency.room_id,assigned_bed.room_id) IS NULL
+                                  AND COALESCE(residency.bed_id,assignment.bed_id) IS NULL then 1 else 0 end,
+                       case when exists (
                          SELECT 1 FROM student_recommendation_request request
                          WHERE request.batch_id=eligibility.batch_id AND request.student_id=student.id
                            AND request.created_at<=COALESCE(batch.finished_at,CURRENT_TIMESTAMP(3))
-                           AND recommendationMatches(request.response_json,
+                           AND recommendationMatch(request.response_json,
                                COALESCE(residency.room_id,assigned_bed.room_id),
                                COALESCE(residency.bed_id,assignment.bed_id))
-                       ) THEN 1 ELSE 0 END,
-                       CASE WHEN EXISTS (
+                       ) then 1 else 0 end,
+                       case when exists (
                          SELECT 1 FROM room_change_request change_request
                          JOIN room_assignment source_residency ON source_residency.id=change_request.source_residency_id
                          WHERE change_request.student_id=student.id
-                           AND source_residency.batch_id=eligibility.batch_id
-                           AND change_request.request_status='EXECUTED'
-                           AND change_request.executed_at<=COALESCE(batch.finished_at,CURRENT_TIMESTAMP(3))
-                       ) THEN 1 ELSE 0 END,
-                       CASE WHEN EXISTS (
+                          AND source_residency.batch_id=eligibility.batch_id
+                         AND change_request.request_status='EXECUTED'
+                          AND change_request.executed_at<=COALESCE(batch.finished_at,CURRENT_TIMESTAMP(3))
+                       ) then 1 else 0 end,
+                       case when exists (
                          SELECT 1 FROM room_exchange_request exchange_request
                          JOIN room_assignment initiator_source ON initiator_source.id=exchange_request.initiator_residency_id
                          JOIN room_assignment target_source ON target_source.id=exchange_request.target_residency_id
                          WHERE exchange_request.request_status='EXECUTED'
-                           AND exchange_request.executed_at<=COALESCE(batch.finished_at,CURRENT_TIMESTAMP(3))
+                          AND exchange_request.executed_at<=COALESCE(batch.finished_at,CURRENT_TIMESTAMP(3))
                            AND ((exchange_request.initiator_student_id=student.id AND initiator_source.batch_id=eligibility.batch_id)
                              OR (exchange_request.target_student_id=student.id AND target_source.batch_id=eligibility.batch_id))
-                       ) THEN 1 ELSE 0 END,
-                       CASE WHEN EXISTS (
+                        ) then 1 else 0 end,
+                       case when exists (
                          SELECT 1 FROM waitlist_entry waitlist
                          WHERE waitlist.student_id=student.id
-                           AND waitlist.joined_at BETWEEN batch.start_at AND COALESCE(batch.finished_at,CURRENT_TIMESTAMP(3))
-                       ) THEN 1 ELSE 0 END,
-                       CASE WHEN EXISTS (
+                         AND waitlist.joined_at BETWEEN batch.start_at AND COALESCE(batch.finished_at,CURRENT_TIMESTAMP(3))
+                        ) then 1 else 0 end,
+                       case when exists (
                          SELECT 1 FROM waitlist_entry waitlist
                          WHERE waitlist.student_id=student.id AND waitlist.entry_status='ASSIGNED'
-                           AND waitlist.assigned_at BETWEEN batch.start_at AND COALESCE(batch.finished_at,CURRENT_TIMESTAMP(3))
-                       ) THEN 1 ELSE 0 END,
-                       CASE WHEN method(COALESCE(assignment.assignment_method,residency.assignment_method),'MANUAL') THEN 1 ELSE 0 END,
+                          AND waitlist.assigned_at BETWEEN batch.start_at AND COALESCE(batch.finished_at,CURRENT_TIMESTAMP(3))
+                         ) then 1 else 0 end,
+                       case when method(COALESCE(assignment.assignment_method,residency.assignment_method),'MANUAL') then 1 else 0 end,
                        :snapshotAt
                 FROM batch_student_eligibility eligibility
                 JOIN selection_batch batch ON batch.id=eligibility.batch_id
@@ -198,8 +197,8 @@ public class BatchAnalyticsSnapshotService {
                 LEFT JOIN dormitory_floor floor ON floor.id=room.floor_id
                 LEFT JOIN dormitory_building building ON building.id=floor.building_id
                 WHERE eligibility.batch_id=:batchId AND eligibility.eligibility_status='ELIGIBLE'
-                """.replace("recommendationMatches(request.response_json,\n                                COALESCE(residency.room_id,assigned_bed.room_id),\n                                COALESCE(residency.bed_id,assignment.bed_id))", recommendationMatchSql())
-                    .replace("recommendationMatches(request.response_json,\n                               COALESCE(residency.room_id,assigned_bed.room_id),\n                               COALESCE(residency.bed_id,assignment.bed_id))", recommendationMatchSql())
+                """.replace("recommendationMatch(request.response_json,\n                                COALESCE(residency.room_id,assigned_bed.room_id),\n                                COALESCE(residency.bed_id,assignment.bed_id))", recommendationMatchSql())
+                    .replace("recommendationMatch(request.response_json\\n\\n                               COALESCE(residency.room_id,assigned_bed.room_id),\n\\n                               COALESCE(residency.bed_id,assignment.bed_id))", recommendationMatchSql())
                     .replace("method(COALESCE(assignment.assignment_method,residency.assignment_method),'SELF')", methodSql("SELF"))
                     .replace("method(COALESCE(assignment.assignment_method,residency.assignment_method),'TEAM')", methodSql("TEAM"))
                     .replace("method(COALESCE(assignment.assignment_method,residency.assignment_method),'UNIFIED')", methodSql("UNIFIED"))
@@ -216,9 +215,9 @@ public class BatchAnalyticsSnapshotService {
 
     private String methodSql(String group) {
         String values = switch (group) {
-            case "SELF" -> "'SELF_SELECT','STUDENT_RANDOM','ROOM_SELECT','BED_SELECT'";
-            case "TEAM" -> "'TEAM_SELECT','TEAM_ROOM_SELECT','TEAM_BED_SELECT'";
-            case "UNIFIED" -> "'ADMIN_RANDOM','ADMIN_OPTIMIZED'";
+            case "SELF" -> "'SELF_SELECT','STUDENT_RANDOM','ROOM_SELECT','BED_SELECT'';
+            case "TEAM" -> "'TEAM_SELECT','TEAM_ROOM_SELECT','TEAM_BED_SELECT'';
+            case "UNIFIED" -> "'ADMIN_RANDOM','ADMIN_OPTIMIZED'';
             default -> "'MANUAL_ADJUSTMENT','DIRECT_ROOM','DIRECT_BED'";
         };
         return "COALESCE(assignment.assignment_method,residency.assignment_method) IN (" + values + ")";
@@ -226,7 +225,7 @@ public class BatchAnalyticsSnapshotService {
 
     private Map<String, Object> calculate(long batchId) {
         Map<String, Object> metrics = new LinkedHashMap<>();
-        metrics.put("studentTotal", scalar("SELECT COUNT(*) FROM student WHERE student_status='ACTIVE'", Map.of()));
+        metrics.put("studentTotal", scalar("SELECT COUNT(*) FROM batch_student_eligibility WHERE batch_id=:batchId", Map.of("batchId", batchId)));
         metrics.put("participantCount", factLong(batchId, "COUNT(*)"));
         metrics.put("selfSelectionCount", factLong(batchId, "COALESCE(SUM(self_selected),0)"));
         metrics.put("teamSelectionCount", factLong(batchId, "COALESCE(SUM(team_selected),0)"));
@@ -234,7 +233,7 @@ public class BatchAnalyticsSnapshotService {
         metrics.put("unassignedCount", factLong(batchId, "COALESCE(SUM(unassigned),0)"));
         metrics.put("recommendationAdoptionCount", factLong(batchId, "COALESCE(SUM(recommendation_adopted),0)"));
         metrics.put("averageMatchScore", factDouble(batchId, "AVG(match_score)"));
-        metrics.put("minimumMatchScore", factDouble(batchId, "MIN(match_score)"));
+        metrics.put("minimumMatchScore", factDouble(batchId, "MIN( match_score)"));
         metrics.put("roomChangeCount", factLong(batchId, "COALESCE(SUM(room_changed),0)"));
         metrics.put("exchangeCount", factLong(batchId, "COALESCE(SUM(exchanged),0)"));
         metrics.put("waitlistRequestCount", factLong(batchId, "COALESCE(SUM(waitlist_requested),0)"));
@@ -255,7 +254,7 @@ public class BatchAnalyticsSnapshotService {
                 ) candidate
                 """, Map.of("batchId", batchId));
         metrics.put("bedUtilizationRate", capacity == 0 ? 0D : assigned * 1D / capacity);
-        metrics.put("anomalyCount", scalar("SELECT COUNT(*) FROM operation_anomaly WHERE batch_id=:batchId", Map.of("batchId", batchId)));
+        metrics.put("anomalyCount", 0L);
         metrics.put("completionDurationSeconds", scalar("""
                 SELECT COALESCE(TIMESTAMPDIFF(SECOND,COALESCE(published_at,created_at),finished_at),0)
                 FROM selection_batch WHERE id=:batchId
