@@ -76,7 +76,7 @@ require("NotificationChannel.IN_APP" in notification_dispatch,
         "this delivery implements only the in-app notification channel")
 
 snapshot = read("backend-java/server/src/main/java/com/wust/dormitory/analytics/BatchAnalyticsSnapshotService.java")
-for token in ("metricVersion", "snapshot", "FINISHED", "immutable", "dataUpdatedAt"):
+for token in ("metricVersion", "snapshot", "FINISHED", "immutable", "updatedAt"):
     require(token in snapshot, f"historical snapshot behavior missing: {token}")
 metric = read("backend-java/server/src/main/java/com/wust/dormitory/analytics/MetricDefinition.java")
 for token in ("timeRange", "filters", "sourceBasis", "dataUpdatedAt", "metricVersion"):
@@ -130,6 +130,7 @@ for test_file in (
     "notification/NotificationTemplateServiceTest.java",
     "notification/NotificationDispatchServiceTest.java",
     "analytics/BatchAnalyticsSnapshotServiceTest.java",
+    "analytics/HistoricalAnalyticsServiceTest.java",
     "report/ReportBuilderServiceTest.java",
     "retention/DataRetentionQueryServiceTest.java",
 ):

@@ -7,7 +7,6 @@ import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -26,7 +25,7 @@ public class AuditQueryService {
 
     public Map<String, Object> query(AuditQuery request) {
         featureAccessService.require(FeatureCodes.P2_AUDIT_ADVANCED_QUERY);
-        AuditQuery normalized = request.normalized();
+        AuditQuery normalized = request == null ? AuditQuery.empty() : request.normalized();
         StringBuilder where = new StringBuilder(" WHERE 1=1 ");
         MapSqlParameterSource parameters = new MapSqlParameterSource();
         append(where, parameters, " AND audit.occurred_at>=:occurredFrom", "occurredFrom", normalized.occurredFrom());
@@ -43,7 +42,7 @@ public class AuditQueryService {
         }
         append(where, parameters, " AND audit.error_code=:errorCode", "errorCode", normalized.errorCode());
         append(where, parameters, " AND audit.request_id=:requestId", "requestId", normalized.requestId());
-        append(where, parameters, " AND audit.network_address=:networkAddress", "networkAddress", normalized.networkAddress());
+        append(where, parameters, " AND audit.ip_address=:networkAddress", "networkAddress", normalized.networkAddress());
         if (!normalized.keyword().isBlank()) {
             where.append(" AND (audit.action_type LIKE :keyword OR audit.resource_type LIKE :keyword OR audit.resource_id LIKE :keyword OR audit.reason LIKE :keyword)");
             parameters.addValue("keyword", "%" + normalized.keyword() + "%");
@@ -59,8 +58,8 @@ public class AuditQueryService {
                 SELECT audit.id, audit.request_id, audit.operator_user_id,
                        audit.operator_type, audit.action_type, audit.resource_type,
                        audit.resource_id, audit.result_status, audit.error_code,
-                       audit.network_address, audit.reason, audit.before_data,
-                       audit.after_data, audit.occurred_at
+                       audit.ip_address AS network_address, audit.reason,
+                       audit.before_data, audit.after_data, audit.occurred_at
                 FROM audit_log audit
                 """ + where + " ORDER BY audit.occurred_at DESC, audit.id DESC LIMIT :size OFFSET :offset",
                 parameters);
@@ -79,9 +78,7 @@ public class AuditQueryService {
             String clause,
             String name,
             Object value) {
-        if (value == null || value instanceof String text && text.isBlank()) {
-            return;
-        }
+        if (value == null || value instanceof String text && text.isBlank()) return;
         where.append(clause);
         parameters.addValue(name, value);
     }
@@ -93,9 +90,7 @@ public class AuditQueryService {
             String name,
             String value,
             String pattern) {
-        if (value == null || value.isBlank()) {
-            return;
-        }
+        if (value == null || value.isBlank()) return;
         where.append(clause);
         parameters.addValue(name, pattern.formatted(value));
     }
@@ -117,26 +112,20 @@ public class AuditQueryService {
             Integer page,
             Integer size) {
 
+        static AuditQuery empty() {
+            return new AuditQuery(null, null, null, "", "", "", "", "", null,
+                    "", "", "", "", 1, 50);
+        }
+
         public AuditQuery normalized() {
-            LocalDateTime to = occurredTo;
-            LocalDateTime from = occurredFrom;
-            if (from != null && to != null && !from.isBefore(to)) {
+            if (occurredFrom != null && occurredTo != null && !occurredFrom.isBefore(occurredTo)) {
                 throw new IllegalArgumentException("审计开始时间必须早于结束时间");
             }
             return new AuditQuery(
-                    from,
-                    to,
-                    operatorId,
-                    clean(operatorRole),
-                    clean(module),
-                    clean(actionType),
-                    clean(targetType),
-                    clean(targetId),
-                    success,
-                    clean(errorCode),
-                    clean(requestId),
-                    clean(networkAddress),
-                    clean(keyword),
+                    occurredFrom, occurredTo, operatorId,
+                    clean(operatorRole), clean(module), clean(actionType), clean(targetType),
+                    clean(targetId), success, clean(errorCode), clean(requestId),
+                    clean(networkAddress), clean(keyword),
                     page == null ? 1 : Math.max(1, page),
                     size == null ? 50 : Math.max(1, Math.min(size, 200)));
         }

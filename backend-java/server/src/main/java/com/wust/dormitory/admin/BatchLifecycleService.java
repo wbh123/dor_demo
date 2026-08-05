@@ -46,9 +46,7 @@ public class BatchLifecycleService {
     public void changeStatus(long batchId, String targetStatus, CurrentUser operator) {
         Map<String, Object> current = currentBatch(batchId);
         String currentStatus = String.valueOf(current.get("batch_status"));
-        if (currentStatus.equals(targetStatus)) {
-            return;
-        }
+        if (currentStatus.equals(targetStatus)) return;
 
         boolean enteringActiveState = !ACTIVE_STATUSES.contains(currentStatus)
                 && ACTIVE_STATUSES.contains(targetStatus);
@@ -67,6 +65,12 @@ public class BatchLifecycleService {
         }
 
         adminService.changeBatchStatus(batchId, targetStatus, operator);
+        if ("FINISHED".equals(targetStatus)) {
+            jdbc.update("""
+                    UPDATE selection_batch SET finished_at=COALESCE(finished_at,CURRENT_TIMESTAMP(3))
+                    WHERE id=:batchId
+                    """, Map.of("batchId", batchId));
+        }
 
         if (leavingActiveState) {
             jdbc.update(

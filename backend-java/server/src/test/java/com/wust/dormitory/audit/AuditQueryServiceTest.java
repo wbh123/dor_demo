@@ -32,8 +32,7 @@ class AuditQueryServiceTest {
         jdbc = mock(NamedParameterJdbcTemplate.class);
         featureAccessService = mock(FeatureAccessService.class);
         service = new AuditQueryService(jdbc, featureAccessService);
-        when(jdbc.queryForObject(anyString(), any(MapSqlParameterSource.class), eq(Integer.class)))
-                .thenReturn(1);
+        when(jdbc.queryForObject(anyString(), any(MapSqlParameterSource.class), eq(Integer.class))).thenReturn(1);
         when(jdbc.queryForList(anyString(), any(MapSqlParameterSource.class)))
                 .thenReturn(List.of(Map.of("id", 9L, "action_type", "STUDENT_UPDATE")));
     }
@@ -58,7 +57,8 @@ class AuditQueryServiceTest {
         verify(jdbc).queryForList(sql.capture(), parameters.capture());
         assertTrue(sql.getValue().contains("audit.operator_user_id=:operatorId"));
         assertTrue(sql.getValue().contains("audit.request_id=:requestId"));
-        assertTrue(sql.getValue().contains("audit.network_address=:networkAddress"));
+        assertTrue(sql.getValue().contains("audit.ip_address=:networkAddress"));
+        assertTrue(sql.getValue().contains("audit.ip_address AS network_address"));
         assertEquals(200, parameters.getValue().getValue("size"));
         assertEquals(200, parameters.getValue().getValue("offset"));
     }
