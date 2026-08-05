@@ -40,16 +40,29 @@ REQUIRED_FILES = (
     "scripts/ci/run_backend.sh",
     "scripts/ci/run_frontend.sh",
     "scripts/ci/run_all.sh",
+    "scripts/load/k6-selection-flow.js",
+    "scripts/load/prepare-load-fixtures.py",
+    "scripts/load/assert-selection-result.py",
+    "scripts/load/run-selection-load-test.sh",
 )
 SKIP_TEXT_SCAN = {Path("scripts/ci/validate_public_repository.py")}
 ALLOWED_MARKDOWN = {
     Path("README.md"), Path("AGENTS.md"), Path("SECURITY.md"),
     Path("CONTRIBUTING.md"), Path("CODE_OF_CONDUCT.md"), Path("LICENSE.md"),
 }
+ALLOWED_PUBLIC_SCRIPT_ROOTS = {Path("scripts/ci"), Path("scripts/load")}
 
 
 def relative(path: Path) -> Path:
     return path.relative_to(ROOT)
+
+
+def is_under(path: Path, parent: Path) -> bool:
+    try:
+        path.relative_to(parent)
+        return True
+    except ValueError:
+        return False
 
 
 def forbidden_reason(path: Path) -> str | None:
@@ -65,8 +78,8 @@ def forbidden_reason(path: Path) -> str | None:
         return "forbidden configuration or deployment file"
     if path.suffix.lower() == ".md" and rel not in ALLOWED_MARKDOWN:
         return "internal documentation"
-    if "scripts" in lowered and "ci" not in lowered:
-        return "non-CI script"
+    if "scripts" in lowered and not any(is_under(rel, root) for root in ALLOWED_PUBLIC_SCRIPT_ROOTS):
+        return "unapproved public script"
     return None
 
 
@@ -109,9 +122,9 @@ def main() -> int:
                 break
         if path.suffix == ".sh":
             if not text.startswith("#!/usr/bin/env bash"):
-                errors.append(f"CI shell script lacks portable bash shebang: {rel.as_posix()}")
+                errors.append(f"shell script lacks portable bash shebang: {rel.as_posix()}")
             if "set -euo pipefail" not in text:
-                errors.append(f"CI shell script lacks strict mode: {rel.as_posix()}")
+                errors.append(f"shell script lacks strict mode: {rel.as_posix()}")
 
     if java_count == 0:
         errors.append("no Java source files found")
