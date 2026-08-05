@@ -1,0 +1,21 @@
+name: Private UI V32 CD90 Export
+on:
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: export/private-ui-v32-cd90-source-20260805
+      - name: Remove repository metadata
+        run: rm -rf .git .github/workflows/private-ui-v32-cd90-export-temp.yml
+      - uses: actions/upload-artifact@v4
+        with:
+          name: private-ui-v32-cd90-source
+          path: .
+          include-hidden-files: true
+          retention-days: 1
