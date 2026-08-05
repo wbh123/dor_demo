@@ -46,14 +46,14 @@ async function submitActivate() {
 
         <form v-if="mode === 'login'" class="form-stack" @submit.prevent="submitLogin">
           <label><span>用户名或学号</span><input v-model.trim="loginForm.username" required maxlength="64" placeholder="管理员用户名或12位学号" /></label>
-          <label><span>密码</span><input v-model="loginForm.password" required minlength="8" maxlength="72" type="password" placeholder="请输入密码" /></label>
+          <label><span>密码</span><input v-model="loginForm.password" required type="password" autocomplete="current-password" placeholder="请输入密码" /></label>
           <button class="button primary full" :disabled="auth.loading">{{ auth.loading ? '正在登录…' : '进入系统' }}</button>
         </form>
 
         <form v-else class="form-stack" @submit.prevent="submitActivate">
           <label><span>12位学号</span><input v-model.trim="activateForm.studentNumber" required pattern="\d{12}" maxlength="12" placeholder="例如 202600000001" /></label>
           <label><span>姓名</span><input v-model.trim="activateForm.studentName" required maxlength="128" placeholder="必须与录入信息一致" /></label>
-          <label><span>设置密码</span><input v-model="activateForm.password" required minlength="8" maxlength="72" type="password" placeholder="至少8位" /></label>
+          <label><span>设置密码</span><input v-model="activateForm.password" required type="password" autocomplete="new-password" placeholder="调试阶段仅要求非空" /></label>
           <button class="button primary full" :disabled="auth.loading">{{ auth.loading ? '正在激活…' : '激活学生账号' }}</button>
         </form>
 
