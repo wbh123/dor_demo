@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import type { ActivateRequest, LoginRequest } from '../api/types'
 
-const institutionName = String(import.meta.env.VITE_INSTITUTION_NAME || '武汉科技大学')
+const institutionName = String(import.meta.env.VITE_INSTITUTION_NAME || '示例大学')
 const operatorName = String(import.meta.env.VITE_OPERATOR_NAME || '')
 const icpRecord = String(import.meta.env.VITE_ICP_RECORD || '')
 const heroTitle = String(import.meta.env.VITE_LOGIN_HERO_TITLE || `${institutionName}学生社区`)

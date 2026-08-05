@@ -11,7 +11,7 @@ import { useAuthStore } from '../stores/auth'
 const auth = useAuthStore()
 const router = useRouter()
 const welcomeError = ref('')
-const institutionName = String(import.meta.env.VITE_INSTITUTION_NAME || '武汉科技大学')
+const institutionName = String(import.meta.env.VITE_INSTITUTION_NAME || '示例大学')
 const productName = String(import.meta.env.VITE_APP_TITLE || `${institutionName}选寝`)
 const productSubtitle = String(import.meta.env.VITE_APP_SUBTITLE || '宿舍智能选择系统')
 const operatorName = String(import.meta.env.VITE_OPERATOR_NAME || '')
