@@ -1,22 +1,54 @@
-name: Requested Regression Red
+name: Apply Requested Residency Governance Fixes
 
 on:
   push:
     branches:
       - fix/student-residency-governance-ui
-  pull_request:
-    branches:
-      - main
 
 permissions:
-  contents: read
+  contents: write
+
+concurrency:
+  group: apply-requested-residency-governance-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
-  regression-red:
+  apply-and-verify:
+    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: fix/student-residency-governance-ui
+          fetch-depth: 0
       - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
-      - run: python scripts/ci/test_requested_residency_governance_regressions.py
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Apply requested fixes
+        run: python scripts/ci/apply_requested_residency_governance_fixes.py
+      - name: Run focused regression contract
+        run: python scripts/ci/test_requested_residency_governance_regressions.py
+      - name: Build frontend
+        working-directory: frontend
+        run: npm ci && npm run build
+      - name: Run focused backend tests
+        run: mvn -f backend-java/pom.xml -pl server -am test -Dtest=AdminStudentResidencyAdjustmentServiceTest -Dsurefire.failIfNoSpecifiedTests=false
+      - name: Commit verified changes
+        run: |
+          rm scripts/ci/apply_requested_residency_governance_fixes.py
+          rm .github/workflows/temp-requested-regression-red.yml
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A
+          git commit -m "fix: 修复在住床位同步与治理界面"
+          git push origin HEAD:fix/student-residency-governance-ui
