@@ -99,14 +99,12 @@ components:
         allowedRecommendationStrategies:
           type: array
           minItems: 1
-          uniqueItems: true
           items:
             type: string
-            description: BEST_MATCH、TRUE_RANDOM或MATCH_WEIGHTED_RANDOM
+            enum: [BEST_MATCH, TRUE_RANDOM, MATCH_WEIGHTED_RANDOM]
         defaultRecommendationStrategy:
           type: string
-          minLength: 1
-          maxLength: 32
+          enum: [BEST_MATCH, TRUE_RANDOM, MATCH_WEIGHTED_RANDOM]
         weightedRandomBaseWeight:
           type: number
           format: double
