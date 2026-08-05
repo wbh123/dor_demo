@@ -2,11 +2,14 @@ name: Sanitize Public UI Validation
 on:
   push:
     branches: [fix/welcome-brand-home-ui-20260806]
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
 permissions:
   contents: write
 jobs:
   sanitize:
-    if: github.actor != 'github-actions[bot]'
+    if: github.actor != 'github-actions[bot]' && (github.event_name == 'push' || github.head_ref == 'fix/welcome-brand-home-ui-20260806')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -26,6 +29,7 @@ jobs:
       - name: Remove temporary files
         run: |
           rm -f scripts/ci/sanitize_public_ui_validation.py
+          rm -f scripts/ci/sanitize-public-ui-trigger.txt
           rm -f .github/workflows/sanitize-public-ui-temp.yml
       - name: Commit sanitized formal source
         run: |
