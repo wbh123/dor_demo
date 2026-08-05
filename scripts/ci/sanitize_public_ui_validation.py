@@ -20,5 +20,5 @@ for path, pairs in replacements.items():
     for old, new in pairs:
         if old not in text:
             raise RuntimeError(f'missing expected fragment in {path}: {old}')
-        text = text.replace(old, new, 1)
+        text = text.replace(old, new)
     path.write_text(text, encoding='utf-8')
