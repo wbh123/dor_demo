@@ -36,8 +36,9 @@ jobs:
       - name: Install frontend dependencies
         working-directory: frontend
         run: npm ci
-      - name: Typecheck and build frontend
+      - name: Generate API types, typecheck and build frontend
         working-directory: frontend
         run: |
+          npm run generate:api
           npm run typecheck
           npm run build
