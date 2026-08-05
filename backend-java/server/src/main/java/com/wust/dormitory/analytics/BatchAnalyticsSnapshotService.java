@@ -23,9 +23,7 @@ public class BatchAnalyticsSnapshotService {
     private final NamedParameterJdbcTemplate jdbc;
     private final ObjectMapper objectMapper;
 
-    public BatchAnalyticsSnapshotService(
-            NamedParameterJdbcTemplate jdbc,
-            ObjectMapper objectMapper) {
+    public BatchAnalyticsSnapshotService(NamedParameterJdbcTemplate jdbc, ObjectMapper objectMapper) {
         this.jdbc = jdbc;
         this.objectMapper = objectMapper;
     }
@@ -40,12 +38,15 @@ public class BatchAnalyticsSnapshotService {
                     HttpStatus.CONFLICT);
         }
         Map<String, Object> existing = find(batchId, METRIC_VERSION);
-        if (existing != null) {
-            return existing;
-        }
+        if (existing != null) return existing;
+
         LocalDateTime dataUpdatedAt = LocalDateTime.now();
         Map<String, Object> metrics = calculate(batchId);
-        Map<String, Object> dimensions = dimensions(batchId);
+        Map<String, Object> dimensions = Map.of(
+                "batchId", batchId,
+                "metricVersion", METRIC_VERSION,
+                "privacyThreshold", 5,
+                "sourceBasis", "BATCH_FINAL_RESULT");
         try {
             jdbc.update("""
                     INSERT INTO batch_analytics_snapshot
@@ -75,82 +76,131 @@ public class BatchAnalyticsSnapshotService {
     public List<MetricDefinition> definitions() {
         LocalDateTime now = LocalDateTime.now();
         return List.of(
-                definition("studentTotal", "学生总数", "Total students", "批次创建至完成", "BATCH_FINAL_RESULT", now),
-                definition("participantCount", "参与人数", "Participants", "批次开放范围", "BATCH_FINAL_RESULT", now),
-                definition("selfSelectionCount", "自主选择人数", "Self-selected students", "批次选择期", "BATCH_FINAL_RESULT", now),
-                definition("teamSelectionCount", "组队人数", "Team-selected students", "批次选择期", "BATCH_FINAL_RESULT", now),
-                definition("unifiedAllocationCount", "统一分配人数", "Unified allocations", "批次分配期", "BATCH_FINAL_RESULT", now),
-                definition("unassignedCount", "未分配人数", "Unassigned students", "批次完成时", "BATCH_FINAL_RESULT", now),
-                definition("recommendationAdoptionCount", "推荐采用人数", "Recommendation adoptions", "批次选择期", "BATCH_FINAL_RESULT", now),
-                definition("averageMatchScore", "平均匹配分", "Average match score", "批次最终结果", "BATCH_FINAL_RESULT", now),
-                definition("minimumMatchScore", "最低匹配分", "Minimum match score", "批次最终结果", "BATCH_FINAL_RESULT", now),
-                definition("roomChangeCount", "换寝人数", "Room changes", "批次结束前", "BATCH_FINAL_RESULT", now),
-                definition("exchangeCount", "交换人数", "Room exchanges", "批次结束前", "BATCH_FINAL_RESULT", now),
-                definition("waitlistRequestCount", "候补申请人数", "Waitlist requests", "批次期间", "BATCH_FINAL_RESULT", now),
-                definition("waitlistAssignmentCount", "候补补位人数", "Waitlist placements", "批次期间", "BATCH_FINAL_RESULT", now),
-                definition("bedUtilizationRate", "床位利用率", "Bed utilization", "批次完成时", "BATCH_FINAL_RESULT", now),
-                definition("manualAdjustmentCount", "人工调整次数", "Manual adjustments", "批次期间", "BATCH_FINAL_RESULT", now),
-                definition("anomalyCount", "异常数量", "Anomalies", "批次期间", "BATCH_FINAL_RESULT", now),
-                definition("completionDurationSeconds", "批次完成耗时", "Completion duration", "创建至完成", "BATCH_FINAL_RESULT", now));
+                definition("studentTotal", "学生总数", "Total students", "批次完成时", now),
+                definition("participantCount", "参与人数", "Participants", "批次开放范围", now),
+                definition("selfSelectionCount", "自主选择人数", "Self-selected students", "批次选择期", now),
+                definition("teamSelectionCount", "组队人数", "Team-selected students", "批次选择期", now),
+                definition("unifiedAllocationCount", "统一分配人数", "Unified allocations", "批次分配期", now),
+                definition("unassignedCount", "未分配人数", "Unassigned students", "批次完成时", now),
+                definition("recommendationAdoptionCount", "推荐采用人数", "Recommendation adoptions", "批次选择期", now),
+                definition("averageMatchScore", "平均匹配分", "Average match score", "统一分配结果", now),
+                definition("minimumMatchScore", "最低匹配分", "Minimum match score", "统一分配结果", now),
+                definition("roomChangeCount", "换寝人数", "Room changes", "批次时间范围", now),
+                definition("exchangeCount", "交换人数", "Room exchanges", "批次时间范围", now),
+                definition("waitlistRequestCount", "候补申请人数", "Waitlist requests", "批次时间范围", now),
+                definition("waitlistAssignmentCount", "候补补位人数", "Waitlist placements", "批次时间范围", now),
+                definition("bedUtilizationRate", "床位利用率", "Bed utilization", "批次完成时", now),
+                definition("manualAdjustmentCount", "人工调整次数", "Manual adjustments", "批次期间", now),
+                definition("anomalyCount", "异常数量", "Anomalies", "批次期间", now),
+                definition("completionDurationSeconds", "批次完成耗时", "Completion duration", "创建至完成", now));
     }
 
-    private MetricDefinition definition(
-            String code,
-            String zh,
-            String en,
-            String timeRange,
-            String sourceBasis,
-            LocalDateTime updatedAt) {
+    private MetricDefinition definition(String code, String zh, String en, String timeRange, LocalDateTime updatedAt) {
         return new MetricDefinition(
-                code,
-                zh,
-                en,
-                timeRange,
+                code, zh, en, timeRange,
                 Map.of("batchStatus", "FINISHED"),
-                sourceBasis,
-                updatedAt,
-                METRIC_VERSION,
+                "BATCH_FINAL_RESULT", updatedAt, METRIC_VERSION,
                 "小样本组合低于5人时不展示个人偏好维度");
     }
 
     private Map<String, Object> calculate(long batchId) {
+        Map<String, Object> parameters = Map.of("batchId", batchId);
         Map<String, Object> metrics = new LinkedHashMap<>();
-        metrics.put("studentTotal", scalar("SELECT COUNT(*) FROM student", Map.of()));
-        metrics.put("participantCount", scalar("SELECT COUNT(*) FROM batch_student_eligibility WHERE batch_id=:batchId AND eligibility_status='ELIGIBLE'", Map.of("batchId", batchId)));
-        metrics.put("selfSelectionCount", scalar("SELECT COUNT(*) FROM bed_assignment WHERE batch_id=:batchId AND assignment_source='SELF_SELECTION'", Map.of("batchId", batchId)));
-        metrics.put("teamSelectionCount", scalar("SELECT COUNT(*) FROM bed_assignment WHERE batch_id=:batchId AND assignment_source='TEAM_SELECTION'", Map.of("batchId", batchId)));
-        metrics.put("unifiedAllocationCount", scalar("SELECT COUNT(*) FROM bed_assignment WHERE batch_id=:batchId AND assignment_source='UNIFIED_ALLOCATION'", Map.of("batchId", batchId)));
+        metrics.put("studentTotal", scalar("""
+                SELECT COUNT(*) FROM batch_student_eligibility
+                WHERE batch_id=:batchId
+                """, parameters));
+        metrics.put("participantCount", scalar("""
+                SELECT COUNT(*) FROM batch_student_eligibility
+                WHERE batch_id=:batchId AND eligibility_status='ELIGIBLE'
+                """, parameters));
+        metrics.put("selfSelectionCount", scalar("""
+                SELECT COUNT(*) FROM bed_assignment
+                WHERE batch_id=:batchId AND assignment_method IN ('SELF_SELECT','STUDENT_RANDOM')
+                """, parameters));
+        metrics.put("teamSelectionCount", scalar("""
+                SELECT COUNT(*) FROM bed_assignment
+                WHERE batch_id=:batchId AND assignment_method='TEAM_SELECT'
+                """, parameters));
+        metrics.put("unifiedAllocationCount", scalar("""
+                SELECT COUNT(*) FROM bed_assignment
+                WHERE batch_id=:batchId AND assignment_method IN ('ADMIN_RANDOM','MANUAL_ADJUSTMENT')
+                """, parameters));
         metrics.put("unassignedCount", scalar("""
-                SELECT COUNT(*) FROM batch_student_eligibility e
-                WHERE e.batch_id=:batchId AND e.eligibility_status='ELIGIBLE'
-                  AND NOT EXISTS (SELECT 1 FROM bed_assignment a WHERE a.batch_id=e.batch_id AND a.student_id=e.student_id)
-                """, Map.of("batchId", batchId)));
-        metrics.put("recommendationAdoptionCount", scalar("SELECT COUNT(*) FROM recommendation_log WHERE batch_id=:batchId AND adopted=1", Map.of("batchId", batchId)));
-        metrics.put("averageMatchScore", decimal("SELECT AVG(match_score) FROM bed_assignment WHERE batch_id=:batchId", Map.of("batchId", batchId)));
-        metrics.put("minimumMatchScore", decimal("SELECT MIN(match_score) FROM bed_assignment WHERE batch_id=:batchId", Map.of("batchId", batchId)));
-        metrics.put("roomChangeCount", scalar("SELECT COUNT(DISTINCT student_id) FROM room_change_request WHERE batch_id=:batchId AND request_status='EXECUTED'", Map.of("batchId", batchId)));
-        metrics.put("exchangeCount", scalar("SELECT COUNT(DISTINCT student_id) FROM room_exchange_participant WHERE batch_id=:batchId AND participant_status='EXECUTED'", Map.of("batchId", batchId)));
-        metrics.put("waitlistRequestCount", scalar("SELECT COUNT(DISTINCT student_id) FROM waitlist_entry WHERE batch_id=:batchId", Map.of("batchId", batchId)));
-        metrics.put("waitlistAssignmentCount", scalar("SELECT COUNT(DISTINCT student_id) FROM waitlist_entry WHERE batch_id=:batchId AND entry_status='ASSIGNED'", Map.of("batchId", batchId)));
-        long assigned = scalar("SELECT COUNT(*) FROM bed_assignment WHERE batch_id=:batchId", Map.of("batchId", batchId));
-        long capacity = scalar("SELECT COALESCE(SUM(room.capacity),0) FROM batch_room_scope scope JOIN room ON room.id=scope.room_id WHERE scope.batch_id=:batchId", Map.of("batchId", batchId));
+                SELECT COUNT(*)
+                FROM batch_student_eligibility eligibility
+                WHERE eligibility.batch_id=:batchId
+                  AND eligibility.eligibility_status='ELIGIBLE'
+                  AND NOT EXISTS (
+                    SELECT 1 FROM bed_assignment assignment
+                    WHERE assignment.batch_id=eligibility.batch_id
+                      AND assignment.student_id=eligibility.student_id
+                  )
+                """, parameters));
+        metrics.put("recommendationAdoptionCount", 0L);
+        metrics.put("averageMatchScore", decimal("""
+                SELECT AVG(result.score)
+                FROM allocation_run_result result
+                JOIN allocation_run run_record ON run_record.id=result.allocation_run_id
+                WHERE run_record.batch_id=:batchId AND result.score IS NOT NULL
+                """, parameters));
+        metrics.put("minimumMatchScore", decimal("""
+                SELECT MIN(result.score)
+                FROM allocation_run_result result
+                JOIN allocation_run run_record ON run_record.id=result.allocation_run_id
+                WHERE run_record.batch_id=:batchId AND result.score IS NOT NULL
+                """, parameters));
+        metrics.put("roomChangeCount", scalar("""
+                SELECT COUNT(DISTINCT request_record.student_id)
+                FROM room_change_request request_record
+                JOIN selection_batch batch_record ON batch_record.id=:batchId
+                WHERE request_record.request_status='EXECUTED'
+                  AND request_record.executed_at BETWEEN batch_record.start_at AND batch_record.updated_at
+                """, parameters));
+        metrics.put("exchangeCount", scalar("""
+                SELECT COUNT(*) * 2
+                FROM room_exchange_request request_record
+                JOIN selection_batch batch_record ON batch_record.id=:batchId
+                WHERE request_record.request_status='EXECUTED'
+                  AND request_record.executed_at BETWEEN batch_record.start_at AND batch_record.updated_at
+                """, parameters));
+        metrics.put("waitlistRequestCount", scalar("""
+                SELECT COUNT(DISTINCT entry_record.student_id)
+                FROM waitlist_entry entry_record
+                JOIN selection_batch batch_record ON batch_record.id=:batchId
+                WHERE entry_record.joined_at BETWEEN batch_record.start_at AND batch_record.updated_at
+                """, parameters));
+        metrics.put("waitlistAssignmentCount", scalar("""
+                SELECT COUNT(DISTINCT entry_record.student_id)
+                FROM waitlist_entry entry_record
+                JOIN selection_batch batch_record ON batch_record.id=:batchId
+                WHERE entry_record.entry_status='ASSIGNED'
+                  AND entry_record.assigned_at BETWEEN batch_record.start_at AND batch_record.updated_at
+                """, parameters));
+        long assigned = scalar("SELECT COUNT(*) FROM bed_assignment WHERE batch_id=:batchId", parameters);
+        long capacity = scalar("""
+                SELECT COALESCE(SUM(room_record.capacity),0)
+                FROM batch_room_scope scope_record
+                JOIN room room_record ON room_record.id=scope_record.room_id
+                WHERE scope_record.batch_id=:batchId
+                """, parameters);
         metrics.put("bedUtilizationRate", capacity == 0 ? 0D : assigned * 1D / capacity);
-        metrics.put("manualAdjustmentCount", scalar("SELECT COUNT(*) FROM audit_log WHERE resource_type='BED_ASSIGNMENT' AND action_type LIKE 'ASSIGNMENT_%' AND JSON_EXTRACT(after_data,'$.batchId')=:batchId", Map.of("batchId", batchId)));
-        metrics.put("anomalyCount", scalar("SELECT COUNT(*) FROM operation_anomaly WHERE batch_id=:batchId", Map.of("batchId", batchId)));
-        metrics.put("completionDurationSeconds", scalar("SELECT TIMESTAMPDIFF(SECOND,created_at,finished_at) FROM selection_batch WHERE id=:batchId", Map.of("batchId", batchId)));
+        metrics.put("manualAdjustmentCount", scalar("""
+                SELECT COUNT(*) FROM assignment_history
+                WHERE batch_id=:batchId AND assignment_method='MANUAL_ADJUSTMENT'
+                """, parameters));
+        metrics.put("anomalyCount", 0L);
+        metrics.put("completionDurationSeconds", scalar("""
+                SELECT TIMESTAMPDIFF(SECOND,created_at,updated_at)
+                FROM selection_batch WHERE id=:batchId
+                """, parameters));
         return metrics;
     }
 
-    private Map<String, Object> dimensions(long batchId) {
-        return Map.of(
-                "batchId", batchId,
-                "metricVersion", METRIC_VERSION,
-                "privacyThreshold", 5,
-                "sourceBasis", "BATCH_FINAL_RESULT");
-    }
-
     private Map<String, Object> batch(long batchId) {
-        List<Map<String, Object>> rows = jdbc.queryForList("SELECT id,batch_status FROM selection_batch WHERE id=:id FOR UPDATE", Map.of("id", batchId));
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                "SELECT id,batch_status FROM selection_batch WHERE id=:id FOR UPDATE",
+                Map.of("id", batchId));
         if (rows.isEmpty()) throw new BusinessException("BATCH_NOT_FOUND", "批次不存在", HttpStatus.NOT_FOUND);
         return rows.getFirst();
     }
@@ -190,9 +240,7 @@ public class BatchAnalyticsSnapshotService {
     private Map<String, Object> parse(Object value) {
         if (value == null) return Map.of();
         try {
-            if (value instanceof String text) {
-                return objectMapper.readValue(text, new TypeReference<>() {});
-            }
+            if (value instanceof String text) return objectMapper.readValue(text, new TypeReference<>() {});
             return objectMapper.convertValue(value, new TypeReference<>() {});
         } catch (JsonProcessingException | IllegalArgumentException exception) {
             return Map.of("parseError", true);
