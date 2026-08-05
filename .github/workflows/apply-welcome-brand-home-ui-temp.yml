@@ -31,9 +31,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          echo 'e755444d52774f205202d455f8187678afd015e935c4596adb037c133d16102f  scripts/ci/welcome-brand-home-ui/patch.b64' | sha256sum -c -
+          echo 'd0ef689b387baae680c3d2b98680ed111508efef6691703e118aa6f5f4725eed  scripts/ci/welcome-brand-home-ui/patch.b64' | sha256sum -c -
           base64 -d scripts/ci/welcome-brand-home-ui/patch.b64 | gzip -dc > /tmp/welcome-brand-home-ui.patch
-          echo 'fc4a11096230ad49ba4844429c86988022a305ec5f5ef7d6b2290e0d287010bf  /tmp/welcome-brand-home-ui.patch' | sha256sum -c -
+          echo 'c356c4ec6768543ce5fed5e167ba2917dc35b028c307f5c68c6c61d01e569cc9  /tmp/welcome-brand-home-ui.patch' | sha256sum -c -
       - name: Confirm RED baseline
         shell: bash
         run: |
