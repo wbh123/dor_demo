@@ -74,8 +74,8 @@ for token in ("student/room-change", "admin/room-change", "admin/operations"):
     require(router, token, f"missing frontend route: {token}")
 
 shell = read("frontend/src/layouts/AppShell.vue")
-require(shell, "换寝管理", "admin navigation must expose room-change management")
-require(shell, "运营与健康", "admin navigation must expose operations dashboard")
+require(shell, "换寝与交换", "admin navigation must expose room-change management")
+require(shell, "运营监控", "admin navigation must expose operations dashboard")
 require(shell, "申请换寝", "student navigation must expose room-change requests")
 
 print("phase2/phase3 operations contract: OK")

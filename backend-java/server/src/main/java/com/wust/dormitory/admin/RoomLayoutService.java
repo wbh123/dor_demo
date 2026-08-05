@@ -30,7 +30,7 @@ public class RoomLayoutService {
     private static final double MIN_Z = -3.5;
     private static final double MAX_Z = 3.5;
     private static final Set<Integer> ROTATIONS = Set.of(0, 90, 180, 270);
-    private static final Set<String> UNIT_TYPES = Set.of("LOFT_BED_DESK", "BUNK");
+    private static final Set<String> UNIT_TYPES = Set.of("LOFT_BED_DESK", "BUNK", "SINGLE_BED");
 
     private final NamedParameterJdbcTemplate jdbc;
     private final AuditService auditService;
@@ -57,12 +57,18 @@ public class RoomLayoutService {
                        CASE WHEN EXISTS (
                            SELECT 1 FROM bed_assignment assignment
                            WHERE assignment.bed_id=bed.id
+                             AND assignment.assignment_status='ACTIVE'
+                       ) OR EXISTS (
+                           SELECT 1 FROM room_assignment residency
+                           WHERE residency.bed_id=bed.id
+                             AND residency.assignment_status='ACTIVE'
                        ) THEN 1 ELSE 0 END AS occupied,
                        layout.layout_x, layout.layout_z, layout.rotation_degrees,
                        CASE WHEN layout.bed_id IS NULL THEN 0 ELSE 1 END AS custom_layout
                 FROM bed
                 LEFT JOIN room_bed_layout layout ON layout.bed_id=bed.id
                 WHERE bed.room_id=:roomId
+                  AND bed.operational_status<>'RETIRED'
                 ORDER BY bed.position_index, bed.id
                 """, Map.of("roomId", roomId));
 
@@ -84,7 +90,11 @@ public class RoomLayoutService {
             Object frameValue = row.get("bed_frame_id");
             boolean genuineBunk = frameValue != null
                     && genuineBunkFrames.contains(number(frameValue));
-            bed.put("layout_unit_type", genuineBunk ? "BUNK" : "LOFT_BED_DESK");
+            bed.put("layout_unit_type", genuineBunk
+                    ? "BUNK"
+                    : "SINGLE_BED".equals(String.valueOf(row.get("bed_type")))
+                    ? "SINGLE_BED"
+                    : "LOFT_BED_DESK");
             beds.add(bed);
         }
 
@@ -139,13 +149,12 @@ public class RoomLayoutService {
                         "非空床位不能修改床位类型",
                         HttpStatus.CONFLICT);
             }
-            if ("BUNK".equals(unit.unitType()) && "LOFT_BED_DESK".equals(item.bedType())) {
-                throw new BusinessException(
-                        "BUNK_COLLAPSE_NOT_SUPPORTED",
-                        "上下铺不能直接合并为上床下桌，请停用多余床位后再调整",
-                        HttpStatus.CONFLICT);
+            if ("BUNK".equals(unit.unitType()) && !"BUNK".equals(item.bedType())) {
+                collapseBunkUnit(roomId, unit, item, operator.userId());
+                capacity--;
+                continue;
             }
-            if ("LOFT_BED_DESK".equals(unit.unitType()) && "BUNK".equals(item.bedType())) {
+            if (!"BUNK".equals(unit.unitType()) && "BUNK".equals(item.bedType())) {
                 if (capacity >= MAX_ROOM_CAPACITY) {
                     throw new BusinessException(
                             "ROOM_CAPACITY_LIMIT",
@@ -155,6 +164,7 @@ public class RoomLayoutService {
                 splitLoftIntoBunk(roomId, unit, item, operator.userId());
                 capacity++;
             } else {
+                updateIndependentBedType(unit, item);
                 savePlacement(unit.beds(), item, operator.userId());
             }
         }
@@ -196,9 +206,15 @@ public class RoomLayoutService {
                        CASE WHEN EXISTS (
                            SELECT 1 FROM bed_assignment assignment
                            WHERE assignment.bed_id=bed.id
+                             AND assignment.assignment_status='ACTIVE'
+                       ) OR EXISTS (
+                           SELECT 1 FROM room_assignment residency
+                           WHERE residency.bed_id=bed.id
+                             AND residency.assignment_status='ACTIVE'
                        ) THEN 1 ELSE 0 END AS occupied
                 FROM bed
                 WHERE bed.room_id=:roomId
+                  AND bed.operational_status<>'RETIRED'
                 ORDER BY bed.position_index, bed.id
                 FOR UPDATE
                 """, Map.of("roomId", roomId));
@@ -210,7 +226,7 @@ public class RoomLayoutService {
         for (Map<String, Object> bed : roomBeds) {
             Object frameValue = bed.get("bed_frame_id");
             if (frameValue == null) {
-                units.add(loftUnit(bed));
+                units.add(independentUnit(bed));
                 continue;
             }
             frameBeds.computeIfAbsent(number(frameValue), ignored -> new ArrayList<>()).add(bed);
@@ -219,7 +235,7 @@ public class RoomLayoutService {
             beds.sort(Comparator.comparingInt(
                     bed -> ((Number) bed.get("position_index")).intValue()));
             if (!isGenuineBunkPair(beds)) {
-                beds.stream().map(this::loftUnit).forEach(units::add);
+                beds.stream().map(this::independentUnit).forEach(units::add);
                 continue;
             }
             Map<String, Object> representative = beds.stream()
@@ -265,10 +281,13 @@ public class RoomLayoutService {
         return types.equals(Set.of("BUNK_UPPER", "BUNK_LOWER"));
     }
 
-    private BedUnit loftUnit(Map<String, Object> bed) {
+    private BedUnit independentUnit(Map<String, Object> bed) {
+        String unitType = "SINGLE_BED".equals(String.valueOf(bed.get("bed_type")))
+                ? "SINGLE_BED"
+                : "LOFT_BED_DESK";
         return new BedUnit(
                 number(bed.get("id")),
-                "LOFT_BED_DESK",
+                unitType,
                 List.of(bed),
                 occupied(bed));
     }
@@ -301,7 +320,7 @@ public class RoomLayoutService {
             if (!UNIT_TYPES.contains(item.bedType())) {
                 throw new BusinessException(
                         "BED_TYPE_INVALID",
-                        "床具类型只能为上床下桌或上下铺");
+                        "床具类型只能为上床下桌、上下铺或单人床");
             }
             if (!Double.isFinite(item.layoutX()) || !Double.isFinite(item.layoutZ())
                     || item.layoutX() < MIN_X || item.layoutX() > MAX_X
@@ -316,6 +335,69 @@ public class RoomLayoutService {
                         "床具朝向只能为0、90、180或270度");
             }
         }
+    }
+
+    private void updateIndependentBedType(BedUnit unit, LayoutItem item) {
+        if ("BUNK".equals(unit.unitType()) || unit.unitType().equals(item.bedType())) {
+            return;
+        }
+        jdbc.update("""
+                UPDATE bed
+                SET bed_type=:bedType, bed_frame_id=NULL, version=version+1
+                WHERE id=:bedId
+                """, new MapSqlParameterSource()
+                .addValue("bedId", unit.representativeBedId())
+                .addValue("bedType", item.bedType()));
+    }
+
+    private void collapseBunkUnit(
+            long roomId,
+            BedUnit unit,
+            LayoutItem item,
+            long operatorUserId) {
+        if (unit.occupied()) {
+            throw new BusinessException(
+                    "BED_TYPE_OCCUPIED",
+                    "上下铺有人在住或已分配时不能合并床型",
+                    HttpStatus.CONFLICT);
+        }
+        Map<String, Object> representative = unit.beds().stream()
+                .filter(bed -> number(bed.get("id")) == unit.representativeBedId())
+                .findFirst()
+                .orElseThrow();
+        Map<String, Object> removed = unit.beds().stream()
+                .filter(bed -> number(bed.get("id")) != unit.representativeBedId())
+                .findFirst()
+                .orElseThrow();
+        long removedBedId = number(removed.get("id"));
+        Object frameValue = representative.get("bed_frame_id");
+
+        jdbc.update("DELETE FROM batch_bed_scope WHERE bed_id=:bedId", Map.of("bedId", removedBedId));
+        jdbc.update("DELETE FROM room_bed_layout WHERE bed_id=:bedId", Map.of("bedId", removedBedId));
+        int retired = jdbc.update("""
+                UPDATE bed
+                SET bed_frame_id=NULL, operational_status='RETIRED', version=version+1
+                WHERE id=:bedId AND room_id=:roomId AND operational_status<>'RETIRED'
+                """, Map.of("bedId", removedBedId, "roomId", roomId));
+        if (retired != 1) {
+            throw new BusinessException(
+                    "BUNK_COLLAPSE_CONFLICT",
+                    "上下铺床位状态已变化，请重新加载后再试",
+                    HttpStatus.CONFLICT);
+        }
+        jdbc.update("""
+                UPDATE bed
+                SET bed_frame_id=NULL, bed_type=:bedType, operational_status='ENABLED', version=version+1
+                WHERE id=:bedId AND room_id=:roomId
+                """, new MapSqlParameterSource()
+                .addValue("bedId", unit.representativeBedId())
+                .addValue("roomId", roomId)
+                .addValue("bedType", item.bedType()));
+        if (frameValue != null) {
+            jdbc.update("DELETE FROM bed_frame WHERE id=:frameId AND room_id=:roomId",
+                    Map.of("frameId", number(frameValue), "roomId", roomId));
+        }
+        savePlacement(List.of(Map.of("id", unit.representativeBedId())), item, operatorUserId);
     }
 
     private void splitLoftIntoBunk(

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import PhoneDialCodeSelect from '../../components/common/PhoneDialCodeSelect.vue'
+import AppModal from '../../components/modal/AppModal.vue'
 import { api } from '../../api/client'
 import type { DataObject, ListSuccessResponse, ObjectSuccessResponse } from '../../api/types'
 import { useI18n } from '../../i18n'
@@ -29,7 +30,6 @@ const {
   locale,
   isChinese,
   t,
-  subtitle,
   countryName,
   applyNationalityLocale,
   translateError,
@@ -324,7 +324,7 @@ function displayAnswer(question: DataObject, value: unknown) {
       && item.feature_value !== undefined
       && Number(item.feature_value) === Number(value)),
   )
-  if (option) return String(option.option_text)
+  if (option) return t(String(option.option_text))
   const code = String(question.question_code)
   if (code === 'SMOKING_ACCEPTANCE') {
     return { ACCEPT: local('接受', 'Accept'), REJECT: local('不接受', 'Reject'), ANY: local('均可', 'Any') }[String(value)] ?? local('未填写', 'Not provided')
@@ -362,7 +362,6 @@ function bedTypeText(value: unknown) { return bedTypeLabel(value) }
     <section class="welcome-card panel gradient-panel compact-home-top-card">
       <span class="home-corner-badge">{{ profile.gender === 'M' ? '男寝' : '女寝' }}</span>
       <div>
-        <span class="eyebrow light">{{ subtitle('欢迎回来', 'WELCOME BACK') }}</span>
         <h2>{{ profile.student_name || local('同学', 'Student') }}</h2>
         <p>{{ profile.student_number }} · {{ profile.major_code }} {{ profile.major_name }}</p>
         <div class="student-profile-inline-meta">
@@ -384,8 +383,7 @@ function bedTypeText(value: unknown) { return bedTypeLabel(value) }
 
     <section class="panel assignment-summary compact-home-top-card">
       <div>
-        <span class="eyebrow">{{ subtitle('我的住宿结果', 'MY DORMITORY') }}</span>
-        <h2>我的住宿结果</h2>
+        <h2>{{ local('我的住宿结果', 'My accommodation') }}</h2>
       </div>
       <template v-if="assigned">
         <div class="assignment-place">
@@ -396,7 +394,7 @@ function bedTypeText(value: unknown) { return bedTypeLabel(value) }
         <RouterLink v-if="currentActivityId" class="button secondary compact-home-card-action" :to="`/student/batches/${currentActivityId}/assignment`">查看完整结果</RouterLink>
       </template>
       <template v-else>
-        <p>尚未确定宿舍和床位。完善个人偏好后，可在开放选寝期间选择合适的房间。</p>
+        <p>{{ local('尚未确定宿舍和床位。完善个人偏好后，可在开放选寝期间选择合适的房间。', 'No room or bed has been confirmed yet. Complete your preferences and choose during an open selection period.') }}</p>
       </template>
     </section>
 
@@ -406,7 +404,6 @@ function bedTypeText(value: unknown) { return bedTypeLabel(value) }
     <section v-if="!loading && unreadNotifications.length" class="panel home-span-2 student-notification-panel">
       <div class="section-head">
         <div>
-          <span class="eyebrow">{{ subtitle('系统通知', 'SYSTEM NOTIFICATIONS') }}</span>
           <h3>{{ local('系统通知', 'Notifications') }}</h3>
         </div>
       </div>
@@ -424,18 +421,16 @@ function bedTypeText(value: unknown) { return bedTypeLabel(value) }
     <section v-if="!loading" class="panel home-span-2 personal-preference-card">
       <div class="section-head split-title">
         <div>
-          <span class="eyebrow">{{ subtitle('个人偏好', 'PERSONAL PREFERENCES') }}</span>
-          <h2>我的个人偏好</h2>
-          <p>完整展示你的已保存偏好，并形成便于理解的宿舍生活画像。</p>
+          <h2>{{ local('我的个人偏好', 'My preferences') }}</h2>
         </div>
         <RouterLink
           v-if="canEditQuestionnaire"
           class="button secondary"
           to="/student/preferences"
-        >{{ questionnaireStarted ? '修改个人偏好' : '填写个人偏好' }}</RouterLink>
+        >{{ questionnaireStarted ? local('修改个人偏好', 'Edit preferences') : local('填写个人偏好', 'Complete preferences') }}</RouterLink>
       </div>
 
-      <p v-if="answerSummary.length === 0" class="empty-state">尚未填写个人偏好。尚未填写个人偏好，可通过卡片右上角按钮开始填写。</p>
+      <p v-if="answerSummary.length === 0" class="empty-state">{{ local('尚未填写个人偏好，可通过右上角按钮开始填写。', 'No preferences have been saved yet. Use the button above to get started.') }}</p>
       <div v-else class="personal-preference-content">
         <div class="personal-preference-table-column">
           <dl class="personal-preference-list">
@@ -463,14 +458,12 @@ function bedTypeText(value: unknown) { return bedTypeLabel(value) }
     </section>
 
     <section class="panel info-card home-span-2 compact-rule-card">
-      <span class="eyebrow">{{ subtitle('规则说明', 'RULES') }}</span>
-      <h3>请在规定时间内完成选择</h3>
-      <p>床位在确认前只会短暂保留，最终确认后会立即显示住宿结果。</p>
+      <h3>{{ local('请在规定时间内完成选择', 'Complete selection within the stated period') }}</h3>
+      <p>{{ local('床位在确认前只会短暂保留，最终确认后会立即显示住宿结果。', 'A bed is held only temporarily until confirmation. Your accommodation result appears immediately after confirmation.') }}</p>
     </section>
 
     <div v-if="homeInvitation && !assigned" class="modal-overlay home-invitation-overlay" role="presentation">
       <section class="modal-card home-invitation-dialog" role="dialog" aria-modal="true">
-        <span class="eyebrow">{{ subtitle('组队邀请', 'TEAM INVITATION') }}</span>
         <h2>{{ t('team.invitation.title') }}</h2>
         <p>{{ t('team.invitation.message', { name: homeInvitation.inviter_name }) }}</p>
         <div class="invitation-student-summary">
@@ -485,26 +478,17 @@ function bedTypeText(value: unknown) { return bedTypeLabel(value) }
       </section>
     </div>
 
-    <div v-if="showPhoneDialog" class="modal-overlay" role="presentation">
-      <section class="modal-card phone-editor-dialog" role="dialog" aria-modal="true">
-        <div class="section-head">
-          <div>
-            <span class="eyebrow">{{ subtitle('联系方式', 'CONTACT INFORMATION') }}</span>
-            <h3>{{ t('profile.phoneEdit') }}</h3>
-          </div>
-          <button class="modal-close" type="button" @click="showPhoneDialog = false">×</button>
-        </div>
-        <label class="form-stack">
-          <span>{{ t('profile.phone') }}</span>
-          <span class="profile-phone-input"><PhoneDialCodeSelect v-model="phoneDialCode" /><input v-model.trim="phoneLocalNumber" class="input" maxlength="24" inputmode="tel" placeholder="本地手机号码" /></span>
-        </label>
-        <p v-if="phoneError" class="alert error">{{ phoneError }}</p>
-        <div class="button-row">
-          <button class="button ghost" type="button" @click="showPhoneDialog = false">{{ t('common.cancel') }}</button>
-          <button class="button primary" :disabled="phoneSaving" @click="savePhoneNumber">{{ t('profile.phoneSave') }}</button>
-        </div>
-      </section>
-    </div>
+    <AppModal :open="showPhoneDialog" :title="t('profile.phoneEdit')" size="compact" @close="showPhoneDialog = false">
+      <label class="form-stack">
+        <span>{{ t('profile.phone') }}</span>
+        <span class="profile-phone-input"><PhoneDialCodeSelect v-model="phoneDialCode" /><input v-model.trim="phoneLocalNumber" class="input" maxlength="24" inputmode="tel" :placeholder="local('本地手机号码', 'Local mobile number')" /></span>
+      </label>
+      <p v-if="phoneError" class="alert error">{{ phoneError }}</p>
+      <template #footer>
+        <button class="button ghost" type="button" @click="showPhoneDialog = false">{{ t('common.cancel') }}</button>
+        <button class="button primary" :disabled="phoneSaving" @click="savePhoneNumber">{{ t('profile.phoneSave') }}</button>
+      </template>
+    </AppModal>
   </div>
 </template>
 
