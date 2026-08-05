@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+# Behavioral contract for the requested room-layout, batch-form and shared-modal restoration.
 import sys
 from pathlib import Path
 
