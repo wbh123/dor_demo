@@ -40,9 +40,17 @@ for token in (
     "data-app-modal-scroll-region",
     "focusInitialElement",
     "onKeydown",
+    "maxHeight",
 ):
     require(token in modal, f"AppModal missing behavior: {token}")
-for token in ("document.body.style.overflow = 'hidden'", "restoreFocus", "isTopModal", "modalDepth"):
+for token in (
+    "document.body.style.overflow = 'hidden'",
+    "restoreFocus",
+    "isTopModal",
+    "modalDepth",
+    "focusin",
+    "inert",
+):
     require(token in stack, f"modal stack missing behavior: {token}")
 for token in (
     "<AppModal",
@@ -54,6 +62,21 @@ for token in (
 ):
     require(token in confirm, f"AppConfirmDialog missing behavior: {token}")
 
+flow = read("frontend/src/views/admin/batchPublishFlow.ts")
+for state in (
+    "IDLE",
+    "CREATING_DRAFT",
+    "SAVING_SCOPE",
+    "RUNNING_PREFLIGHT",
+    "WAITING_CONFIRMATION",
+    "PUBLISHING",
+    "SUCCEEDED",
+    "FAILED",
+):
+    require(state in flow, f"batch publishing state machine missing state: {state}")
+require("ALLOWED_TRANSITIONS" in flow and "transitionPublishFlow" in flow,
+        "batch publishing state machine does not validate transitions")
+
 batch = read("frontend/src/views/admin/AdminBatchView.vue")
 require("PublishFlowState" in batch, "batch publishing does not expose an explicit state machine")
 require("AppModal" in batch and "AppConfirmDialog" in batch,
@@ -62,6 +85,18 @@ require("scope-filter-panel" in batch and "scope-result-summary" in batch and "s
         "batch scope columns do not preserve top-aligned filter and independently scrolling results")
 require("saveScopeAndContinuePublish" in batch,
         "batch scope cannot continue directly through preflight and confirmation")
+require("const response = await api.post<ObjectSuccessResponse>('/api/v1/admin/batches'" in batch,
+        "new draft flow does not capture the real server batch id")
+require("Number(created.id)" in batch,
+        "new draft flow does not use the server returned batch id")
+require("resetScopeDialog()\n      await load()\n      if (continuePublish)" not in batch,
+        "batch scope still closes before preflight and publish confirmation")
+require("reconcilePublishedState" in batch,
+        "publish timeout does not reconcile the server truth")
+
+lifecycle = read("backend-java/server/src/main/java/com/wust/dormitory/admin/BatchLifecycleService.java")
+require("currentStatus.equals(targetStatus)" in lifecycle,
+        "server batch status transition is not idempotent for repeated publish requests")
 
 if errors:
     print("Common modal and batch publish contract failed:", file=sys.stderr)
