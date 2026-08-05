@@ -16,6 +16,8 @@ import java.util.UUID;
 
 @Service
 public class TeamFormationService {
+    private static final int MAX_TEAM_SIZE = 5;
+
     private final NamedParameterJdbcTemplate jdbc;
     private final AuditService auditService;
 
@@ -47,6 +49,15 @@ public class TeamFormationService {
                     "你已经加入当前批次的队伍",
                     HttpStatus.CONFLICT);
         }
+        Integer configuredMaximum = jdbc.queryForObject("""
+                SELECT team_max_size
+                FROM selection_batch
+                WHERE id=:batchId
+                """, Map.of("batchId", batchId), Integer.class);
+        int teamMaximum = configuredMaximum == null
+                ? MAX_TEAM_SIZE
+                : Math.min(configuredMaximum, MAX_TEAM_SIZE);
+
         String code = "T" + batchId + "-" + UUID.randomUUID()
                 .toString().substring(0, 8).toUpperCase();
         GeneratedKeyHolder key = new GeneratedKeyHolder();
@@ -82,7 +93,8 @@ public class TeamFormationService {
                 "id", teamId,
                 "batch_id", batchId,
                 "team_status", "FORMING",
-                "member_role", "LEADER");
+                "member_role", "LEADER",
+                "team_max_size", teamMaximum);
     }
 
     long currentBatchId(long studentId) {
