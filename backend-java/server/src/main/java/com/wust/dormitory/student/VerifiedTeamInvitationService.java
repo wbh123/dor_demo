@@ -82,9 +82,10 @@ public class VerifiedTeamInvitationService {
 
         List<Map<String, Object>> memberships = jdbc.queryForList("""
                 SELECT team.id, team.batch_id, team.team_status,
-                       member.member_role
+                       member.member_role, batch_record.team_max_size
                 FROM selection_team_member member
                 JOIN selection_team team ON team.id=member.team_id
+                JOIN selection_batch batch_record ON batch_record.id=team.batch_id
                 WHERE member.batch_id=:batchId
                   AND member.student_id=:studentId
                   AND member.member_status IN ('JOINED','LOCKED')
@@ -139,13 +140,12 @@ public class VerifiedTeamInvitationService {
                        AND invitation.expires_at>CURRENT_TIMESTAMP(3))
                 )
                 """, Map.of("teamId", teamId), Integer.class);
-        int configuredMaximum = ((Number) team.getOrDefault("team_max_size", MAX_TEAM_SIZE))
-                .intValue();
+        int configuredMaximum = ((Number) team.get("team_max_size")).intValue();
         if (occupied != null
                 && occupied >= Math.min(configuredMaximum, MAX_TEAM_SIZE)) {
             throw new BusinessException(
                     "TEAM_SIZE_LIMIT",
-                    "每个小组最多5人，邀请发起人最多邀请4名队友",
+                    "当前队伍人数和待处理邀请已经达到批次上限",
                     HttpStatus.CONFLICT);
         }
 
