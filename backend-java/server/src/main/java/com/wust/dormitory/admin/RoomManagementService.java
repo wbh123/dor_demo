@@ -126,9 +126,12 @@ public class RoomManagementService {
         long buildingId = key.getKey().longValue();
         for (int floor = 1; floor <= command.floorCount(); floor++) {
             jdbc.update("""
-                    INSERT INTO dormitory_floor (building_id, floor_number, enabled)
-                    VALUES (:buildingId, :floor, 1)
-                    """, Map.of("buildingId", buildingId, "floor", floor));
+                    INSERT INTO dormitory_floor (building_id, floor_number, floor_name, enabled)
+                    VALUES (:buildingId, :floor, :floorName, 1)
+                    """, Map.of(
+                            "buildingId", buildingId,
+                            "floor", floor,
+                            "floorName", floor + "层"));
         }
         auditService.success(operator, "BUILDING_CREATE", "BUILDING", buildingId,
                 command.reason().trim(), null, command.asAuditMap());
