@@ -3,6 +3,7 @@ from pathlib import Path
 import unittest
 
 # 该契约覆盖本轮用户可见回归，并作为公开仓库完整构建前的聚焦门禁。
+# 工作流恢复后由普通代码提交触发，避免验证逻辑与业务修改互相影响。
 ROOT = Path(__file__).resolve().parents[2]
 
 
