@@ -62,30 +62,29 @@ public class HistoricalAnalyticsService {
         MapSqlParameterSource params = new MapSqlParameterSource();
         append(sql, params, " AND YEAR(batch.start_at)=:academicYear", "academicYear", filter.academicYear());
         append(sql, params, " AND batch.id=:batchId", "batchId", filter.batchId());
-        if (filter.majorId() != null || filter.gradeYear() != null || !filter.degreeLevel().isBlank()
-                || !filter.studentCategory().isBlank() || filter.campusId() != null
-                || filter.buildingId() != null || !filter.roomType().isBlank()) {
+        if (filter.hasStudentDimension()) {
             sql.append("""
                      AND EXISTS (
                        SELECT 1
                        FROM batch_student_eligibility eligibility
-                       JOIN student ON student.id=eligibility.student_id
-                       LEFT JOIN major ON major.id=student.major_id
-                       LEFT JOIN bed_assignment assignment
-                         ON assignment.batch_id=eligibility.batch_id
-                        AND assignment.student_id=student.id
-                       LEFT JOIN room ON room.id=assignment.room_id
-                       LEFT JOIN dormitory_floor floor ON floor.id=room.floor_id
-                       LEFT JOIN dormitory_building building ON building.id=floor.building_id
+                       JOIN student student_record ON student_record.id=eligibility.student_id
+                       LEFT JOIN major major_record ON major_record.id=student_record.major_id
+                       LEFT JOIN bed_assignment assignment_record
+                         ON assignment_record.batch_id=eligibility.batch_id
+                        AND assignment_record.student_id=student_record.id
+                       LEFT JOIN bed bed_record ON bed_record.id=assignment_record.bed_id
+                       LEFT JOIN room room_record ON room_record.id=bed_record.room_id
+                       LEFT JOIN dormitory_floor floor_record ON floor_record.id=room_record.floor_id
+                       LEFT JOIN dormitory_building building_record ON building_record.id=floor_record.building_id
                        WHERE eligibility.batch_id=batch.id
                     """);
-            append(sql, params, " AND student.major_id=:majorId", "majorId", filter.majorId());
-            append(sql, params, " AND student.grade_year=:gradeYear", "gradeYear", filter.gradeYear());
-            append(sql, params, " AND student.degree_level=:degreeLevel", "degreeLevel", filter.degreeLevel());
-            append(sql, params, " AND student.student_category=:studentCategory", "studentCategory", filter.studentCategory());
-            append(sql, params, " AND building.campus_id=:campusId", "campusId", filter.campusId());
-            append(sql, params, " AND building.id=:buildingId", "buildingId", filter.buildingId());
-            append(sql, params, " AND room.room_type=:roomType", "roomType", filter.roomType());
+            append(sql, params, " AND student_record.major_id=:majorId", "majorId", filter.majorId());
+            append(sql, params, " AND student_record.grade_year=:gradeYear", "gradeYear", filter.gradeYear());
+            append(sql, params, " AND student_record.degree_level=:degreeLevel", "degreeLevel", filter.degreeLevel());
+            append(sql, params, " AND student_record.student_category=:studentCategory", "studentCategory", filter.studentCategory());
+            append(sql, params, " AND building_record.campus_id=:campusId", "campusId", filter.campusId());
+            append(sql, params, " AND building_record.id=:buildingId", "buildingId", filter.buildingId());
+            append(sql, params, " AND room_record.room_type=:roomType", "roomType", filter.roomType());
             sql.append(")");
         }
         sql.append(" ORDER BY academic_year, snapshot.batch_id");
@@ -106,27 +105,29 @@ public class HistoricalAnalyticsService {
 
     private long filteredSampleSize(AnalyticsFilter filter) {
         StringBuilder sql = new StringBuilder("""
-                SELECT COUNT(DISTINCT student.id)
+                SELECT COUNT(DISTINCT student_record.id)
                 FROM batch_student_eligibility eligibility
-                JOIN student ON student.id=eligibility.student_id
+                JOIN student student_record ON student_record.id=eligibility.student_id
                 JOIN selection_batch batch ON batch.id=eligibility.batch_id
-                LEFT JOIN bed_assignment assignment
-                  ON assignment.batch_id=batch.id AND assignment.student_id=student.id
-                LEFT JOIN room ON room.id=assignment.room_id
-                LEFT JOIN dormitory_floor floor ON floor.id=room.floor_id
-                LEFT JOIN dormitory_building building ON building.id=floor.building_id
+                LEFT JOIN bed_assignment assignment_record
+                  ON assignment_record.batch_id=batch.id
+                 AND assignment_record.student_id=student_record.id
+                LEFT JOIN bed bed_record ON bed_record.id=assignment_record.bed_id
+                LEFT JOIN room room_record ON room_record.id=bed_record.room_id
+                LEFT JOIN dormitory_floor floor_record ON floor_record.id=room_record.floor_id
+                LEFT JOIN dormitory_building building_record ON building_record.id=floor_record.building_id
                 WHERE eligibility.eligibility_status='ELIGIBLE'
                 """);
         MapSqlParameterSource params = new MapSqlParameterSource();
         append(sql, params, " AND YEAR(batch.start_at)=:academicYear", "academicYear", filter.academicYear());
         append(sql, params, " AND batch.id=:batchId", "batchId", filter.batchId());
-        append(sql, params, " AND student.major_id=:majorId", "majorId", filter.majorId());
-        append(sql, params, " AND student.grade_year=:gradeYear", "gradeYear", filter.gradeYear());
-        append(sql, params, " AND student.degree_level=:degreeLevel", "degreeLevel", filter.degreeLevel());
-        append(sql, params, " AND student.student_category=:studentCategory", "studentCategory", filter.studentCategory());
-        append(sql, params, " AND building.campus_id=:campusId", "campusId", filter.campusId());
-        append(sql, params, " AND building.id=:buildingId", "buildingId", filter.buildingId());
-        append(sql, params, " AND room.room_type=:roomType", "roomType", filter.roomType());
+        append(sql, params, " AND student_record.major_id=:majorId", "majorId", filter.majorId());
+        append(sql, params, " AND student_record.grade_year=:gradeYear", "gradeYear", filter.gradeYear());
+        append(sql, params, " AND student_record.degree_level=:degreeLevel", "degreeLevel", filter.degreeLevel());
+        append(sql, params, " AND student_record.student_category=:studentCategory", "studentCategory", filter.studentCategory());
+        append(sql, params, " AND building_record.campus_id=:campusId", "campusId", filter.campusId());
+        append(sql, params, " AND building_record.id=:buildingId", "buildingId", filter.buildingId());
+        append(sql, params, " AND room_record.room_type=:roomType", "roomType", filter.roomType());
         Number value = jdbc.queryForObject(sql.toString(), params, Number.class);
         return value == null ? 0L : value.longValue();
     }
@@ -141,21 +142,14 @@ public class HistoricalAnalyticsService {
     private Map<String, Object> parse(Object value) {
         if (value == null) return Map.of();
         try {
-            if (value instanceof String text) {
-                return objectMapper.readValue(text, new TypeReference<>() {});
-            }
+            if (value instanceof String text) return objectMapper.readValue(text, new TypeReference<>() {});
             return objectMapper.convertValue(value, new TypeReference<>() {});
         } catch (JsonProcessingException | IllegalArgumentException exception) {
             return Map.of("parseError", true);
         }
     }
 
-    private void append(
-            StringBuilder sql,
-            MapSqlParameterSource params,
-            String clause,
-            String name,
-            Object value) {
+    private void append(StringBuilder sql, MapSqlParameterSource params, String clause, String name, Object value) {
         if (value == null || value instanceof String text && text.isBlank()) return;
         sql.append(clause);
         params.addValue(name, value);
@@ -173,15 +167,14 @@ public class HistoricalAnalyticsService {
             String roomType) {
         AnalyticsFilter normalized() {
             return new AnalyticsFilter(
-                    academicYear,
-                    batchId,
-                    majorId,
-                    gradeYear,
-                    clean(degreeLevel),
-                    clean(studentCategory),
-                    campusId,
-                    buildingId,
-                    clean(roomType));
+                    academicYear, batchId, majorId, gradeYear,
+                    clean(degreeLevel), clean(studentCategory), campusId, buildingId, clean(roomType));
+        }
+
+        boolean hasStudentDimension() {
+            return majorId != null || gradeYear != null || !degreeLevel.isBlank()
+                    || !studentCategory.isBlank() || campusId != null
+                    || buildingId != null || !roomType.isBlank();
         }
 
         Map<String, Object> asMap() {
