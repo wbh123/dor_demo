@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import AppModal from '../../components/modal/AppModal.vue'
 import { api } from '../../api/client'
 import type { DataObject, ListSuccessResponse, ObjectSuccessResponse } from '../../api/types'
@@ -18,6 +18,13 @@ const submitting = ref(false)
 const loading = ref(true)
 const error = ref('')
 const message = ref('')
+const CHANGE_ROOM_ROWS_PER_PAGE = 6
+const candidateKeyword = ref('')
+const changeRoomPage = ref(1)
+const changeRoomColumnCount = ref(3)
+const exchangeStudentNumber = ref('')
+const exchangeSearchStarted = ref(false)
+const exchangeSearching = ref(false)
 const form = reactive({ reason: '' })
 const exchangeForm = reactive({ reason: '' })
 const { subtitle, translateError } = useI18n()
@@ -37,8 +44,43 @@ const incomingExchanges = computed(() => exchangeRequests.value.filter((item) =>
 const outgoingExchanges = computed(() => exchangeRequests.value.filter((item) =>
   String(item.initiator_student_number) === String(profile.value.student_number),
 ))
+const filteredCandidates = computed(() => {
+  const term = candidateKeyword.value.trim().toLowerCase()
+  return candidates.value
+    .filter((room) => !term || `${room.building_name ?? ''} ${room.room_number ?? ''}`.toLowerCase().includes(term))
+    .sort((left, right) => {
+      const buildingDifference = String(left.building_name ?? '').localeCompare(String(right.building_name ?? ''), 'zh-CN')
+      if (buildingDifference !== 0) return buildingDifference
+      return String(left.room_number ?? '').localeCompare(String(right.room_number ?? ''), 'zh-CN', { numeric: true })
+    })
+})
+const changeRoomPageSize = computed(() => CHANGE_ROOM_ROWS_PER_PAGE * changeRoomColumnCount.value)
+const totalChangeRoomPages = computed(() => Math.max(1, Math.ceil(filteredCandidates.value.length / changeRoomPageSize.value)))
+const pagedCandidates = computed(() => {
+  const start = (changeRoomPage.value - 1) * changeRoomPageSize.value
+  return filteredCandidates.value.slice(start, start + changeRoomPageSize.value)
+})
+const currentCandidateStart = computed(() => filteredCandidates.value.length === 0 ? 0 : (changeRoomPage.value - 1) * changeRoomPageSize.value + 1)
+const currentCandidateEnd = computed(() => Math.min(changeRoomPage.value * changeRoomPageSize.value, filteredCandidates.value.length))
 
-onMounted(load)
+function updateChangeRoomColumnCount() {
+  const width = window.innerWidth
+  changeRoomColumnCount.value = width >= 1180 ? 3 : width >= 700 ? 2 : 1
+  changeRoomPage.value = Math.min(changeRoomPage.value, totalChangeRoomPages.value)
+}
+
+watch(candidateKeyword, () => {
+  changeRoomPage.value = 1
+})
+watch([filteredCandidates, changeRoomPageSize], () => {
+  changeRoomPage.value = Math.min(changeRoomPage.value, totalChangeRoomPages.value)
+})
+onMounted(() => {
+  updateChangeRoomColumnCount()
+  window.addEventListener('resize', updateChangeRoomColumnCount)
+  void load()
+})
+onBeforeUnmount(() => window.removeEventListener('resize', updateChangeRoomColumnCount))
 
 async function load() {
   loading.value = true
@@ -62,24 +104,44 @@ async function load() {
       candidates.value = []
     }
 
-    try {
-      const exchangeCandidateResponse = await api.get<ListSuccessResponse>('/api/v1/student/room-exchanges/candidates')
-      exchangeCandidates.value = (exchangeCandidateResponse.data.data ?? []) as DataObject[]
-      const latestMode = String(exchangeRequests.value[0]?.policy_mode ?? 'ENABLED')
-      exchangePolicy.value = {
-        mode: latestMode,
-        enabled: true,
-        requiresApproval: latestMode === 'APPROVAL_REQUIRED',
-      }
-    } catch {
-      exchangeCandidates.value = []
-      exchangePolicy.value = { mode: 'DISABLED', enabled: false, requiresApproval: false }
+    exchangeCandidates.value = []
+    exchangeSearchStarted.value = false
+    const latestMode = String(exchangeRequests.value[0]?.policy_mode ?? 'ENABLED')
+    exchangePolicy.value = {
+      mode: latestMode,
+      enabled: latestMode !== 'DISABLED',
+      requiresApproval: latestMode === 'APPROVAL_REQUIRED',
     }
   } catch (reason) {
     error.value = translateError(reason)
   } finally {
     loading.value = false
   }
+}
+
+async function searchExchangeCandidates() {
+  const studentNumber = exchangeStudentNumber.value.trim()
+  exchangeSearchStarted.value = true
+  exchangeCandidates.value = []
+  if (!studentNumber) return
+  exchangeSearching.value = true
+  error.value = ''
+  try {
+    const response = await api.get<ListSuccessResponse>('/api/v1/student/room-exchanges/candidates', {
+      params: { studentNumber },
+    })
+    exchangeCandidates.value = (response.data.data ?? []) as DataObject[]
+  } catch (reason) {
+    error.value = translateError(reason)
+  } finally {
+    exchangeSearching.value = false
+  }
+}
+
+function clearExchangeSearch() {
+  exchangeStudentNumber.value = ''
+  exchangeCandidates.value = []
+  exchangeSearchStarted.value = false
 }
 
 function requestChange(room: DataObject) {
@@ -202,10 +264,17 @@ function statusText(value: unknown) {
 
     <section class="panel policy-summary-grid"><article><span>单人换寝策略</span><strong>{{ modeText }}</strong><small>迁入空余寝室或床位</small></article><article><span>双方交换策略</span><strong>{{ exchangeModeText }}</strong><small>互换双方当前寝室与床位</small></article></section>
 
-    <section v-if="policy.enabled" class="panel"><div class="section-head"><div><span class="eyebrow">空余资源换寝</span><h3>符合条件的可用寝室</h3><p>系统已按性别、学生类别和真实剩余容量过滤。</p></div></div><p v-if="loading" class="empty-state">正在加载…</p><div v-else class="change-room-grid"><article v-for="room in candidates" :key="String(room.id)" class="change-room-card"><div><span class="eyebrow">{{ room.building_name }}</span><h3>{{ room.room_number }}室</h3><p>{{ room.floor_number }}层 · {{ room.room_type }} · 剩余{{ room.available_count }}个名额</p></div><button class="button primary" @click="requestChange(room)">选择此寝室</button></article><p v-if="!candidates.length" class="empty-state">当前没有符合条件的空余寝室。</p></div></section>
+    <section v-if="policy.enabled" class="panel change-room-section">
+      <div class="section-head"><div><span class="eyebrow">空余资源换寝</span><h3>符合条件的可用寝室</h3><p>先对全部可迁入寝室按楼栋或房间号查找，再分页显示结果。</p></div></div>
+      <div class="change-room-search-row"><label class="search-field"><span>查找寝室</span><input v-model="candidateKeyword" class="input" placeholder="输入楼栋名称或房间号" /></label><div class="filter-summary"><strong>{{ filteredCandidates.length }}</strong><span>个可迁入寝室</span></div></div>
+      <p v-if="loading" class="empty-state">正在加载…</p>
+      <div v-else-if="pagedCandidates.length" class="change-room-grid"><article v-for="room in pagedCandidates" :key="String(room.id)" class="change-room-card change-room-card-equal"><div><span class="eyebrow">{{ room.building_name }}</span><h3>{{ room.room_number }}室</h3><p>{{ room.floor_number }}层 · {{ room.room_type }} · 剩余{{ room.available_count }}个名额</p></div><button class="button primary" @click="requestChange(room)">选择此寝室</button></article></div>
+      <p v-else class="empty-state">当前没有符合查找条件的空余寝室。</p>
+      <nav v-if="!loading && filteredCandidates.length" class="change-room-pagination" aria-label="可迁入寝室分页"><div><strong>{{ currentCandidateStart }}–{{ currentCandidateEnd }}</strong><span> / 共{{ filteredCandidates.length }}条 · 第{{ changeRoomPage }} / {{ totalChangeRoomPages }}页</span></div><div class="button-row"><button class="button ghost small" :disabled="changeRoomPage <= 1" @click="changeRoomPage--">上一页</button><button class="button ghost small" :disabled="changeRoomPage >= totalChangeRoomPages" @click="changeRoomPage++">下一页</button></div></nav>
+    </section>
     <section v-else class="panel empty-state"><h3>学校当前未开放单人换寝</h3><p>如有特殊需求，请联系管理员处理。</p></section>
 
-    <section v-if="exchangePolicy.enabled" class="panel"><div class="section-head"><div><span class="eyebrow">双方意向交换</span><h3>可邀请交换的在住学生</h3><p>发送邀请后，对方必须明确接受；管理员可配置双方确认后直接执行或继续审批。</p></div></div><div class="exchange-candidate-grid"><article v-for="candidate in exchangeCandidates" :key="String(candidate.target_student_id)" class="exchange-candidate-card"><div><strong>{{ candidate.student_name }}</strong><small>{{ candidate.student_number }}</small></div><p>{{ candidate.building_name }} {{ candidate.room_number }}室<span v-if="candidate.bed_code"> · {{ candidate.bed_code }}</span></p><button class="button secondary" @click="openExchange(candidate)">发起交换</button></article><p v-if="!exchangeCandidates.length" class="empty-state">当前没有可发起交换的学生。</p></div></section>
+    <section v-if="exchangePolicy.enabled" class="panel"><div class="section-head"><div><span class="eyebrow">双方意向交换</span><h3>按学号查找可交换学生</h3><p>查找前不会显示任何学生信息；仅支持完整或部分学号，不支持姓名模糊查询。</p></div></div><form class="exchange-search-row" @submit.prevent="searchExchangeCandidates"><label class="search-field"><span>学生学号</span><input v-model.trim="exchangeStudentNumber" class="input" autocomplete="off" maxlength="32" placeholder="请输入完整或部分学号" /></label><div class="button-row"><button v-if="exchangeSearchStarted" type="button" class="button ghost" @click="clearExchangeSearch">清空</button><button class="button secondary" :disabled="exchangeSearching || !exchangeStudentNumber.trim()">{{ exchangeSearching ? '正在查找…' : '查找学生' }}</button></div></form><div v-if="exchangeSearchStarted" class="exchange-candidate-grid"><article v-for="candidate in exchangeCandidates" :key="String(candidate.target_student_id)" class="exchange-candidate-card"><div><strong>{{ candidate.student_name }}</strong><small>{{ candidate.student_number }}</small></div><p>{{ candidate.building_name }} {{ candidate.room_number }}室<span v-if="candidate.bed_code"> · {{ candidate.bed_code }}</span></p><button class="button secondary" @click="openExchange(candidate)">发起交换</button></article><p v-if="!exchangeSearching && !exchangeCandidates.length" class="empty-state">未找到符合条件且可交换的在住学生。</p></div><p v-else class="empty-state">输入学号后再查找，不会默认列出全校学生。</p></section>
     <section v-else class="panel empty-state"><h3>学校当前未开放寝室交换</h3><p>单人换寝策略不受影响。</p></section>
 
     <section v-if="incomingExchanges.length" class="panel incoming-panel"><div class="section-head"><div><span class="eyebrow">待你确认</span><h3>收到的寝室交换邀请</h3></div></div><article v-for="item in incomingExchanges" :key="String(item.id)" class="incoming-exchange-card"><div><strong>{{ item.initiator_student_name }}（{{ item.initiator_student_number }}）</strong><p>希望用 {{ item.initiator_building_name }} {{ item.initiator_room_number }}室 {{ item.initiator_bed_code || '未确认床位' }} 与你的当前寝室床位交换。</p><small>原因：{{ item.reason }}</small></div><div class="button-row"><button class="button primary" :disabled="submitting" @click="respondExchange(item, true)">接受交换</button><button class="button ghost" :disabled="submitting" @click="respondExchange(item, false)">拒绝</button></div></article></section>
@@ -221,5 +290,5 @@ function statusText(value: unknown) {
 </template>
 
 <style scoped>
-.policy-summary-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.policy-summary-grid article{display:grid;gap:5px;padding:14px;border:1px solid var(--line);border-radius:14px;background:var(--soft)}.policy-summary-grid span,.policy-summary-grid small{color:var(--muted)}.change-room-grid,.exchange-candidate-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}.change-room-card{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:16px;border:1px solid var(--line);border-radius:16px;background:var(--soft)}.change-room-card h3{margin:5px 0}.change-room-card p,.exchange-candidate-card p{margin:0;color:var(--muted)}.exchange-candidate-card{display:grid;gap:10px;padding:16px;border:1px solid var(--line);border-radius:16px;background:var(--soft)}.exchange-candidate-card div{display:grid;gap:3px}.exchange-candidate-card small{color:var(--muted)}.incoming-panel{border-color:#8fb8ef;background:#f7fbff}.incoming-exchange-card{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:15px;border:1px solid #bfd7f5;border-radius:14px;background:#fff}.incoming-exchange-card p{margin:6px 0}.incoming-exchange-card small{color:var(--muted)}.room-change-overlay{z-index:1260;padding:30px;background:rgba(9,23,48,.78);backdrop-filter:blur(7px)}.room-change-dialog{width:min(620px,calc(100vw - 60px));padding:26px;border-radius:26px;background:var(--panel,#fff)}.dialog-actions{justify-content:flex-end}.status-pill{display:inline-block;padding:4px 8px;border-radius:999px;background:#eef4ff;color:#315f9d;font-size:12px}@media(max-width:720px){.policy-summary-grid{grid-template-columns:1fr}.incoming-exchange-card{display:grid}.room-change-overlay{padding:10px}.room-change-dialog{width:100%;padding:18px;border-radius:22px}.change-room-card{align-items:flex-start;display:grid}}
+.policy-summary-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.policy-summary-grid article{display:grid;gap:5px;padding:14px;border:1px solid var(--line);border-radius:14px;background:var(--soft)}.policy-summary-grid span,.policy-summary-grid small{color:var(--muted)}.change-room-search-row,.exchange-search-row,.change-room-pagination{display:flex;align-items:end;justify-content:space-between;gap:16px;margin-bottom:16px}.change-room-search-row .search-field,.exchange-search-row .search-field{flex:1}.change-room-pagination{align-items:center;margin:18px 0 0;padding-top:14px;border-top:1px solid var(--line);color:var(--muted)}.change-room-pagination strong{color:var(--text)}.change-room-grid,.exchange-candidate-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));align-items:stretch;gap:12px}.change-room-card{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:16px;border:1px solid var(--line);border-radius:16px;background:var(--soft)}.change-room-card-equal{min-width:0;min-height:156px;height:100%}.change-room-card h3{margin:5px 0}.change-room-card p,.exchange-candidate-card p{margin:0;color:var(--muted)}.exchange-candidate-card{display:grid;gap:10px;padding:16px;border:1px solid var(--line);border-radius:16px;background:var(--soft)}.exchange-candidate-card div{display:grid;gap:3px}.exchange-candidate-card small{color:var(--muted)}.incoming-panel{border-color:#8fb8ef;background:#f7fbff}.incoming-exchange-card{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:15px;border:1px solid #bfd7f5;border-radius:14px;background:#fff}.incoming-exchange-card p{margin:6px 0}.incoming-exchange-card small{color:var(--muted)}.room-change-overlay{z-index:1260;padding:30px;background:rgba(9,23,48,.78);backdrop-filter:blur(7px)}.room-change-dialog{width:min(620px,calc(100vw - 60px));padding:26px;border-radius:26px;background:var(--panel,#fff)}.dialog-actions{justify-content:flex-end}.status-pill{display:inline-block;padding:4px 8px;border-radius:999px;background:#eef4ff;color:#315f9d;font-size:12px}@media(max-width:720px){.policy-summary-grid{grid-template-columns:1fr}.change-room-search-row,.exchange-search-row,.change-room-pagination{align-items:stretch;flex-direction:column}.change-room-search-row .filter-summary,.exchange-search-row .button-row,.change-room-pagination .button-row{width:100%}.change-room-pagination .button-row{display:grid;grid-template-columns:1fr 1fr}.incoming-exchange-card{display:grid}.room-change-overlay{padding:10px}.room-change-dialog{width:100%;padding:18px;border-radius:22px}.change-room-card{align-items:flex-start;display:grid}}
 </style>
