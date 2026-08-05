@@ -2,6 +2,7 @@ import axios, { AxiosError } from 'axios'
 import type { ErrorResponse } from './types'
 
 export const TOKEN_KEY = 'wust-dormitory-token'
+export const SELECTION_LEASE_TOKEN_KEY = 'wust-selection-lease-token'
 
 export const api = axios.create({
   baseURL: '/',
@@ -15,6 +16,10 @@ api.interceptors.request.use((config) => {
   const token = localStorage.getItem(TOKEN_KEY)
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
+  }
+  const selectionLeaseToken = sessionStorage.getItem(SELECTION_LEASE_TOKEN_KEY)
+  if (selectionLeaseToken) {
+    config.headers['X-Selection-Lease-Token'] = selectionLeaseToken
   }
   config.headers['X-Request-Id'] = crypto.randomUUID()
   return config
@@ -44,8 +49,12 @@ export async function subscribeRoomEvents(
   onMessage: (message: SseMessage) => void,
 ): Promise<void> {
   const token = localStorage.getItem(TOKEN_KEY)
+  const selectionLeaseToken = sessionStorage.getItem(SELECTION_LEASE_TOKEN_KEY)
+  const headers: Record<string, string> = {}
+  if (token) headers.Authorization = `Bearer ${token}`
+  if (selectionLeaseToken) headers['X-Selection-Lease-Token'] = selectionLeaseToken
   const response = await fetch(`/api/v1/realtime/batches/${batchId}/rooms/${roomId}`, {
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    headers,
     signal,
   })
   if (!response.ok || !response.body) {
