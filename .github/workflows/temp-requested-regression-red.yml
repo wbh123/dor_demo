@@ -1,0 +1,19 @@
+name: Requested Regression Red
+
+on:
+  push:
+    branches:
+      - fix/student-residency-governance-ui
+
+permissions:
+  contents: read
+
+jobs:
+  regression-red:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - run: python scripts/ci/test_requested_residency_governance_regressions.py
