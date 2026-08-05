@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: Wust Dormitory Select 匹配权重管理接口
-  version: 1.0.0
+  version: 1.1.0
 paths:
   /api/v1/admin/matching-weight-schemes:
     get:
@@ -92,72 +92,102 @@ paths:
 
 components:
   schemas:
-    MatchingWeightSchemeCreateRequest:
+    RecommendationPolicyFields:
       type: object
-      required: [schemeCode, schemeName, algorithmVersion, weights, conflictRules, activate, reason]
+      required: [allowedRecommendationStrategies, defaultRecommendationStrategy, weightedRandomBaseWeight, weightedRandomTemperature]
       properties:
-        schemeCode:
+        allowedRecommendationStrategies:
+          type: array
+          minItems: 1
+          description: 允许使用的推荐方式；服务端会校验 BEST_MATCH、TRUE_RANDOM 和 MATCH_WEIGHTED_RANDOM。
+          items:
+            type: string
+        defaultRecommendationStrategy:
           type: string
-          minLength: 2
-          maxLength: 32
-          pattern: '^[A-Z0-9][A-Z0-9_-]*$'
-        schemeName:
-          type: string
-          minLength: 2
-          maxLength: 128
-        algorithmVersion:
-          type: string
-          minLength: 2
-          maxLength: 32
-        weights:
-          type: object
-          additionalProperties:
-            type: number
-            format: double
-        conflictRules:
-          type: object
-          additionalProperties:
-            type: number
-            format: double
-        activate:
-          type: boolean
-        reason:
-          type: string
-          minLength: 2
-          maxLength: 500
+          description: 默认推荐方式；服务端会校验其属于允许方式集合。
+        weightedRandomBaseWeight:
+          type: number
+          format: double
+          exclusiveMinimum: true
+          minimum: 0
+          maximum: 10
+        weightedRandomTemperature:
+          type: number
+          format: double
+          exclusiveMinimum: true
+          minimum: 0
+          maximum: 10
+
+    MatchingWeightSchemeCreateRequest:
+      allOf:
+        - $ref: '#/components/schemas/RecommendationPolicyFields'
+        - type: object
+          required: [schemeCode, schemeName, algorithmVersion, weights, conflictRules, activate, reason]
+          properties:
+            schemeCode:
+              type: string
+              minLength: 2
+              maxLength: 32
+              pattern: '^[A-Z0-9][A-Z0-9_-]*$'
+            schemeName:
+              type: string
+              minLength: 2
+              maxLength: 128
+            algorithmVersion:
+              type: string
+              minLength: 2
+              maxLength: 32
+            weights:
+              type: object
+              additionalProperties:
+                type: number
+                format: double
+            conflictRules:
+              type: object
+              additionalProperties:
+                type: number
+                format: double
+            activate:
+              type: boolean
+            reason:
+              type: string
+              minLength: 2
+              maxLength: 500
 
     MatchingWeightSchemeRevisionRequest:
-      type: object
-      required: [schemeName, algorithmVersion, weights, conflictRules, activate, expectedVersion, reason]
-      properties:
-        schemeName:
-          type: string
-          minLength: 2
-          maxLength: 128
-        algorithmVersion:
-          type: string
-          minLength: 2
-          maxLength: 32
-        weights:
-          type: object
-          additionalProperties:
-            type: number
-            format: double
-        conflictRules:
-          type: object
-          additionalProperties:
-            type: number
-            format: double
-        activate:
-          type: boolean
-        expectedVersion:
-          type: integer
-          format: int32
-          minimum: 0
-        reason:
-          type: string
-          minLength: 2
-          maxLength: 500
+      allOf:
+        - $ref: '#/components/schemas/RecommendationPolicyFields'
+        - type: object
+          required: [schemeName, algorithmVersion, weights, conflictRules, activate, expectedVersion, reason]
+          properties:
+            schemeName:
+              type: string
+              minLength: 2
+              maxLength: 128
+            algorithmVersion:
+              type: string
+              minLength: 2
+              maxLength: 32
+            weights:
+              type: object
+              additionalProperties:
+                type: number
+                format: double
+            conflictRules:
+              type: object
+              additionalProperties:
+                type: number
+                format: double
+            activate:
+              type: boolean
+            expectedVersion:
+              type: integer
+              format: int32
+              minimum: 0
+            reason:
+              type: string
+              minLength: 2
+              maxLength: 500
 
   securitySchemes:
     bearerAuth:

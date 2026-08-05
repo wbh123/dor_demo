@@ -18,6 +18,14 @@ interface RuleDefinition {
   unit: string
 }
 
+type RecommendationStrategy = 'BEST_MATCH' | 'TRUE_RANDOM' | 'MATCH_WEIGHTED_RANDOM'
+
+const recommendationDefinitions: Array<{ value: RecommendationStrategy; label: string; description: string }> = [
+  { value: 'BEST_MATCH', label: '最匹配', description: '在全部合法候选中选择匹配分最高的寝室。' },
+  { value: 'TRUE_RANDOM', label: '随机看看', description: '在硬约束合法寝室中等概率随机。' },
+  { value: 'MATCH_WEIGHTED_RANDOM', label: '按匹配度随机', description: '全部合法候选保留非零概率，匹配度越高越容易抽中。' },
+]
+
 const weightDefinitions: WeightDefinition[] = [
   { key: 'sleepTimeMinutes', label: '入睡时间', description: '入睡时间越接近，匹配分越高' },
   { key: 'wakeTimeMinutes', label: '起床时间', description: '起床时间差异' },
@@ -60,6 +68,13 @@ const form = reactive({
   algorithmVersion: 'weighted-distance-v2',
   activate: true,
   reason: '',
+})
+
+const recommendationPolicy = reactive({
+  allowed: ['BEST_MATCH', 'TRUE_RANDOM', 'MATCH_WEIGHTED_RANDOM'] as RecommendationStrategy[],
+  defaultStrategy: 'BEST_MATCH' as RecommendationStrategy,
+  baseWeight: 0.05,
+  temperature: 0.2,
 })
 
 const defaultWeights: Record<string, number> = {
@@ -144,6 +159,17 @@ function selectScheme(scheme: DataObject) {
     cleaningWarningDifference: 1,
     gamingVoiceWarningDifference: 1,
   })
+  const allowed = Array.isArray(scheme.allowedRecommendationStrategies)
+    ? scheme.allowedRecommendationStrategies.map(String).filter(isRecommendationStrategy)
+    : recommendationDefinitions.map((definition) => definition.value)
+  recommendationPolicy.allowed = allowed.length ? allowed : ['BEST_MATCH']
+  const configuredDefault = String(scheme.defaultRecommendationStrategy ?? 'BEST_MATCH')
+  recommendationPolicy.defaultStrategy = isRecommendationStrategy(configuredDefault)
+    && recommendationPolicy.allowed.includes(configuredDefault)
+    ? configuredDefault
+    : recommendationPolicy.allowed[0]
+  recommendationPolicy.baseWeight = Number(scheme.weightedRandomBaseWeight ?? 0.05)
+  recommendationPolicy.temperature = Number(scheme.weightedRandomTemperature ?? 0.2)
   error.value = ''
   message.value = ''
 }
@@ -156,6 +182,10 @@ function startCreate() {
   form.algorithmVersion = 'weighted-distance-v2'
   form.activate = false
   form.reason = ''
+  recommendationPolicy.allowed = ['BEST_MATCH', 'TRUE_RANDOM', 'MATCH_WEIGHTED_RANDOM']
+  recommendationPolicy.defaultStrategy = 'BEST_MATCH'
+  recommendationPolicy.baseWeight = 0.05
+  recommendationPolicy.temperature = 0.2
   assignNumbers(weights, defaultWeights, defaultWeights)
   assignNumbers(conflictRules, {
     smokingConflictPenalty: 25,
@@ -163,6 +193,25 @@ function startCreate() {
     cleaningWarningDifference: 1,
     gamingVoiceWarningDifference: 1,
   }, {})
+}
+
+function isRecommendationStrategy(value: string): value is RecommendationStrategy {
+  return recommendationDefinitions.some((definition) => definition.value === value)
+}
+
+function toggleRecommendationStrategy(strategy: RecommendationStrategy, checked: boolean) {
+  if (checked) {
+    if (!recommendationPolicy.allowed.includes(strategy)) recommendationPolicy.allowed.push(strategy)
+    return
+  }
+  if (recommendationPolicy.allowed.length === 1) {
+    error.value = '至少必须保留一种推荐方式。'
+    return
+  }
+  recommendationPolicy.allowed = recommendationPolicy.allowed.filter((value) => value !== strategy)
+  if (recommendationPolicy.defaultStrategy === strategy) {
+    recommendationPolicy.defaultStrategy = recommendationPolicy.allowed[0]
+  }
 }
 
 function assignNumbers(
@@ -186,6 +235,18 @@ async function save() {
     error.value = '至少一个匹配权重必须大于0。'
     return
   }
+  if (recommendationPolicy.allowed.length === 0) {
+    error.value = '至少必须保留一种推荐方式。'
+    return
+  }
+  if (!recommendationPolicy.allowed.includes(recommendationPolicy.defaultStrategy)) {
+    error.value = '默认推荐方式必须属于允许方式。'
+    return
+  }
+  if (recommendationPolicy.baseWeight <= 0 || recommendationPolicy.temperature <= 0) {
+    error.value = '加权随机的基础权重和温度参数必须大于0。'
+    return
+  }
 
   saving.value = true
   try {
@@ -194,6 +255,10 @@ async function save() {
       algorithmVersion: form.algorithmVersion.trim(),
       weights: { ...weights },
       conflictRules: { ...conflictRules },
+      allowedRecommendationStrategies: [...recommendationPolicy.allowed],
+      defaultRecommendationStrategy: recommendationPolicy.defaultStrategy,
+      weightedRandomBaseWeight: recommendationPolicy.baseWeight,
+      weightedRandomTemperature: recommendationPolicy.temperature,
       activate: form.activate,
       reason: form.reason.trim(),
     }
@@ -219,7 +284,6 @@ async function save() {
     saving.value = false
   }
 }
-
 
 async function saveSelectionPolicy() {
   if (!selectionPolicy.reason.trim()) {
@@ -257,7 +321,7 @@ function revisionLabel(scheme: DataObject) {
     <div class="page-title">
       <span class="eyebrow">MATCHING OPERATIONS</span>
       <h2>匹配规则</h2>
-      <p>管理个人偏好匹配权重和冲突提示。每次修改都会创建不可变修订，已有批次不会受影响。</p>
+      <p>管理个人偏好匹配权重、推荐方式和冲突提示。每次修改都会创建不可变修订，已有批次不会受影响。</p>
     </div>
 
     <p v-if="error" class="alert error">{{ error }}</p>
@@ -324,6 +388,26 @@ function revisionLabel(scheme: DataObject) {
           </div>
 
           <div class="matching-section-title">
+            <div><h4>学生推荐方式</h4><p>至少保留一种方式，默认方式必须属于允许方式；设置会随修订绑定到批次。</p></div>
+          </div>
+          <div class="recommendation-policy-grid">
+            <label v-for="definition in recommendationDefinitions" :key="definition.value" class="recommendation-option">
+              <input
+                type="checkbox"
+                :checked="recommendationPolicy.allowed.includes(definition.value)"
+                @change="toggleRecommendationStrategy(definition.value, ($event.target as HTMLInputElement).checked)"
+              />
+              <span><strong>{{ definition.label }}</strong><small>{{ definition.description }}</small></span>
+            </label>
+          </div>
+          <div class="form-grid three-column recommendation-parameters">
+            <label><span>默认推荐方式</span><select v-model="recommendationPolicy.defaultStrategy" class="input"><option v-for="strategy in recommendationPolicy.allowed" :key="strategy" :value="strategy">{{ recommendationDefinitions.find((item) => item.value === strategy)?.label }}</option></select></label>
+            <label><span>加权随机基础权重</span><input v-model.number="recommendationPolicy.baseWeight" class="input" type="number" min="0.0001" max="10" step="0.01" required /></label>
+            <label><span>加权随机温度</span><input v-model.number="recommendationPolicy.temperature" class="input" type="number" min="0.0001" max="10" step="0.01" required /></label>
+          </div>
+          <p class="parameter-hint">基础权重保证低匹配候选仍有非零概率；温度越低越偏向高分候选，越高越接近均匀随机。</p>
+
+          <div class="matching-section-title">
             <div><h4>个人偏好权重</h4><p>范围0～5，数值越大表示该维度对排序影响越明显。</p></div>
           </div>
           <div class="weight-grid">
@@ -371,5 +455,5 @@ function revisionLabel(scheme: DataObject) {
 </template>
 
 <style scoped>
-.policy-switch-grid,.weight-manual-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.policy-switch-grid label{display:flex;gap:12px;padding:15px;border:1px solid var(--border);border-radius:14px;background:var(--surface-soft)}.policy-switch-grid label.disabled{opacity:.55}.policy-switch-grid span,.policy-switch-grid small{display:block}.policy-switch-grid small{margin-top:5px;color:var(--text-muted)}.weight-manual{display:grid;gap:14px}.weight-manual-grid article{padding:14px;border:1px solid var(--border);border-radius:13px}.weight-manual-grid strong{font-size:20px}.weight-manual-grid p{margin:5px 0 0;color:var(--text-muted)}@media(max-width:720px){.policy-switch-grid,.weight-manual-grid{grid-template-columns:1fr}}
+.policy-switch-grid,.weight-manual-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.policy-switch-grid label{display:flex;gap:12px;padding:15px;border:1px solid var(--border);border-radius:14px;background:var(--surface-soft)}.policy-switch-grid label.disabled{opacity:.55}.policy-switch-grid span,.policy-switch-grid small{display:block}.policy-switch-grid small{margin-top:5px;color:var(--text-muted)}.weight-manual{display:grid;gap:14px}.weight-manual-grid article{padding:14px;border:1px solid var(--border);border-radius:13px}.weight-manual-grid strong{font-size:20px}.weight-manual-grid p{margin:5px 0 0;color:var(--text-muted)}.recommendation-policy-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.recommendation-option{display:flex;align-items:flex-start;gap:10px;padding:14px;border:1px solid var(--border);border-radius:14px;background:var(--surface-soft)}.recommendation-option span,.recommendation-option small{display:block}.recommendation-option small{margin-top:5px;color:var(--text-muted);line-height:1.45}.recommendation-parameters{margin-top:14px}.parameter-hint{margin:8px 0 0;color:var(--text-muted);font-size:13px}@media(max-width:900px){.recommendation-policy-grid{grid-template-columns:1fr}}@media(max-width:720px){.policy-switch-grid,.weight-manual-grid{grid-template-columns:1fr}}
 </style>

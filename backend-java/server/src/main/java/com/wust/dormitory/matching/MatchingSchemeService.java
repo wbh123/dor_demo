@@ -17,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -25,38 +26,22 @@ import java.util.regex.Pattern;
 @Service
 public class MatchingSchemeService {
     public static final Set<String> SUPPORTED_WEIGHT_KEYS = Set.of(
-            "sleepTimeMinutes",
-            "wakeTimeMinutes",
-            "napHabit",
-            "sleepSensitivity",
-            "noiseTolerance",
-            "cleaningFrequency",
-            "tidinessRequirement",
-            "airConditionerTemperature",
-            "ventilationPreference",
-            "summerAirConditionerTemperature",
-            "winterHeatingTemperature",
-            "summerOvernightAirConditioner",
-            "winterHeatingAcceptance",
-            "afterLightsActivity",
-            "alarmSnooze",
-            "strongFoodOdorAcceptance",
-            "studyFrequency",
-            "gamingVoiceFrequency",
-            "socialActivity",
-            "smokingAcceptance",
-            "bedPreference"
-    );
+            "sleepTimeMinutes", "wakeTimeMinutes", "napHabit", "sleepSensitivity",
+            "noiseTolerance", "cleaningFrequency", "tidinessRequirement",
+            "airConditionerTemperature", "ventilationPreference",
+            "summerAirConditionerTemperature", "winterHeatingTemperature",
+            "summerOvernightAirConditioner", "winterHeatingAcceptance",
+            "afterLightsActivity", "alarmSnooze", "strongFoodOdorAcceptance",
+            "studyFrequency", "gamingVoiceFrequency", "socialActivity",
+            "smokingAcceptance", "bedPreference");
 
     public static final Set<String> SUPPORTED_RULE_KEYS = Set.of(
-            "smokingConflictPenalty",
-            "sleepTimeWarningMinutes",
-            "cleaningWarningDifference",
-            "gamingVoiceWarningDifference"
-    );
+            "smokingConflictPenalty", "sleepTimeWarningMinutes",
+            "cleaningWarningDifference", "gamingVoiceWarningDifference");
 
     private static final Pattern CODE_PATTERN = Pattern.compile("^[A-Z0-9][A-Z0-9_-]{1,31}$");
     private static final TypeReference<Map<String, Double>> DOUBLE_MAP = new TypeReference<>() { };
+    private static final TypeReference<List<String>> STRING_LIST = new TypeReference<>() { };
 
     private final NamedParameterJdbcTemplate jdbc;
     private final ObjectMapper objectMapper;
@@ -76,6 +61,10 @@ public class MatchingSchemeService {
                 SELECT scheme.id, scheme.scheme_code, scheme.scheme_name,
                        scheme.revision, scheme.algorithm_version,
                        scheme.weights_json, scheme.conflict_rules_json,
+                       scheme.allowed_recommendation_strategies_json,
+                       scheme.default_recommendation_strategy,
+                       scheme.weighted_random_base_weight,
+                       scheme.weighted_random_temperature,
                        scheme.enabled, scheme.version, scheme.change_reason,
                        scheme.published_at, scheme.created_at, scheme.updated_at,
                        creator.display_name AS created_by_name,
@@ -91,12 +80,10 @@ public class MatchingSchemeService {
 
     @Transactional
     public Map<String, Object> create(CreateCommand command, CurrentUser operator) {
-        validateCommon(
-                command.schemeName(),
-                command.algorithmVersion(),
-                command.weights(),
-                command.conflictRules(),
-                command.reason());
+        validateCommon(command.schemeName(), command.algorithmVersion(), command.weights(),
+                command.conflictRules(), command.allowedRecommendationStrategies(),
+                command.defaultRecommendationStrategy(), command.weightedRandomBaseWeight(),
+                command.weightedRandomTemperature(), command.reason());
         if (command.schemeCode() == null
                 || !CODE_PATTERN.matcher(command.schemeCode().trim()).matches()) {
             throw new BusinessException(
@@ -113,21 +100,16 @@ public class MatchingSchemeService {
                     "方案编码已经存在",
                     HttpStatus.CONFLICT);
         }
-        if (command.activate()) {
-            deactivateAll();
-        }
+        if (command.activate()) deactivateAll();
         long id;
         try {
-            id = insert(
-                    code,
-                    command.schemeName(),
-                    1,
-                    command.algorithmVersion(),
-                    command.weights(),
-                    command.conflictRules(),
-                    command.activate(),
-                    command.reason(),
-                    operator.userId());
+            id = insert(code, command.schemeName(), 1, command.algorithmVersion(),
+                    command.weights(), command.conflictRules(),
+                    command.allowedRecommendationStrategies(),
+                    command.defaultRecommendationStrategy(),
+                    command.weightedRandomBaseWeight(),
+                    command.weightedRandomTemperature(),
+                    command.activate(), command.reason(), operator.userId());
         } catch (DuplicateKeyException exception) {
             throw new BusinessException(
                     "MATCHING_SCHEME_CODE_CONFLICT",
@@ -135,14 +117,8 @@ public class MatchingSchemeService {
                     HttpStatus.CONFLICT);
         }
         Map<String, Object> created = one(id);
-        auditService.success(
-                operator,
-                "MATCHING_SCHEME_CREATE",
-                "MATCHING_WEIGHT_SCHEME",
-                id,
-                command.reason().trim(),
-                null,
-                created);
+        auditService.success(operator, "MATCHING_SCHEME_CREATE", "MATCHING_WEIGHT_SCHEME",
+                id, command.reason().trim(), null, created);
         return created;
     }
 
@@ -151,24 +127,16 @@ public class MatchingSchemeService {
             long schemeId,
             RevisionCommand command,
             CurrentUser operator) {
-        validateCommon(
-                command.schemeName(),
-                command.algorithmVersion(),
-                command.weights(),
-                command.conflictRules(),
-                command.reason());
+        validateCommon(command.schemeName(), command.algorithmVersion(), command.weights(),
+                command.conflictRules(), command.allowedRecommendationStrategies(),
+                command.defaultRecommendationStrategy(), command.weightedRandomBaseWeight(),
+                command.weightedRandomTemperature(), command.reason());
         Map<String, Object> source = oneForUpdate(schemeId);
         int currentVersion = ((Number) source.get("version")).intValue();
-        if (currentVersion != command.expectedVersion()) {
-            throw new BusinessException(
-                    "MATCHING_SCHEME_VERSION_CONFLICT",
-                    "匹配方案已经发生变化，请重新加载后再保存",
-                    HttpStatus.CONFLICT);
-        }
+        if (currentVersion != command.expectedVersion()) throw versionConflict();
 
         Map<String, Object> sourceForAudit = new LinkedHashMap<>(source);
         expandJson(sourceForAudit);
-
         int claimed = jdbc.update("""
                 UPDATE matching_weight_scheme
                 SET version=version+1
@@ -176,45 +144,25 @@ public class MatchingSchemeService {
                 """, new MapSqlParameterSource()
                 .addValue("id", schemeId)
                 .addValue("expectedVersion", command.expectedVersion()));
-        if (claimed != 1) {
-            throw new BusinessException(
-                    "MATCHING_SCHEME_VERSION_CONFLICT",
-                    "匹配方案已经发生变化，请重新加载后再保存",
-                    HttpStatus.CONFLICT);
-        }
+        if (claimed != 1) throw versionConflict();
 
         String code = String.valueOf(source.get("scheme_code"));
         Integer latestRevision = jdbc.queryForObject("""
-                SELECT revision
-                FROM matching_weight_scheme
+                SELECT revision FROM matching_weight_scheme
                 WHERE scheme_code=:code
-                ORDER BY revision DESC
-                LIMIT 1
-                FOR UPDATE
+                ORDER BY revision DESC LIMIT 1 FOR UPDATE
                 """, Map.of("code", code), Integer.class);
         int revision = (latestRevision == null ? 0 : latestRevision) + 1;
-        if (command.activate()) {
-            deactivateAll();
-        }
-        long id = insert(
-                code,
-                command.schemeName(),
-                revision,
-                command.algorithmVersion(),
-                command.weights(),
-                command.conflictRules(),
-                command.activate(),
-                command.reason(),
-                operator.userId());
+        if (command.activate()) deactivateAll();
+        long id = insert(code, command.schemeName(), revision, command.algorithmVersion(),
+                command.weights(), command.conflictRules(),
+                command.allowedRecommendationStrategies(),
+                command.defaultRecommendationStrategy(),
+                command.weightedRandomBaseWeight(), command.weightedRandomTemperature(),
+                command.activate(), command.reason(), operator.userId());
         Map<String, Object> created = one(id);
-        auditService.success(
-                operator,
-                "MATCHING_SCHEME_REVISION_CREATE",
-                "MATCHING_WEIGHT_SCHEME",
-                id,
-                command.reason().trim(),
-                sourceForAudit,
-                created);
+        auditService.success(operator, "MATCHING_SCHEME_REVISION_CREATE",
+                "MATCHING_WEIGHT_SCHEME", id, command.reason().trim(), sourceForAudit, created);
         return created;
     }
 
@@ -222,7 +170,11 @@ public class MatchingSchemeService {
         Map<String, Object> row = jdbc.queryForMap("""
                 SELECT scheme.id, scheme.scheme_code, scheme.scheme_name,
                        scheme.revision, scheme.algorithm_version,
-                       scheme.weights_json, scheme.conflict_rules_json
+                       scheme.weights_json, scheme.conflict_rules_json,
+                       scheme.allowed_recommendation_strategies_json,
+                       scheme.default_recommendation_strategy,
+                       scheme.weighted_random_base_weight,
+                       scheme.weighted_random_temperature
                 FROM selection_batch batch
                 JOIN matching_weight_scheme scheme
                   ON scheme.id=batch.matching_weight_scheme_id
@@ -235,7 +187,11 @@ public class MatchingSchemeService {
                 ((Number) row.get("revision")).intValue(),
                 String.valueOf(row.get("algorithm_version")),
                 readDoubleMap(jsonText(row.get("weights_json"))),
-                readDoubleMap(jsonText(row.get("conflict_rules_json"))));
+                readDoubleMap(jsonText(row.get("conflict_rules_json"))),
+                readStrategyNames(jsonText(row.get("allowed_recommendation_strategies_json"))),
+                RecommendationStrategy.valueOf(String.valueOf(row.get("default_recommendation_strategy"))),
+                ((Number) row.get("weighted_random_base_weight")).doubleValue(),
+                ((Number) row.get("weighted_random_temperature")).doubleValue());
     }
 
     private long insert(
@@ -245,6 +201,10 @@ public class MatchingSchemeService {
             String algorithmVersion,
             Map<String, Double> weights,
             Map<String, Double> rules,
+            List<String> allowedStrategies,
+            String defaultStrategy,
+            double baseWeight,
+            double temperature,
             boolean activate,
             String reason,
             long operatorId) {
@@ -252,12 +212,18 @@ public class MatchingSchemeService {
         jdbc.update("""
                 INSERT INTO matching_weight_scheme
                 (scheme_code, scheme_name, revision, algorithm_version,
-                 weights_json, conflict_rules_json, enabled, version,
-                 created_by, change_reason, published_at)
+                 weights_json, conflict_rules_json,
+                 allowed_recommendation_strategies_json,
+                 default_recommendation_strategy,
+                 weighted_random_base_weight,
+                 weighted_random_temperature,
+                 enabled, version, created_by, change_reason, published_at)
                 VALUES
                 (:code, :name, :revision, :algorithmVersion,
-                 CAST(:weights AS JSON), CAST(:rules AS JSON), :enabled, 0,
-                 :createdBy, :reason, :publishedAt)
+                 CAST(:weights AS JSON), CAST(:rules AS JSON),
+                 CAST(:allowedStrategies AS JSON), :defaultStrategy,
+                 :baseWeight, :temperature,
+                 :enabled, 0, :createdBy, :reason, :publishedAt)
                 """, new MapSqlParameterSource()
                 .addValue("code", code)
                 .addValue("name", name.trim())
@@ -265,13 +231,19 @@ public class MatchingSchemeService {
                 .addValue("algorithmVersion", algorithmVersion.trim())
                 .addValue("weights", json(weights))
                 .addValue("rules", json(rules))
+                .addValue("allowedStrategies", json(allowedStrategies))
+                .addValue("defaultStrategy", defaultStrategy)
+                .addValue("baseWeight", baseWeight)
+                .addValue("temperature", temperature)
                 .addValue("enabled", activate ? 1 : 0)
                 .addValue("createdBy", operatorId)
                 .addValue("reason", reason.trim())
                 .addValue("publishedAt", activate ? LocalDateTime.now() : null),
                 keyHolder,
                 new String[]{"id"});
-        return keyHolder.getKey().longValue();
+        Number key = keyHolder.getKey();
+        if (key == null) throw new IllegalStateException("匹配方案创建成功但没有返回编号");
+        return key.longValue();
     }
 
     private void deactivateAll() {
@@ -283,6 +255,10 @@ public class MatchingSchemeService {
             String algorithmVersion,
             Map<String, Double> weights,
             Map<String, Double> rules,
+            List<String> allowedStrategies,
+            String defaultStrategy,
+            double baseWeight,
+            double temperature,
             String reason) {
         if (name == null || name.isBlank() || name.length() > 128) {
             throw new BusinessException("MATCHING_SCHEME_NAME_INVALID", "方案名称长度不正确");
@@ -295,6 +271,39 @@ public class MatchingSchemeService {
         }
         validateWeights(weights);
         validateRules(rules);
+        validateRecommendationPolicy(allowedStrategies, defaultStrategy, baseWeight, temperature);
+    }
+
+    static void validateRecommendationPolicy(
+            List<String> allowedStrategies,
+            String defaultStrategy,
+            double baseWeight,
+            double temperature) {
+        if (allowedStrategies == null || allowedStrategies.isEmpty()) {
+            throw new BusinessException("RECOMMENDATION_STRATEGY_REQUIRED", "至少保留一种推荐方式");
+        }
+        Set<String> unique = new LinkedHashSet<>(allowedStrategies);
+        if (unique.size() != allowedStrategies.size()) {
+            throw new BusinessException("RECOMMENDATION_STRATEGY_DUPLICATE", "推荐方式不能重复");
+        }
+        for (String strategy : unique) {
+            try {
+                RecommendationStrategy.valueOf(strategy);
+            } catch (IllegalArgumentException exception) {
+                throw new BusinessException("RECOMMENDATION_STRATEGY_INVALID", "存在未知推荐方式：" + strategy);
+            }
+        }
+        if (defaultStrategy == null || !unique.contains(defaultStrategy)) {
+            throw new BusinessException(
+                    "RECOMMENDATION_DEFAULT_STRATEGY_INVALID",
+                    "默认推荐方式必须属于允许方式集合");
+        }
+        if (!Double.isFinite(baseWeight) || baseWeight <= 0.0d || baseWeight > 10.0d) {
+            throw new BusinessException("RECOMMENDATION_BASE_WEIGHT_INVALID", "基础权重必须大于0且不超过10");
+        }
+        if (!Double.isFinite(temperature) || temperature <= 0.0d || temperature > 10.0d) {
+            throw new BusinessException("RECOMMENDATION_TEMPERATURE_INVALID", "温度参数必须大于0且不超过10");
+        }
     }
 
     private void validateWeights(Map<String, Double> weights) {
@@ -303,24 +312,18 @@ public class MatchingSchemeService {
         }
         for (String key : weights.keySet()) {
             if (!SUPPORTED_WEIGHT_KEYS.contains(key)) {
-                throw new BusinessException(
-                        "MATCHING_WEIGHT_KEY_INVALID",
-                        "存在不支持的匹配维度：" + key);
+                throw new BusinessException("MATCHING_WEIGHT_KEY_INVALID", "存在不支持的匹配维度：" + key);
             }
         }
         double total = 0;
         for (String key : SUPPORTED_WEIGHT_KEYS) {
             Double value = weights.getOrDefault(key, 0.0);
             if (value == null || !Double.isFinite(value) || value < 0 || value > 5) {
-                throw new BusinessException(
-                        "MATCHING_WEIGHT_INVALID",
-                        "匹配权重必须在0到5之间");
+                throw new BusinessException("MATCHING_WEIGHT_INVALID", "匹配权重必须在0到5之间");
             }
             total += value;
         }
-        if (total <= 0) {
-            throw new BusinessException("MATCHING_WEIGHT_INVALID", "至少一个匹配权重必须大于0");
-        }
+        if (total <= 0) throw new BusinessException("MATCHING_WEIGHT_INVALID", "至少一个匹配权重必须大于0");
     }
 
     private void validateRules(Map<String, Double> rules) {
@@ -345,6 +348,10 @@ public class MatchingSchemeService {
                 SELECT scheme.id, scheme.scheme_code, scheme.scheme_name,
                        scheme.revision, scheme.algorithm_version,
                        scheme.weights_json, scheme.conflict_rules_json,
+                       scheme.allowed_recommendation_strategies_json,
+                       scheme.default_recommendation_strategy,
+                       scheme.weighted_random_base_weight,
+                       scheme.weighted_random_temperature,
                        scheme.enabled, scheme.version, scheme.change_reason,
                        scheme.published_at, scheme.created_at, scheme.updated_at,
                        creator.display_name AS created_by_name,
@@ -354,12 +361,8 @@ public class MatchingSchemeService {
                 LEFT JOIN app_user creator ON creator.id=scheme.created_by
                 WHERE scheme.id=:id
                 """, Map.of("id", id));
-        if (rows.isEmpty()) {
-            throw new BusinessException(
-                    "MATCHING_SCHEME_NOT_FOUND",
-                    "匹配方案不存在",
-                    HttpStatus.NOT_FOUND);
-        }
+        if (rows.isEmpty()) throw new BusinessException(
+                "MATCHING_SCHEME_NOT_FOUND", "匹配方案不存在", HttpStatus.NOT_FOUND);
         Map<String, Object> result = new LinkedHashMap<>(rows.getFirst());
         expandJson(result);
         return result;
@@ -367,28 +370,35 @@ public class MatchingSchemeService {
 
     private Map<String, Object> oneForUpdate(long id) {
         List<Map<String, Object>> rows = jdbc.queryForList("""
-                SELECT * FROM matching_weight_scheme
-                WHERE id=:id
-                FOR UPDATE
+                SELECT * FROM matching_weight_scheme WHERE id=:id FOR UPDATE
                 """, Map.of("id", id));
-        if (rows.isEmpty()) {
-            throw new BusinessException(
-                    "MATCHING_SCHEME_NOT_FOUND",
-                    "匹配方案不存在",
-                    HttpStatus.NOT_FOUND);
-        }
+        if (rows.isEmpty()) throw new BusinessException(
+                "MATCHING_SCHEME_NOT_FOUND", "匹配方案不存在", HttpStatus.NOT_FOUND);
         return new LinkedHashMap<>(rows.getFirst());
     }
 
     private void expandJson(Map<String, Object> row) {
         row.put("weights", readDoubleMap(jsonText(row.remove("weights_json"))));
         row.put("conflictRules", readDoubleMap(jsonText(row.remove("conflict_rules_json"))));
+        row.put("allowedRecommendationStrategies",
+                readStrategyNames(jsonText(row.remove("allowed_recommendation_strategies_json"))));
+        row.put("defaultRecommendationStrategy", row.remove("default_recommendation_strategy"));
+        row.put("weightedRandomBaseWeight", row.remove("weighted_random_base_weight"));
+        row.put("weightedRandomTemperature", row.remove("weighted_random_temperature"));
+    }
+
+    private List<RecommendationStrategy> readStrategyNames(String json) {
+        try {
+            return objectMapper.readValue(json, STRING_LIST).stream()
+                    .map(RecommendationStrategy::valueOf)
+                    .toList();
+        } catch (JsonProcessingException | IllegalArgumentException exception) {
+            throw new BusinessException("MATCHING_SCHEME_DATA_INVALID", "推荐策略配置无法解析");
+        }
     }
 
     private String jsonText(Object value) {
-        if (value instanceof byte[] bytes) {
-            return new String(bytes, StandardCharsets.UTF_8);
-        }
+        if (value instanceof byte[] bytes) return new String(bytes, StandardCharsets.UTF_8);
         return value == null ? "{}" : String.valueOf(value);
     }
 
@@ -408,12 +418,23 @@ public class MatchingSchemeService {
         }
     }
 
+    private BusinessException versionConflict() {
+        return new BusinessException(
+                "MATCHING_SCHEME_VERSION_CONFLICT",
+                "匹配方案已经发生变化，请重新加载后再保存",
+                HttpStatus.CONFLICT);
+    }
+
     public record CreateCommand(
             String schemeCode,
             String schemeName,
             String algorithmVersion,
             Map<String, Double> weights,
             Map<String, Double> conflictRules,
+            List<String> allowedRecommendationStrategies,
+            String defaultRecommendationStrategy,
+            double weightedRandomBaseWeight,
+            double weightedRandomTemperature,
             boolean activate,
             String reason) {
     }
@@ -423,6 +444,10 @@ public class MatchingSchemeService {
             String algorithmVersion,
             Map<String, Double> weights,
             Map<String, Double> conflictRules,
+            List<String> allowedRecommendationStrategies,
+            String defaultRecommendationStrategy,
+            double weightedRandomBaseWeight,
+            double weightedRandomTemperature,
             boolean activate,
             int expectedVersion,
             String reason) {
@@ -435,6 +460,10 @@ public class MatchingSchemeService {
             int revision,
             String algorithmVersion,
             Map<String, Double> weights,
-            Map<String, Double> conflictRules) {
+            Map<String, Double> conflictRules,
+            List<RecommendationStrategy> allowedRecommendationStrategies,
+            RecommendationStrategy defaultRecommendationStrategy,
+            double weightedRandomBaseWeight,
+            double weightedRandomTemperature) {
     }
 }

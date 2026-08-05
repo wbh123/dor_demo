@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { pinia } from '../stores'
 import { platformRoutes, installPlatformRouteGuard } from '../platform/routes'
+import { startSelectionAccessLease, stopSelectionAccessLease } from '../selection/selectionAccessLease'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -36,6 +37,7 @@ const router = createRouter({
         { path: 'admin/waitlist', name: 'admin-waitlist', component: () => import('../views/admin/AdminWaitlistView.vue'), meta: { role: 'ADMIN' } },
         { path: 'admin/operations', name: 'admin-operations', component: () => import('../views/admin/AdminOperationsView.vue'), meta: { role: 'ADMIN' } },
         { path: 'admin/anomalies', name: 'admin-anomalies', component: () => import('../views/admin/AdminAnomalyWorkbenchView.vue'), meta: { role: 'ADMIN' } },
+        { path: 'admin/settings/features', name: 'admin-feature-settings', component: () => import('../views/admin/AdminFeatureSettingsView.vue'), meta: { role: 'ADMIN' } },
         { path: 'admin/profile/password', name: 'admin-password', component: () => import('../views/admin/AdminPasswordView.vue'), meta: { role: 'ADMIN' } },
       ],
     },
@@ -59,6 +61,20 @@ router.beforeEach(async (to) => {
   if (requiredRole && auth.user?.userType !== requiredRole) return auth.isAdmin ? '/admin' : '/student'
   if (to.path === '/' || (to.path === '/student' && auth.isAdmin)) return auth.isAdmin ? '/admin' : '/student'
   return true
+})
+
+function isSelectionWorkspace(path: string) {
+  return /^\/student\/batches\/\d+\/rooms(?:\/\d+)?$/.test(path)
+}
+
+router.afterEach((to, from) => {
+  if (isSelectionWorkspace(to.path)) {
+    void startSelectionAccessLease().catch((reason) => {
+      console.error('无法取得选寝并发租约', reason)
+    })
+  } else if (isSelectionWorkspace(from.path)) {
+    void stopSelectionAccessLease()
+  }
 })
 
 export default router

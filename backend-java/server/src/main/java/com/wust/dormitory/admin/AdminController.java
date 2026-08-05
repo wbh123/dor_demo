@@ -126,11 +126,7 @@ public class AdminController implements AdminApi {
             Integer page,
             Integer size) {
         return ResponseEntity.ok(ResponseFactory.object(studentAdminService.students(
-                keyword,
-                gender,
-                majorId,
-                studentCategory,
-                enrollmentSource,
+                keyword, gender, majorId, studentCategory, enrollmentSource,
                 page == null ? 1 : page,
                 size == null ? 20 : size)));
     }
@@ -138,18 +134,13 @@ public class AdminController implements AdminApi {
     @Override
     public ResponseEntity<ObjectSuccessResponse> createStudent(StudentRequest request) {
         long id = studentAdminService.saveStudent(
-                null,
-                studentCommand(request),
-                SecurityUsers.requireAdmin());
+                null, studentCommand(request), SecurityUsers.requireAdmin());
         return ResponseEntity.ok(ResponseFactory.object(Map.of("id", id)));
     }
 
     @Override
     public ResponseEntity<ObjectSuccessResponse> updateStudent(Long id, StudentRequest request) {
-        studentAdminService.saveStudent(
-                id,
-                studentCommand(request),
-                SecurityUsers.requireAdmin());
+        studentAdminService.saveStudent(id, studentCommand(request), SecurityUsers.requireAdmin());
         return ResponseEntity.ok(ResponseFactory.object(Map.of("id", id)));
     }
 
@@ -269,9 +260,7 @@ public class AdminController implements AdminApi {
                 .map(this::layoutItem)
                 .toList();
         RoomLayoutService.LayoutCommand command = new RoomLayoutService.LayoutCommand(
-                request.getExpectedRoomVersion(),
-                request.getReason(),
-                beds);
+                request.getExpectedRoomVersion(), request.getReason(), beds);
         return ResponseEntity.ok(ResponseFactory.object(
                 roomLayoutService.updateLayout(roomId, command, SecurityUsers.requireAdmin())));
     }
@@ -291,6 +280,10 @@ public class AdminController implements AdminApi {
                 request.getAlgorithmVersion(),
                 request.getWeights(),
                 request.getConflictRules(),
+                request.getAllowedRecommendationStrategies(),
+                request.getDefaultRecommendationStrategy(),
+                request.getWeightedRandomBaseWeight(),
+                request.getWeightedRandomTemperature(),
                 Boolean.TRUE.equals(request.getActivate()),
                 request.getReason());
         return ResponseEntity.ok(ResponseFactory.object(
@@ -306,14 +299,16 @@ public class AdminController implements AdminApi {
                 request.getAlgorithmVersion(),
                 request.getWeights(),
                 request.getConflictRules(),
+                request.getAllowedRecommendationStrategies(),
+                request.getDefaultRecommendationStrategy(),
+                request.getWeightedRandomBaseWeight(),
+                request.getWeightedRandomTemperature(),
                 Boolean.TRUE.equals(request.getActivate()),
                 request.getExpectedVersion(),
                 request.getReason());
         return ResponseEntity.ok(ResponseFactory.object(
                 matchingSchemeService.createRevision(
-                        schemeId,
-                        command,
-                        SecurityUsers.requireAdmin())));
+                        schemeId, command, SecurityUsers.requireAdmin())));
     }
 
     @Override
@@ -372,9 +367,7 @@ public class AdminController implements AdminApi {
     public ResponseEntity<ObjectSuccessResponse> previewAllocation(Long batchId, Long randomSeed) {
         SecurityUsers.requireAdmin();
         return ResponseEntity.ok(ResponseFactory.object(
-                allocationService.preview(
-                        batchId,
-                        randomSeed == null ? 20260801L : randomSeed)));
+                allocationService.preview(batchId, randomSeed == null ? 20260801L : randomSeed)));
     }
 
     @Override
@@ -420,8 +413,7 @@ public class AdminController implements AdminApi {
         SecurityUsers.requireAdmin();
         Resource resource = exportService.exportCsv(batchId);
         return ResponseEntity.ok()
-                .header(
-                        HttpHeaders.CONTENT_DISPOSITION,
+                .header(HttpHeaders.CONTENT_DISPOSITION,
                         "attachment; filename=assignments-" + batchId + ".csv")
                 .contentType(new MediaType("text", "csv", StandardCharsets.UTF_8))
                 .body(resource);
@@ -445,15 +437,11 @@ public class AdminController implements AdminApi {
 
     private StudentAdminService.StudentCommand studentCommand(StudentRequest request) {
         String nationalityCode = request.getNationalityCode();
-        if (nationalityCode == null || nationalityCode.isBlank()) {
-            nationalityCode = "CN";
-        }
+        if (nationalityCode == null || nationalityCode.isBlank()) nationalityCode = "CN";
         String phoneNumber = request.getPhoneNumber();
         if (phoneNumber != null) {
             phoneNumber = phoneNumber.trim();
-            if (phoneNumber.isEmpty()) {
-                phoneNumber = null;
-            }
+            if (phoneNumber.isEmpty()) phoneNumber = null;
         }
         String enrollmentSource = request.getEnrollmentSource() == null
                 ? "ADMIN_MANUAL"
@@ -472,8 +460,6 @@ public class AdminController implements AdminApi {
     }
 
     private LocalDateTime toLocalDateTime(Date value) {
-        return value.toInstant()
-                .atZone(ZoneId.systemDefault())
-                .toLocalDateTime();
+        return value.toInstant().atZone(ZoneId.systemDefault()).toLocalDateTime();
     }
 }
