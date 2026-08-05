@@ -243,11 +243,6 @@ public class StudentController implements StudentApi {
     }
 
     @Override
-    public ResponseEntity<ObjectSuccessResponse> createFormingTeam() {
-        return ResponseEntity.ok(ResponseFactory.object(teamService.createFormingTeam(student())));
-    }
-
-    @Override
     public ResponseEntity<ListSuccessResponse> listMyTeams() {
         return ResponseEntity.ok(ResponseFactory.list(teamService.teams(student())));
     }
