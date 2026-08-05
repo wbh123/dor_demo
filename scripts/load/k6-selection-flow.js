@@ -20,28 +20,19 @@ const duplicateConfirmationAccepted = new Counter('duplicate_confirmation_accept
 export const options = {
   scenarios: {
     five_hundred_active_leases: {
-      executor: 'per-vu-iterations',
-      exec: 'activeLeaseFlow',
-      vus: Number(__ENV.ENTRY_VUS || 500),
-      iterations: 1,
-      maxDuration: '3m',
-      startTime: '0s',
+      executor: 'per-vu-iterations', exec: 'activeLeaseFlow',
+      vus: Number(__ENV.ENTRY_VUS || 500), iterations: 1,
+      maxDuration: '3m', startTime: '0s',
     },
     one_hundred_compete_one_bed: {
-      executor: 'per-vu-iterations',
-      exec: 'sameBedCompetition',
-      vus: Number(__ENV.BED_COMPETITION_VUS || 100),
-      iterations: 1,
-      maxDuration: '3m',
-      startTime: '5s',
+      executor: 'per-vu-iterations', exec: 'sameBedCompetition',
+      vus: Number(__ENV.BED_COMPETITION_VUS || 100), iterations: 1,
+      maxDuration: '3m', startTime: '5s',
     },
     twenty_teams_compete_one_room: {
-      executor: 'per-vu-iterations',
-      exec: 'teamRoomCompetition',
-      vus: Number(__ENV.TEAM_COMPETITION_VUS || 20),
-      iterations: 1,
-      maxDuration: '3m',
-      startTime: '10s',
+      executor: 'per-vu-iterations', exec: 'teamRoomCompetition',
+      vus: Number(__ENV.TEAM_COMPETITION_VUS || 20), iterations: 1,
+      maxDuration: '3m', startTime: '10s',
     },
   },
   thresholds: {
@@ -57,6 +48,10 @@ function fixture(index = exec.vu.idInTest - 1) {
   const item = fixtures[index % fixtures.length]
   if (!item) fail(`missing fixture for VU ${index + 1}`)
   return item
+}
+
+function requestId() {
+  return `k6-${exec.scenario.name}-${exec.vu.idInTest}-${exec.scenario.iterationInTest}-${Date.now()}`
 }
 
 function login(student) {
@@ -75,7 +70,7 @@ function headers(token, leaseToken = '') {
   const result = {
     Authorization: `Bearer ${token}`,
     'Content-Type': 'application/json',
-    'X-Request-Id': crypto.randomUUID(),
+    'X-Request-Id': requestId(),
   }
   if (leaseToken) result['X-Selection-Lease-Token'] = leaseToken
   return result
@@ -83,8 +78,7 @@ function headers(token, leaseToken = '') {
 
 function acquireLease(token) {
   const response = http.post(`${baseUrl}/api/v1/student/selection-leases`, null, {
-    headers: headers(token),
-    tags: { operation: 'lease_acquire' },
+    headers: headers(token), tags: { operation: 'lease_acquire' },
   })
   check(response, { 'lease acquired or disabled': (r) => r.status === 200 }) || fail(`lease failed: ${response.status}`)
   const data = response.json()?.data || {}
