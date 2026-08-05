@@ -8,8 +8,9 @@ def read(path: str) -> str:
     return (ROOT / path).read_text(encoding="utf-8")
 
 
-def schema_block(source: str, name: str, next_name: str) -> str:
-    return source.split(f"    {name}:\n", 1)[1].split(f"    {next_name}:\n", 1)[0]
+def password_property_lines(source: str) -> list[str]:
+    names = ("password:", "currentPassword:", "newPassword:")
+    return [line.strip() for line in source.splitlines() if line.strip().startswith(names)]
 
 
 auth_openapi = read("backend-java/model/src/main/resources/auth/openapi-auth.yaml")
@@ -20,16 +21,12 @@ platform_password_view = read("frontend/src/views/platform/PlatformPasswordView.
 auth_service = read("backend-java/server/src/main/java/com/wust/dormitory/auth/AuthService.java")
 platform_auth_service = read("backend-java/server/src/main/java/com/wust/dormitory/platform/PlatformAuthService.java")
 
-for block in (
-    schema_block(auth_openapi, "LoginRequest", "ActivateRequest"),
-    schema_block(auth_openapi, "ActivateRequest", "ChangePasswordRequest"),
-    schema_block(auth_openapi, "ChangePasswordRequest", "WelcomeData"),
-    schema_block(platform_openapi, "PlatformLoginRequest", "PlatformLoginResponse"),
-    schema_block(platform_openapi, "PlatformPasswordChangeRequest", "PlanCreateRequest"),
-):
-    assert "minLength" not in block
-    assert "maxLength" not in block
-    assert "pattern" not in block
+password_lines = password_property_lines(auth_openapi) + password_property_lines(platform_openapi)
+assert len(password_lines) >= 7
+for line in password_lines:
+    assert "minLength" not in line
+    assert "maxLength" not in line
+    assert "pattern" not in line
 
 for view in (login_view, admin_password_view, platform_password_view):
     assert 'minlength=' not in view.lower()
