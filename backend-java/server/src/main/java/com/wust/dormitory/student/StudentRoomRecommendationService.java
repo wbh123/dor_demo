@@ -1,6 +1,7 @@
 package com.wust.dormitory.student;
 
 import com.wust.dormitory.common.error.BusinessException;
+import com.wust.dormitory.matching.BatchRecommendationPolicyService;
 import com.wust.dormitory.matching.MatchingService;
 import com.wust.dormitory.matching.RecommendationSampler;
 import com.wust.dormitory.matching.RecommendationStrategy;
@@ -30,14 +31,13 @@ import java.util.stream.Collectors;
 @Service
 public class StudentRoomRecommendationService {
     static final String ALGORITHM_VERSION = "room-recommendation-v2";
-    static final double WEIGHTED_BASE_WEIGHT = 0.05d;
-    static final double WEIGHTED_TEMPERATURE = 0.20d;
 
     private final NamedParameterJdbcTemplate jdbc;
     private final MatchingService matchingService;
     private final ResidencyPolicyService policy;
     private final StudentPreferenceService preferenceService;
     private final FeatureAccessService featureAccessService;
+    private final BatchRecommendationPolicyService recommendationPolicyService;
     private final SecureRandom secureRandom;
 
     public StudentRoomRecommendationService(
@@ -45,8 +45,16 @@ public class StudentRoomRecommendationService {
             MatchingService matchingService,
             ResidencyPolicyService policy,
             StudentPreferenceService preferenceService,
-            FeatureAccessService featureAccessService) {
-        this(jdbc, matchingService, policy, preferenceService, featureAccessService, new SecureRandom());
+            FeatureAccessService featureAccessService,
+            BatchRecommendationPolicyService recommendationPolicyService) {
+        this(
+                jdbc,
+                matchingService,
+                policy,
+                preferenceService,
+                featureAccessService,
+                recommendationPolicyService,
+                new SecureRandom());
     }
 
     StudentRoomRecommendationService(
@@ -55,18 +63,22 @@ public class StudentRoomRecommendationService {
             ResidencyPolicyService policy,
             StudentPreferenceService preferenceService,
             FeatureAccessService featureAccessService,
+            BatchRecommendationPolicyService recommendationPolicyService,
             SecureRandom secureRandom) {
         this.jdbc = jdbc;
         this.matchingService = matchingService;
         this.policy = policy;
         this.preferenceService = preferenceService;
         this.featureAccessService = featureAccessService;
+        this.recommendationPolicyService = recommendationPolicyService;
         this.secureRandom = secureRandom;
     }
 
     public List<Map<String, Object>> rooms(long batchId, CurrentUser user) {
         requireAccessibleBatch(batchId, user.studentId());
         Map<String, Object> batch = policy.batch(batchId);
+        BatchRecommendationPolicyService.Policy recommendationPolicy =
+                recommendationPolicyService.forBatch(batchId);
         Map<String, Object> student = policy.student(user.studentId());
         String feature = featureJson(batchId, user.studentId());
         String mode = String.valueOf(batch.get("selection_mode"));
@@ -106,6 +118,8 @@ public class StudentRoomRecommendationService {
                     : matchingService.roomScore("", List.of());
             Map<String, Object> view = new LinkedHashMap<>(room);
             view.put("selectionMode", mode);
+            view.put("allowedRecommendationStrategies", recommendationPolicy.allowedNames());
+            view.put("defaultRecommendationStrategy", recommendationPolicy.defaultStrategy().name());
             view.put("activeResidentCount", activeResidents);
             view.put("confirmedBedCount", activeResidents - unknownBedResidents);
             view.put("unconfirmedBedCount", unknownBedResidents);
@@ -152,7 +166,7 @@ public class StudentRoomRecommendationService {
     }
 
     /**
-     * 旧接口在公开验证阶段仅作为真正随机策略的薄适配层；迁移统一接口后删除。
+     * 旧接口在公开验证阶段仅作为真正随机策略的薄适配层；统一接口稳定后删除。
      */
     public Map<String, Object> randomRecommendation(long batchId, CurrentUser user) {
         return recommend(batchId, RecommendationStrategy.TRUE_RANDOM, user);
@@ -162,6 +176,9 @@ public class StudentRoomRecommendationService {
             long batchId,
             RecommendationStrategy strategy,
             CurrentUser user) {
+        BatchRecommendationPolicyService.Policy recommendationPolicy =
+                recommendationPolicyService.forBatch(batchId);
+        recommendationPolicy.requireAllowed(strategy);
         featureAccessService.require(strategy.requiredFeatureCode());
         Map<String, Object> batch = policy.batch(batchId);
         List<Map<String, Object>> candidates = rooms(batchId, user);
@@ -183,8 +200,8 @@ public class StudentRoomRecommendationService {
             case MATCH_WEIGHTED_RANDOM -> RecommendationSampler.weightedRandom(
                     legalCandidates,
                     random,
-                    WEIGHTED_BASE_WEIGHT,
-                    WEIGHTED_TEMPERATURE);
+                    recommendationPolicy.baseWeight(),
+                    recommendationPolicy.temperature());
         };
         Map<String, Object> selectedRoom = selected.value();
 
