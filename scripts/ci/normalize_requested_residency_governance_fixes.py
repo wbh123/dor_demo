@@ -46,11 +46,23 @@ replace_once(room_change, "import { api }", "import AppModal from '../../compone
 sub_once(
     room_change,
     r'<div v-if="target" class="modal-overlay room-change-overlay" @click\.self="closeDialog"><section class="modal-card room-change-dialog" role="dialog" aria-modal="true">(.*?)</section></div>',
-    r'''<AppModal :open="Boolean(target)" size="default" :busy="submitting" @close="closeDialog"><div class="room-change-dialog" role="dialog">\1</div></AppModal>''',
+    r'''<AppModal :open="Boolean(target)" size="default" :busy="submitting" @close="closeDialog"><div v-if="target" class="room-change-dialog" role="dialog">\1</div></AppModal>''',
 )
 
 """
 text = text[:room_change_start] + current_room_change_patch + text[residency_start:]
+
+modal_type_guards = {
+    r'<div class="student-dialog">\1</div>': r'<div v-if="editingStudent" class="student-dialog">\1</div>',
+    r'<div class="placement-dialog">\1</div>': r'<div v-if="placementTarget" class="placement-dialog">\1</div>',
+    r'<div class="reset-dialog">\1</div>': r'<div v-if="resetTarget" class="reset-dialog">\1</div>',
+    r'<div class="bed-confirm-dialog">\1</div>': r'<div v-if="selected" class="bed-confirm-dialog">\1</div>',
+}
+for old, new in modal_type_guards.items():
+    count = text.count(old)
+    if count != 1:
+        raise RuntimeError(f"公共弹窗类型守卫锚点数量异常：{old} -> {count}")
+    text = text.replace(old, new, 1)
 
 lines = text.splitlines(keepends=True)
 fixed_audit_literal = 0
