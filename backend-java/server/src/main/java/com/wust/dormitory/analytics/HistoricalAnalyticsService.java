@@ -51,8 +51,10 @@ public class HistoricalAnalyticsService {
         AnalyticsFilter filter = request == null ? AnalyticsFilter.empty() : request.normalized();
         StringBuilder sql = new StringBuilder("""
                 SELECT snapshot.id, snapshot.batch_id, snapshot.metric_version,
-                       snapshot.metrics_json, snapshot.dimensions_json,
-                       snapshot.source_basis, snapshot.data_updated_at,
+                       ANY_VALUE(snapshot.metrics_json) AS metrics_json,
+                       ANY_VALUE(snapshot.dimensions_json) AS dimensions_json,
+                       ANY_VALUE(snapshot.source_basis) AS source_basis,
+                       ANY_VALUE(snapshot.data_updated_at) AS data_updated_at,
                        batch.batch_code, batch.batch_name,
                        YEAR(batch.start_at) AS academic_year,
                        COUNT(fact.student_id) AS sample_size,
@@ -85,8 +87,6 @@ public class HistoricalAnalyticsService {
         append(sql, params, " AND fact.room_type=:roomType", "roomType", filter.roomType());
         sql.append("""
                 GROUP BY snapshot.id, snapshot.batch_id, snapshot.metric_version,
-                         snapshot.metrics_json, snapshot.dimensions_json,
-                         snapshot.source_basis, snapshot.data_updated_at,
                          batch.batch_code, batch.batch_name, YEAR(batch.start_at)
                 ORDER BY academic_year, snapshot.batch_id
                 """);
