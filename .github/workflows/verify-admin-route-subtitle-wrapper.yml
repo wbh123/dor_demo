@@ -1,0 +1,43 @@
+name: Verify admin route subtitle wrapper
+
+on:
+  push:
+    branches:
+      - verify/admin-route-subtitle-wrapper-20260805
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  verify-frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Apply equivalent subtitle wrapper
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('frontend/src/views/admin/AdminDataView.vue')
+          text = path.read_text(encoding='utf-8')
+          old = "const { subtitle, translateError } = useI18n()"
+          new = "const { subtitle: i18nSubtitle, translateError } = useI18n()\nfunction subtitle(chinese: string, english: string) { return i18nSubtitle(chinese, english) }"
+          if old not in text:
+              raise SystemExit('公开镜像未找到待验证的 subtitle 解构')
+          path.write_text(text.replace(old, new, 1), encoding='utf-8')
+          PY
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+      - name: Typecheck and build frontend
+        working-directory: frontend
+        run: |
+          npm run typecheck
+          npm run build
