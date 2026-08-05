@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// Executes the compiled Vue template so subtitle binding regressions fail at render time.
 import assert from 'node:assert/strict'
 import { createRequire } from 'node:module'
 import { fileURLToPath, pathToFileURL } from 'node:url'
