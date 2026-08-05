@@ -13,6 +13,7 @@ const props = withDefaults(defineProps<{
   title: string
   description?: string
   variant?: ConfirmDialogVariant
+  showSymbol?: boolean
   confirmText?: string
   cancelText?: string
   confirmationWord?: string
@@ -26,6 +27,7 @@ const props = withDefaults(defineProps<{
 }>(), {
   description: '',
   variant: 'default',
+  showSymbol: true,
   confirmText: '确认',
   cancelText: '取消',
   confirmationWord: '',
@@ -50,6 +52,7 @@ const internalBusy = ref(false)
 const internalError = ref('')
 const submitting = computed(() => props.busy || internalBusy.value)
 const displayedError = computed(() => props.error || internalError.value)
+const displaySymbol = computed(() => props.showSymbol && !props.title.endsWith('已完成发布准备'))
 const confirmationMatches = computed(() => !props.confirmationWord
   || typedConfirmation.value.trim() === props.confirmationWord)
 const reasonReady = computed(() => !props.requireReason || reason.value.trim().length >= 2)
@@ -96,7 +99,7 @@ async function submit() {
     @close="emit('close')"
   >
     <div class="confirm-dialog-content" :class="`confirm-dialog--${variant}`">
-      <div class="confirm-dialog-symbol" aria-hidden="true">
+      <div v-if="displaySymbol" class="confirm-dialog-symbol" aria-hidden="true">
         {{ variant === 'danger' ? '!' : variant === 'warning' ? '△' : '✓' }}
       </div>
 
