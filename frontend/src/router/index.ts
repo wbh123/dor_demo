@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { pinia } from '../stores'
 import { platformRoutes, installPlatformRouteGuard } from '../platform/routes'
+import { startSelectionAccessLease, stopSelectionAccessLease } from '../selection/selectionAccessLease'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -60,6 +61,20 @@ router.beforeEach(async (to) => {
   if (requiredRole && auth.user?.userType !== requiredRole) return auth.isAdmin ? '/admin' : '/student'
   if (to.path === '/' || (to.path === '/student' && auth.isAdmin)) return auth.isAdmin ? '/admin' : '/student'
   return true
+})
+
+function isSelectionWorkspace(path: string) {
+  return /^\/student\/batches\/\d+\/rooms(?:\/\d+)?$/.test(path)
+}
+
+router.afterEach((to, from) => {
+  if (isSelectionWorkspace(to.path)) {
+    void startSelectionAccessLease().catch((reason) => {
+      console.error('无法取得选寝并发租约', reason)
+    })
+  } else if (isSelectionWorkspace(from.path)) {
+    void stopSelectionAccessLease()
+  }
 })
 
 export default router
