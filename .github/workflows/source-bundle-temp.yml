@@ -15,7 +15,12 @@ jobs:
       - name: Apply patch
         run: |
           cat scripts/ci/patch_chunk_*.txt | base64 -d | gzip -d > /tmp/ui.patch
-          patch -p1 < /tmp/ui.patch
+          awk '
+            /^diff -ruN .*\.github\/workflows\/source-bundle-temp\.yml / { skip=1; next }
+            skip && /^diff -ruN / { skip=0 }
+            !skip { print }
+          ' /tmp/ui.patch > /tmp/ui-clean.patch
+          patch --batch --forward -p1 < /tmp/ui-clean.patch
           rm -f scripts/ci/patch_chunk_*.txt .github/workflows/source-bundle-temp.yml
       - name: Commit patch
         run: |
