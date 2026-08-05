@@ -59,7 +59,7 @@ async def login(student: dict[str, Any]) -> str:
     return str(token)
 
 
-async def open_sse(student: dict[str, Any], room_id: int, ready: asyncio.Event) -> tuple[bool, str]:
+async def open_sse(student: dict[str, Any], room_id: int) -> tuple[bool, str]:
     token = await login(student)
     parsed = urllib.parse.urlsplit(BASE_URL)
     use_tls = parsed.scheme == 'https'
@@ -96,12 +96,13 @@ async def open_sse(student: dict[str, Any], room_id: int, ready: asyncio.Event) 
         writer.close()
         await writer.wait_closed()
         return False, status_line.decode('latin-1', errors='replace').strip()
-    ready.set()
     try:
         end = asyncio.get_running_loop().time() + HOLD_SECONDS
         while asyncio.get_running_loop().time() < end:
             try:
-                await asyncio.wait_for(reader.read(1), timeout=5)
+                chunk = await asyncio.wait_for(reader.read(1), timeout=5)
+                if chunk == b'':
+                    return False, 'connection closed before hold interval ended'
             except asyncio.TimeoutError:
                 continue
     finally:
@@ -121,14 +122,8 @@ async def main_async() -> dict[str, Any]:
     if len(students) < CONNECTIONS:
         fail(f'{CONNECTIONS} students required, only {len(students)} found')
 
-    semaphore = asyncio.Semaphore(min(CONNECTIONS, 100))
-
-    async def guarded(student: dict[str, Any]) -> tuple[bool, str]:
-        async with semaphore:
-            return await open_sse(student, room_id, asyncio.Event())
-
     results = await asyncio.gather(
-        *(guarded(student) for student in students[:CONNECTIONS]),
+        *(open_sse(student, room_id) for student in students[:CONNECTIONS]),
         return_exceptions=True,
     )
     accepted = sum(1 for item in results if item == (True, 'connected'))
