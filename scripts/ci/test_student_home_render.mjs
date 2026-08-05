@@ -14,6 +14,12 @@ const importFrontendPackage = async (name) => {
   return import(pathToFileURL(resolved).href)
 }
 
+// 先加载 Vue 服务端渲染模块。此时不伪造 document，避免 runtime-dom
+// 将不完整的浏览器桩当成真实文档并调用 createElement。
+const { createServer } = await importFrontendPackage('vite')
+const { createSSRApp, h } = await importFrontendPackage('vue')
+const { renderToString } = await importFrontendPackage('@vue/server-renderer')
+
 const storage = new Map()
 Object.defineProperty(globalThis, 'navigator', {
   value: { language: 'zh-CN' },
@@ -41,10 +47,6 @@ globalThis.MutationObserver = class MutationObserver {
   observe() {}
   disconnect() {}
 }
-
-const { createServer } = await importFrontendPackage('vite')
-const { createSSRApp, h } = await importFrontendPackage('vue')
-const { renderToString } = await importFrontendPackage('@vue/server-renderer')
 
 const server = await createServer({
   root: frontendRoot,
