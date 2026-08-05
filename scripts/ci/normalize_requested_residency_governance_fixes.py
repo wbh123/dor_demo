@@ -41,7 +41,7 @@ text = text[:policy_start] + current_policy_patch + text[matching_start:]
 
 room_change_start = text.index('room_change = "frontend/src/views/student/StudentRoomChangeView.vue"')
 residency_start = text.index('residency = "frontend/src/views/admin/AdminResidencyView.vue"', room_change_start)
-current_room_change_patch = r'''room_change = "frontend/src/views/student/StudentRoomChangeView.vue"
+current_room_change_patch = r"""room_change = "frontend/src/views/student/StudentRoomChangeView.vue"
 replace_once(room_change, "import { api }", "import AppModal from '../../components/modal/AppModal.vue'\nimport { api }")
 sub_once(
     room_change,
@@ -49,7 +49,7 @@ sub_once(
     r'''<AppModal :open="Boolean(target)" size="default" :busy="submitting" @close="closeDialog"><div class="room-change-dialog" role="dialog">\1</div></AppModal>''',
 )
 
-'''
+"""
 text = text[:room_change_start] + current_room_change_patch + text[residency_start:]
 
 lines = text.splitlines(keepends=True)
