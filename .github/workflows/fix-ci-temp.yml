@@ -1,0 +1,52 @@
+name: Apply Final Public CI Fixes
+on:
+  pull_request:
+    branches: [main]
+    types: [synchronize, reopened]
+permissions:
+  contents: write
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: fix/dormitory-login-preference-ui-20260805
+      - name: Fix frontend and public boundary
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          home = Path('frontend/src/views/student/StudentHomeContent.vue')
+          text = home.read_text(encoding='utf-8')
+          text = text.replace('  subtitle,\n', '')
+          home.write_text(text, encoding='utf-8')
+
+          login = Path('frontend/src/views/LoginView.vue')
+          text = login.read_text(encoding='utf-8')
+          text = text.replace(
+              "const heroTitle = String(import.meta.env.VITE_LOGIN_HERO_TITLE || '武汉科技大学马德里学院')",
+              "const heroTitle = String(import.meta.env.VITE_LOGIN_HERO_TITLE || institutionName)",
+          )
+          text = text.replace(
+              "const heroDescription = String(import.meta.env.VITE_LOGIN_HERO_DESCRIPTION || '在多元文化校园中，连接同学、共享成长，让每一段宿舍生活都成为难忘的大学记忆。')",
+              "const heroDescription = String(import.meta.env.VITE_LOGIN_HERO_DESCRIPTION || '连接同学、共享成长，让每一段校园生活都成为难忘的大学记忆。')",
+          )
+          login.write_text(text, encoding='utf-8')
+
+          test = Path('scripts/ci/test_dormitory_login_preference_ui.py')
+          text = test.read_text(encoding='utf-8')
+          text = text.replace(
+              'assert "武汉科技大学马德里学院" in login',
+              'assert "VITE_LOGIN_HERO_TITLE" in login',
+          )
+          test.write_text(text, encoding='utf-8')
+          PY
+          rm -f .github/workflows/fix-ci-temp.yml
+      - name: Commit fixes
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A
+          git commit -m "fix: align login copy with public boundary and frontend types"
+          git push origin HEAD:fix/dormitory-login-preference-ui-20260805
