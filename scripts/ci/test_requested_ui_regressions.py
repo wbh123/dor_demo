@@ -26,10 +26,11 @@ def require(condition: bool, message: str) -> None:
 
 layout = read('frontend/src/components/admin/RoomLayoutEditor.vue')
 require('P2_ROOM_LAYOUT_UPDATE' in layout and 'layout-boundary-label door' in layout
-        and 'layout-boundary-label window' in layout and 'layout-relative-reference' in layout,
-        'room layout editor does not expose permission-aware door/window position references')
-require('v-if="canEdit"' in layout and 'nudgeUnit' in layout,
-        'room layout cards do not restore editing controls for authorized administrators')
+        and 'layout-boundary-label window' in layout and 'layout-relative-reference' not in layout,
+        'room layout editor must keep door/window boundary labels without redundant reference bubbles')
+require('v-if="canEdit"' in layout and 'rotate(unit)' in layout and 'setType(unit' in layout
+        and 'nudgeUnit' not in layout,
+        'room layout cards must expose only rotate and bed-type controls to authorized administrators')
 
 admin_data = read('frontend/src/views/admin/AdminDataView.vue')
 phone_codes = read('frontend/src/utils/phoneCodes.ts')
