@@ -1,5 +1,7 @@
 package com.wust.dormitory.mapper;
 
+import com.baomidou.mybatisplus.core.MybatisConfiguration;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wust.dormitory.admin.mapper.AdminCatalogMapper;
 import com.wust.dormitory.admin.mapper.RoomCatalogMapper;
@@ -139,8 +141,7 @@ class MybatisMySqlIntegrationTest {
         dataSource.setUsername("root");
         dataSource.setPassword("root-test-password");
 
-        org.apache.ibatis.session.Configuration configuration =
-                new org.apache.ibatis.session.Configuration();
+        MybatisConfiguration configuration = new MybatisConfiguration();
         configuration.setMapUnderscoreToCamelCase(true);
         new MybatisConfig()
                 .mybatisConfigurationCustomizer(new ObjectMapper())
