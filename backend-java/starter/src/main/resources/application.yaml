@@ -27,7 +27,7 @@ platform:
   campus-name: ${WUST_DORMITORY_CAMPUS_NAME:示例校区}
 
 mybatis:
-  mapper-locations: classpath*:com/wust/dormitory/mappers/**/*.xml
+  mapper-locations: classpath*:mapper/**/*.xml
   configuration:
     map-underscore-to-camel-case: true
 
