@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.wust.dormitory.admin.mapper.AdminDashboardMapper">
+    <resultMap id="AdminDashboardStatsResultMap"
+               type="com.wust.dormitory.admin.model.persistence.AdminDashboardStatsRow">
+        <constructor>
+            <arg column="major_count" javaType="java.lang.Long"/>
+            <arg column="student_count" javaType="java.lang.Long"/>
+            <arg column="male_student_count" javaType="java.lang.Long"/>
+            <arg column="female_student_count" javaType="java.lang.Long"/>
+            <arg column="room_count" javaType="java.lang.Long"/>
+            <arg column="bed_count" javaType="java.lang.Long"/>
+            <arg column="active_assignment_count" javaType="java.lang.Long"/>
+            <arg column="open_batch_count" javaType="java.lang.Long"/>
+        </constructor>
+    </resultMap>
+
+    <select id="findStats" resultMap="AdminDashboardStatsResultMap">
+        SELECT (SELECT COUNT(*) FROM major WHERE enabled = 1) AS major_count,
+               (SELECT COUNT(*) FROM student) AS student_count,
+               (SELECT COUNT(*) FROM student WHERE gender = 'M') AS male_student_count,
+               (SELECT COUNT(*) FROM student WHERE gender = 'F') AS female_student_count,
+               (SELECT COUNT(*) FROM room) AS room_count,
+               (SELECT COUNT(*) FROM bed WHERE operational_status = 'ENABLED') AS bed_count,
+               (SELECT COUNT(*) FROM bed_assignment) AS active_assignment_count,
+               (SELECT COUNT(*)
+                FROM selection_batch
+                WHERE batch_status IN ('PUBLISHED', 'OPEN', 'PAUSED')) AS open_batch_count
+    </select>
+</mapper>

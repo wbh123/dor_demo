@@ -2,6 +2,7 @@ package com.wust.dormitory.admin;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wust.dormitory.admin.mapper.AdminCatalogMapper;
+import com.wust.dormitory.admin.mapper.AdminDashboardMapper;
 import com.wust.dormitory.admin.mapper.StudentAdminMapper;
 import com.wust.dormitory.admin.model.persistence.StudentCatalogRow;
 import com.wust.dormitory.admin.model.query.StudentCatalogQuery;
@@ -25,6 +26,7 @@ class StudentAdminQueryServiceTest {
         AuditService auditService = mock(AuditService.class);
         AdminCatalogMapper adminCatalogMapper = mock(AdminCatalogMapper.class);
         StudentAdminMapper studentAdminMapper = mock(StudentAdminMapper.class);
+        AdminDashboardMapper dashboardMapper = mock(AdminDashboardMapper.class);
         StudentCatalogQuery expectedQuery = new StudentCatalogQuery(
                 "%2026%",
                 "F",
@@ -48,7 +50,8 @@ class StudentAdminQueryServiceTest {
                 objectMapper,
                 auditService,
                 adminCatalogMapper,
-                studentAdminMapper);
+                studentAdminMapper,
+                dashboardMapper);
         Map<String, Object> result = service.students(" 2026 ", "F", 9L, 0, 500);
 
         verify(studentAdminMapper).countStudents(expectedQuery);
@@ -72,6 +75,7 @@ class StudentAdminQueryServiceTest {
         AuditService auditService = mock(AuditService.class);
         AdminCatalogMapper adminCatalogMapper = mock(AdminCatalogMapper.class);
         StudentAdminMapper studentAdminMapper = mock(StudentAdminMapper.class);
+        AdminDashboardMapper dashboardMapper = mock(AdminDashboardMapper.class);
         StudentCatalogQuery expectedQuery = new StudentCatalogQuery(
                 null,
                 null,
@@ -86,7 +90,8 @@ class StudentAdminQueryServiceTest {
                 objectMapper,
                 auditService,
                 adminCatalogMapper,
-                studentAdminMapper);
+                studentAdminMapper,
+                dashboardMapper);
         Map<String, Object> result = service.students(" ", "", null, 3, 10);
 
         verify(studentAdminMapper).countStudents(expectedQuery);
