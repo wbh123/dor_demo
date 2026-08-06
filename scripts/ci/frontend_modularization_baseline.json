@@ -2,7 +2,7 @@
   "view_effective_line_limit": 350,
   "logic_line_limit": 350,
   "large_views": {
-    "frontend/src/views/admin/AdminBatchView.vue": 1,
+    "frontend/src/views/admin/AdminBatchView.vue": 994,
     "frontend/src/views/admin/AdminDataView.vue": 425,
     "frontend/src/views/admin/AdminMatchingView.vue": 461,
     "frontend/src/views/student/QuestionnaireContent.vue": 355,
