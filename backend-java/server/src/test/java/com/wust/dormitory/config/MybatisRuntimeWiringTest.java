@@ -4,6 +4,9 @@ import com.baomidou.mybatisplus.autoconfigure.MybatisPlusAutoConfiguration;
 import com.baomidou.mybatisplus.core.MybatisConfiguration;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wust.dormitory.admin.mapper.AdminCatalogMapper;
+import com.wust.dormitory.export.ExportTaskMapper;
+import com.wust.dormitory.export.ExportTaskQueueRow;
+import org.apache.ibatis.mapping.MappedStatement;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.junit.jupiter.api.Test;
 import org.mybatis.spring.SqlSessionTemplate;
@@ -32,6 +35,7 @@ class MybatisRuntimeWiringTest {
             assertThat(context).hasSingleBean(SqlSessionFactory.class);
             assertThat(context).hasSingleBean(SqlSessionTemplate.class);
             assertThat(context).hasSingleBean(AdminCatalogMapper.class);
+            assertThat(context).hasSingleBean(ExportTaskMapper.class);
 
             SqlSessionFactory sessionFactory = context.getBean(SqlSessionFactory.class);
             assertThat(sessionFactory.getConfiguration())
@@ -41,6 +45,13 @@ class MybatisRuntimeWiringTest {
             assertThat(sessionFactory.getConfiguration().hasStatement(
                     "com.wust.dormitory.admin.mapper.AdminCatalogMapper.findMajors"))
                     .isTrue();
+
+            MappedStatement queuedTaskStatement = sessionFactory.getConfiguration().getMappedStatement(
+                    "com.wust.dormitory.export.ExportTaskMapper.findNextQueued");
+            assertThat(queuedTaskStatement.getResultMaps())
+                    .singleElement()
+                    .satisfies(resultMap -> assertThat(resultMap.getType())
+                            .isEqualTo(ExportTaskQueueRow.class));
         });
     }
 
