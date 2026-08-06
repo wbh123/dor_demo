@@ -84,7 +84,7 @@ public class AdminStudentResidencyAdjustmentService {
         if (!current.isEmpty()) {
             residencyService.end(
                     number(current.get("residency_id")),
-                    "管理员调整住宿：" + normalizedReason,
+                    normalizedReason,
                     operator);
         }
         Map<String, Object> assignment = residencyService.assign(

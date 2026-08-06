@@ -177,13 +177,13 @@ function methodText(value: unknown) {
       </div>
     </section>
 
-    <div v-if="ending" class="modal-overlay" @click.self="closeEndDialog">
-      <section class="modal-card residency-end-dialog" role="dialog" aria-modal="true" aria-labelledby="residency-end-title">
-        <span class="eyebrow">END RESIDENCY</span><h3 id="residency-end-title">办理 {{ ending.student_name }} 退宿</h3><p>退宿会结束当前在住记录并释放寝室容量，请填写可审计的处理原因。</p>
+    <AppModal :open="Boolean(ending)" size="default" :busy="endingResidency" @close="closeEndDialog">
+      <div v-if="ending" class="residency-end-dialog">
+        <span class="eyebrow">END RESIDENCY</span><h3>办理 {{ ending.student_name }} 退宿</h3><p>退宿会结束当前在住记录并释放寝室容量，请填写可审计的处理原因。</p>
         <label class="form-stack"><span>退宿原因</span><textarea v-model.trim="endReason" class="input" rows="4" maxlength="500" placeholder="例如：学生申请退宿、转宿舍或毕业离校"></textarea></label>
         <div class="button-row dialog-actions"><button class="button ghost" type="button" :disabled="endingResidency" @click="closeEndDialog">取消</button><button class="button danger" type="button" :disabled="!endReason.trim() || endingResidency" @click="endResidency">{{ endingResidency ? '处理中…' : '确认结束在住' }}</button></div>
-      </section>
-    </div>
+      </div>
+    </AppModal>
 
     </template>
     <AdminBedConfirmationView v-else embedded />
@@ -197,6 +197,6 @@ function methodText(value: unknown) {
 </template>
 
 <style scoped>
-.residency-tabs{display:flex;gap:10px;flex-wrap:wrap}.residency-end-dialog{width:min(540px,calc(100vw - 32px));padding:24px}.residency-end-dialog p{color:var(--text-muted);line-height:1.7}.residency-end-dialog .dialog-actions{justify-content:flex-end;margin-top:16px}
+.residency-tabs{display:flex;gap:10px;flex-wrap:wrap}.residency-end-dialog{width:100%;padding:0}.residency-end-dialog p{color:var(--text-muted);line-height:1.7}.residency-end-dialog .dialog-actions{justify-content:flex-end;margin-top:16px}
 .residency-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}.residency-stats article{padding:18px}.residency-stats span{color:var(--text-muted)}.residency-stats strong{display:block;margin-top:6px;font-size:28px}.residency-filter{display:grid;grid-template-columns:minmax(220px,1fr) 220px 160px auto;gap:10px;margin-bottom:16px}.warning{background:#fff7ed;color:#c2410c}.bed-confirm-dialog{width:min(760px,calc(100vw - 32px));padding:24px}.bed-card-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin:16px 0}.bed-card{display:grid;gap:5px;padding:16px;border:1px solid var(--border);border-radius:14px;background:var(--surface);text-align:left;color:inherit}.bed-card.selected{border-color:var(--primary);box-shadow:0 0 0 3px color-mix(in srgb,var(--primary) 14%,transparent)}.bed-card span,.bed-card small{color:var(--text-muted)}.dialog-actions{justify-content:flex-end;margin-top:16px}@media(max-width:800px){.residency-stats,.residency-filter{grid-template-columns:1fr}}
 </style>

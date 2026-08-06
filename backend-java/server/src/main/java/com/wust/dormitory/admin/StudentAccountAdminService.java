@@ -91,7 +91,7 @@ public class StudentAccountAdminService {
         deleted.put("releasedRedisHolds", bedHoldResetService.releaseAllForStudent(studentId, activeTeamIds));
         deleted.put("cancelledRoomChanges", roomChangeService.cancelActiveRoomChanges(
                 studentId,
-                "管理员完全重置学生：" + reason.trim(),
+                reason.trim(),
                 operator));
 
         List<Long> activeResidencyIds = jdbc.queryForList("""
@@ -103,7 +103,7 @@ public class StudentAccountAdminService {
         for (Long residencyId : activeResidencyIds) {
             residencyService.end(
                     residencyId,
-                    "管理员完全重置学生：" + reason.trim(),
+                    reason.trim(),
                     operator);
         }
         deleted.put("endedResidencies", activeResidencyIds.size());

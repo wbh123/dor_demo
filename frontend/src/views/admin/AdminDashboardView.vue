@@ -125,17 +125,26 @@ async function saveWelcomeSetting() {
   finally { welcomeSaving.value = false }
 }
 
-function auditActionText(value: unknown) {
-  const key = String(value ?? '')
-  return ({ STUDENT_CREATE:'录入学生', STUDENT_UPDATE:'修改学生资料', STUDENT_PASSWORD_RESET:'重置学生密码', STUDENT_STATE_RESET:'完全重置学生状态', RESIDENCY_ASSIGN:'分配寝室床位', RESIDENCY_ADJUST:'调整寝室床位', SELECTION_POLICY_UPDATE:'修改选寝策略', BED_CONFIRMATION_ROOM_APPROVE:'审批实际床位', BATCH_PUBLISH:'发布选寝批次' } as Record<string,string>)[key] ?? (key ? key.replaceAll('_',' ').toLowerCase() : '完成业务操作')
+const auditActionLabels:Record<string,string>={
+  STUDENT_CREATE:'录入学生',STUDENT_UPDATE:'修改学生资料',STUDENT_PHONE_UPDATE:'修改学生手机号',STUDENT_PASSWORD_RESET:'重置学生密码',STUDENT_STATE_RESET:'完全重置学生状态',
+  MAJOR_CREATE:'新增专业',MAJOR_UPDATE:'修改专业',BUILDING_CREATE:'新增宿舍楼',BUILDING_UPDATE:'修改宿舍楼',ROOM_CREATE:'新增房间',ROOM_UPDATE:'修改房间属性',ROOM_LAYOUT_UPDATE:'修改房间床位布局',BED_UPDATE:'修改床位状态',
+  BATCH_CREATE:'创建选寝批次',BATCH_COPY:'复制选寝批次',BATCH_PUBLISH:'发布选寝批次',BATCH_OPEN:'开放选寝批次',BATCH_PAUSE:'暂停选寝批次',BATCH_CLOSE:'关闭选寝批次',BATCH_FINISH:'完成选寝批次',BATCH_CANCEL:'取消选寝批次',
+  RESIDENCY_ASSIGN:'分配寝室床位',RESIDENCY_ADJUST:'调整寝室床位',RESIDENCY_BED_CONFIRM:'确认实际床位',RESIDENCY_END:'办理退宿',
+  BED_CONFIRMATION_SUBMIT:'提交实际床位申报',BED_CONFIRMATION_CANCEL:'取消实际床位申报',BED_CONFIRMATION_ROOM_APPROVE:'通过寝室床位核查',BED_CONFIRMATION_REJECT:'驳回实际床位申报',
+  ROOM_CHANGE_REQUEST:'提交换寝申请',ROOM_CHANGE_APPROVE:'批准换寝申请',ROOM_CHANGE_REJECT:'驳回换寝申请',ROOM_CHANGE_CANCEL:'取消换寝申请',ROOM_CHANGE_EXECUTE:'执行换寝',
+  ROOM_EXCHANGE_REQUEST:'发起寝室交换',ROOM_EXCHANGE_APPROVE:'批准寝室交换',ROOM_EXCHANGE_REJECT:'驳回寝室交换',ROOM_EXCHANGE_CANCEL:'取消寝室交换',ROOM_EXCHANGE_EXECUTE:'执行寝室交换',
+  WAITLIST_REQUEST:'提交候补申请',WAITLIST_CANCEL:'取消候补申请',WAITLIST_OFFER:'发放候补名额',WAITLIST_ASSIGN:'完成候补补位',
+  TEAM_CREATE:'创建选寝队伍',TEAM_INVITE:'邀请队员',TEAM_INVITATION_RESPOND:'处理组队邀请',TEAM_MEMBER_REMOVE:'移除队员',TEAM_DISSOLVE:'解散队伍',
+  SELECTION_POLICY_UPDATE:'修改选寝策略',MATCHING_SCHEME_CREATE:'创建匹配方案',MATCHING_SCHEME_REVISION:'创建匹配方案修订',SYSTEM_SETTING_UPDATE:'修改系统设置',
+  IMPORT_CREATE:'创建导入任务',IMPORT_COMMIT:'提交批量导入',AUDIT_EXPORT:'导出审计记录',REPORT_EXPORT:'导出自定义报表',REPORT_TEMPLATE_SAVE:'保存报表模板',NOTIFICATION_SEND:'发送站内通知',NOTIFICATION_TEMPLATE_UPDATE:'修改通知模板',RETENTION_PREFLIGHT:'执行数据保留预检'
 }
-function auditTargetText(log: DataObject) {
-  const type = String(log.resource_type ?? log.target_type ?? '业务对象')
-  const id = log.resource_id ?? log.target_id
-  return id == null || id === '' ? type : `${type} #${id}`
-}
-function auditResultText(value: unknown) { return String(value) === 'SUCCESS' ? '成功' : String(value) === 'FAILED' ? '失败' : String(value ?? '已记录') }
-function formatAuditTime(value: unknown) { const date = new Date(String(value ?? '')); return Number.isNaN(date.getTime()) ? '时间未记录' : date.toLocaleString() }
+const auditResourceLabels:Record<string,string>={STUDENT:'学生',MAJOR:'专业',DORMITORY_BUILDING:'宿舍楼',BUILDING:'宿舍楼',ROOM:'房间',BED:'床位',ROOM_LAYOUT:'房间布局',SELECTION_BATCH:'选寝批次',BATCH:'选寝批次',ROOM_ASSIGNMENT:'在住记录',RESIDENCY:'在住记录',BED_CONFIRMATION_REQUEST:'实际床位申报',ROOM_CHANGE_REQUEST:'换寝申请',ROOM_EXCHANGE_REQUEST:'寝室交换申请',WAITLIST_ENTRY:'候补申请',SELECTION_TEAM:'选寝队伍',SYSTEM_SETTING:'系统设置',MATCHING_SCHEME:'匹配方案',IMPORT_JOB:'导入任务',EXPORT_TASK:'导出任务',REPORT_TEMPLATE:'报表模板',NOTIFICATION_TASK:'通知任务'}
+const auditTokenLabels:Record<string,string>={CREATE:'创建',UPDATE:'修改',DELETE:'删除',RESET:'重置',PASSWORD:'密码',STATE:'状态',PUBLISH:'发布',OPEN:'开放',PAUSE:'暂停',CLOSE:'关闭',FINISH:'完成',CANCEL:'取消',APPROVE:'批准',REJECT:'驳回',ASSIGN:'分配',ADJUST:'调整',END:'结束',SUBMIT:'提交',REQUEST:'申请',EXECUTE:'执行',EXPORT:'导出',IMPORT:'导入',SEND:'发送',SAVE:'保存',ROOM:'寝室',BED:'床位',STUDENT:'学生',TEAM:'队伍',BATCH:'批次',POLICY:'策略',LAYOUT:'布局',CONFIRMATION:'核查',WAITLIST:'候补',NOTIFICATION:'通知',REPORT:'报表',AUDIT:'审计'}
+function auditActionText(value:unknown){const key=String(value??'');if(!key)return'完成业务操作';return auditActionLabels[key]??key.split('_').map(part=>auditTokenLabels[part]??part).join('')}
+function auditResourceText(value:unknown){const key=String(value??'业务对象');return auditResourceLabels[key]??key.split('_').map(part=>auditTokenLabels[part]??part).join('')}
+function auditTargetText(log:DataObject){const type=auditResourceText(log.resource_type??log.target_type);const id=log.resource_id??log.target_id;return id==null||id===''?type:`${type} #${id}`}
+function auditResultText(value:unknown){return String(value)==='SUCCESS'?'成功':String(value)==='FAILED'?'失败':String(value)==='REJECTED'?'已拒绝':String(value??'已记录')}
+function formatAuditTime(value:unknown){const date=new Date(String(value??''));return Number.isNaN(date.getTime())?'时间未记录':date.toLocaleString()}
 
 function batchStatus(value: unknown) {
   return ({ DRAFT:'草稿',PUBLISHED:'已发布',OPEN:'进行中',CLOSED:'已关闭',ALLOCATING:'分配中',FINISHED:'已完成',CANCELLED:'已取消' } as Record<string,string>)[String(value)] ?? String(value ?? '-')
