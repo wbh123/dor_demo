@@ -20,17 +20,27 @@ import static org.mockito.Mockito.mock;
 class MybatisRuntimeWiringTest {
     private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
             .withConfiguration(AutoConfigurations.of(MybatisPlusAutoConfiguration.class))
-            .withUserConfiguration(MybatisConfig.class, TestDependencies.class);
+            .withUserConfiguration(MybatisConfig.class, TestDependencies.class)
+            .withPropertyValues(
+                    "mybatis-plus.mapper-locations=classpath*:mapper/**/*.xml",
+                    "mybatis-plus.configuration.map-underscore-to-camel-case=true");
 
     @Test
-    void createsSqlSessionInfrastructureAndMapperBeans() {
+    void createsSqlSessionInfrastructureLoadsXmlAndRegistersMapperBeans() {
         contextRunner.run(context -> {
             assertThat(context).hasNotFailed();
             assertThat(context).hasSingleBean(SqlSessionFactory.class);
             assertThat(context).hasSingleBean(SqlSessionTemplate.class);
             assertThat(context).hasSingleBean(AdminCatalogMapper.class);
-            assertThat(context.getBean(SqlSessionFactory.class).getConfiguration())
+
+            SqlSessionFactory sessionFactory = context.getBean(SqlSessionFactory.class);
+            assertThat(sessionFactory.getConfiguration())
                     .isInstanceOf(MybatisConfiguration.class);
+            assertThat(sessionFactory.getConfiguration().isMapUnderscoreToCamelCase())
+                    .isTrue();
+            assertThat(sessionFactory.getConfiguration().hasStatement(
+                    "com.wust.dormitory.admin.mapper.AdminCatalogMapper.findMajors"))
+                    .isTrue();
         });
     }
 
