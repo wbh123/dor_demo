@@ -1,5 +1,7 @@
 package com.wust.dormitory.admin;
 
+import com.wust.dormitory.admin.mapper.RoomCatalogMapper;
+import com.wust.dormitory.admin.model.persistence.RoomCatalogRow;
 import com.wust.dormitory.audit.AuditService;
 import com.wust.dormitory.common.error.BusinessException;
 import com.wust.dormitory.security.CurrentUser;
@@ -29,12 +31,15 @@ public class RoomManagementService {
 
     private final NamedParameterJdbcTemplate jdbc;
     private final AuditService auditService;
+    private final RoomCatalogMapper roomCatalogMapper;
 
     public RoomManagementService(
             NamedParameterJdbcTemplate jdbc,
-            AuditService auditService) {
+            AuditService auditService,
+            RoomCatalogMapper roomCatalogMapper) {
         this.jdbc = jdbc;
         this.auditService = auditService;
+        this.roomCatalogMapper = roomCatalogMapper;
     }
 
     public List<Map<String, Object>> buildings() {
@@ -55,47 +60,9 @@ public class RoomManagementService {
     }
 
     public List<Map<String, Object>> rooms(Long buildingId, String gender) {
-        StringBuilder where = new StringBuilder(" WHERE 1=1 ");
-        MapSqlParameterSource parameters = new MapSqlParameterSource();
-        if (buildingId != null) {
-            where.append(" AND b.id=:buildingId ");
-            parameters.addValue("buildingId", buildingId);
-        }
-        if (gender != null && !gender.isBlank()) {
-            where.append(" AND r.gender_restriction=:gender ");
-            parameters.addValue("gender", gender);
-        }
-        return jdbc.queryForList("""
-                SELECT r.id, b.id AS building_id, b.building_name, f.floor_number,
-                       r.room_number, r.room_type, r.capacity, r.gender_restriction,
-                       r.education_level_scope, r.resident_scope,
-                       b.gender_restriction AS building_gender_restriction,
-                       b.education_level_scope AS building_education_level_scope,
-                       b.resident_scope AS building_resident_scope,
-                       r.operational_status, r.state_version, r.remark,
-                       COUNT(CASE WHEN bed.operational_status<>'RETIRED' THEN bed.id END) AS bed_count,
-                       COALESCE(SUM(bed.operational_status='ENABLED'), 0) AS enabled_bed_count,
-                       COALESCE(SUM(bed.operational_status='DISABLED'), 0) AS disabled_bed_count,
-                       COALESCE(SUM(bed.operational_status='MAINTENANCE'), 0) AS maintenance_bed_count,
-                       (SELECT COUNT(*) FROM room_assignment ra
-                        WHERE ra.room_id=r.id AND ra.assignment_status='ACTIVE') AS active_resident_count,
-                       (SELECT COUNT(*) FROM room_assignment ra
-                        WHERE ra.room_id=r.id AND ra.assignment_status='ACTIVE'
-                          AND ra.bed_id IS NOT NULL) AS confirmed_bed_count,
-                       (SELECT COUNT(*) FROM room_assignment ra
-                        WHERE ra.room_id=r.id AND ra.assignment_status='ACTIVE'
-                          AND ra.bed_id IS NULL) AS unconfirmed_bed_count,
-                       GREATEST(r.capacity-(SELECT COUNT(*) FROM room_assignment ra
-                        WHERE ra.room_id=r.id AND ra.assignment_status='ACTIVE'),0) AS remaining_capacity
-                FROM room r
-                JOIN dormitory_floor f ON f.id=r.floor_id
-                JOIN dormitory_building b ON b.id=f.building_id
-                LEFT JOIN bed ON bed.room_id=r.id
-                """ + where + " GROUP BY r.id, b.id, b.building_name, f.floor_number, r.room_number, " +
-                "r.room_type, r.capacity, r.gender_restriction, r.education_level_scope, r.resident_scope, " +
-                "b.gender_restriction, b.education_level_scope, b.resident_scope, " +
-                "r.operational_status, r.state_version, r.remark " +
-                "ORDER BY b.building_code, f.floor_number, r.room_number", parameters);
+        return roomCatalogMapper.findRooms(buildingId, gender).stream()
+                .map(RoomCatalogRow::asResponseMap)
+                .toList();
     }
 
     @Transactional
