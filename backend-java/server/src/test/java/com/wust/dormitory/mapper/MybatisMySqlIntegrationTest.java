@@ -29,22 +29,23 @@ class MybatisMySqlIntegrationTest {
 
     @BeforeAll
     static void startMysql() {
+        boolean dockerAvailable;
         try {
-            Assumptions.assumeTrue(
-                    DockerClientFactory.instance().isDockerAvailable(),
-                    "Docker 不可用，跳过真实 MySQL Mapper 验证");
-            mysql = new GenericContainer<>(DockerImageName.parse("mysql:8.4"));
-            mysql.withEnv("MYSQL_ROOT_PASSWORD", "root-test-password");
-            mysql.withEnv("MYSQL_DATABASE", "mybatis_test");
-            mysql.withExposedPorts(3306);
-            mysql.setWaitStrategy(
-                    Wait.forListeningPort().withStartupTimeout(Duration.ofMinutes(3)));
-            mysql.start();
+            dockerAvailable = DockerClientFactory.instance().isDockerAvailable();
         } catch (RuntimeException exception) {
-            Assumptions.assumeTrue(
-                    false,
-                    "无法启动 MySQL Testcontainer：" + exception.getMessage());
+            dockerAvailable = false;
         }
+        Assumptions.assumeTrue(
+                dockerAvailable,
+                "Docker 不可用，跳过真实 MySQL Mapper 验证");
+
+        mysql = new GenericContainer<>(DockerImageName.parse("mysql:8.4"));
+        mysql.withEnv("MYSQL_ROOT_PASSWORD", "root-test-password");
+        mysql.withEnv("MYSQL_DATABASE", "mybatis_test");
+        mysql.withExposedPorts(3306);
+        mysql.setWaitStrategy(
+                Wait.forListeningPort().withStartupTimeout(Duration.ofMinutes(3)));
+        mysql.start();
     }
 
     @AfterAll
