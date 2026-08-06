@@ -2,6 +2,7 @@ package com.wust.dormitory.admin;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wust.dormitory.admin.mapper.AdminCatalogMapper;
+import com.wust.dormitory.admin.mapper.AdminDashboardMapper;
 import com.wust.dormitory.admin.mapper.StudentAdminMapper;
 import com.wust.dormitory.admin.model.persistence.BuildingCatalogRow;
 import com.wust.dormitory.admin.model.persistence.MajorCatalogRow;
@@ -26,6 +27,7 @@ class AdminCatalogQueryServiceTest {
         AuditService auditService = mock(AuditService.class);
         AdminCatalogMapper mapper = mock(AdminCatalogMapper.class);
         StudentAdminMapper studentAdminMapper = mock(StudentAdminMapper.class);
+        AdminDashboardMapper dashboardMapper = mock(AdminDashboardMapper.class);
         LocalDateTime now = LocalDateTime.of(2026, 8, 6, 10, 0);
 
         when(mapper.findMajors(true)).thenReturn(List.of(new MajorCatalogRow(
@@ -39,7 +41,8 @@ class AdminCatalogQueryServiceTest {
                 objectMapper,
                 auditService,
                 mapper,
-                studentAdminMapper);
+                studentAdminMapper,
+                dashboardMapper);
 
         List<Map<String, Object>> majors = service.majors(true);
         List<Map<String, Object>> buildings = service.buildings();
