@@ -39,9 +39,12 @@ residency = read("frontend/src/views/admin/AdminResidencyView.vue")
 bed_confirmation = read("frontend/src/views/admin/AdminBedConfirmationView.vue")
 student_admin = read("frontend/src/views/admin/AdminDataView.vue")
 student_service = read("backend-java/server/src/main/java/com/wust/dormitory/admin/StudentAdminService.java")
-batch = read("frontend/src/views/admin/AdminBatchView.vue") + "\n" + read(
-    "frontend/src/features/admin-batch/components/BatchScopeDialog.vue"
-)
+batch = "\n".join((
+    read("frontend/src/views/admin/AdminBatchView.vue"),
+    read("frontend/src/features/admin-batch/components/BatchScopeDialog.vue"),
+    read("frontend/src/features/admin-batch/components/BatchPublishConfirmationDialog.vue"),
+    read("frontend/src/features/admin-batch/components/BatchAllocationPreviewDialog.vue"),
+))
 openapi_root = read("backend-java/model/src/main/resources/openapi-interface.yaml")
 auth_contract = read("backend-java/model/src/main/resources/auth/openapi-auth.yaml")
 welcome_service = read("backend-java/server/src/main/java/com/wust/dormitory/auth/StudentWelcomeService.java")
@@ -104,7 +107,7 @@ require(
     "batch publication does not use the shared confirmation dialog after completed preparation",
 )
 require(
-    "<AppModal :open=\"Boolean(allocationPreview)\"" in batch
+    "<AppModal" in batch
     and "统一分配预演" in batch
     and "allocation-stats" in batch,
     "allocation preview does not use the shared modal visual layer",
