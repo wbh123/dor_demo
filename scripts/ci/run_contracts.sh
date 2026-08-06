@@ -27,6 +27,7 @@ python3 "$ROOT_DIR/scripts/ci/test_audit_notification_analytics.py" "$ROOT_DIR"
 python3 "$ROOT_DIR/scripts/ci/test_governance_openapi.py" "$ROOT_DIR"
 python3 "$ROOT_DIR/scripts/ci/test_governance_schema_alignment.py" "$ROOT_DIR"
 python3 "$ROOT_DIR/scripts/ci/test_admin_runtime_governance_ui.py" "$ROOT_DIR"
+python3 "$ROOT_DIR/scripts/ci/test_admin_operations_componentization.py" "$ROOT_DIR"
 
 python3 "$ROOT_DIR/scripts/ci/test_dormitory_login_preference_ui.py"
 python3 "$ROOT_DIR/scripts/ci/test_building_floor_name_contract.py"
