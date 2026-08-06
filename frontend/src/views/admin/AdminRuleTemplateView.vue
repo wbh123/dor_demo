@@ -102,6 +102,10 @@ function resetForm() {
 async function save() {
   error.value = ''
   message.value = ''
+  if (form.changeReason.trim().length < 2) {
+    error.value = '修改原因至少填写2个字符。'
+    return
+  }
   saving.value = true
   try {
     const common = {
@@ -116,7 +120,7 @@ async function save() {
       ruleVersion: form.ruleVersion,
       enabled: form.enabled,
       makeDefault: form.makeDefault,
-      changeReason: form.changeReason,
+      changeReason: form.changeReason.trim(),
     }
     let response
     if (revisionSource.value) {
@@ -230,7 +234,7 @@ function strategyText(value: unknown) {
           <label><span>规则执行版本</span><input v-model.trim="form.ruleVersion" class="input" required maxlength="32" /></label>
           <label class="toggle-field"><input v-model="form.enabled" type="checkbox" /><span>新修订可供批次选择</span></label>
           <label class="toggle-field"><input v-model="form.makeDefault" type="checkbox" /><span>设为默认模板</span></label>
-          <label class="rule-template-reason-field"><span>修改原因</span><textarea v-model.trim="form.changeReason" class="input" rows="3" maxlength="500" required placeholder="说明新建或修订原因"></textarea></label>
+          <label class="rule-template-reason-field"><span>修改原因</span><textarea v-model.trim="form.changeReason" class="input" rows="3" minlength="2" maxlength="500" required placeholder="说明新建或修订原因"></textarea></label>
           <div class="rule-template-actions">
             <button class="button ghost" type="button" :disabled="saving" @click="closeDialog">取消</button>
             <button class="button primary" type="submit" :disabled="saving">{{ saving ? '正在保存…' : revisionSource ? '创建新修订' : '创建模板' }}</button>
