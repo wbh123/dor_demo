@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.wust.dormitory.export.ExportTaskMapper">
+    <select id="findNextQueued" resultType="map">
+        SELECT id, task_type AS taskType, request_json AS requestJson,
+               download_token AS downloadToken
+        FROM export_task
+        WHERE task_status='QUEUED'
+        ORDER BY id
+        LIMIT 1
+        FOR UPDATE SKIP LOCKED
+    </select>
+
+    <update id="claim">
+        UPDATE export_task
+        SET task_status='RUNNING', started_at=CURRENT_TIMESTAMP(3), progress=1,
+            updated_at=CURRENT_TIMESTAMP(3)
+        WHERE id=#{taskId} AND task_status='QUEUED'
+    </update>
+
+    <select id="auditRows" resultType="map">
+        SELECT audit.occurred_at AS occurredAt,
+               audit.operator_user_id AS operatorUserId,
+               audit.operator_type AS operatorType,
+               audit.action_type AS actionType,
+               audit.resource_type AS resourceType,
+               audit.resource_id AS resourceId,
+               audit.result_status AS resultStatus,
+               audit.reason,
+               audit.request_id AS requestId,
+               audit.error_code AS errorCode,
+               audit.network_address AS networkAddress,
+               audit.before_data AS beforeData,
+               audit.after_data AS afterData
+        FROM audit_log audit
+        WHERE 1=1
+        <if test="filters.occurredFrom != null and filters.occurredFrom != ''">
+            AND audit.occurred_at &gt;= #{filters.occurredFrom}
+        </if>
+        <if test="filters.occurredTo != null and filters.occurredTo != ''">
+            AND audit.occurred_at &lt; #{filters.occurredTo}
+        </if>
+        <if test="filters.operatorId != null">
+            AND audit.operator_user_id=#{filters.operatorId}
+        </if>
+        <if test="filters.operatorRole != null and filters.operatorRole != ''">
+            AND audit.operator_type=#{filters.operatorRole}
+        </if>
+        <if test="filters.module != null and filters.module != ''">
+            AND audit.action_type LIKE CONCAT(#{filters.module}, '%')
+        </if>
+        <if test="filters.actionType != null and filters.actionType != ''">
+            AND audit.action_type=#{filters.actionType}
+        </if>
+        <if test="filters.targetType != null and filters.targetType != ''">
+            AND audit.resource_type=#{filters.targetType}
+        </if>
+        <if test="filters.targetId != null and filters.targetId != ''">
+            AND audit.resource_id=#{filters.targetId}
+        </if>
+        <if test="filters.success != null">
+            AND audit.result_status=
+            <choose>
+                <when test="filters.success">'SUCCESS'</when>
+                <otherwise>'FAILED'</otherwise>
+            </choose>
+        </if>
+        <if test="filters.errorCode != null and filters.errorCode != ''">
+            AND audit.error_code=#{filters.errorCode}
+        </if>
+        <if test="filters.requestId != null and filters.requestId != ''">
+            AND audit.request_id=#{filters.requestId}
+        </if>
+        <if test="filters.networkAddress != null and filters.networkAddress != ''">
+            AND audit.network_address=#{filters.networkAddress}
+        </if>
+        <if test="filters.keyword != null and filters.keyword != ''">
+            AND (audit.action_type LIKE CONCAT('%',#{filters.keyword},'%')
+                 OR audit.resource_type LIKE CONCAT('%',#{filters.keyword},'%')
+                 OR audit.resource_id LIKE CONCAT('%',#{filters.keyword},'%')
+                 OR audit.reason LIKE CONCAT('%',#{filters.keyword},'%'))
+        </if>
+        ORDER BY audit.occurred_at DESC, audit.id DESC
+        LIMIT 10000
+    </select>
+
+    <select id="reportRows" resultType="map">
+        SELECT batch.id AS batchId,
+               batch.batch_code AS batchCode,
+               batch.batch_name AS batchName,
+               YEAR(batch.start_at) AS academicYear,
+               snapshot.metric_version AS metricVersion,
+               snapshot.metrics_json AS metricsJson,
+               snapshot.dimensions_json AS dimensionsJson,
+               snapshot.data_updated_at AS dataUpdatedAt
+        FROM batch_analytics_snapshot snapshot
+        JOIN selection_batch batch ON batch.id=snapshot.batch_id
+        WHERE snapshot.immutable=1
+        <if test="filters.academicYear != null">
+            AND YEAR(batch.start_at)=#{filters.academicYear}
+        </if>
+        <if test="filters.batchId != null">
+            AND batch.id=#{filters.batchId}
+        </if>
+        ORDER BY batch.start_at, batch.id
+        LIMIT 10000
+    </select>
+</mapper>
