@@ -43,12 +43,17 @@ class AdminRuntimeRegressionContracts(unittest.TestCase):
         self.assertIn('minlength="2"', rules)
 
     def test_heavy_allocation_exposes_busy_state(self) -> None:
+        page = self.read("frontend/src/views/admin/AdminBatchView.vue")
+        template = self.read("frontend/src/views/admin/AdminBatchView.template.html")
         dialog = self.read(
             "frontend/src/features/admin-batch/components/BatchAllocationPreviewDialog.vue"
         )
-        self.assertIn("const committing = ref(false)", dialog)
+        self.assertIn("const allocationCommitting = ref(false)", page)
+        self.assertIn("finally", page)
+        self.assertIn(':busy="allocationCommitting"', template)
+        self.assertIn("busy: boolean", dialog)
         self.assertIn("正在执行统一分配", dialog)
-        self.assertIn(":busy=\"committing\"", dialog)
+        self.assertIn(":busy=\"busy\"", dialog)
         self.assertIn("请勿重复操作", dialog)
 
     def test_assignment_adjustment_is_visible_modal(self) -> None:
