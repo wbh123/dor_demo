@@ -23,8 +23,13 @@ class AdminRuntimeRegressionContracts(unittest.TestCase):
             "backend-java/server/src/main/java/com/wust/dormitory/residency/"
             "AdminResidencyBedAdjustmentAspect.java"
         )
+        mapper = self.read(
+            "backend-java/server/src/main/resources/mapper/residency/"
+            "ResidencyAdminSourceMapper.xml"
+        )
         self.assertIn("operator.isAdmin()", aspect)
-        self.assertIn("assignment_method='MANUAL_ADJUSTMENT'", aspect)
+        self.assertIn("sourceMapper.markManualAdjustment", aspect)
+        self.assertIn("assignment_method='MANUAL_ADJUSTMENT'", mapper)
         view = self.read("frontend/src/views/admin/AdminResidencyView.vue")
         self.assertIn("MANUAL_ADJUSTMENT: '管理员修改'", view)
         self.assertIn("TransientNotice", view)
@@ -57,10 +62,15 @@ class AdminRuntimeRegressionContracts(unittest.TestCase):
         service = self.read(
             "backend-java/server/src/main/java/com/wust/dormitory/operations/OperationsService.java"
         )
-        self.assertIn("FROM bed_assignment", service)
-        self.assertIn("COUNT(DISTINCT occupied.bed_id)", service)
-        self.assertIn("COUNT(DISTINCT occupied.student_id)", service)
-        self.assertIn("assignment.assignment_status='ACTIVE'", service)
+        mapper = self.read(
+            "backend-java/server/src/main/resources/mapper/operations/OperationsMetricsMapper.xml"
+        )
+        self.assertIn("OperationsMetricsMapper metricsMapper", service)
+        self.assertIn("metricsMapper.countOccupiedBeds()", service)
+        self.assertIn("FROM bed_assignment", mapper)
+        self.assertIn("COUNT(DISTINCT occupied.bed_id)", mapper)
+        self.assertIn("COUNT(DISTINCT occupied.student_id)", mapper)
+        self.assertIn("assignment.assignment_status='ACTIVE'", mapper)
 
     def test_governance_download_uses_authenticated_client(self) -> None:
         panel = self.read("frontend/src/components/admin/ExportTaskPanel.vue")
