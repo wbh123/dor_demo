@@ -4,6 +4,8 @@ import AppConfirmDialog from '../../components/modal/AppConfirmDialog.vue'
 import AppModal from '../../components/modal/AppModal.vue'
 import BatchCopyDialog from '../../features/admin-batch/components/BatchCopyDialog.vue'
 import BatchCreationPanel from '../../features/admin-batch/components/BatchCreationPanel.vue'
+import BatchPreflightDialog from '../../features/admin-batch/components/BatchPreflightDialog.vue'
+import BatchScopeDialog from '../../features/admin-batch/components/BatchScopeDialog.vue'
 import { useAdminBatchView } from './AdminBatchView.logic'
 
 const {
