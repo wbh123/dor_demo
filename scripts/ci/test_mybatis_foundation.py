@@ -46,6 +46,18 @@ require(
     "org.mybatis.spring.boot.autoconfigure.ConfigurationCustomizer" not in config_text,
     "不得继续使用纯 MyBatis Starter 的 ConfigurationCustomizer",
 )
+require(
+    "registry.register(JsonNode.class" in config_text,
+    "JsonNode JSON 类型处理器必须保留",
+)
+require(
+    "registry.register(List.class" not in config_text,
+    "List 不得全局注册为 JSON 类型，否则普通 List 结果会被误解析",
+)
+require(
+    "registry.register(Map.class" not in config_text,
+    "Map 不得全局注册为 JSON 类型，否则 resultType=map 会从首列按 JSON 解析",
+)
 
 require("mybatis-plus:" in yaml_text, "必须使用 mybatis-plus 配置前缀")
 require("mapper-locations: classpath*:mapper/**/*.xml" in yaml_text, "MyBatis XML 必须统一到 mapper 目录")
