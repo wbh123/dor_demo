@@ -3,7 +3,9 @@ package com.wust.dormitory.admin;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wust.dormitory.admin.mapper.AdminCatalogMapper;
+import com.wust.dormitory.admin.mapper.AdminDashboardMapper;
 import com.wust.dormitory.admin.mapper.StudentAdminMapper;
+import com.wust.dormitory.admin.model.persistence.AdminDashboardStatsRow;
 import com.wust.dormitory.admin.model.persistence.BuildingCatalogRow;
 import com.wust.dormitory.admin.model.persistence.MajorCatalogRow;
 import com.wust.dormitory.admin.model.persistence.StudentCatalogRow;
@@ -44,31 +46,26 @@ public class AdminService {
     private final AuditService auditService;
     private final AdminCatalogMapper adminCatalogMapper;
     private final StudentAdminMapper studentAdminMapper;
+    private final AdminDashboardMapper adminDashboardMapper;
 
     public AdminService(
             NamedParameterJdbcTemplate jdbc,
             ObjectMapper objectMapper,
             AuditService auditService,
             AdminCatalogMapper adminCatalogMapper,
-            StudentAdminMapper studentAdminMapper) {
+            StudentAdminMapper studentAdminMapper,
+            AdminDashboardMapper adminDashboardMapper) {
         this.jdbc = jdbc;
         this.objectMapper = objectMapper;
         this.auditService = auditService;
         this.adminCatalogMapper = adminCatalogMapper;
         this.studentAdminMapper = studentAdminMapper;
+        this.adminDashboardMapper = adminDashboardMapper;
     }
 
     public Map<String, Object> dashboard() {
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("majorCount", count("SELECT COUNT(*) FROM major WHERE enabled=1", Map.of()));
-        result.put("studentCount", count("SELECT COUNT(*) FROM student", Map.of()));
-        result.put("maleStudentCount", count("SELECT COUNT(*) FROM student WHERE gender='M'", Map.of()));
-        result.put("femaleStudentCount", count("SELECT COUNT(*) FROM student WHERE gender='F'", Map.of()));
-        result.put("roomCount", count("SELECT COUNT(*) FROM room", Map.of()));
-        result.put("bedCount", count("SELECT COUNT(*) FROM bed WHERE operational_status='ENABLED'", Map.of()));
-        result.put("activeAssignmentCount", count("SELECT COUNT(*) FROM bed_assignment", Map.of()));
-        result.put("openBatchCount", count("SELECT COUNT(*) FROM selection_batch WHERE batch_status IN ('PUBLISHED','OPEN','PAUSED')", Map.of()));
-        return result;
+        AdminDashboardStatsRow stats = adminDashboardMapper.findStats();
+        return stats.asResponseMap();
     }
 
     public List<Map<String, Object>> majors(Boolean enabled) {
