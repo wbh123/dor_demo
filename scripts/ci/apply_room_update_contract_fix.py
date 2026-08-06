@@ -40,9 +40,9 @@ if old_room_request not in spec:
 SPEC.write_text(spec.replace(old_room_request, new_room_request, 1), encoding="utf-8")
 
 contracts = CONTRACTS.read_text(encoding="utf-8")
-line = "python scripts/ci/test_room_update_contract_sync.py\n"
+line = 'python3 "$ROOT_DIR/scripts/ci/test_room_update_contract_sync.py"\n'
 if line not in contracts:
-    anchor = "python scripts/ci/test_admin_building_room_contract_sync.py\n"
+    anchor = 'python3 "$ROOT_DIR/scripts/ci/test_admin_building_room_contract_sync.py"\n'
     if anchor not in contracts:
         raise RuntimeError("标准契约入口锚点不存在")
     contracts = contracts.replace(anchor, anchor + line, 1)
