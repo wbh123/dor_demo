@@ -29,6 +29,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -72,6 +73,18 @@ class MybatisMySqlIntegrationTest {
 
         try (SqlSession session = sessionFactory(jdbcUrl).openSession()) {
             assertEquals(1, session.getMapper(MybatisSmokeMapper.class).selectOne());
+        }
+    }
+
+    @Test
+    void resultTypeMapDoesNotTreatFirstScalarColumnAsJsonObject() throws Exception {
+        String jdbcUrl = jdbcUrl();
+        awaitDatabase(jdbcUrl);
+
+        try (SqlSession session = sessionFactory(jdbcUrl).openSession()) {
+            Map<String, Object> row = session.getMapper(MybatisSmokeMapper.class).selectMapRow();
+            assertEquals(1L, ((Number) row.get("id")).longValue());
+            assertEquals("QUEUED", row.get("taskStatus"));
         }
     }
 

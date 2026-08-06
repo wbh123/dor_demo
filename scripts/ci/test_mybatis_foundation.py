@@ -17,6 +17,8 @@ old_mapper = ROOT / "backend-java/server/src/main/resources/com/wust/dormitory/m
 handler_dir = ROOT / "backend-java/server/src/main/java/com/wust/dormitory/common/persistence/typehandler"
 configuration_test = ROOT / "backend-java/server/src/test/java/com/wust/dormitory/config/MybatisConfigurationTest.java"
 runtime_wiring_test = ROOT / "backend-java/server/src/test/java/com/wust/dormitory/config/MybatisRuntimeWiringTest.java"
+map_regression_mapper = ROOT / "backend-java/server/src/test/resources/mapper/test/MybatisSmokeMapper.xml"
+map_regression_test = ROOT / "backend-java/server/src/test/java/com/wust/dormitory/mapper/MybatisMySqlIntegrationTest.java"
 server_pom = ROOT / "backend-java/server/pom.xml"
 bom_pom = ROOT / "backend-java/build-support/general-bom3/pom.xml"
 
@@ -26,11 +28,15 @@ require(application_yaml.exists(), "缺少 application.yaml")
 require(not old_mapper.exists(), "空 TestMapper.xml 必须删除")
 require(configuration_test.exists(), "缺少 MybatisConfigurationTest")
 require(runtime_wiring_test.exists(), "缺少 MyBatis-Plus 运行时装配测试")
+require(map_regression_mapper.exists(), "缺少 resultType=map 回归 Mapper")
+require(map_regression_test.exists(), "缺少 resultType=map MySQL 回归测试")
 
 application_text = application.read_text(encoding="utf-8")
 config_text = mybatis_config.read_text(encoding="utf-8")
 yaml_text = application_yaml.read_text(encoding="utf-8")
 runtime_test_text = runtime_wiring_test.read_text(encoding="utf-8")
+map_mapper_text = map_regression_mapper.read_text(encoding="utf-8")
+map_test_text = map_regression_test.read_text(encoding="utf-8")
 server_pom_text = server_pom.read_text(encoding="utf-8")
 bom_pom_text = bom_pom.read_text(encoding="utf-8")
 
@@ -45,6 +51,26 @@ require(
 require(
     "org.mybatis.spring.boot.autoconfigure.ConfigurationCustomizer" not in config_text,
     "不得继续使用纯 MyBatis Starter 的 ConfigurationCustomizer",
+)
+require(
+    "registry.register(JsonNode.class" in config_text,
+    "JsonNode JSON 类型处理器必须保留",
+)
+require(
+    "registry.register(List.class" not in config_text,
+    "List 不得全局注册为 JSON 类型，否则普通 List 结果会被误解析",
+)
+require(
+    "registry.register(Map.class" not in config_text,
+    "Map 不得全局注册为 JSON 类型，否则 resultType=map 会从首列按 JSON 解析",
+)
+require(
+    'id="selectMapRow" resultType="map"' in map_mapper_text,
+    "回归 Mapper 必须覆盖 resultType=map 多列结果",
+)
+require(
+    "resultTypeMapDoesNotTreatFirstScalarColumnAsJsonObject" in map_test_text,
+    "MySQL 回归测试必须覆盖首列整数不被当作 JSON 对象解析",
 )
 
 require("mybatis-plus:" in yaml_text, "必须使用 mybatis-plus 配置前缀")
