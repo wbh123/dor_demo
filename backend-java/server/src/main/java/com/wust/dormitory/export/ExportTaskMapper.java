@@ -8,7 +8,7 @@ import java.util.Map;
 
 @Mapper
 public interface ExportTaskMapper {
-    Map<String, Object> findNextQueued();
+    ExportTaskQueueRow findNextQueued();
 
     int claim(@Param("taskId") long taskId);
 
