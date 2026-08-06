@@ -39,7 +39,9 @@ residency = read("frontend/src/views/admin/AdminResidencyView.vue")
 bed_confirmation = read("frontend/src/views/admin/AdminBedConfirmationView.vue")
 student_admin = read("frontend/src/views/admin/AdminDataView.vue")
 student_service = read("backend-java/server/src/main/java/com/wust/dormitory/admin/StudentAdminService.java")
-batch = read("frontend/src/views/admin/AdminBatchView.vue")
+batch = read("frontend/src/views/admin/AdminBatchView.vue") + "\n" + read(
+    "frontend/src/features/admin-batch/components/BatchScopeDialog.vue"
+)
 openapi_root = read("backend-java/model/src/main/resources/openapi-interface.yaml")
 auth_contract = read("backend-java/model/src/main/resources/auth/openapi-auth.yaml")
 welcome_service = read("backend-java/server/src/main/java/com/wust/dormitory/auth/StudentWelcomeService.java")

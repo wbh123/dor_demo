@@ -41,108 +41,68 @@
     </div>
   </section>
 
-  <AppModal
+  <BatchScopeDialog
     :open="scopeDialog"
-    :title="`${scopeBatch?.batch_name ?? '批次'} · 参与范围`"
-    description="筛选器固定在标题下方，结果列表独立滚动；保存并发布会在当前窗口内连续执行。"
-    size="large"
-    max-height="94dvh"
-    :busy="scopeLoading"
-    :prevent-close="publishFlowBusy || publishFlowState === 'WAITING_CONFIRMATION'"
+    :scope-batch="scopeBatch"
+    :scope-loading="scopeLoading"
+    :scope-saving="scopeSaving"
+    :selected-student-ids="selectedStudentIds"
+    :selected-room-ids="selectedRoomIds"
+    :student-filter="studentFilter"
+    :student-gender-filter="studentGenderFilter"
+    :student-category-filter="studentCategoryFilter"
+    :student-degree-filter="studentDegreeFilter"
+    :student-major-filter="studentMajorFilter"
+    :student-grade-filter="studentGradeFilter"
+    :room-filter="roomFilter"
+    :room-gender-filter="roomGenderFilter"
+    :room-scope-filter="roomScopeFilter"
+    :room-building-filter="roomBuildingFilter"
+    :room-floor-filter="roomFloorFilter"
+    :scope-major-options="scopeMajorOptions"
+    :scope-grade-options="scopeGradeOptions"
+    :scope-building-options="scopeBuildingOptions"
+    :scope-floor-options="scopeFloorOptions"
+    :filtered-students="filteredStudents"
+    :filtered-rooms="filteredRooms"
+    :publish-after-scope="publishAfterScope"
+    :publish-flow-state="publishFlowState"
+    :publish-flow-busy="publishFlowBusy"
+    :running-preflight="runningPreflight"
     @close="closeScope"
-  >
-    <template v-if="!scopeLoading">
-      <div class="scope-summary">
-        <article><span>已选学生</span><strong>{{ selectedStudentIds.length }}</strong></article>
-        <article><span>已选宿舍</span><strong>{{ selectedRoomIds.length }}</strong></article>
-      </div>
+    @toggle-student="toggleStudent"
+    @toggle-room="toggleRoom"
+    @select-all-students="selectAllStudents"
+    @clear-students="selectedStudentIds=[]"
+    @select-all-rooms="selectAllRooms"
+    @clear-rooms="selectedRoomIds=[]"
+    @update:student-filter="studentFilter=$event"
+    @update:student-gender-filter="studentGenderFilter=$event"
+    @update:student-category-filter="studentCategoryFilter=$event"
+    @update:student-degree-filter="studentDegreeFilter=$event"
+    @update:student-major-filter="studentMajorFilter=$event"
+    @update:student-grade-filter="studentGradeFilter=$event"
+    @update:room-filter="roomFilter=$event"
+    @update:room-gender-filter="roomGenderFilter=$event"
+    @update:room-scope-filter="roomScopeFilter=$event"
+    @update:room-building-filter="roomBuildingFilter=$event"
+    @update:room-floor-filter="roomFloorFilter=$event"
+    @save="saveScope"
+    @save-and-publish="saveScopeAndContinuePublish"
+  />
 
-      <div class="scope-grid">
-        <section class="scope-column">
-          <header class="scope-column-header">
-            <div><strong>参与学生</strong><small>按学号、姓名、专业和学生属性筛选</small></div>
-            <div class="button-row"><button class="button ghost small" type="button" @click="selectAllStudents">全选当前结果</button><button class="button ghost small" type="button" @click="selectedStudentIds = []">清空</button></div>
-          </header>
-          <div class="scope-filter-panel scope-filter-grid">
-            <input v-model.trim="studentFilter" class="input span-2" placeholder="搜索学号、姓名或专业" />
-            <select v-model="studentGenderFilter" class="input"><option value="">全部性别</option><option value="M">男生</option><option value="F">女生</option></select>
-            <select v-model="studentCategoryFilter" class="input"><option value="">国内外不限</option><option value="DOMESTIC">国内生</option><option value="INTERNATIONAL">国际生</option></select>
-            <select v-model="studentDegreeFilter" class="input"><option value="">培养层次不限</option><option value="UNDERGRADUATE">本科生</option><option value="MASTER">硕士生</option><option value="DOCTOR">博士生</option><option value="MASTER_DOCTOR">硕博生</option></select>
-            <select v-model="studentMajorFilter" class="input"><option value="">全部专业</option><option v-for="major in scopeMajorOptions" :key="major.id" :value="major.id">{{ major.label }}</option></select>
-            <select v-model="studentGradeFilter" class="input span-2"><option value="">全部年级</option><option v-for="grade in scopeGradeOptions" :key="grade" :value="grade">{{ grade }}级</option></select>
-          </div>
-          <div class="scope-result-summary"><span>筛选结果 {{ filteredStudents.length }} 人</span><span>已选择 {{ selectedStudentIds.length }} 人</span></div>
-          <div class="scope-result-list">
-            <label v-for="student in filteredStudents" :key="String(student.id)" class="scope-option">
-              <input type="checkbox" :checked="selectedStudentIds.includes(Number(student.id))" @change="toggleStudent(Number(student.id))" />
-              <div><strong>{{ student.student_number }} · {{ student.student_name }}</strong><span>{{ student.major_name }} · {{ student.gender === 'M' ? '男' : '女' }} · {{ student.student_category === 'INTERNATIONAL' ? '国际生' : '国内生' }}</span></div>
-            </label>
-            <p v-if="filteredStudents.length === 0" class="empty-state compact">没有符合当前条件的学生，筛选器位置不会随结果数量改变。</p>
-          </div>
-        </section>
-
-        <section class="scope-column">
-          <header class="scope-column-header">
-            <div><strong>可选宿舍</strong><small>停用、维护或不符合批次规则的宿舍不可选择</small></div>
-            <div class="button-row"><button class="button ghost small" type="button" @click="selectAllRooms">全选当前可用</button><button class="button ghost small" type="button" @click="selectedRoomIds = []">清空</button></div>
-          </header>
-          <div class="scope-filter-panel scope-filter-grid">
-            <input v-model.trim="roomFilter" class="input span-2" placeholder="搜索楼栋、楼层或房间号" />
-            <select v-model="roomGenderFilter" class="input"><option value="">全部性别</option><option value="M">男寝</option><option value="F">女寝</option></select>
-            <select v-model="roomScopeFilter" class="input"><option value="">国内外不限</option><option value="DOMESTIC_ONLY">国内生宿舍</option><option value="INTERNATIONAL_ONLY">国际生宿舍</option><option value="MIXED">混住宿舍</option></select>
-            <select v-model="roomBuildingFilter" class="input"><option value="">全部楼栋</option><option v-for="building in scopeBuildingOptions" :key="building.id" :value="building.id">{{ building.label }}</option></select>
-            <select v-model="roomFloorFilter" class="input"><option value="">全部楼层</option><option v-for="floor in scopeFloorOptions" :key="floor" :value="floor">{{ floor }}层</option></select>
-          </div>
-          <div class="scope-result-summary"><span>筛选结果 {{ filteredRooms.length }} 间</span><span>已选择 {{ selectedRoomIds.length }} 间</span></div>
-          <div class="scope-result-list">
-            <label v-for="room in filteredRooms" :key="String(room.id)" class="scope-option" :class="{ disabled: !room.selectable }">
-              <input type="checkbox" :disabled="!room.selectable" :checked="selectedRoomIds.includes(Number(room.id))" @change="toggleRoom(Number(room.id))" />
-              <div><strong>{{ room.building_name }} {{ room.room_number }}</strong><span>{{ room.floor_number }}层 · 容量{{ room.capacity }} · {{ room.gender_restriction === 'M' ? '男寝' : '女寝' }} · {{ room.operational_status }}</span></div>
-            </label>
-            <p v-if="filteredRooms.length === 0" class="empty-state compact">没有符合当前条件的宿舍，筛选器仍保持顶部对齐。</p>
-          </div>
-        </section>
-      </div>
-    </template>
-
-    <template #footer>
-      <div class="scope-footer-status">
-        <strong>{{ publishAfterScope ? '需要补齐范围后继续发布' : '当前状态：' + publishFlowState }}</strong>
-        <span>范围保存成功后即使发布失败也不会丢失。</span>
-      </div>
-      <button class="button ghost" type="button" :disabled="publishFlowBusy" @click="closeScope">关闭</button>
-      <button class="button secondary" type="button" :disabled="scopeLoading || publishFlowBusy" @click="saveScope">{{ scopeSaving ? '保存中…' : '仅保存范围' }}</button>
-      <button class="button primary" type="button" :disabled="scopeLoading || publishFlowBusy" @click="saveScopeAndContinuePublish">{{ scopeSaving || runningPreflight ? '正在准备发布…' : '保存并发布' }}</button>
-    </template>
-  </AppModal>
-
-  <AppModal
+  <BatchPreflightDialog
     :open="Boolean(preflightBatch && roomPreflight)"
-    :title="`${preflightBatch?.batch_name ?? '批次'} · 发布预检`"
-    :description="`可用容量${roomPreflight?.availableCapacity ?? 0}，涉及${roomPreflight?.roomCount ?? 0}间宿舍。`"
-    size="wide"
-    :busy="runningPreflight"
-    :prevent-close="runningPreflight"
+    :preflight-batch="preflightBatch"
+    :room-preflight="roomPreflight"
+    :preflight-rooms="preflightRooms"
+    :preflight-blockers="preflightBlockers"
+    :preflight-missing-steps="preflightMissingSteps"
+    :running-preflight="runningPreflight"
+    :issue-text="issueText"
     @close="closePreflight"
-  >
-    <div class="preflight-summary" :class="{ pass: roomPreflight?.publishable }">
-      <strong>{{ roomPreflight?.publishable ? '检查通过，可以发布' : preflightMissingSteps.length ? '发布准备尚未完成' : `存在${preflightBlockers.length}间阻断宿舍` }}</strong>
-      <span>{{ roomPreflight?.publishable ? '参与范围、宿舍范围和床位可用性已满足发布条件。' : '已保存的范围不会丢失，请按下方提示补齐后再次执行。' }}</span>
-    </div>
-    <div v-if="preflightMissingSteps.length" class="readiness-grid">
-      <article><strong>仍需完成</strong><ul><li v-for="step in preflightMissingSteps" :key="step">{{ step }}</li></ul></article>
-      <article><strong>已经完成</strong><ul><li v-for="step in (roomPreflight?.completedSteps ?? [])" :key="String(step)">{{ step }}</li></ul></article>
-    </div>
-    <div class="preflight-room-grid">
-      <article v-for="room in preflightRooms" :key="String(room.id)" :class="{ blocker: (room.issues ?? []).length > 0 }">
-        <strong>{{ room.building_name }} {{ room.room_number }}</strong><span>在住{{ room.activeResidents }} · 剩余{{ room.remainingCapacity }}</span><small v-if="(room.issues ?? []).length">{{ issueText(room) }}</small><small v-else>符合发布条件</small>
-      </article>
-    </div>
-    <template #footer>
-      <button class="button ghost" type="button" :disabled="runningPreflight" @click="closePreflight">关闭</button>
-      <button v-if="preflightBatch?.batch_status === 'DRAFT' && !roomPreflight?.publishable" class="button primary" type="button" @click="reopenScopeFromPreflight">在参与范围中补齐</button>
-    </template>
-  </AppModal>
+    @reopen-scope="reopenScopeFromPreflight"
+  />
 
   <AppConfirmDialog
     :open="Boolean(publishConfirmation)"

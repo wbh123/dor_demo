@@ -38,8 +38,10 @@ require("unit-list" not in layout and "type-buttons" not in layout,
 batch_template = read("frontend/src/views/admin/AdminBatchView.template.html")
 batch_css = read("frontend/src/views/admin/AdminBatchView.css")
 batch_creation = read("frontend/src/features/admin-batch/components/BatchCreationPanel.vue")
+batch_scope = read("frontend/src/features/admin-batch/components/BatchScopeDialog.vue")
 batch_form_markup = batch_template + "\n" + batch_creation
 batch_form_styles = batch_css + "\n" + batch_creation
+scope_styles = batch_css + "\n" + batch_scope
 require('<div class="separation-switch">' in batch_form_markup,
         "domestic/international separation selector still uses the malformed label/button nesting")
 require("appearance:none" in batch_form_styles.replace(" ", "") and "cursor:pointer" in batch_form_styles.replace(" ", ""),
@@ -47,11 +49,11 @@ require("appearance:none" in batch_form_styles.replace(" ", "") and "cursor:poin
 require(".rule-summary" in batch_form_styles and "align-self:end" in batch_form_styles.replace(" ", "")
         and "min-height:" in batch_form_styles,
         "rule summary is not vertically aligned with the date selector row")
-require("height:min(60vh,620px)" not in batch_css.replace(" ", ""),
+require("height:min(60vh,620px)" not in scope_styles.replace(" ", ""),
         "scope modal still forces the regressed fixed-height layout")
-require("max-height:440px" in batch_css.replace(" ", ""),
+require("max-height:440px" in scope_styles.replace(" ", ""),
         "scope result lists do not restore the original independent scrolling height")
-require("justify-content:flex-start" in batch_css.replace(" ", ""),
+require("justify-content:flex-start" in scope_styles.replace(" ", ""),
         "scope columns are not explicitly top-aligned")
 
 modal = read("frontend/src/components/modal/AppModal.vue")
