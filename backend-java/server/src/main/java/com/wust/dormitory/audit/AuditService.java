@@ -2,6 +2,7 @@ package com.wust.dormitory.audit;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.wust.dormitory.common.json.JdbcJsonNormalizer;
 import com.wust.dormitory.security.CurrentUser;
 import org.slf4j.MDC;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
@@ -50,7 +51,7 @@ public class AuditService {
             return null;
         }
         try {
-            return objectMapper.writeValueAsString(value);
+            return objectMapper.writeValueAsString(JdbcJsonNormalizer.normalize(value));
         } catch (JsonProcessingException exception) {
             return "{}";
         }
