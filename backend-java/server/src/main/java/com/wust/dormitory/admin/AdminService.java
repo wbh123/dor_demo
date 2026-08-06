@@ -2,6 +2,9 @@ package com.wust.dormitory.admin;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.wust.dormitory.admin.mapper.AdminCatalogMapper;
+import com.wust.dormitory.admin.model.persistence.BuildingCatalogRow;
+import com.wust.dormitory.admin.model.persistence.MajorCatalogRow;
 import com.wust.dormitory.audit.AuditService;
 import com.wust.dormitory.common.error.BusinessException;
 import com.wust.dormitory.security.CurrentUser;
@@ -36,12 +39,17 @@ public class AdminService {
     private final NamedParameterJdbcTemplate jdbc;
     private final ObjectMapper objectMapper;
     private final AuditService auditService;
+    private final AdminCatalogMapper adminCatalogMapper;
 
-    public AdminService(NamedParameterJdbcTemplate jdbc, ObjectMapper objectMapper,
-                        AuditService auditService) {
+    public AdminService(
+            NamedParameterJdbcTemplate jdbc,
+            ObjectMapper objectMapper,
+            AuditService auditService,
+            AdminCatalogMapper adminCatalogMapper) {
         this.jdbc = jdbc;
         this.objectMapper = objectMapper;
         this.auditService = auditService;
+        this.adminCatalogMapper = adminCatalogMapper;
     }
 
     public Map<String, Object> dashboard() {
@@ -58,13 +66,9 @@ public class AdminService {
     }
 
     public List<Map<String, Object>> majors(Boolean enabled) {
-        String sql = "SELECT id, major_code, major_name, enabled, created_at, updated_at FROM major";
-        Map<String, Object> parameters = Map.of();
-        if (enabled != null) {
-            sql += " WHERE enabled=:enabled";
-            parameters = Map.of("enabled", enabled ? 1 : 0);
-        }
-        return jdbc.queryForList(sql + " ORDER BY major_code", parameters);
+        return adminCatalogMapper.findMajors(enabled).stream()
+                .map(MajorCatalogRow::asResponseMap)
+                .toList();
     }
 
     @Transactional
@@ -179,18 +183,9 @@ public class AdminService {
     }
 
     public List<Map<String, Object>> buildings() {
-        return jdbc.queryForList("""
-                SELECT b.id, b.building_code, b.building_name, b.gender_restriction,
-                       b.enabled, c.campus_name,
-                       COUNT(DISTINCT r.id) AS room_count, COUNT(DISTINCT bed.id) AS bed_count
-                FROM dormitory_building b JOIN campus c ON c.id=b.campus_id
-                LEFT JOIN dormitory_floor f ON f.building_id=b.id
-                LEFT JOIN room r ON r.floor_id=f.id
-                LEFT JOIN bed ON bed.room_id=r.id
-                GROUP BY b.id, b.building_code, b.building_name, b.gender_restriction,
-                         b.enabled, c.campus_name
-                ORDER BY b.building_code
-                """, Map.of());
+        return adminCatalogMapper.findBuildings().stream()
+                .map(BuildingCatalogRow::asResponseMap)
+                .toList();
     }
 
     public List<Map<String, Object>> rooms(Long buildingId, String gender) {
