@@ -1,10 +1,11 @@
 <script setup lang="ts">
 // @ts-nocheck
-import AppConfirmDialog from '../../components/modal/AppConfirmDialog.vue'
-import AppModal from '../../components/modal/AppModal.vue'
+import BatchAllocationPreviewDialog from '../../features/admin-batch/components/BatchAllocationPreviewDialog.vue'
 import BatchCopyDialog from '../../features/admin-batch/components/BatchCopyDialog.vue'
 import BatchCreationPanel from '../../features/admin-batch/components/BatchCreationPanel.vue'
+import BatchListPanel from '../../features/admin-batch/components/BatchListPanel.vue'
 import BatchPreflightDialog from '../../features/admin-batch/components/BatchPreflightDialog.vue'
+import BatchPublishConfirmationDialog from '../../features/admin-batch/components/BatchPublishConfirmationDialog.vue'
 import BatchScopeDialog from '../../features/admin-batch/components/BatchScopeDialog.vue'
 import { useAdminBatchView } from './AdminBatchView.logic'
 
