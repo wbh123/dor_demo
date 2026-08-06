@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# 管理运行时修复的跨层回归契约；验证最新主线适配。
+# 管理运行时修复的跨层回归契约；包含真实 MySQL 在住历史验证。
 from pathlib import Path
 import sys
 
@@ -72,5 +72,10 @@ for token in (
 ):
     require(dashboard, token, f"业务操作记录缺少中文动作映射：{token}")
 require(dashboard, "auditResourceText", "业务操作目标类型应统一中文映射")
+
+normalizer = read("backend-java/server/src/main/java/com/wust/dormitory/common/json/JdbcJsonNormalizer.java")
+require(normalizer, "TemporalAccessor", "JDBC/Java 时间值必须在写入历史和审计前规范化")
+require(read("backend-java/server/src/main/java/com/wust/dormitory/residency/ResidencyService.java"), "JdbcJsonNormalizer.normalize", "在住历史必须规范化数据库时间值")
+require(read("backend-java/server/src/main/java/com/wust/dormitory/audit/AuditService.java"), "JdbcJsonNormalizer.normalize", "通用审计必须规范化数据库时间值")
 
 print("admin runtime and governance UI contract: OK")
