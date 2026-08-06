@@ -1,11 +1,17 @@
 package com.wust.dormitory.selection;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.RedisScript;
 
 import java.time.Instant;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class ConcurrentSelectionLeaseServiceTest {
     @Test
@@ -33,6 +39,22 @@ class ConcurrentSelectionLeaseServiceTest {
         assertTrue(acquire.contains("redis.call('zadd', KEYS[1], maxExpiry, ARGV[3])"));
         assertTrue(release.contains("redis.call('zrem', KEYS[2], ARGV[3])"));
         assertTrue(release.contains("redis.call('zrem', KEYS[1], ARGV[2])"));
+    }
+
+    @Test
+    void activeUserCountCleansExpiredMembersBehindServiceBoundary() {
+        String countScript = ConcurrentSelectionLeaseService.countScriptText();
+        assertTrue(countScript.contains("redis.call('zremrangebyscore', KEYS[1], '-inf', ARGV[1])"));
+        assertTrue(countScript.contains("redis.call('zcard', KEYS[1])"));
+
+        StringRedisTemplate redis = mock(StringRedisTemplate.class);
+        when(redis.execute(
+                org.mockito.ArgumentMatchers.<RedisScript<Long>>any(),
+                eq(List.of(ConcurrentSelectionLeaseService.activeUsersKey())),
+                org.mockito.ArgumentMatchers.<Object[]>any()))
+                .thenReturn(7L);
+
+        assertEquals(7, new ConcurrentSelectionLeaseService(redis).activeUsers());
     }
 
     @Test

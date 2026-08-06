@@ -8,8 +8,6 @@ import com.wust.dormitory.subscription.FeatureAccessService;
 import com.wust.dormitory.subscription.FeatureCodes;
 import com.wust.dormitory.subscription.QuotaCodes;
 import com.wust.dormitory.subscription.QuotaService;
-import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -21,32 +19,24 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.time.Duration;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1")
 public class SelectionAccessLeaseController {
     private static final Duration LEASE_TTL = Duration.ofSeconds(75);
-    private static final String COUNT_SCRIPT = """
-            redis.call('zremrangebyscore', KEYS[1], '-inf', ARGV[1])
-            return redis.call('zcard', KEYS[1])
-            """;
 
     private final ConcurrentSelectionLeaseService leaseService;
     private final FeatureAccessService featureAccessService;
     private final QuotaService quotaService;
-    private final StringRedisTemplate redis;
 
     public SelectionAccessLeaseController(
             ConcurrentSelectionLeaseService leaseService,
             FeatureAccessService featureAccessService,
-            QuotaService quotaService,
-            StringRedisTemplate redis) {
+            QuotaService quotaService) {
         this.leaseService = leaseService;
         this.featureAccessService = featureAccessService;
         this.quotaService = quotaService;
-        this.redis = redis;
     }
 
     @PostMapping("/student/selection-leases")
@@ -105,7 +95,7 @@ public class SelectionAccessLeaseController {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("enabled", enabled);
         result.put("maxUsers", enabled ? maxUsers() : 0);
-        result.put("activeUsers", enabled ? activeUsers() : 0);
+        result.put("activeUsers", enabled ? leaseService.activeUsers() : 0);
         result.put("editable", false);
         return ResponseEntity.ok(ResponseFactory.object(result));
     }
@@ -119,13 +109,5 @@ public class SelectionAccessLeaseController {
                     org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE);
         }
         return value.intValue();
-    }
-
-    private int activeUsers() {
-        Long count = redis.execute(
-                new DefaultRedisScript<>(COUNT_SCRIPT, Long.class),
-                List.of(ConcurrentSelectionLeaseService.activeUsersKey()),
-                String.valueOf(System.currentTimeMillis()));
-        return count == null ? 0 : Math.toIntExact(count);
     }
 }

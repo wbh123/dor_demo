@@ -16,6 +16,11 @@ import java.util.UUID;
 public class ConcurrentSelectionLeaseService {
     private static final String ACTIVE_USERS_KEY = "dormitory:selection:active-students";
 
+    private static final String COUNT_SCRIPT = """
+            redis.call('zremrangebyscore', KEYS[1], '-inf', ARGV[1])
+            return redis.call('zcard', KEYS[1])
+            """;
+
     private static final String ACQUIRE_SCRIPT = """
             redis.call('zremrangebyscore', KEYS[1], '-inf', ARGV[1])
             redis.call('zremrangebyscore', KEYS[2], '-inf', ARGV[1])
@@ -147,6 +152,22 @@ public class ConcurrentSelectionLeaseService {
         }
     }
 
+    public int activeUsers() {
+        DefaultRedisScript<Long> script = new DefaultRedisScript<>(COUNT_SCRIPT, Long.class);
+        try {
+            Long count = redis.execute(
+                    script,
+                    List.of(activeUsersKey()),
+                    String.valueOf(System.currentTimeMillis()));
+            if (count == null) {
+                throw redisUnavailable();
+            }
+            return Math.toIntExact(count);
+        } catch (RedisConnectionFailureException exception) {
+            throw redisUnavailable();
+        }
+    }
+
     private LeaseScriptResult executeAcquireOrRenew(
             String scriptText,
             long studentId,
@@ -194,6 +215,10 @@ public class ConcurrentSelectionLeaseService {
 
     static String studentLeasesKey(long studentId) {
         return "dormitory:selection:student:" + studentId + ":leases";
+    }
+
+    static String countScriptText() {
+        return COUNT_SCRIPT;
     }
 
     static String acquireScriptText() {
