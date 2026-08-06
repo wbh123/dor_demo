@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.wust.dormitory.admin.mapper.RoomCatalogMapper">
+    <resultMap id="RoomCatalogResultMap"
+               type="com.wust.dormitory.admin.model.persistence.RoomCatalogRow">
+        <constructor>
+            <idArg column="id" javaType="java.lang.Long"/>
+            <arg column="building_id" javaType="java.lang.Long"/>
+            <arg column="building_name" javaType="java.lang.String"/>
+            <arg column="floor_number" javaType="java.lang.Integer"/>
+            <arg column="room_number" javaType="java.lang.String"/>
+            <arg column="room_type" javaType="java.lang.String"/>
+            <arg column="capacity" javaType="java.lang.Integer"/>
+            <arg column="gender_restriction" javaType="java.lang.String"/>
+            <arg column="education_level_scope" javaType="java.lang.String"/>
+            <arg column="resident_scope" javaType="java.lang.String"/>
+            <arg column="building_gender_restriction" javaType="java.lang.String"/>
+            <arg column="building_education_level_scope" javaType="java.lang.String"/>
+            <arg column="building_resident_scope" javaType="java.lang.String"/>
+            <arg column="operational_status" javaType="java.lang.String"/>
+            <arg column="state_version" javaType="java.lang.Long"/>
+            <arg column="remark" javaType="java.lang.String"/>
+            <arg column="bed_count" javaType="java.lang.Long"/>
+            <arg column="enabled_bed_count" javaType="java.lang.Long"/>
+            <arg column="disabled_bed_count" javaType="java.lang.Long"/>
+            <arg column="maintenance_bed_count" javaType="java.lang.Long"/>
+            <arg column="active_resident_count" javaType="java.lang.Long"/>
+            <arg column="confirmed_bed_count" javaType="java.lang.Long"/>
+            <arg column="unconfirmed_bed_count" javaType="java.lang.Long"/>
+            <arg column="remaining_capacity" javaType="java.lang.Long"/>
+        </constructor>
+    </resultMap>
+
+    <select id="findRooms" resultMap="RoomCatalogResultMap">
+        SELECT r.id,
+               b.id AS building_id,
+               b.building_name,
+               f.floor_number,
+               r.room_number,
+               r.room_type,
+               r.capacity,
+               r.gender_restriction,
+               r.education_level_scope,
+               r.resident_scope,
+               b.gender_restriction AS building_gender_restriction,
+               b.education_level_scope AS building_education_level_scope,
+               b.resident_scope AS building_resident_scope,
+               r.operational_status,
+               r.state_version,
+               r.remark,
+               COALESCE(bed_stats.bed_count, 0) AS bed_count,
+               COALESCE(bed_stats.enabled_bed_count, 0) AS enabled_bed_count,
+               COALESCE(bed_stats.disabled_bed_count, 0) AS disabled_bed_count,
+               COALESCE(bed_stats.maintenance_bed_count, 0) AS maintenance_bed_count,
+               COALESCE(occupancy.active_resident_count, 0) AS active_resident_count,
+               COALESCE(occupancy.confirmed_bed_count, 0) AS confirmed_bed_count,
+               COALESCE(occupancy.unconfirmed_bed_count, 0) AS unconfirmed_bed_count,
+               GREATEST(r.capacity - COALESCE(occupancy.active_resident_count, 0), 0)
+                   AS remaining_capacity
+        FROM room r
+        JOIN dormitory_floor f ON f.id = r.floor_id
+        JOIN dormitory_building b ON b.id = f.building_id
+        LEFT JOIN (
+            SELECT bed.room_id,
+                   SUM(CASE WHEN bed.operational_status &lt;&gt; 'RETIRED' THEN 1 ELSE 0 END)
+                       AS bed_count,
+                   SUM(CASE WHEN bed.operational_status = 'ENABLED' THEN 1 ELSE 0 END)
+                       AS enabled_bed_count,
+                   SUM(CASE WHEN bed.operational_status = 'DISABLED' THEN 1 ELSE 0 END)
+                       AS disabled_bed_count,
+                   SUM(CASE WHEN bed.operational_status = 'MAINTENANCE' THEN 1 ELSE 0 END)
+                       AS maintenance_bed_count
+            FROM bed
+            GROUP BY bed.room_id
+        ) bed_stats ON bed_stats.room_id = r.id
+        LEFT JOIN (
+            SELECT ra.room_id,
+                   COUNT(*) AS active_resident_count,
+                   SUM(CASE WHEN ra.bed_id IS NOT NULL THEN 1 ELSE 0 END)
+                       AS confirmed_bed_count,
+                   SUM(CASE WHEN ra.bed_id IS NULL THEN 1 ELSE 0 END)
+                       AS unconfirmed_bed_count
+            FROM room_assignment ra
+            WHERE ra.assignment_status = 'ACTIVE'
+            GROUP BY ra.room_id
+        ) occupancy ON occupancy.room_id = r.id
+        <where>
+            <if test="buildingId != null">
+                b.id = #{buildingId}
+            </if>
+            <if test="gender != null and gender != ''">
+                AND r.gender_restriction = #{gender}
+            </if>
+        </where>
+        ORDER BY b.building_code, f.floor_number, r.room_number
+    </select>
+</mapper>
