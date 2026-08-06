@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Prevent RoomRequest, AdminController, RoomManagementService and the edit form from drifting apart.
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
