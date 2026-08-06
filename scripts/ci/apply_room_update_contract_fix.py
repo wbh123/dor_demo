@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Trigger after workflow registration.
+# Pull-request trigger after workflow registration.
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
