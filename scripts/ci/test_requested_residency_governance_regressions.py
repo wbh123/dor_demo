@@ -37,10 +37,11 @@ class RequestedResidencyGovernanceRegressionTest(unittest.TestCase):
         self.assertIn(':open="Boolean(selected)"', residency)
 
     def test_report_builder_does_not_assign_const_reactive_binding(self):
-        source = read("frontend/src/views/admin/AdminGovernanceView.vue")
-        self.assertNotIn('v-model="reportDefinition"', source)
-        self.assertIn(':model-value="reportDefinition"', source)
-        self.assertIn("Object.assign(reportDefinition, value)", source)
+        panel = read("frontend/src/features/admin-governance/components/ReportExportPanel.vue")
+        workspace = read("frontend/src/features/admin-governance/composables/useReportWorkspace.ts")
+        self.assertNotIn('v-model="definition"', panel)
+        self.assertIn(':model-value="definition"', panel)
+        self.assertIn("Object.assign(definition, value)", workspace)
 
     def test_selection_policy_preserves_direct_preference_setting(self):
         source = read("frontend/src/views/admin/AdminMatchingView.vue")
@@ -59,10 +60,14 @@ class RequestedResidencyGovernanceRegressionTest(unittest.TestCase):
         self.assertIn("weight-manual compact-weight-manual", matching)
 
     def test_governance_has_audit_details_and_analytics_summary(self):
-        source = read("frontend/src/views/admin/AdminGovernanceView.vue")
-        self.assertIn("selectedAudit", source)
-        self.assertIn("analytics-summary-grid", source)
-        self.assertIn("queryAudit()", source)
+        view = read("frontend/src/views/admin/AdminGovernanceView.vue")
+        audit_panel = read("frontend/src/features/admin-governance/components/AuditSearchPanel.vue")
+        analytics_panel = read("frontend/src/features/admin-governance/components/HistoricalAnalyticsPanel.vue")
+        audit_search = read("frontend/src/features/admin-governance/composables/useAuditSearch.ts")
+        self.assertIn("AuditSearchPanel", view)
+        self.assertIn("selectedAudit", audit_panel)
+        self.assertIn("analytics-summary-grid", analytics_panel)
+        self.assertIn("async function query()", audit_search)
 
 
 if __name__ == "__main__":
