@@ -9,9 +9,14 @@ import org.springframework.jdbc.support.GeneratedKeyHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.MessageDigest;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -23,9 +28,11 @@ public class ExportTaskService {
     public static final String CANCELLED = "CANCELLED";
 
     private final NamedParameterJdbcTemplate jdbc;
+    private final ExportTaskMapper mapper;
 
-    public ExportTaskService(NamedParameterJdbcTemplate jdbc) {
+    public ExportTaskService(NamedParameterJdbcTemplate jdbc, ExportTaskMapper mapper) {
         this.jdbc = jdbc;
+        this.mapper = mapper;
     }
 
     @Transactional
@@ -85,6 +92,15 @@ public class ExportTaskService {
             throw new BusinessException("EXPORT_TASK_NOT_FOUND", "导出任务不存在", HttpStatus.NOT_FOUND);
         }
         return rows.getFirst();
+    }
+
+    @Transactional
+    public Optional<Map<String, Object>> claimNext() {
+        Map<String, Object> queued = mapper.findNextQueued();
+        if (queued == null || queued.isEmpty()) return Optional.empty();
+        long taskId = ((Number) queued.get("id")).longValue();
+        if (mapper.claim(taskId) != 1) return Optional.empty();
+        return Optional.of(get(taskId));
     }
 
     @Transactional
@@ -150,11 +166,43 @@ public class ExportTaskService {
         }
     }
 
+    public ExportDownload download(long taskId, String token) {
+        Map<String, Object> task = mapper.downloadRecord(taskId);
+        if (task == null || task.isEmpty()) {
+            throw new BusinessException("EXPORT_TASK_NOT_FOUND", "导出任务不存在", HttpStatus.NOT_FOUND);
+        }
+        String expected = String.valueOf(task.get("downloadToken"));
+        String provided = token == null ? "" : token;
+        if (!MessageDigest.isEqual(
+                expected.getBytes(StandardCharsets.UTF_8),
+                provided.getBytes(StandardCharsets.UTF_8))) {
+            throw new BusinessException("EXPORT_DOWNLOAD_TOKEN_INVALID", "导出下载令牌无效", HttpStatus.FORBIDDEN);
+        }
+        if (!downloadAvailable(task, LocalDateTime.now())) {
+            throw new BusinessException("EXPORT_NOT_READY", "导出任务尚未完成或下载已过期", HttpStatus.CONFLICT);
+        }
+        Object reference = task.get("fileReference");
+        if (reference == null) {
+            throw new BusinessException("EXPORT_FILE_MISSING", "导出文件不存在", HttpStatus.GONE);
+        }
+        Path path = Path.of(String.valueOf(reference)).toAbsolutePath().normalize();
+        if (!Files.isRegularFile(path)) {
+            throw new BusinessException("EXPORT_FILE_MISSING", "导出文件不存在", HttpStatus.GONE);
+        }
+        return new ExportDownload(
+                path,
+                String.valueOf(task.get("fileName")),
+                ((Number) task.getOrDefault("fileSize", 0L)).longValue());
+    }
+
     public boolean downloadAvailable(Map<String, Object> task, LocalDateTime now) {
-        if (!SUCCEEDED.equals(String.valueOf(task.get("task_status")))) {
+        Object status = task.containsKey("taskStatus") ? task.get("taskStatus") : task.get("task_status");
+        if (!SUCCEEDED.equals(String.valueOf(status))) {
             return false;
         }
-        Object expires = task.get("expires_at");
+        Object expires = task.containsKey("expiresAt") ? task.get("expiresAt") : task.get("expires_at");
         return !(expires instanceof LocalDateTime value) || value.isAfter(now);
     }
+
+    public record ExportDownload(Path path, String fileName, long fileSize) {}
 }
