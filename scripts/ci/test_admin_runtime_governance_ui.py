@@ -25,7 +25,7 @@ def forbid(source: str, token: str, message: str) -> None:
 
 dormitory = read("frontend/src/views/admin/AdminDormitoryView.vue")
 forbid(dormitory, 'class="building-summary-list"', "楼栋概况不得继续使用独立小卡片列表")
-require(dormitory, 'class="building-summary-table"', "楼栋概况应使用集中式高密度表格")
+require(dormitory, 'class="table-wrap building-compact-table"', "楼栋概况应使用集中式高密度表格")
 require(dormitory, '<table', "楼栋概况应集中展示楼栋详细信息")
 
 residency = read("frontend/src/views/admin/AdminResidencyView.vue")
