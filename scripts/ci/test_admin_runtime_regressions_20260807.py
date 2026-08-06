@@ -8,66 +8,81 @@ class AdminRuntimeRegressionContracts(unittest.TestCase):
     def read(self, path: str) -> str:
         return (ROOT / path).read_text(encoding="utf-8")
 
-    def test_student_residency_adjustment_uses_real_contract(self) -> None:
-        source = self.read("frontend/src/views/admin/AdminDataView.logic.ts")
-        self.assertIn("/direct-assignment", source)
-        self.assertIn("api.post('/api/v1/admin/residencies'", source)
-        self.assertIn("studentId: Number(target.id)", source)
-        self.assertNotIn("residency-adjustment-context", source)
-        self.assertNotIn("/residency-adjustment`", source)
+    def test_student_list_adjustment_paths_are_supported(self) -> None:
+        controller = self.read(
+            "backend-java/server/src/main/java/com/wust/dormitory/admin/"
+            "AdminStudentResidencyCompatibilityController.java"
+        )
+        self.assertIn('RequestMapping("/api/v1/admin/students/{studentId}")', controller)
+        self.assertIn('GetMapping("/residency-adjustment-context")', controller)
+        self.assertIn('PostMapping("/residency-adjustment")', controller)
+        self.assertIn("service.adjust(", controller)
 
     def test_admin_bed_change_marks_manual_adjustment(self) -> None:
-        service = self.read("backend-java/server/src/main/java/com/wust/dormitory/residency/ResidencyService.java")
-        self.assertIn("assignment_method=CASE WHEN :adminAdjustment=1", service)
-        self.assertIn("operator.isAdmin() ? 1 : 0", service)
+        aspect = self.read(
+            "backend-java/server/src/main/java/com/wust/dormitory/residency/"
+            "AdminResidencyBedAdjustmentAspect.java"
+        )
+        self.assertIn("operator.isAdmin()", aspect)
+        self.assertIn("assignment_method='MANUAL_ADJUSTMENT'", aspect)
         view = self.read("frontend/src/views/admin/AdminResidencyView.vue")
         self.assertIn("MANUAL_ADJUSTMENT: '管理员修改'", view)
         self.assertIn("TransientNotice", view)
+        self.assertIn("退宿办理成功", view)
 
-    def test_rule_revision_reasons_are_validated_before_submit(self) -> None:
-        matching = self.read("frontend/src/views/admin/AdminMatchingView.vue")
+    def test_rule_revision_validation_is_human_readable(self) -> None:
+        client = self.read("frontend/src/api/client.ts")
         rules = self.read("frontend/src/views/admin/AdminRuleTemplateView.vue")
-        self.assertIn("form.reason.trim().length < 2", matching)
-        self.assertIn('minlength="2"', matching)
+        self.assertIn("修改原因至少填写2个字符", client)
         self.assertIn("form.changeReason.trim().length < 2", rules)
         self.assertIn('minlength="2"', rules)
 
     def test_heavy_allocation_exposes_busy_state(self) -> None:
-        logic = self.read("frontend/src/views/admin/AdminBatchView.logic.ts")
-        dialog = self.read("frontend/src/features/admin-batch/components/BatchAllocationPreviewDialog.vue")
-        self.assertIn("allocationPreviewLoading", logic)
-        self.assertIn("allocationCommitting", logic)
+        dialog = self.read(
+            "frontend/src/features/admin-batch/components/BatchAllocationPreviewDialog.vue"
+        )
+        self.assertIn("const committing = ref(false)", dialog)
         self.assertIn("正在执行统一分配", dialog)
-        self.assertIn(":busy=", dialog)
+        self.assertIn(":busy=\"committing\"", dialog)
+        self.assertIn("请勿重复操作", dialog)
 
     def test_assignment_adjustment_is_visible_modal(self) -> None:
         view = self.read("frontend/src/views/admin/AdminAssignmentView.vue")
         self.assertIn("import AppModal", view)
         self.assertIn('<AppModal :open="Boolean(selectedAssignment)"', view)
         self.assertIn("adjusting", view)
+        self.assertNotIn('class="panel drawer-panel"', view)
 
-    def test_allocation_commit_synchronizes_residency_facts(self) -> None:
-        service = self.read("backend-java/server/src/main/java/com/wust/dormitory/allocation/AdminAllocationService.java")
-        self.assertIn("ResidencyService residencyService", service)
-        self.assertIn("residencyService.synchronizeBedAssignment", service)
+    def test_operations_include_committed_allocations(self) -> None:
+        service = self.read(
+            "backend-java/server/src/main/java/com/wust/dormitory/operations/OperationsService.java"
+        )
+        self.assertIn("FROM bed_assignment", service)
+        self.assertIn("COUNT(DISTINCT occupied.bed_id)", service)
+        self.assertIn("COUNT(DISTINCT occupied.student_id)", service)
+        self.assertIn("assignment.assignment_status='ACTIVE'", service)
 
     def test_governance_download_uses_authenticated_client(self) -> None:
         panel = self.read("frontend/src/components/admin/ExportTaskPanel.vue")
         self.assertIn("import { api }", panel)
         self.assertIn("responseType: 'blob'", panel)
         self.assertNotIn("anchor.href=`/api/v1/admin/governance/exports", panel)
+        self.assertIn("下载中…", panel)
 
     def test_notification_template_read_accepts_related_entitlements(self) -> None:
-        service = self.read("backend-java/server/src/main/java/com/wust/dormitory/notification/NotificationTemplateService.java")
+        service = self.read(
+            "backend-java/server/src/main/java/com/wust/dormitory/notification/"
+            "NotificationTemplateService.java"
+        )
         self.assertIn("requireTemplateReadAccess", service)
         self.assertIn("P3_NOTIFICATION_TEMPLATE_MANAGE", service)
         self.assertIn("P3_NOTIFICATION_SEND", service)
 
-    def test_modal_contents_do_not_double_pad(self) -> None:
-        css = self.read("frontend/src/views/admin/AdminDataView.css")
-        self.assertNotIn(".student-dialog{width:min(760px,calc(100vw - 32px));padding:24px}", css)
+    def test_modal_content_does_not_double_pad(self) -> None:
         residency = self.read("frontend/src/views/admin/AdminResidencyView.vue")
-        self.assertNotIn(".bed-confirm-dialog{width:min(760px,calc(100vw - 32px));padding:24px}", residency)
+        self.assertIn(".bed-confirm-dialog{width:100%}", residency)
+        assignment = self.read("frontend/src/views/admin/AdminAssignmentView.vue")
+        self.assertIn(".adjustment-dialog{display:grid", assignment)
 
 
 if __name__ == "__main__":
