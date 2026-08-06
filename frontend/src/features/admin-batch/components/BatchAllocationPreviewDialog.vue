@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
 import type { DataObject } from '../../../api/types'
 import AppModal from '../../../components/modal/AppModal.vue'
 
@@ -9,33 +8,27 @@ const props = defineProps<{
   allocationBatchId: number | null
   allocationSummary: DataObject
   unassignedStudents: DataObject[]
+  busy: boolean
 }>()
 
 const emit = defineEmits<{
   close: []
   commit: []
 }>()
-const committing = ref(false)
-
-watch(() => [props.open, props.allocationBatchId], ([open, batchId]) => {
-  if (!open || !batchId) committing.value = false
-})
 
 function close() {
-  if (!committing.value) emit('close')
+  if (!props.busy) emit('close')
 }
 
 function commit() {
-  if (committing.value) return
-  committing.value = true
-  emit('commit')
+  if (!props.busy) emit('commit')
 }
 </script>
 
 <template>
   <AppModal
     :open="open"
-    :busy="committing"
+    :busy="busy"
     title="统一分配预演"
     description="确认预演结果后再执行正式统一分配。任务量较大时请保持当前页面打开。"
     size="wide"
@@ -47,7 +40,7 @@ function commit() {
       <article><span>预计成功</span><strong>{{ allocationSummary.assignedCount ?? 0 }}</strong></article>
       <article><span>未分配</span><strong>{{ allocationSummary.unassignedCount ?? 0 }}</strong></article>
     </div>
-    <p v-if="committing" class="alert info">正在写入床位分配结果和审计记录，完成前请勿关闭页面或重复点击。</p>
+    <p v-if="busy" class="alert info">正在写入床位分配结果和审计记录，完成前请勿关闭页面或重复点击。</p>
     <div v-if="unassignedStudents.length" class="table-wrap">
       <table>
         <thead><tr><th>学号</th><th>姓名</th><th>原因</th></tr></thead>
@@ -61,8 +54,8 @@ function commit() {
       </table>
     </div>
     <template #footer>
-      <button class="button ghost" type="button" :disabled="committing" @click="close">关闭</button>
-      <button v-if="allocationBatchId" class="button primary" type="button" :disabled="committing" @click="commit">{{ committing ? '正在执行统一分配…' : '确认执行统一分配' }}</button>
+      <button class="button ghost" type="button" :disabled="busy" @click="close">关闭</button>
+      <button v-if="allocationBatchId" class="button primary" type="button" :disabled="busy" @click="commit">{{ busy ? '正在执行统一分配…' : '确认执行统一分配' }}</button>
     </template>
   </AppModal>
 </template>
