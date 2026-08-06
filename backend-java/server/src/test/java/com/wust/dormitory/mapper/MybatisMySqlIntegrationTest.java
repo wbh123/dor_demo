@@ -1,7 +1,10 @@
 package com.wust.dormitory.mapper;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.wust.dormitory.admin.mapper.AdminCatalogMapper;
 import com.wust.dormitory.admin.mapper.RoomCatalogMapper;
+import com.wust.dormitory.admin.model.persistence.BuildingCatalogRow;
+import com.wust.dormitory.admin.model.persistence.MajorCatalogRow;
 import com.wust.dormitory.admin.model.persistence.RoomCatalogRow;
 import com.wust.dormitory.config.MybatisConfig;
 import org.apache.ibatis.session.SqlSession;
@@ -74,7 +77,7 @@ class MybatisMySqlIntegrationTest {
     void roomCatalogMapperAggregatesBedsAndOccupancyInOneQuery() throws Exception {
         String jdbcUrl = jdbcUrl();
         awaitDatabase(jdbcUrl);
-        createRoomCatalogFixture(jdbcUrl);
+        createCatalogFixture(jdbcUrl);
 
         try (SqlSession session = sessionFactory(jdbcUrl).openSession()) {
             RoomCatalogMapper mapper = session.getMapper(RoomCatalogMapper.class);
@@ -96,6 +99,36 @@ class MybatisMySqlIntegrationTest {
             assertEquals(1L, room.unconfirmedBedCount());
             assertEquals(1L, room.remainingCapacity());
             assertTrue(mapper.findRooms(1L, "M").isEmpty());
+        }
+    }
+
+    @Test
+    void adminCatalogMapperFiltersMajorsAndAggregatesBuildingCapacity() throws Exception {
+        String jdbcUrl = jdbcUrl();
+        awaitDatabase(jdbcUrl);
+        createCatalogFixture(jdbcUrl);
+
+        try (SqlSession session = sessionFactory(jdbcUrl).openSession()) {
+            AdminCatalogMapper mapper = session.getMapper(AdminCatalogMapper.class);
+
+            List<MajorCatalogRow> enabledMajors = mapper.findMajors(true);
+            assertEquals(1, enabledMajors.size());
+            assertEquals("CS", enabledMajors.getFirst().majorCode());
+            assertEquals("计算机科学与技术", enabledMajors.getFirst().majorName());
+
+            List<MajorCatalogRow> allMajors = mapper.findMajors(null);
+            assertEquals(List.of("CS", "SE"), allMajors.stream()
+                    .map(MajorCatalogRow::majorCode)
+                    .toList());
+
+            List<BuildingCatalogRow> buildings = mapper.findBuildings();
+            assertEquals(1, buildings.size());
+            BuildingCatalogRow building = buildings.getFirst();
+            assertEquals("F01", building.buildingCode());
+            assertEquals("示例校区", building.campusName());
+            assertEquals("MIXED", building.educationLevelScope());
+            assertEquals(1L, building.roomCount());
+            assertEquals(4L, building.bedCount());
         }
     }
 
@@ -125,7 +158,7 @@ class MybatisMySqlIntegrationTest {
         return sessionFactory;
     }
 
-    private static void createRoomCatalogFixture(String jdbcUrl) throws SQLException {
+    private static void createCatalogFixture(String jdbcUrl) throws SQLException {
         try (Connection connection = DriverManager.getConnection(
                 jdbcUrl,
                 "root",
@@ -136,14 +169,24 @@ class MybatisMySqlIntegrationTest {
             statement.execute("DROP TABLE IF EXISTS room");
             statement.execute("DROP TABLE IF EXISTS dormitory_floor");
             statement.execute("DROP TABLE IF EXISTS dormitory_building");
+            statement.execute("DROP TABLE IF EXISTS campus");
+            statement.execute("DROP TABLE IF EXISTS major");
+            statement.execute("""
+                    CREATE TABLE campus (
+                        id BIGINT PRIMARY KEY,
+                        campus_name VARCHAR(128) NOT NULL
+                    )
+                    """);
             statement.execute("""
                     CREATE TABLE dormitory_building (
                         id BIGINT PRIMARY KEY,
+                        campus_id BIGINT NOT NULL,
                         building_code VARCHAR(32) NOT NULL,
                         building_name VARCHAR(128) NOT NULL,
                         gender_restriction VARCHAR(8) NOT NULL,
                         education_level_scope VARCHAR(32) NOT NULL,
-                        resident_scope VARCHAR(32) NOT NULL
+                        resident_scope VARCHAR(32) NOT NULL,
+                        enabled TINYINT(1) NOT NULL
                     )
                     """);
             statement.execute("""
@@ -184,8 +227,19 @@ class MybatisMySqlIntegrationTest {
                     )
                     """);
             statement.execute("""
+                    CREATE TABLE major (
+                        id BIGINT PRIMARY KEY,
+                        major_code VARCHAR(32) NOT NULL,
+                        major_name VARCHAR(128) NOT NULL,
+                        enabled TINYINT(1) NOT NULL,
+                        created_at DATETIME(3) NOT NULL,
+                        updated_at DATETIME(3) NOT NULL
+                    )
+                    """);
+            statement.execute("INSERT INTO campus VALUES (1, '示例校区')");
+            statement.execute("""
                     INSERT INTO dormitory_building VALUES
-                    (1, 'F01', '北苑一栋', 'F', 'MIXED', 'MIXED')
+                    (1, 1, 'F01', '示例一栋', 'F', 'MIXED', 'MIXED', 1)
                     """);
             statement.execute("INSERT INTO dormitory_floor VALUES (10, 1, 3)");
             statement.execute("""
@@ -207,6 +261,11 @@ class MybatisMySqlIntegrationTest {
                     (2, 100, 2, 'ACTIVE'),
                     (3, 100, NULL, 'ACTIVE'),
                     (4, 100, 3, 'ENDED')
+                    """);
+            statement.execute("""
+                    INSERT INTO major VALUES
+                    (1, 'CS', '计算机科学与技术', 1, CURRENT_TIMESTAMP(3), CURRENT_TIMESTAMP(3)),
+                    (2, 'SE', '软件工程', 0, CURRENT_TIMESTAMP(3), CURRENT_TIMESTAMP(3))
                     """);
         }
     }

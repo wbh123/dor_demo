@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.wust.dormitory.admin.mapper.AdminCatalogMapper">
+    <resultMap id="MajorCatalogResultMap"
+               type="com.wust.dormitory.admin.model.persistence.MajorCatalogRow">
+        <constructor>
+            <idArg column="id" javaType="java.lang.Long"/>
+            <arg column="major_code" javaType="java.lang.String"/>
+            <arg column="major_name" javaType="java.lang.String"/>
+            <arg column="enabled" javaType="java.lang.Boolean"/>
+            <arg column="created_at" javaType="java.time.LocalDateTime"/>
+            <arg column="updated_at" javaType="java.time.LocalDateTime"/>
+        </constructor>
+    </resultMap>
+
+    <resultMap id="BuildingCatalogResultMap"
+               type="com.wust.dormitory.admin.model.persistence.BuildingCatalogRow">
+        <constructor>
+            <idArg column="id" javaType="java.lang.Long"/>
+            <arg column="building_code" javaType="java.lang.String"/>
+            <arg column="building_name" javaType="java.lang.String"/>
+            <arg column="gender_restriction" javaType="java.lang.String"/>
+            <arg column="education_level_scope" javaType="java.lang.String"/>
+            <arg column="resident_scope" javaType="java.lang.String"/>
+            <arg column="enabled" javaType="java.lang.Boolean"/>
+            <arg column="campus_name" javaType="java.lang.String"/>
+            <arg column="room_count" javaType="java.lang.Long"/>
+            <arg column="bed_count" javaType="java.lang.Long"/>
+        </constructor>
+    </resultMap>
+
+    <select id="findMajors" resultMap="MajorCatalogResultMap">
+        SELECT id,
+               major_code,
+               major_name,
+               enabled,
+               created_at,
+               updated_at
+        FROM major
+        <where>
+            <if test="enabled != null">
+                enabled = #{enabled}
+            </if>
+        </where>
+        ORDER BY major_code
+    </select>
+
+    <select id="findBuildings" resultMap="BuildingCatalogResultMap">
+        SELECT b.id,
+               b.building_code,
+               b.building_name,
+               b.gender_restriction,
+               b.education_level_scope,
+               b.resident_scope,
+               b.enabled,
+               c.campus_name,
+               COUNT(DISTINCT r.id) AS room_count,
+               COUNT(DISTINCT CASE
+                   WHEN bed.operational_status &lt;&gt; 'RETIRED' THEN bed.id
+                   ELSE NULL
+               END) AS bed_count
+        FROM dormitory_building b
+        JOIN campus c ON c.id = b.campus_id
+        LEFT JOIN dormitory_floor f ON f.building_id = b.id
+        LEFT JOIN room r ON r.floor_id = f.id
+        LEFT JOIN bed ON bed.room_id = r.id
+        GROUP BY b.id,
+                 b.building_code,
+                 b.building_name,
+                 b.gender_restriction,
+                 b.education_level_scope,
+                 b.resident_scope,
+                 b.enabled,
+                 c.campus_name
+        ORDER BY b.building_code
+    </select>
+</mapper>
