@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Prevent RoomRequest, AdminController, RoomManagementService and the edit form from drifting apart.
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -47,8 +48,9 @@ for token in (
         raise AssertionError(f"房间编辑后端契约不同步：{token}")
 
 for token in (
-        "educationLevelScope: 'UNDERGRADUATE_ONLY' | 'GRADUATE_ONLY' | 'MIXED'",
-        "editForm.educationLevelScope = String(room.education_level_scope ?? 'MIXED')",
+        "type EducationScope = 'UNDERGRADUATE_ONLY' | 'GRADUATE_ONLY' | 'MIXED'",
+        "educationLevelScope: EducationScope",
+        "editForm.educationLevelScope = String(room.education_level_scope ?? 'MIXED') as EducationScope",
         "v-model=\"editForm.educationLevelScope\"",
 ):
     if token not in frontend:
