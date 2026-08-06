@@ -8,15 +8,20 @@ class AdminRuntimeRegressionContracts(unittest.TestCase):
     def read(self, path: str) -> str:
         return (ROOT / path).read_text(encoding="utf-8")
 
-    def test_student_list_adjustment_paths_are_supported(self) -> None:
+    def test_student_list_adjustment_uses_formal_route_and_typed_null(self) -> None:
         controller = self.read(
             "backend-java/server/src/main/java/com/wust/dormitory/admin/"
-            "AdminStudentResidencyCompatibilityController.java"
+            "AdminStudentResidencyAdjustmentController.java"
+        )
+        service = self.read(
+            "backend-java/server/src/main/java/com/wust/dormitory/admin/"
+            "AdminStudentResidencyAdjustmentService.java"
         )
         self.assertIn('RequestMapping("/api/v1/admin/students/{studentId}")', controller)
         self.assertIn('GetMapping("/residency-adjustment-context")', controller)
         self.assertIn('PostMapping("/residency-adjustment")', controller)
-        self.assertIn("service.adjust(", controller)
+        self.assertIn("import java.sql.Types", service)
+        self.assertIn('.addValue("currentBedId", currentBedId, Types.BIGINT)', service)
 
     def test_admin_bed_change_marks_manual_adjustment(self) -> None:
         aspect = self.read(
