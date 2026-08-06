@@ -78,7 +78,11 @@ jobs:
           )
 
           '''
-          path.write_text(source[:start] + replacement + source[end:], encoding='utf-8')
+          source = source[:start] + replacement + source[end:]
+          start = source.index('# 楼栋概况')
+          end = source.index('# 退宿弹窗', start)
+          source = source[:start] + '# 主线已经是集中式 building-compact-table，不重复改写。\n\n' + source[end:]
+          path.write_text(source, encoding='utf-8')
           PY
       - name: Apply fixes
         if: steps.patch.outputs.needed == 'true'
