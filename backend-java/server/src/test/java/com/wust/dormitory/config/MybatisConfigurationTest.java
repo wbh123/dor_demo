@@ -1,5 +1,7 @@
 package com.wust.dormitory.config;
 
+import com.baomidou.mybatisplus.core.MybatisConfiguration;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wust.dormitory.common.persistence.typehandler.JsonNodeTypeHandler;
@@ -28,8 +30,7 @@ class MybatisConfigurationTest {
 
     @Test
     void configurationRegistersSupportedJsonTypes() {
-        org.apache.ibatis.session.Configuration configuration =
-                new org.apache.ibatis.session.Configuration();
+        MybatisConfiguration configuration = new MybatisConfiguration();
 
         new MybatisConfig()
                 .mybatisConfigurationCustomizer(objectMapper)
