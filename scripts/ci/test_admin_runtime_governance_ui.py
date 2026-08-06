@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# 管理运行时修复的跨层回归契约。
+# 管理运行时修复的跨层回归契约；验证最新主线适配。
 from pathlib import Path
 import sys
 
