@@ -3,6 +3,7 @@ package com.wust.dormitory.admin;
 import com.wust.dormitory.allocation.AdminAllocationService;
 import com.wust.dormitory.allocation.AssignmentAdjustmentService;
 import com.wust.dormitory.allocation.AssignmentQueryService;
+import com.wust.dormitory.audit.RecentAuditLogQueryService;
 import com.wust.dormitory.common.response.ResponseFactory;
 import com.wust.dormitory.matching.MatchingSchemeService;
 import com.wust.dormitory.model.api.AdminApi;
@@ -62,6 +63,7 @@ public class AdminController implements AdminApi {
     private final AssignmentQueryService assignmentQueryService;
     private final AssignmentAdjustmentService adjustmentService;
     private final AssignmentExportService exportService;
+    private final RecentAuditLogQueryService recentAuditLogQueryService;
 
     public AdminController(
             AdminService adminService,
@@ -78,7 +80,8 @@ public class AdminController implements AdminApi {
             AdminAllocationService allocationService,
             AssignmentQueryService assignmentQueryService,
             AssignmentAdjustmentService adjustmentService,
-            AssignmentExportService exportService) {
+            AssignmentExportService exportService,
+            RecentAuditLogQueryService recentAuditLogQueryService) {
         this.adminService = adminService;
         this.studentAdminService = studentAdminService;
         this.residencyService = residencyService;
@@ -94,6 +97,7 @@ public class AdminController implements AdminApi {
         this.assignmentQueryService = assignmentQueryService;
         this.adjustmentService = adjustmentService;
         this.exportService = exportService;
+        this.recentAuditLogQueryService = recentAuditLogQueryService;
     }
 
     @Override
@@ -441,7 +445,7 @@ public class AdminController implements AdminApi {
     public ResponseEntity<ListSuccessResponse> listAuditLogs(Integer limit) {
         SecurityUsers.requireAdmin();
         return ResponseEntity.ok(ResponseFactory.list(
-                adminService.auditLogs(limit == null ? 100 : limit)));
+                recentAuditLogQueryService.list(limit == null ? 100 : limit)));
     }
 
     @Override
