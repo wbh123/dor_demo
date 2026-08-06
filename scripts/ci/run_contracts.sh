@@ -34,6 +34,7 @@ python3 "$ROOT_DIR/scripts/ci/test_admin_operations_componentization.py" "$ROOT_
 python3 "$ROOT_DIR/scripts/ci/test_admin_governance_audit_componentization.py" "$ROOT_DIR"
 python3 "$ROOT_DIR/scripts/ci/test_admin_governance_notification_analytics_componentization.py" "$ROOT_DIR"
 python3 "$ROOT_DIR/scripts/ci/test_admin_governance_report_retention_componentization.py" "$ROOT_DIR"
+python3 "$ROOT_DIR/scripts/ci/test_frontend_modularization_boundaries.py"
 
 python3 "$ROOT_DIR/scripts/ci/test_dormitory_login_preference_ui.py"
 python3 "$ROOT_DIR/scripts/ci/test_building_floor_name_contract.py"
