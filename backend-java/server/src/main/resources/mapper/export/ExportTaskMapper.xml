@@ -20,6 +20,14 @@
         WHERE id=#{taskId} AND task_status='QUEUED'
     </update>
 
+    <select id="downloadRecord" resultType="map">
+        SELECT id, task_status AS taskStatus, file_name AS fileName,
+               file_size AS fileSize, file_reference AS fileReference,
+               download_token AS downloadToken, expires_at AS expiresAt
+        FROM export_task
+        WHERE id=#{taskId}
+    </select>
+
     <select id="auditRows" resultType="map">
         SELECT audit.occurred_at AS occurredAt,
                audit.operator_user_id AS operatorUserId,
