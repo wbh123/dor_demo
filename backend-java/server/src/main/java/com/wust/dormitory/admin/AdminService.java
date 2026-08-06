@@ -3,8 +3,11 @@ package com.wust.dormitory.admin;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wust.dormitory.admin.mapper.AdminCatalogMapper;
+import com.wust.dormitory.admin.mapper.StudentAdminMapper;
 import com.wust.dormitory.admin.model.persistence.BuildingCatalogRow;
 import com.wust.dormitory.admin.model.persistence.MajorCatalogRow;
+import com.wust.dormitory.admin.model.persistence.StudentCatalogRow;
+import com.wust.dormitory.admin.model.query.StudentCatalogQuery;
 import com.wust.dormitory.audit.AuditService;
 import com.wust.dormitory.common.error.BusinessException;
 import com.wust.dormitory.security.CurrentUser;
@@ -40,16 +43,19 @@ public class AdminService {
     private final ObjectMapper objectMapper;
     private final AuditService auditService;
     private final AdminCatalogMapper adminCatalogMapper;
+    private final StudentAdminMapper studentAdminMapper;
 
     public AdminService(
             NamedParameterJdbcTemplate jdbc,
             ObjectMapper objectMapper,
             AuditService auditService,
-            AdminCatalogMapper adminCatalogMapper) {
+            AdminCatalogMapper adminCatalogMapper,
+            StudentAdminMapper studentAdminMapper) {
         this.jdbc = jdbc;
         this.objectMapper = objectMapper;
         this.auditService = auditService;
         this.adminCatalogMapper = adminCatalogMapper;
+        this.studentAdminMapper = studentAdminMapper;
     }
 
     public Map<String, Object> dashboard() {
@@ -96,32 +102,33 @@ public class AdminService {
         return id;
     }
 
-    public Map<String, Object> students(String keyword, String gender, Long majorId, int page, int size) {
+    public Map<String, Object> students(
+            String keyword,
+            String gender,
+            Long majorId,
+            int page,
+            int size) {
         int safePage = Math.max(1, page);
         int safeSize = Math.min(Math.max(1, size), 200);
-        StringBuilder where = new StringBuilder(" WHERE 1=1 ");
-        MapSqlParameterSource parameters = new MapSqlParameterSource();
-        if (keyword != null && !keyword.isBlank()) {
-            where.append(" AND (s.student_number LIKE :keyword OR s.student_name LIKE :keyword) ");
-            parameters.addValue("keyword", "%" + keyword.trim() + "%");
-        }
-        if (gender != null && !gender.isBlank()) {
-            where.append(" AND s.gender=:gender ");
-            parameters.addValue("gender", gender);
-        }
-        if (majorId != null) {
-            where.append(" AND s.major_id=:majorId ");
-            parameters.addValue("majorId", majorId);
-        }
-        int total = jdbc.queryForObject("SELECT COUNT(*) FROM student s" + where, parameters, Integer.class);
-        parameters.addValue("limit", safeSize).addValue("offset", (safePage - 1) * safeSize);
-        List<Map<String, Object>> items = jdbc.queryForList("""
-                SELECT s.id, s.student_number, s.student_name, s.gender, s.major_id,
-                       m.major_code, m.major_name, u.account_status
-                FROM student s JOIN major m ON m.id=s.major_id
-                LEFT JOIN app_user u ON u.student_id=s.id
-                """ + where + " ORDER BY s.student_number LIMIT :limit OFFSET :offset", parameters);
-        return Map.of("page", safePage, "size", safeSize, "total", total, "items", items);
+        String keywordPattern = keyword == null || keyword.isBlank()
+                ? null
+                : "%" + keyword.trim() + "%";
+        String genderFilter = gender == null || gender.isBlank() ? null : gender;
+        StudentCatalogQuery query = new StudentCatalogQuery(
+                keywordPattern,
+                genderFilter,
+                majorId,
+                safeSize,
+                (safePage - 1) * safeSize);
+        int total = Math.toIntExact(studentAdminMapper.countStudents(query));
+        List<Map<String, Object>> items = studentAdminMapper.findStudents(query).stream()
+                .map(StudentCatalogRow::asResponseMap)
+                .toList();
+        return Map.of(
+                "page", safePage,
+                "size", safeSize,
+                "total", total,
+                "items", items);
     }
 
     @Transactional
@@ -188,30 +195,6 @@ public class AdminService {
                 .toList();
     }
 
-    public List<Map<String, Object>> rooms(Long buildingId, String gender) {
-        StringBuilder where = new StringBuilder(" WHERE 1=1 ");
-        MapSqlParameterSource parameters = new MapSqlParameterSource();
-        if (buildingId != null) {
-            where.append(" AND b.id=:buildingId ");
-            parameters.addValue("buildingId", buildingId);
-        }
-        if (gender != null && !gender.isBlank()) {
-            where.append(" AND r.gender_restriction=:gender ");
-            parameters.addValue("gender", gender);
-        }
-        return jdbc.queryForList("""
-                SELECT r.id, b.id AS building_id, b.building_name, f.floor_number,
-                       r.room_number, r.room_type, r.capacity, r.gender_restriction,
-                       r.operational_status, r.state_version, r.remark,
-                       COUNT(bed.id) AS bed_count,
-                       SUM(bed.operational_status='ENABLED') AS enabled_bed_count
-                FROM room r JOIN dormitory_floor f ON f.id=r.floor_id
-                JOIN dormitory_building b ON b.id=f.building_id
-                LEFT JOIN bed ON bed.room_id=r.id
-                """ + where + " GROUP BY r.id, b.id, b.building_name, f.floor_number, r.room_number, " +
-                "r.room_type, r.capacity, r.gender_restriction, r.operational_status, r.state_version, r.remark " +
-                "ORDER BY b.building_code, f.floor_number, r.room_number", parameters);
-    }
 
     @Transactional
     public void updateRoom(long roomId, RoomCommand command, CurrentUser operator) {
