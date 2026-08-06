@@ -17,6 +17,10 @@ const emit = defineEmits<{
   close: []
   'reopen-scope': []
 }>()
+
+function hasIssues(room: DataObject) {
+  return Array.isArray(room.issues) && room.issues.length > 0
+}
 </script>
 
 <template>
@@ -38,10 +42,10 @@ const emit = defineEmits<{
       <article><strong>已经完成</strong><ul><li v-for="step in (roomPreflight?.completedSteps ?? [])" :key="String(step)">{{ step }}</li></ul></article>
     </div>
     <div class="preflight-room-grid">
-      <article v-for="room in preflightRooms" :key="String(room.id)" :class="{ blocker: (room.issues ?? []).length > 0 }">
+      <article v-for="room in preflightRooms" :key="String(room.id)" :class="{ blocker: hasIssues(room) }">
         <strong>{{ room.building_name }} {{ room.room_number }}</strong>
         <span>在住{{ room.activeResidents }} · 剩余{{ room.remainingCapacity }}</span>
-        <small v-if="(room.issues ?? []).length">{{ props.issueText(room) }}</small>
+        <small v-if="hasIssues(room)">{{ props.issueText(room) }}</small>
         <small v-else>符合发布条件</small>
       </article>
     </div>
