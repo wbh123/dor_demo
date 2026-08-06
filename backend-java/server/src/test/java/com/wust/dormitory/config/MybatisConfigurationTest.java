@@ -18,6 +18,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -29,7 +30,7 @@ class MybatisConfigurationTest {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Test
-    void configurationRegistersSupportedJsonTypes() {
+    void configurationRegistersJsonNodeWithoutGloballyClaimingCollectionTypes() {
         MybatisConfiguration configuration = new MybatisConfiguration();
 
         new MybatisConfig()
@@ -39,12 +40,8 @@ class MybatisConfigurationTest {
         assertInstanceOf(
                 JsonNodeTypeHandler.class,
                 configuration.getTypeHandlerRegistry().getTypeHandler(JsonNode.class));
-        assertInstanceOf(
-                StringListJsonTypeHandler.class,
-                configuration.getTypeHandlerRegistry().getTypeHandler(List.class));
-        assertInstanceOf(
-                StringMapJsonTypeHandler.class,
-                configuration.getTypeHandlerRegistry().getTypeHandler(Map.class));
+        assertFalse(configuration.getTypeHandlerRegistry().hasTypeHandler(List.class));
+        assertFalse(configuration.getTypeHandlerRegistry().hasTypeHandler(Map.class));
     }
 
     @Test
