@@ -32,9 +32,18 @@ api.interceptors.response.use(
       localStorage.removeItem(TOKEN_KEY)
     }
     const contractMessage = error.response?.data?.error?.message
-    return Promise.reject(new Error(contractMessage || error.message || '请求失败'))
+    return Promise.reject(new Error(friendlyValidationMessage(contractMessage) || error.message || '请求失败'))
   },
 )
+
+function friendlyValidationMessage(message?: string) {
+  if (!message) return ''
+  if (/个数必须在\s*2\s*和\s*500\s*之间/.test(message)
+    || /size must be between 2 and 500/i.test(message)) {
+    return '修改原因至少填写2个字符，最多500个字符。'
+  }
+  return message
+}
 
 export interface SseMessage {
   id?: string
