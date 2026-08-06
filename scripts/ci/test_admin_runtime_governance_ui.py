@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# 管理运行时修复的跨层回归契约；包含真实 MySQL 在住历史验证。
+# 管理运行时修复的跨层回归契约；通过标准五项门禁持续验证。
 from pathlib import Path
 import sys
 
