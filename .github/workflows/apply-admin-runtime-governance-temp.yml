@@ -1,0 +1,70 @@
+name: Apply admin runtime governance fix
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: write
+
+jobs:
+  apply-and-verify:
+    if: github.event.pull_request.head.ref == 'fix/admin-runtime-governance-ui-20260806'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: fix/admin-runtime-governance-ui-20260806
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Stop when patch was already applied
+        id: patch
+        run: |
+          if [[ -f scripts/ci/apply_admin_runtime_governance_fix.py ]]; then
+            echo "needed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "needed=false" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/setup-python@v6
+        if: steps.patch.outputs.needed == 'true'
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v6
+        if: steps.patch.outputs.needed == 'true'
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - uses: actions/setup-java@v5
+        if: steps.patch.outputs.needed == 'true'
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Apply fixes
+        if: steps.patch.outputs.needed == 'true'
+        run: |
+          python scripts/ci/apply_admin_runtime_governance_fix.py
+          rm scripts/ci/apply_admin_runtime_governance_fix.py
+      - name: Run focused contracts
+        if: steps.patch.outputs.needed == 'true'
+        run: |
+          python scripts/ci/test_admin_runtime_governance_ui.py .
+          bash scripts/ci/run_contracts.sh
+      - name: Build frontend
+        if: steps.patch.outputs.needed == 'true'
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+      - name: Verify backend
+        if: steps.patch.outputs.needed == 'true'
+        run: mvn -f backend-java/pom.xml verify -DskipITs=false
+      - name: Commit verified fixes
+        if: steps.patch.outputs.needed == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "fix: 修复管理员运行时与治理页面"
+          git push origin HEAD:fix/admin-runtime-governance-ui-20260806
