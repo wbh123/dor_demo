@@ -36,7 +36,7 @@ public class NotificationTemplateService {
     }
 
     public List<Map<String, Object>> list() {
-        featureAccessService.require(FeatureCodes.P3_NOTIFICATION_TEMPLATE_VIEW);
+        requireTemplateReadAccess();
         return jdbc.queryForList("""
                 SELECT template.id, template.template_code, template.template_name,
                        template.built_in AS builtIn, template.enabled,
@@ -128,6 +128,15 @@ public class NotificationTemplateService {
         }
         matcher.appendTail(result);
         return result.toString();
+    }
+
+    private void requireTemplateReadAccess() {
+        if (featureAccessService.has(FeatureCodes.P3_NOTIFICATION_TEMPLATE_VIEW)
+                || featureAccessService.has(FeatureCodes.P3_NOTIFICATION_TEMPLATE_MANAGE)
+                || featureAccessService.has(FeatureCodes.P3_NOTIFICATION_SEND)) {
+            return;
+        }
+        featureAccessService.require(FeatureCodes.P3_NOTIFICATION_TEMPLATE_VIEW);
     }
 
     private long createTemplate(TemplateCommand command, CurrentUser operator) {
