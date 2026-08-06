@@ -1,11 +1,12 @@
 package com.wust.dormitory.config;
 
+import com.baomidou.mybatisplus.autoconfigure.MybatisPlusAutoConfiguration;
+import com.baomidou.mybatisplus.core.MybatisConfiguration;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wust.dormitory.admin.mapper.AdminCatalogMapper;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.junit.jupiter.api.Test;
 import org.mybatis.spring.SqlSessionTemplate;
-import org.mybatis.spring.boot.autoconfigure.MybatisAutoConfiguration;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.Bean;
@@ -18,7 +19,7 @@ import static org.mockito.Mockito.mock;
 
 class MybatisRuntimeWiringTest {
     private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
-            .withConfiguration(AutoConfigurations.of(MybatisAutoConfiguration.class))
+            .withConfiguration(AutoConfigurations.of(MybatisPlusAutoConfiguration.class))
             .withUserConfiguration(MybatisConfig.class, TestDependencies.class);
 
     @Test
@@ -28,6 +29,8 @@ class MybatisRuntimeWiringTest {
             assertThat(context).hasSingleBean(SqlSessionFactory.class);
             assertThat(context).hasSingleBean(SqlSessionTemplate.class);
             assertThat(context).hasSingleBean(AdminCatalogMapper.class);
+            assertThat(context.getBean(SqlSessionFactory.class).getConfiguration())
+                    .isInstanceOf(MybatisConfiguration.class);
         });
     }
 
