@@ -29,12 +29,28 @@ public class OperationsService {
         long totalBeds = scalar("SELECT COUNT(*) FROM bed", Map.of());
         long enabledBeds = scalar("SELECT COUNT(*) FROM bed WHERE operational_status='ENABLED'", Map.of());
         long occupiedBeds = scalar("""
-                SELECT COUNT(*) FROM room_assignment
-                WHERE assignment_status='ACTIVE' AND bed_id IS NOT NULL
+                SELECT COUNT(DISTINCT occupied.bed_id)
+                FROM (
+                    SELECT bed_id
+                    FROM room_assignment
+                    WHERE assignment_status='ACTIVE' AND bed_id IS NOT NULL
+                    UNION ALL
+                    SELECT bed_id
+                    FROM bed_assignment
+                    WHERE assignment_status='ACTIVE' AND bed_id IS NOT NULL
+                ) occupied
                 """, Map.of());
         long activeResidents = scalar("""
-                SELECT COUNT(*) FROM room_assignment
-                WHERE assignment_status='ACTIVE'
+                SELECT COUNT(DISTINCT occupied.student_id)
+                FROM (
+                    SELECT student_id
+                    FROM room_assignment
+                    WHERE assignment_status='ACTIVE'
+                    UNION ALL
+                    SELECT student_id
+                    FROM bed_assignment
+                    WHERE assignment_status='ACTIVE'
+                ) occupied
                 """, Map.of());
         long unselectedStudents = scalar("""
                 SELECT COUNT(*)
@@ -46,6 +62,11 @@ public class OperationsService {
                     SELECT 1 FROM room_assignment residency
                     WHERE residency.student_id=eligibility.student_id
                       AND residency.assignment_status='ACTIVE'
+                  )
+                  AND NOT EXISTS (
+                    SELECT 1 FROM bed_assignment assignment
+                    WHERE assignment.student_id=eligibility.student_id
+                      AND assignment.assignment_status='ACTIVE'
                   )
                 """, Map.of());
         long manualAdjustments = scalar("""
