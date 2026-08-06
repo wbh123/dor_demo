@@ -54,7 +54,9 @@ require('activeWelcomeEditor' in welcome and 'welcome-token-toolbar' in welcome
 require("P2_MULTILINGUAL_INTERFACE" in welcome and 'multilingualWelcomeEnabled' in welcome,
         'multilingual welcome editing is not protected by a system feature')
 
-batch = read('frontend/src/views/admin/AdminBatchView.vue')
+batch = read('frontend/src/views/admin/AdminBatchView.vue') + '\n' + read(
+    'frontend/src/features/admin-batch/components/BatchPublishConfirmationDialog.vue'
+)
 require(
     'publishPreflightSnapshot' in batch
     and 'openPublishConfirmationAfterPreflight' in batch
