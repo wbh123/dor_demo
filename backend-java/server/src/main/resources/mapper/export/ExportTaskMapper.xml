@@ -3,7 +3,7 @@
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.wust.dormitory.export.ExportTaskMapper">
-    <select id="findNextQueued" resultType="map">
+    <select id="findNextQueued" resultType="com.wust.dormitory.export.ExportTaskQueueRow">
         SELECT id, task_type AS taskType, request_json AS requestJson,
                download_token AS downloadToken
         FROM export_task
