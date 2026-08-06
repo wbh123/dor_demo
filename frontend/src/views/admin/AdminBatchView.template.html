@@ -7,34 +7,15 @@
   <p v-if="error" class="alert error">{{ error }}</p>
   <p v-if="message" class="alert success">{{ message }}</p>
 
-  <section class="panel">
-    <div class="section-head">
-      <div><span class="eyebrow">NEW BATCH</span><h3>创建选寝批次</h3></div>
-    </div>
-    <form class="batch-create-form" @submit.prevent="createBatch">
-      <div class="mode-card-grid">
-        <button type="button" class="mode-card" :class="{ selected: form.selectionMode === 'ROOM' }" @click="form.selectionMode = 'ROOM'">
-          <strong>选择寝室</strong><span>学生只确定寝室归属，具体床位由入住成员自行商议。</span><small>基础模式</small>
-        </button>
-        <button type="button" class="mode-card" :class="{ selected: form.selectionMode === 'BED', disabled: !bedModeAuthorized }" :disabled="!bedModeAuthorized" @click="form.selectionMode = 'BED'">
-          <strong>选择床位</strong><span>学生进入寝室后选择系统确认真实空闲的具体床位。</span><small>{{ bedModeAuthorized ? '已授权' : '当前服务未开通' }}</small>
-        </button>
-      </div>
-      <div class="separation-switch">
-        <button type="button" role="switch" :aria-checked="form.separateStudentCategories" :class="{ checked: form.separateStudentCategories }" @click="form.separateStudentCategories = !form.separateStudentCategories"><span /></button>
-        <div><strong>国内生与国际生分开选寝</strong><p>开启后仅允许国内生使用国内生专用宿舍、国际生使用国际生专用宿舍，混住宿舍不进入本批次。</p></div>
-      </div>
-      <div class="form-grid three-column">
-        <label><span>批次编号</span><input v-model.trim="form.batchCode" class="input" required maxlength="32" /></label>
-        <label><span>批次名称</span><input v-model.trim="form.batchName" class="input" required maxlength="128" /></label>
-        <label><span>规则模板</span><select v-model.number="form.ruleTemplateId" class="input" required><option :value="0" disabled>请选择</option><option v-for="item in ruleTemplates" :key="String(item.id)" :value="Number(item.id)">{{ item.rule_name }} · 修订{{ item.revision }}</option></select></label>
-        <label><span>开始时间</span><input v-model="form.startAt" class="input" type="datetime-local" required /><small>请使用24小时制，例如 18:30</small></label>
-        <label><span>结束时间</span><input v-model="form.endAt" class="input" type="datetime-local" required /><small>请使用24小时制，例如 21:00</small></label>
-        <div class="rule-summary"><strong>规则摘要</strong><span>{{ ruleTemplateSummary }}</span></div>
-      </div>
-      <button class="button primary" :disabled="creatingDraft">{{ creatingDraft ? '正在创建草稿…' : '创建草稿并配置范围' }}</button>
-    </form>
-  </section>
+  <BatchCreationPanel
+    :form="form"
+    :rule-templates="ruleTemplates"
+    :bed-mode-authorized="bedModeAuthorized"
+    :rule-template-summary="ruleTemplateSummary"
+    :creating="creatingDraft"
+    @update:form="Object.assign(form, $event)"
+    @submit="createBatch"
+  />
 
   <section class="panel">
     <div class="section-head"><div><span class="eyebrow">BATCH LIST</span><h3>批次管理</h3></div></div>
@@ -187,16 +168,15 @@
     </dl>
   </AppConfirmDialog>
 
-  <AppModal :open="copyDialog" :title="`复制“${copySource?.batch_name ?? ''}”`" description="自动保留选择模式、类别隔离、规则模板和宿舍范围。" size="wide" :busy="copying" :prevent-close="copying" @close="closeCopy">
-    <form class="form-grid two-column" @submit.prevent="copyBatch">
-      <label><span>新批次编号</span><input v-model.trim="copyForm.batchCode" class="input" required /></label>
-      <label><span>新批次名称</span><input v-model.trim="copyForm.batchName" class="input" required /></label>
-      <label><span>开始时间</span><input v-model="copyForm.startAt" class="input" type="datetime-local" required /><small>24小时制</small></label>
-      <label><span>结束时间</span><input v-model="copyForm.endAt" class="input" type="datetime-local" required /><small>24小时制</small></label>
-      <label class="span-2"><span>复制原因</span><textarea v-model.trim="copyForm.reason" class="input" required rows="3" /></label>
-    </form>
-    <template #footer><button class="button ghost" type="button" :disabled="copying" @click="closeCopy">取消</button><button class="button primary" type="button" :disabled="copying" @click="copyBatch">{{ copying ? '复制中…' : '创建草稿副本' }}</button></template>
-  </AppModal>
+  <BatchCopyDialog
+    :open="copyDialog"
+    :copy-source="copySource"
+    :copy-form="copyForm"
+    :busy="copying"
+    @update:copy-form="Object.assign(copyForm, $event)"
+    @submit="copyBatch"
+    @close="closeCopy"
+  />
 
   <AppModal :open="Boolean(allocationPreview)" title="统一分配预演" description="确认预演结果后再执行正式统一分配。" size="wide" @close="allocationPreview = null; allocationBatchId = null">
     <div class="allocation-stats"><article><span>学生</span><strong>{{ allocationSummary.studentCount ?? 0 }}</strong></article><article><span>预计成功</span><strong>{{ allocationSummary.assignedCount ?? 0 }}</strong></article><article><span>未分配</span><strong>{{ allocationSummary.unassignedCount ?? 0 }}</strong></article></div>
