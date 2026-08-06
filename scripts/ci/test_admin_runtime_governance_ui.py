@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# 管理运行时修复的跨层回归契约。
 from pathlib import Path
 import sys
 
