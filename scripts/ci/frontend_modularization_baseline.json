@@ -1,0 +1,7 @@
+{
+  "view_effective_line_limit": 350,
+  "logic_line_limit": 350,
+  "large_views": {},
+  "large_logic_files": {},
+  "ts_nocheck_allowlist": []
+}
