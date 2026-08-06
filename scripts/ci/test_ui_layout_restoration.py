@@ -37,12 +37,15 @@ require("unit-list" not in layout and "type-buttons" not in layout,
 
 batch_template = read("frontend/src/views/admin/AdminBatchView.template.html")
 batch_css = read("frontend/src/views/admin/AdminBatchView.css")
-require('<div class="separation-switch">' in batch_template,
+batch_creation = read("frontend/src/features/admin-batch/components/BatchCreationPanel.vue")
+batch_form_markup = batch_template + "\n" + batch_creation
+batch_form_styles = batch_css + "\n" + batch_creation
+require('<div class="separation-switch">' in batch_form_markup,
         "domestic/international separation selector still uses the malformed label/button nesting")
-require("appearance:none" in batch_css.replace(" ", "") and "cursor:pointer" in batch_css.replace(" ", ""),
+require("appearance:none" in batch_form_styles.replace(" ", "") and "cursor:pointer" in batch_form_styles.replace(" ", ""),
         "selection mode cards are missing explicit button reset and pointer interaction styles")
-require(".rule-summary" in batch_css and "align-self:end" in batch_css.replace(" ", "")
-        and "min-height:" in batch_css,
+require(".rule-summary" in batch_form_styles and "align-self:end" in batch_form_styles.replace(" ", "")
+        and "min-height:" in batch_form_styles,
         "rule summary is not vertically aligned with the date selector row")
 require("height:min(60vh,620px)" not in batch_css.replace(" ", ""),
         "scope modal still forces the regressed fixed-height layout")
