@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/xsd/maven-4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>com.wangbh.bom</groupId>
@@ -23,7 +23,7 @@
         <spring-cloud.version>2025.1.0</spring-cloud.version>
         <mysql-connector-java.version>8.0.33</mysql-connector-java.version>
         <mybatis-generator.version>1.4.0</mybatis-generator.version>
-        <mybatis-spring-boot-starter.version>4.0.1</mybatis-spring-boot-starter.version>
+        <mybatis-plus.version>3.5.17</mybatis-plus.version>
         <openapi-generator.version>7.6.0</openapi-generator.version>
         <openapi-generator-core.version>7.12.0</openapi-generator-core.version>
         <jackson-databind-nullable.version>0.2.1</jackson-databind-nullable.version>
@@ -49,9 +49,9 @@
                 <scope>import</scope>
             </dependency>
             <dependency>
-                <groupId>org.mybatis.spring.boot</groupId>
-                <artifactId>mybatis-spring-boot-starter</artifactId>
-                <version>${mybatis-spring-boot-starter.version}</version>
+                <groupId>com.baomidou</groupId>
+                <artifactId>mybatis-plus-spring-boot4-starter</artifactId>
+                <version>${mybatis-plus.version}</version>
             </dependency>
             <dependency>
                 <groupId>com.mysql</groupId>
