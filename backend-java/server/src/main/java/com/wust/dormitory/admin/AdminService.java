@@ -382,13 +382,6 @@ public class AdminService {
                 "reused", false, "summary", preview.get("summary"));
     }
 
-    public List<Map<String, Object>> auditLogs(int limit) {
-        return jdbc.queryForList("""
-                SELECT id, request_id, operator_user_id, operator_type, action_type,
-                       resource_type, resource_id, result_status, reason, occurred_at
-                FROM audit_log ORDER BY occurred_at DESC LIMIT :limit
-                """, Map.of("limit", Math.min(Math.max(limit, 1), 500)));
-    }
 
     private Map<String, Object> buildAllocation(long batchId, long randomSeed) {
         ensureBatchExists(batchId);

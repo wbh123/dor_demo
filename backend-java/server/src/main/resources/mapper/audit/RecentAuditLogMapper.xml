@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.wust.dormitory.audit.mapper.RecentAuditLogMapper">
+    <resultMap id="RecentAuditLogResultMap"
+               type="com.wust.dormitory.audit.model.persistence.RecentAuditLogRow">
+        <constructor>
+            <idArg column="id" javaType="java.lang.Long"/>
+            <arg column="request_id" javaType="java.lang.String"/>
+            <arg column="operator_user_id" javaType="java.lang.Long"/>
+            <arg column="operator_type" javaType="java.lang.String"/>
+            <arg column="action_type" javaType="java.lang.String"/>
+            <arg column="resource_type" javaType="java.lang.String"/>
+            <arg column="resource_id" javaType="java.lang.String"/>
+            <arg column="result_status" javaType="java.lang.String"/>
+            <arg column="reason" javaType="java.lang.String"/>
+            <arg column="occurred_at" javaType="java.time.LocalDateTime"/>
+        </constructor>
+    </resultMap>
+
+    <select id="findRecent" resultMap="RecentAuditLogResultMap">
+        SELECT id,
+               request_id,
+               operator_user_id,
+               operator_type,
+               action_type,
+               resource_type,
+               resource_id,
+               result_status,
+               reason,
+               occurred_at
+        FROM audit_log
+        ORDER BY occurred_at DESC
+        LIMIT #{limit}
+    </select>
+</mapper>
