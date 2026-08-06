@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.wust.dormitory.admin.mapper.StudentAdminMapper">
+    <resultMap id="StudentCatalogResultMap"
+               type="com.wust.dormitory.admin.model.persistence.StudentCatalogRow">
+        <constructor>
+            <idArg column="id" javaType="java.lang.Long"/>
+            <arg column="student_number" javaType="java.lang.String"/>
+            <arg column="student_name" javaType="java.lang.String"/>
+            <arg column="gender" javaType="java.lang.String"/>
+            <arg column="major_id" javaType="java.lang.Long"/>
+            <arg column="major_code" javaType="java.lang.String"/>
+            <arg column="major_name" javaType="java.lang.String"/>
+            <arg column="account_status" javaType="java.lang.String"/>
+        </constructor>
+    </resultMap>
+
+    <sql id="StudentCatalogFilters">
+        <where>
+            <if test="keywordPattern != null">
+                (s.student_number LIKE #{keywordPattern}
+                 OR s.student_name LIKE #{keywordPattern})
+            </if>
+            <if test="gender != null">
+                AND s.gender = #{gender}
+            </if>
+            <if test="majorId != null">
+                AND s.major_id = #{majorId}
+            </if>
+        </where>
+    </sql>
+
+    <select id="countStudents" resultType="java.lang.Long">
+        SELECT COUNT(*)
+        FROM student s
+        <include refid="StudentCatalogFilters"/>
+    </select>
+
+    <select id="findStudents" resultMap="StudentCatalogResultMap">
+        SELECT s.id,
+               s.student_number,
+               s.student_name,
+               s.gender,
+               s.major_id,
+               m.major_code,
+               m.major_name,
+               u.account_status
+        FROM student s
+        JOIN major m ON m.id = s.major_id
+        LEFT JOIN app_user u ON u.student_id = s.id
+        <include refid="StudentCatalogFilters"/>
+        ORDER BY s.student_number
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+</mapper>
