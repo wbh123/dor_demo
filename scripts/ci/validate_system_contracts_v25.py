@@ -21,6 +21,13 @@ def read_split_view(relative: str) -> str:
         companion = target.with_name(f"{target.stem}{suffix}")
         if companion.exists():
             content += "\n" + companion.read_text(encoding="utf-8")
+    if relative == "frontend/src/views/admin/AdminBatchView.vue":
+        feature_root = contracts.ROOT / "frontend/src/features/admin-batch"
+        if feature_root.exists():
+            for component in sorted(feature_root.rglob("*.vue")):
+                content += "\n" + component.read_text(encoding="utf-8")
+            for composable in sorted(feature_root.rglob("*.ts")):
+                content += "\n" + composable.read_text(encoding="utf-8")
     return content
 
 
