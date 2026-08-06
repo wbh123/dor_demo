@@ -1,5 +1,6 @@
 package com.wust.dormitory.config;
 
+import com.baomidou.mybatisplus.autoconfigure.ConfigurationCustomizer;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wust.dormitory.common.persistence.typehandler.JsonNodeTypeHandler;
@@ -8,7 +9,6 @@ import com.wust.dormitory.common.persistence.typehandler.StringMapJsonTypeHandle
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.type.TypeHandlerRegistry;
 import org.mybatis.spring.annotation.MapperScan;
-import org.mybatis.spring.boot.autoconfigure.ConfigurationCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
