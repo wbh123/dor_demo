@@ -15,39 +15,25 @@ public class OperationsService {
     private final NamedParameterJdbcTemplate jdbc;
     private final RedisConnectionFactory redisConnectionFactory;
     private final AdminAllocationService allocationService;
+    private final OperationsMetricsMapper metricsMapper;
 
     public OperationsService(
             NamedParameterJdbcTemplate jdbc,
             RedisConnectionFactory redisConnectionFactory,
-            AdminAllocationService allocationService) {
+            AdminAllocationService allocationService,
+            OperationsMetricsMapper metricsMapper) {
         this.jdbc = jdbc;
         this.redisConnectionFactory = redisConnectionFactory;
         this.allocationService = allocationService;
+        this.metricsMapper = metricsMapper;
     }
 
     public Map<String, Object> overview() {
         long totalBeds = scalar("SELECT COUNT(*) FROM bed", Map.of());
         long enabledBeds = scalar("SELECT COUNT(*) FROM bed WHERE operational_status='ENABLED'", Map.of());
-        long occupiedBeds = scalar("""
-                SELECT COUNT(*) FROM room_assignment
-                WHERE assignment_status='ACTIVE' AND bed_id IS NOT NULL
-                """, Map.of());
-        long activeResidents = scalar("""
-                SELECT COUNT(*) FROM room_assignment
-                WHERE assignment_status='ACTIVE'
-                """, Map.of());
-        long unselectedStudents = scalar("""
-                SELECT COUNT(*)
-                FROM batch_student_eligibility eligibility
-                JOIN selection_batch batch ON batch.id=eligibility.batch_id
-                WHERE eligibility.eligibility_status='ELIGIBLE'
-                  AND batch.batch_status IN ('PUBLISHED','OPEN','PAUSED','CLOSED')
-                  AND NOT EXISTS (
-                    SELECT 1 FROM room_assignment residency
-                    WHERE residency.student_id=eligibility.student_id
-                      AND residency.assignment_status='ACTIVE'
-                  )
-                """, Map.of());
+        long occupiedBeds = metricsMapper.countOccupiedBeds();
+        long activeResidents = metricsMapper.countActiveResidents();
+        long unselectedStudents = metricsMapper.countUnselectedStudents();
         long manualAdjustments = scalar("""
                 SELECT COUNT(*) FROM room_assignment_history
                 WHERE event_type IN ('BED_CHANGED','ROOM_CHANGED')

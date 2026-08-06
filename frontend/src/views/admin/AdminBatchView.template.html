@@ -125,6 +125,7 @@
     :allocation-batch-id="allocationBatchId"
     :allocation-summary="allocationSummary"
     :unassigned-students="unassignedStudents"
+    :busy="allocationCommitting"
     @close="allocationPreview = null; allocationBatchId = null"
     @commit="commitAllocation"
   />

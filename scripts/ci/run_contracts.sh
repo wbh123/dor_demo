@@ -25,6 +25,7 @@ python3 "$ROOT_DIR/scripts/ci/test_admin_scope_questionnaire_team_ux.py" "$ROOT_
 python3 "$ROOT_DIR/scripts/ci/test_ui_business_closure.py" "$ROOT_DIR"
 python3 "$ROOT_DIR/scripts/ci/test_requested_ui_regressions.py" "$ROOT_DIR"
 python3 "$ROOT_DIR/scripts/ci/test_requested_residency_governance_regressions.py"
+python3 "$ROOT_DIR/scripts/ci/test_admin_runtime_regressions_20260807.py"
 python3 "$ROOT_DIR/scripts/ci/test_modal_component_behavior.py" "$ROOT_DIR"
 python3 "$ROOT_DIR/scripts/ci/test_common_modal_batch_publish.py" "$ROOT_DIR"
 python3 "$ROOT_DIR/scripts/ci/test_ui_layout_restoration.py" "$ROOT_DIR"

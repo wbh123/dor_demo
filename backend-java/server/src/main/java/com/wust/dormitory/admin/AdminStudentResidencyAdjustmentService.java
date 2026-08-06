@@ -9,6 +9,7 @@ import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.sql.Types;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -169,7 +170,7 @@ public class AdminStudentResidencyAdjustmentService {
                 .addValue("gender", student.get("gender"))
                 .addValue("studentCategory", student.get("student_category"))
                 .addValue("currentRoomId", currentRoomId == null ? -1L : currentRoomId)
-                .addValue("currentBedId", currentBedId));
+                .addValue("currentBedId", currentBedId, Types.BIGINT));
     }
 
     private String requiredReason(String reason) {

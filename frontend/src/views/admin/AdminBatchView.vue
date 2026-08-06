@@ -1,5 +1,6 @@
 <script setup lang="ts">
 // @ts-nocheck
+import { ref } from 'vue'
 import BatchAllocationPreviewDialog from '../../features/admin-batch/components/BatchAllocationPreviewDialog.vue'
 import BatchCopyDialog from '../../features/admin-batch/components/BatchCopyDialog.vue'
 import BatchCreationPanel from '../../features/admin-batch/components/BatchCreationPanel.vue'
@@ -80,7 +81,7 @@ const {
   closeCopy,
   copyBatch,
   previewAllocation,
-  commitAllocation,
+  commitAllocation: commitAllocationRequest,
   download,
   nextActions,
   modeText,
@@ -90,6 +91,18 @@ const {
   formatDateTime,
   batchRuleSummary,
 } = useAdminBatchView()
+
+const allocationCommitting = ref(false)
+
+async function commitAllocation() {
+  if (allocationCommitting.value) return
+  allocationCommitting.value = true
+  try {
+    await commitAllocationRequest()
+  } finally {
+    allocationCommitting.value = false
+  }
+}
 </script>
 
 <template src="./AdminBatchView.template.html"></template>
