@@ -49,12 +49,32 @@ jobs:
           path = Path('scripts/ci/apply_admin_runtime_governance_fix.py')
           source = path.read_text(encoding='utf-8')
           start = source.index('# MySQL 8.4')
-          end = source.index('# 原因字段', start)
-          replacement = '''# 当前主线已经使用 occupied 作为在住别名；这里只修复原因字段越界。
+          end = source.index('# 楼栋概况', start)
+          replacement = '''# 当前主线已经使用 occupied 作为在住别名；修复原因字段越界与 JDBC 时间审计序列化。
           replace(
               "backend-java/server/src/main/java/com/wust/dormitory/admin/AdminStudentResidencyAdjustmentService.java",
               '"管理员调整住宿：" + normalizedReason',
               'normalizedReason',
+          )
+          replace(
+              "backend-java/server/src/main/java/com/wust/dormitory/admin/StudentAccountAdminService.java",
+              '"管理员完全重置学生：" + reason.trim()',
+              'reason.trim()',
+          )
+          replace(
+              "backend-java/server/src/main/java/com/wust/dormitory/admin/StudentAccountAdminService.java",
+              '"管理员完全重置学生：" + reason.trim()',
+              'reason.trim()',
+          )
+          replace(
+              "backend-java/server/src/main/java/com/wust/dormitory/residency/ResidencyService.java",
+              'import com.wust.dormitory.common.error.BusinessException;',
+              'import com.wust.dormitory.common.error.BusinessException;\\nimport com.wust.dormitory.common.json.JdbcJsonNormalizer;',
+          )
+          replace(
+              "backend-java/server/src/main/java/com/wust/dormitory/residency/ResidencyService.java",
+              'return objectMapper.writeValueAsString(value);',
+              'return objectMapper.writeValueAsString(JdbcJsonNormalizer.normalize(value));',
           )
 
           '''
