@@ -17,29 +17,20 @@
     @submit="createBatch"
   />
 
-  <section class="panel">
-    <div class="section-head"><div><span class="eyebrow">BATCH LIST</span><h3>批次管理</h3></div></div>
-    <div class="batch-list">
-      <article v-for="batch in batches" :key="String(batch.id)" class="batch-card">
-        <header>
-          <div>
-            <div class="badge-row"><span class="status-chip compact">{{ statusText(batch.batch_status) }}</span><span class="status-chip compact mode">{{ modeText(batch.selection_mode) }}</span><span v-if="batch.separate_student_categories" class="status-chip compact category">国内/国际隔离</span></div>
-            <h3>{{ batch.batch_name }}</h3><p>{{ batch.batch_code }}</p>
-          </div>
-          <div class="batch-counts"><strong>{{ batch.eligible_count ?? 0 }}</strong><span>已选参与学生</span></div>
-        </header>
-        <div class="batch-facts"><span>寝室结果 {{ batch.room_assigned_count ?? 0 }}</span><span>床位结果 {{ batch.bed_assigned_count ?? batch.assigned_count ?? 0 }}</span><span>活动锁定宿舍 {{ batch.locked_room_count ?? 0 }}</span><span v-if="Number(batch.unconfirmed_bed_resident_count ?? 0) > 0" class="warn">{{ batch.unconfirmed_bed_resident_count }}人待确认床位</span></div>
-        <div class="button-row wrap">
-          <button v-if="batch.batch_status === 'DRAFT'" class="button secondary small" :disabled="publishFlowBusy" @click="openScope(batch)">配置参与范围</button>
-          <button class="button ghost small" :disabled="publishFlowBusy" @click="preflight(batch)">宿舍预检</button>
-          <button class="button ghost small" :disabled="publishFlowBusy" @click="openCopy(batch)">复制配置</button>
-          <button v-for="target in nextActions(batch.batch_status)" :key="target" class="button small" :class="target === 'CANCELLED' ? 'danger' : 'primary'" :disabled="publishFlowBusy" @click="changeStatus(batch, target)">{{ actionText(target) }}</button>
-          <button v-if="['CLOSED', 'ALLOCATING'].includes(String(batch.batch_status))" class="button secondary small" @click="previewAllocation(batch)">统一分配预演</button>
-          <button class="button ghost small" @click="download(batch)">导出结果</button>
-        </div>
-      </article>
-    </div>
-  </section>
+  <BatchListPanel
+    :batches="batches"
+    :publish-flow-busy="publishFlowBusy"
+    :next-actions="nextActions"
+    :mode-text="modeText"
+    :status-text="statusText"
+    :action-text="actionText"
+    @open-scope="openScope"
+    @preflight="preflight"
+    @open-copy="openCopy"
+    @change-status="changeStatus"
+    @preview-allocation="previewAllocation"
+    @download="download"
+  />
 
   <BatchScopeDialog
     :open="scopeDialog"
@@ -104,29 +95,19 @@
     @reopen-scope="reopenScopeFromPreflight"
   />
 
-  <AppConfirmDialog
+  <BatchPublishConfirmationDialog
     :open="Boolean(publishConfirmation)"
-    :title="`${publishConfirmation?.batch_name ?? '批次'} 已完成发布准备`"
-    description="发布后学生可以按开放时间参与选择，参与范围、模式和主要规则不能在活动进行中随意修改。"
-    variant="warning"
-    confirm-text="确认发布"
-    cancel-text="暂不发布"
-    :busy="publishing"
+    :publish-confirmation="publishConfirmation"
+    :publish-preflight-snapshot="publishPreflightSnapshot"
+    :selected-student-count="selectedStudentIds.length"
+    :scope-open="scopeDialog"
+    :publishing="publishing"
     :action="confirmPublish"
+    :mode-text="modeText"
+    :format-date-time="formatDateTime"
+    :batch-rule-summary="batchRuleSummary"
     @close="closePublishConfirmation"
-  >
-    <div class="publish-confirmation-facts">
-      <span>参与学生 {{ scopeDialog ? selectedStudentIds.length : (publishConfirmation?.eligible_count ?? 0) }} 人</span>
-      <span>可选宿舍 {{ publishPreflightSnapshot?.roomCount ?? 0 }} 间</span>
-      <span>可用床位/容量 {{ publishPreflightSnapshot?.availableCapacity ?? 0 }}</span>
-      <span>模式 {{ modeText(publishConfirmation?.selection_mode) }}</span>
-    </div>
-    <dl class="publish-detail-list">
-      <div><dt>开放时间</dt><dd>{{ formatDateTime(publishConfirmation?.start_at) }} 至 {{ formatDateTime(publishConfirmation?.end_at) }}</dd></div>
-      <div><dt>主要规则</dt><dd>{{ batchRuleSummary(publishConfirmation ?? {}) }}</dd></div>
-      <div><dt>发布限制</dt><dd>发布后范围将参与活动锁定；需要调整时应先按批次生命周期暂停或结束活动。</dd></div>
-    </dl>
-  </AppConfirmDialog>
+  />
 
   <BatchCopyDialog
     :open="copyDialog"
@@ -138,9 +119,13 @@
     @close="closeCopy"
   />
 
-  <AppModal :open="Boolean(allocationPreview)" title="统一分配预演" description="确认预演结果后再执行正式统一分配。" size="wide" @close="allocationPreview = null; allocationBatchId = null">
-    <div class="allocation-stats"><article><span>学生</span><strong>{{ allocationSummary.studentCount ?? 0 }}</strong></article><article><span>预计成功</span><strong>{{ allocationSummary.assignedCount ?? 0 }}</strong></article><article><span>未分配</span><strong>{{ allocationSummary.unassignedCount ?? 0 }}</strong></article></div>
-    <div v-if="unassignedStudents.length" class="table-wrap"><table><thead><tr><th>学号</th><th>姓名</th><th>原因</th></tr></thead><tbody><tr v-for="student in unassignedStudents" :key="String(student.studentId)"><td>{{ student.studentNumber }}</td><td>{{ student.studentName }}</td><td>{{ student.reason }}</td></tr></tbody></table></div>
-    <template #footer><button class="button ghost" type="button" @click="allocationPreview = null; allocationBatchId = null">关闭</button><button v-if="allocationBatchId" class="button primary" type="button" @click="commitAllocation">确认执行统一分配</button></template>
-  </AppModal>
+  <BatchAllocationPreviewDialog
+    :open="Boolean(allocationPreview)"
+    :allocation-preview="allocationPreview"
+    :allocation-batch-id="allocationBatchId"
+    :allocation-summary="allocationSummary"
+    :unassigned-students="unassignedStudents"
+    @close="allocationPreview = null; allocationBatchId = null"
+    @commit="commitAllocation"
+  />
 </div>
