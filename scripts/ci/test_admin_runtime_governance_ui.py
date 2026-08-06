@@ -44,10 +44,14 @@ require(operations_preview, "<select", "公平性预演批次必须使用下拉�
 require(operations_view, 'v-if="loading"', "运营数据加载期间必须只显示加载状态")
 require(operations_view, "正在加载运营与健康数据", "运营页必须提供明确加载文案")
 
-governance = read("frontend/src/views/admin/AdminGovernanceView.vue")
-forbid(governance, 'v-model="analyticsFilters"', "analyticsFilters 不得通过组件级 v-model 修改 const reactive")
-require(governance, ':model-value="analyticsFilters"', "analyticsFilters 应使用显式 model-value")
-require(governance, '@update:model-value="updateAnalyticsFilters"', "analyticsFilters 应显式合并更新")
+governance_view = read("frontend/src/views/admin/AdminGovernanceView.vue")
+analytics_page = read("frontend/src/features/admin-governance/composables/useHistoricalAnalytics.ts")
+analytics_panel = read("frontend/src/features/admin-governance/components/HistoricalAnalyticsPanel.vue")
+forbid(governance_view, 'v-model="analyticsFilters"', "analyticsFilters 不得通过组件级 v-model 修改 const reactive")
+forbid(analytics_panel, 'v-model="filters"', "历史分析面板不得通过组件级 v-model 修改响应式筛选对象")
+require(analytics_panel, ':model-value="filters"', "历史分析筛选应使用显式 model-value")
+require(analytics_panel, "@update:model-value=\"emit('update:filters', $event)\"", "历史分析筛选应显式向父级发送新值")
+require(analytics_page, "Object.assign(filters, value)", "历史分析组合函数应显式合并筛选更新")
 
 processor = read("backend-java/server/src/main/java/com/wust/dormitory/export/ExportTaskProcessor.java")
 require(processor, "@Scheduled", "异步导出必须存在后台任务处理器")
