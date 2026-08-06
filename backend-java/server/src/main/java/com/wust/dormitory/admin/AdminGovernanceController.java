@@ -17,7 +17,11 @@ import com.wust.dormitory.retention.DataRetentionQueryService;
 import com.wust.dormitory.security.SecurityUsers;
 import com.wust.dormitory.subscription.FeatureAccessService;
 import com.wust.dormitory.subscription.FeatureCodes;
+import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.Resource;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -27,6 +31,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.Map;
 
@@ -93,6 +99,23 @@ public class AdminGovernanceController {
         requireAny(FeatureCodes.P2_AUDIT_EXPORT, FeatureCodes.P3_CUSTOM_REPORT_EXPORT);
         exportTaskService.cancel(taskId, SecurityUsers.requireAdmin());
         return ResponseEntity.ok(ResponseFactory.object(exportTaskService.get(taskId)));
+    }
+
+    @GetMapping("/exports/{taskId}/download")
+    public ResponseEntity<Resource> downloadExport(
+            @PathVariable long taskId,
+            @RequestParam String token) {
+        SecurityUsers.requireAdmin();
+        requireAny(FeatureCodes.P2_AUDIT_EXPORT, FeatureCodes.P3_CUSTOM_REPORT_EXPORT);
+        ExportTaskService.ExportDownload download = exportTaskService.download(taskId, token);
+        String encoded = URLEncoder.encode(download.fileName(), StandardCharsets.UTF_8)
+                .replace("+", "%20");
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType("text/csv;charset=UTF-8"))
+                .contentLength(download.fileSize())
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename*=UTF-8''" + encoded)
+                .body(new FileSystemResource(download.path()));
     }
 
     @GetMapping("/notifications/templates")

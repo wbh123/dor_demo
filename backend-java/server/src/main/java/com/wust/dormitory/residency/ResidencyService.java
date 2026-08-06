@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wust.dormitory.audit.AuditService;
 import com.wust.dormitory.common.error.BusinessException;
+import com.wust.dormitory.common.json.JdbcJsonNormalizer;
 import com.wust.dormitory.security.CurrentUser;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
@@ -478,7 +479,7 @@ public class ResidencyService {
             return null;
         }
         try {
-            return objectMapper.writeValueAsString(value);
+            return objectMapper.writeValueAsString(JdbcJsonNormalizer.normalize(value));
         } catch (JsonProcessingException exception) {
             throw new IllegalStateException("在住历史序列化失败", exception);
         }
