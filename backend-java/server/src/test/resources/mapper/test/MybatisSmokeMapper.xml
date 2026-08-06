@@ -6,4 +6,8 @@
     <select id="selectOne" resultType="java.lang.Integer">
         SELECT 1
     </select>
+
+    <select id="selectMapRow" resultType="map">
+        SELECT 1 AS id, 'QUEUED' AS taskStatus
+    </select>
 </mapper>
