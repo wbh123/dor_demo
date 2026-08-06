@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.wust.dormitory.admin.mapper.BatchCatalogMapper">
+    <resultMap id="BatchCatalogResultMap"
+               type="com.wust.dormitory.admin.model.persistence.BatchCatalogRow">
+        <constructor>
+            <idArg column="id" javaType="java.lang.Long"/>
+            <arg column="batch_code" javaType="java.lang.String"/>
+            <arg column="batch_name" javaType="java.lang.String"/>
+            <arg column="batch_status" javaType="java.lang.String"/>
+            <arg column="selection_mode" javaType="java.lang.String"/>
+            <arg column="separate_student_categories" javaType="java.lang.Boolean"/>
+            <arg column="questionnaire_version_id" javaType="java.lang.Long"/>
+            <arg column="matching_weight_scheme_id" javaType="java.lang.Long"/>
+            <arg column="rule_template_id" javaType="java.lang.Long"/>
+            <arg column="start_at" javaType="java.time.LocalDateTime"/>
+            <arg column="end_at" javaType="java.time.LocalDateTime"/>
+            <arg column="hold_duration_seconds" javaType="java.lang.Integer"/>
+            <arg column="hold_renewal_limit" javaType="java.lang.Integer"/>
+            <arg column="allow_team" javaType="java.lang.Boolean"/>
+            <arg column="team_min_size" javaType="java.lang.Integer"/>
+            <arg column="team_max_size" javaType="java.lang.Integer"/>
+            <arg column="allow_student_random" javaType="java.lang.Boolean"/>
+            <arg column="unselected_strategy" javaType="java.lang.String"/>
+            <arg column="rule_version" javaType="java.lang.String"/>
+            <arg column="created_by" javaType="java.lang.Long"/>
+            <arg column="published_at" javaType="java.time.LocalDateTime"/>
+            <arg column="finished_at" javaType="java.time.LocalDateTime"/>
+            <arg column="version" javaType="java.lang.Integer"/>
+            <arg column="created_at" javaType="java.time.LocalDateTime"/>
+            <arg column="updated_at" javaType="java.time.LocalDateTime"/>
+            <arg column="eligible_count" javaType="java.lang.Long"/>
+            <arg column="assigned_count" javaType="java.lang.Long"/>
+            <arg column="bed_assigned_count" javaType="java.lang.Long"/>
+            <arg column="room_assigned_count" javaType="java.lang.Long"/>
+            <arg column="locked_room_count" javaType="java.lang.Long"/>
+            <arg column="unconfirmed_bed_resident_count" javaType="java.lang.Long"/>
+        </constructor>
+    </resultMap>
+
+    <select id="findBatches" resultMap="BatchCatalogResultMap">
+        SELECT sb.id,
+               sb.batch_code,
+               sb.batch_name,
+               sb.batch_status,
+               sb.selection_mode,
+               sb.separate_student_categories,
+               sb.questionnaire_version_id,
+               sb.matching_weight_scheme_id,
+               sb.rule_template_id,
+               sb.start_at,
+               sb.end_at,
+               sb.hold_duration_seconds,
+               sb.hold_renewal_limit,
+               sb.allow_team,
+               sb.team_min_size,
+               sb.team_max_size,
+               sb.allow_student_random,
+               sb.unselected_strategy,
+               sb.rule_version,
+               sb.created_by,
+               sb.published_at,
+               sb.finished_at,
+               sb.version,
+               sb.created_at,
+               sb.updated_at,
+               COALESCE(eligibility.eligible_count, 0) AS eligible_count,
+               COALESCE(bed_results.bed_assigned_count, 0) AS assigned_count,
+               COALESCE(bed_results.bed_assigned_count, 0) AS bed_assigned_count,
+               COALESCE(room_results.room_assigned_count, 0) AS room_assigned_count,
+               COALESCE(room_locks.locked_room_count, 0) AS locked_room_count,
+               COALESCE(room_results.unconfirmed_bed_resident_count, 0)
+                   AS unconfirmed_bed_resident_count
+        FROM selection_batch sb
+        LEFT JOIN (
+            SELECT batch_id,
+                   COUNT(*) AS eligible_count
+            FROM batch_student_eligibility
+            WHERE eligibility_status = 'ELIGIBLE'
+            GROUP BY batch_id
+        ) eligibility ON eligibility.batch_id = sb.id
+        LEFT JOIN (
+            SELECT batch_id,
+                   COUNT(*) AS bed_assigned_count
+            FROM bed_assignment
+            GROUP BY batch_id
+        ) bed_results ON bed_results.batch_id = sb.id
+        LEFT JOIN (
+            SELECT batch_id,
+                   COUNT(*) AS room_assigned_count,
+                   SUM(CASE
+                       WHEN assignment_status = 'ACTIVE' AND bed_id IS NULL THEN 1
+                       ELSE 0
+                   END) AS unconfirmed_bed_resident_count
+            FROM room_assignment
+            WHERE batch_id IS NOT NULL
+            GROUP BY batch_id
+        ) room_results ON room_results.batch_id = sb.id
+        LEFT JOIN (
+            SELECT batch_id,
+                   COUNT(*) AS locked_room_count
+            FROM active_batch_room_lock
+            GROUP BY batch_id
+        ) room_locks ON room_locks.batch_id = sb.id
+        ORDER BY sb.created_at DESC, sb.id DESC
+    </select>
+</mapper>
