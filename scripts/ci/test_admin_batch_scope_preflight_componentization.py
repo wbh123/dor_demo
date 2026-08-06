@@ -31,8 +31,8 @@ for token in ("BatchScopeDialog", "BatchPreflightDialog"):
     require(view, token, f"选寝批次页面必须导入组件：{token}")
     require(template, token, f"选寝批次模板必须使用组件：{token}")
 
-forbid(template, ':open="scopeDialog"', "参与范围弹窗不得继续内联在大型模板中")
-forbid(template, ':open="Boolean(preflightBatch && roomPreflight)"', "发布预检弹窗不得继续内联在大型模板中")
+forbid(template, '<AppModal\n    :open="scopeDialog"', "参与范围弹窗不得继续内联在大型模板中")
+forbid(template, '<AppModal\n    :open="Boolean(preflightBatch && roomPreflight)"', "发布预检弹窗不得继续内联在大型模板中")
 
 forbid(scope, "api/client", "参与范围展示组件不得直接调用接口")
 forbid(preflight, "api/client", "发布预检展示组件不得直接调用接口")
