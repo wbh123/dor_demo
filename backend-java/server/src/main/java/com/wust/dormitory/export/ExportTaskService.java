@@ -96,9 +96,9 @@ public class ExportTaskService {
 
     @Transactional
     public Optional<Map<String, Object>> claimNext() {
-        Map<String, Object> queued = mapper.findNextQueued();
-        if (queued == null || queued.isEmpty()) return Optional.empty();
-        long taskId = ((Number) queued.get("id")).longValue();
+        ExportTaskQueueRow queued = mapper.findNextQueued();
+        if (queued == null) return Optional.empty();
+        long taskId = queued.id();
         if (mapper.claim(taskId) != 1) return Optional.empty();
         return Optional.of(get(taskId));
     }
