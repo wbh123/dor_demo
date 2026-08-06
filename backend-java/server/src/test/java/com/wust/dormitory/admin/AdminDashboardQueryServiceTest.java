@@ -3,6 +3,7 @@ package com.wust.dormitory.admin;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wust.dormitory.admin.mapper.AdminCatalogMapper;
 import com.wust.dormitory.admin.mapper.AdminDashboardMapper;
+import com.wust.dormitory.admin.mapper.BatchCatalogMapper;
 import com.wust.dormitory.admin.mapper.StudentAdminMapper;
 import com.wust.dormitory.admin.model.persistence.AdminDashboardStatsRow;
 import com.wust.dormitory.audit.AuditService;
@@ -25,6 +26,7 @@ class AdminDashboardQueryServiceTest {
         AdminCatalogMapper adminCatalogMapper = mock(AdminCatalogMapper.class);
         StudentAdminMapper studentAdminMapper = mock(StudentAdminMapper.class);
         AdminDashboardMapper dashboardMapper = mock(AdminDashboardMapper.class);
+        BatchCatalogMapper batchCatalogMapper = mock(BatchCatalogMapper.class);
         when(dashboardMapper.findStats()).thenReturn(new AdminDashboardStatsRow(
                 6L,
                 500L,
@@ -41,7 +43,8 @@ class AdminDashboardQueryServiceTest {
                 auditService,
                 adminCatalogMapper,
                 studentAdminMapper,
-                dashboardMapper);
+                dashboardMapper,
+                batchCatalogMapper);
         Map<String, Object> result = service.dashboard();
 
         verify(dashboardMapper).findStats();

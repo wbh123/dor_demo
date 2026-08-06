@@ -4,8 +4,10 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wust.dormitory.admin.mapper.AdminCatalogMapper;
 import com.wust.dormitory.admin.mapper.AdminDashboardMapper;
+import com.wust.dormitory.admin.mapper.BatchCatalogMapper;
 import com.wust.dormitory.admin.mapper.StudentAdminMapper;
 import com.wust.dormitory.admin.model.persistence.AdminDashboardStatsRow;
+import com.wust.dormitory.admin.model.persistence.BatchCatalogRow;
 import com.wust.dormitory.admin.model.persistence.BuildingCatalogRow;
 import com.wust.dormitory.admin.model.persistence.MajorCatalogRow;
 import com.wust.dormitory.admin.model.persistence.StudentCatalogRow;
@@ -47,6 +49,7 @@ public class AdminService {
     private final AdminCatalogMapper adminCatalogMapper;
     private final StudentAdminMapper studentAdminMapper;
     private final AdminDashboardMapper adminDashboardMapper;
+    private final BatchCatalogMapper batchCatalogMapper;
 
     public AdminService(
             NamedParameterJdbcTemplate jdbc,
@@ -54,13 +57,15 @@ public class AdminService {
             AuditService auditService,
             AdminCatalogMapper adminCatalogMapper,
             StudentAdminMapper studentAdminMapper,
-            AdminDashboardMapper adminDashboardMapper) {
+            AdminDashboardMapper adminDashboardMapper,
+            BatchCatalogMapper batchCatalogMapper) {
         this.jdbc = jdbc;
         this.objectMapper = objectMapper;
         this.auditService = auditService;
         this.adminCatalogMapper = adminCatalogMapper;
         this.studentAdminMapper = studentAdminMapper;
         this.adminDashboardMapper = adminDashboardMapper;
+        this.batchCatalogMapper = batchCatalogMapper;
     }
 
     public Map<String, Object> dashboard() {
@@ -212,12 +217,9 @@ public class AdminService {
     }
 
     public List<Map<String, Object>> batches() {
-        return jdbc.queryForList("""
-                SELECT sb.*,
-                       (SELECT COUNT(*) FROM batch_student_eligibility e WHERE e.batch_id=sb.id AND e.eligibility_status='ELIGIBLE') AS eligible_count,
-                       (SELECT COUNT(*) FROM bed_assignment a WHERE a.batch_id=sb.id) AS assigned_count
-                FROM selection_batch sb ORDER BY sb.created_at DESC
-                """, Map.of());
+        return batchCatalogMapper.findBatches().stream()
+                .map(BatchCatalogRow::asResponseMap)
+                .toList();
     }
 
     @Transactional
