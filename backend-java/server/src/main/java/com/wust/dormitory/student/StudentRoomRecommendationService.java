@@ -45,7 +45,7 @@ public class StudentRoomRecommendationService {
     private final BatchRecommendationPolicyService recommendationPolicyService;
     private final SecureRandom secureRandom;
 
-    public StudentRoomRecommendationService(
+    @org.springframework.beans.factory.annotation.Autowired public StudentRoomRecommendationService(
             StudentRoomRecommendationMapper mapper,
             MatchingService matchingService,
             ResidencyPolicyService policy,
