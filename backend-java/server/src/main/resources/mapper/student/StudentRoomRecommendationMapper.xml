@@ -119,15 +119,11 @@
                    COUNT(*) AS active_resident_count,
                    SUM(CASE WHEN assignment.bed_id IS NULL THEN 1 ELSE 0 END)
                        AS unknown_bed_resident_count
-            FROM room_assignment assignment
-            WHERE assignment.assignment_status = 'ACTIVE'
+            FROM scoped_rooms scoped
+            JOIN room_assignment assignment
+              ON assignment.room_id = scoped.room_id
+             AND assignment.assignment_status = 'ACTIVE'
             GROUP BY assignment.room_id
-        ),
-        occupied_beds AS (
-            SELECT DISTINCT assignment.bed_id
-            FROM room_assignment assignment
-            WHERE assignment.assignment_status = 'ACTIVE'
-              AND assignment.bed_id IS NOT NULL
         ),
         available_beds AS (
             SELECT bed.room_id,
@@ -136,9 +132,11 @@
             JOIN bed
               ON bed.id = scoped.bed_id
              AND bed.operational_status = 'ENABLED'
-            LEFT JOIN occupied_beds occupied
-              ON occupied.bed_id = bed.id
-            WHERE occupied.bed_id IS NULL
+            LEFT JOIN room_assignment occupied
+              ON occupied.room_id = bed.room_id
+             AND occupied.assignment_status = 'ACTIVE'
+             AND occupied.bed_id = bed.id
+            WHERE occupied.id IS NULL
             GROUP BY bed.room_id
         )
         SELECT room.id,
@@ -218,12 +216,6 @@
             JOIN bed
               ON bed.room_id = room.id
             WHERE scope.batch_id = #{batchId}
-        ),
-        occupied_beds AS (
-            SELECT DISTINCT assignment.bed_id
-            FROM room_assignment assignment
-            WHERE assignment.assignment_status = 'ACTIVE'
-              AND assignment.bed_id IS NOT NULL
         )
         SELECT bed.room_id,
                bed.bed_type,
@@ -232,9 +224,11 @@
         JOIN bed
           ON bed.id = scoped.bed_id
          AND bed.operational_status = 'ENABLED'
-        LEFT JOIN occupied_beds occupied
-          ON occupied.bed_id = bed.id
-        WHERE occupied.bed_id IS NULL
+        LEFT JOIN room_assignment occupied
+          ON occupied.room_id = bed.room_id
+         AND occupied.assignment_status = 'ACTIVE'
+         AND occupied.bed_id = bed.id
+        WHERE occupied.id IS NULL
           AND bed.room_id IN
           <foreach collection="roomIds" item="roomId" open="(" separator="," close=")">
               #{roomId}
@@ -263,12 +257,6 @@
             JOIN bed
               ON bed.room_id = room.id
             WHERE scope.batch_id = #{batchId}
-        ),
-        occupied_beds AS (
-            SELECT DISTINCT assignment.bed_id
-            FROM room_assignment assignment
-            WHERE assignment.assignment_status = 'ACTIVE'
-              AND assignment.bed_id IS NOT NULL
         )
         SELECT bed.id,
                bed.bed_code,
@@ -279,9 +267,11 @@
           ON bed.id = scoped.bed_id
          AND bed.room_id = #{roomId}
          AND bed.operational_status = 'ENABLED'
-        LEFT JOIN occupied_beds occupied
-          ON occupied.bed_id = bed.id
-        WHERE occupied.bed_id IS NULL
+        LEFT JOIN room_assignment occupied
+          ON occupied.room_id = bed.room_id
+         AND occupied.assignment_status = 'ACTIVE'
+         AND occupied.bed_id = bed.id
+        WHERE occupied.id IS NULL
         ORDER BY bed.position_index, bed.id
     </select>
 </mapper>
