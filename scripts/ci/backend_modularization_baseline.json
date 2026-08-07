@@ -1,0 +1,6 @@
+{
+  "java_line_limit": 300,
+  "controller_operation_limit": 12,
+  "large_java_files": {},
+  "large_controllers": {}
+}
