@@ -23,12 +23,10 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-
 @Service
 public class NotificationDispatchService {
     private static final int DEFAULT_MAX_NOTIFICATION_RECIPIENTS = 1000;
     private static final int CHUNK_SIZE = 200;
-
     private final NamedParameterJdbcTemplate jdbc;
     private final FeatureAccessService featureAccessService;
     private final SubscriptionService subscriptionService;
