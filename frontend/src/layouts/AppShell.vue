@@ -19,7 +19,8 @@ const icpRecord = String(import.meta.env.VITE_ICP_RECORD || '')
 const showOperatorInfo = String(import.meta.env.VITE_SHOW_OPERATOR_INFO || 'false').toLowerCase() === 'true' && Boolean(operatorName.trim())
 const showIcpRecord = String(import.meta.env.VITE_SHOW_ICP_RECORD || 'false').toLowerCase() === 'true' && Boolean(icpRecord.trim())
 const publicBase = String(import.meta.env.BASE_URL || '/').replace(/\/?$/, '/')
-const logoOnly = `${publicBase}assert/logo-only.png`
+const logoOnly = `${publicBase}assets/logo-only.png`
+const legacyLogoOnly = `${publicBase}assert/logo-only.png`
 const { locale, localeOptions, t, subtitle, setLocale, applyNationalityLocale, welcomeMessage, translateError } = useI18n()
 const { hasFeature } = useFeatureAccess()
 
@@ -92,6 +93,13 @@ function changeLocale(event: Event) {
   setLocale((event.target as HTMLSelectElement).value as LocaleCode)
 }
 
+function fallbackLogo(event: Event) {
+  const image = event.target as HTMLImageElement
+  if (image.dataset.fallbackApplied === 'true') return
+  image.dataset.fallbackApplied = 'true'
+  image.src = legacyLogoOnly
+}
+
 async function acknowledgeWelcome() {
   welcomeError.value = ''
   try { await auth.acknowledgeWelcome() }
@@ -108,7 +116,7 @@ async function logout() {
   <div class="app-shell fixed-navigation-shell">
     <aside class="sidebar fixed-sidebar">
       <div class="brand school-brand logo-safe-layer">
-        <img class="school-brand-logo logo-safe-layer" :src="logoOnly" :alt="`${institutionName}校徽`" />
+        <img class="school-brand-logo logo-safe-layer" :src="logoOnly" :alt="`${institutionName}校徽`" @error="fallbackLogo" />
         <div class="school-brand-title">
           <strong>{{ productName }}</strong>
           <small>{{ productSubtitle }}</small>
@@ -148,7 +156,7 @@ async function logout() {
         <div class="welcome-modal-heading">
           <span class="eyebrow">{{ subtitle('欢迎来到校园', 'WELCOME TO CAMPUS') }}</span>
           <div class="welcome-modal-heading-row">
-            <img class="welcome-school-logo logo-safe-layer" :src="logoOnly" :alt="`${institutionName}校徽`" />
+            <img class="welcome-school-logo logo-safe-layer" :src="logoOnly" :alt="`${institutionName}校徽`" @error="fallbackLogo" />
             <h2>{{ t('welcome.title') }}</h2>
           </div>
         </div>
