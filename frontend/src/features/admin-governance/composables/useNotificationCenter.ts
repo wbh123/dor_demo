@@ -3,6 +3,7 @@ import { api } from '../../../api/client'
 import type { DataObject, ListSuccessResponse, ObjectSuccessResponse } from '../../../api/types'
 
 export interface NotificationTemplateDraft {
+  templateId?: number
   templateCode: string
   templateName: string
   titleZhCn: string
@@ -15,12 +16,12 @@ export interface NotificationTemplateDraft {
 
 export interface NotificationRecipientCriteria {
   studentIds: number[]
-  batchId: string
-  majorId: string
-  gradeYear: string
-  degreeLevel: string
-  studentCategory: string
-  buildingId: string
+  batchIds: number[]
+  majorIds: number[]
+  buildingIds: number[]
+  gradeYears: number[]
+  degreeLevels: string[]
+  studentCategories: string[]
   unselectedOnly: boolean
   pendingReviewOnly: boolean
 }
@@ -38,8 +39,8 @@ export function useNotificationCenter(capabilities: NotificationCapabilities) {
   })
   const templates = ref<DataObject[]>([])
   const recipientCriteria = reactive<NotificationRecipientCriteria>({
-    studentIds: [], batchId: '', majorId: '', gradeYear: '', degreeLevel: '',
-    studentCategory: '', buildingId: '', unselectedOnly: false, pendingReviewOnly: false,
+    studentIds: [], batchIds: [], majorIds: [], buildingIds: [], gradeYears: [],
+    degreeLevels: [], studentCategories: [], unselectedOnly: false, pendingReviewOnly: false,
   })
   const selectedTemplateRevisionId = ref('')
   const recipientCount = ref<number | undefined>()
@@ -82,8 +83,13 @@ export function useNotificationCenter(capabilities: NotificationCapabilities) {
     if (!capabilities.canTemplateManage()) return
     message.value = ''
     await execute(async () => {
-      await api.post('/api/v1/admin/governance/notifications/templates/revisions', templateDraft)
-      message.value = '通知模板修订已保存，旧修订保持不变。'
+      const response = await api.post<ObjectSuccessResponse>('/api/v1/admin/governance/notifications/templates/revisions', templateDraft)
+      const saved = (response.data.data ?? {}) as DataObject
+      templateDraft.templateId = Number(saved.templateId ?? templateDraft.templateId ?? 0) || undefined
+      templateDraft.templateCode = String(saved.templateCode ?? templateDraft.templateCode ?? '')
+      selectedTemplateRevisionId.value = String(saved.revisionId ?? selectedTemplateRevisionId.value)
+      templateDraft.creationReason = ''
+      message.value = '当前通知内容已保存为模板新修订，旧修订保持不变。'
       await loadTemplates()
     })
   }
@@ -93,15 +99,19 @@ export function useNotificationCenter(capabilities: NotificationCapabilities) {
     message.value = ''
     await execute(async () => {
       const response = await api.post<ObjectSuccessResponse>(
-        '/api/v1/admin/governance/notifications/preflight',
-        {
-          criteria: criteriaPayload(),
-          templateRevisionId: Number(selectedTemplateRevisionId.value),
-          variables: {},
-        },
+        '/api/v1/admin/governance/notifications/recipients/count',
+        { criteria: criteriaPayload() },
       )
-      preview.value = (response.data.data ?? {}) as DataObject
-      recipientCount.value = Number(preview.value.recipientCount ?? 0)
+      const data = (response.data.data ?? {}) as DataObject
+      recipientCount.value = Number(data.recipientCount ?? 0)
+      preview.value = {
+        recipientCount: recipientCount.value,
+        titleZhCn: templateDraft.titleZhCn,
+        contentZhCn: templateDraft.contentZhCn,
+        titleEnUs: templateDraft.titleEnUs,
+        contentEnUs: templateDraft.contentEnUs,
+        direct: !scheduledAt.value,
+      }
     })
   }
 
@@ -109,19 +119,34 @@ export function useNotificationCenter(capabilities: NotificationCapabilities) {
     message.value = ''
     let succeeded = false
     await execute(async () => {
-      await api.post('/api/v1/admin/governance/notifications/schedule', {
-        criteria: criteriaPayload(),
-        templateRevisionId: Number(selectedTemplateRevisionId.value),
-        variables: {},
-        scheduledAt: toIso(scheduledAt.value),
-        zoneId: 'Asia/Shanghai',
-        reason: payload.reason,
-      })
-      message.value = scheduledAt.value ? '定时站内通知已创建。' : '站内通知已进入发送任务。'
+      if (scheduledAt.value) {
+        if (!selectedTemplateRevisionId.value) {
+          throw new Error('定时发送需要先将当前内容保存为模板，或选择已有模板修订。')
+        }
+        await api.post('/api/v1/admin/governance/notifications/schedule', {
+          criteria: criteriaPayload(),
+          templateRevisionId: Number(selectedTemplateRevisionId.value),
+          variables: {},
+          scheduledAt: toIso(scheduledAt.value),
+          zoneId: 'Asia/Shanghai',
+          reason: payload.reason,
+        })
+        message.value = '定时站内通知已创建。'
+        await loadStatus()
+      } else {
+        await api.post('/api/v1/admin/governance/notifications/direct', {
+          criteria: criteriaPayload(),
+          titleZhCn: templateDraft.titleZhCn,
+          contentZhCn: templateDraft.contentZhCn,
+          titleEnUs: templateDraft.titleEnUs,
+          contentEnUs: templateDraft.contentEnUs,
+          reason: payload.reason,
+        })
+        message.value = '当前编辑内容已直接发送为站内通知。'
+      }
       succeeded = true
-      await loadStatus()
     })
-    if (!succeeded) throw new Error(error.value || '通知任务创建失败')
+    if (!succeeded) throw new Error(error.value || '通知发送失败')
   }
 
   async function cancelTask(taskId: number) {
@@ -135,21 +160,24 @@ export function useNotificationCenter(capabilities: NotificationCapabilities) {
 
   function updateTemplateDraft(value: NotificationTemplateDraft) {
     Object.assign(templateDraft, value)
+    preview.value = null
   }
 
   function updateRecipientCriteria(value: NotificationRecipientCriteria) {
     Object.assign(recipientCriteria, value)
+    recipientCount.value = undefined
+    preview.value = null
   }
 
   function criteriaPayload() {
     return {
       studentIds: recipientCriteria.studentIds,
-      batchId: numberOrNull(recipientCriteria.batchId),
-      majorId: numberOrNull(recipientCriteria.majorId),
-      gradeYear: numberOrNull(recipientCriteria.gradeYear),
-      degreeLevel: recipientCriteria.degreeLevel,
-      studentCategory: recipientCriteria.studentCategory,
-      buildingId: numberOrNull(recipientCriteria.buildingId),
+      batchIds: recipientCriteria.batchIds,
+      majorIds: recipientCriteria.majorIds,
+      buildingIds: recipientCriteria.buildingIds,
+      gradeYears: recipientCriteria.gradeYears,
+      degreeLevels: recipientCriteria.degreeLevels,
+      studentCategories: recipientCriteria.studentCategories,
       unselectedOnly: recipientCriteria.unselectedOnly,
       pendingReviewOnly: recipientCriteria.pendingReviewOnly,
     }
@@ -176,11 +204,6 @@ export function useNotificationCenter(capabilities: NotificationCapabilities) {
     updateTemplateDraft,
     updateRecipientCriteria,
   }
-}
-
-function numberOrNull(value: string) {
-  const parsed = Number(value)
-  return value.trim() && Number.isFinite(parsed) ? parsed : null
 }
 
 function toIso(value: string) {
