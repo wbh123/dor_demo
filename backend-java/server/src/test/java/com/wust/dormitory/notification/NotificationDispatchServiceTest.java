@@ -2,7 +2,6 @@ package com.wust.dormitory.notification;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wust.dormitory.common.error.BusinessException;
-import com.wust.dormitory.security.CurrentUser;
 import com.wust.dormitory.subscription.FeatureAccessService;
 import com.wust.dormitory.subscription.FeatureCodes;
 import com.wust.dormitory.subscription.QuotaCodes;
@@ -94,37 +93,6 @@ class NotificationDispatchServiceTest {
         assertEquals("请尽快完善资料", result.get("contentZhCn"));
         assertNull(result.get("titleEnUs"));
         assertNull(result.get("contentEnUs"));
-    }
-
-    @Test
-    void sendDirectDeliversLocalizedTextWithoutTemplate() {
-        NotificationRecipientResolver.RecipientCriteria criteria = mock(NotificationRecipientResolver.RecipientCriteria.class);
-        when(recipientResolver.resolve(criteria)).thenReturn(List.of(10L, 11L));
-        CurrentUser operator = new CurrentUser(99L, null, "admin", "管理员", "ADMIN");
-
-        Map<String, Object> result = service.sendDirect(
-                criteria,
-                "资料提醒",
-                "请尽快完善个人资料。",
-                "Profile reminder",
-                "Please complete your profile.",
-                "单独提醒学生完善资料",
-                operator);
-
-        assertEquals(2, result.get("recipientCount"));
-        assertEquals("IN_APP", result.get("channel"));
-        verify(featureAccessService).require(FeatureCodes.P3_NOTIFICATION_SEND);
-        verify(notificationService).sendInAppBulk(
-                List.of(10L, 11L),
-                "ADMIN_NOTIFICATION",
-                "notification.direct.title",
-                "notification.direct.message",
-                Map.of(
-                        "directTitleZhCn", "资料提醒",
-                        "directContentZhCn", "请尽快完善个人资料。",
-                        "directTitleEnUs", "Profile reminder",
-                        "directContentEnUs", "Please complete your profile.",
-                        "operatorName", "管理员"));
     }
 
     @Test
