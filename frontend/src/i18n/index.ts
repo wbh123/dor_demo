@@ -36,7 +36,22 @@ function interpolate(template: string, params: Record<string, unknown> = {}) {
   return template.replace(/\{(\w+)\}/g, (_, key: string) => String(params[key] ?? ''))
 }
 
+function directNotificationText(
+  key: string,
+  params: Record<string, unknown>,
+): string | null {
+  if (key !== 'notification.direct.title' && key !== 'notification.direct.message') return null
+  const title = key === 'notification.direct.title'
+  const zhKey = title ? 'directTitleZhCn' : 'directContentZhCn'
+  const enKey = title ? 'directTitleEnUs' : 'directContentEnUs'
+  const zh = String(params[zhKey] ?? '').trim()
+  const en = String(params[enKey] ?? '').trim()
+  return locale.value === 'en-US' ? (en || zh) : (zh || en)
+}
+
 function t(key: string, params: Record<string, unknown> = {}) {
+  const directText = directNotificationText(key, params)
+  if (directText !== null) return directText
   const template = messages[locale.value][key] ?? messages['zh-CN'][key] ?? key
   return interpolate(template, params)
 }
