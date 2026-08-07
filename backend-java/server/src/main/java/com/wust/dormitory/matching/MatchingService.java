@@ -31,14 +31,12 @@ public class MatchingService {
             Map.entry("strongFoodOdorAcceptance", 0.7),
             Map.entry("studyFrequency", 0.8),
             Map.entry("gamingVoiceFrequency", 1.1),
-            Map.entry("socialActivity", 0.6)
-    );
+            Map.entry("socialActivity", 0.6));
     private static final Map<String, Double> FALLBACK_RULES = Map.of(
             "smokingConflictPenalty", 25.0,
             "sleepTimeWarningMinutes", 60.0,
             "cleaningWarningDifference", 1.0,
-            "gamingVoiceWarningDifference", 1.0
-    );
+            "gamingVoiceWarningDifference", 1.0);
 
     private final ObjectMapper objectMapper;
     private final MatchingSchemeService schemeService;
@@ -48,30 +46,31 @@ public class MatchingService {
         this.schemeService = schemeService;
     }
 
+    public MatchingSchemeService.Policy policyForBatch(long batchId) {
+        return schemeService.policyForBatch(batchId);
+    }
+
+    public MatchResult roomScore(long batchId, String studentFeatureJson, List<String> roommateFeatureJson) {
+        return roomScore(policyForBatch(batchId), studentFeatureJson, roommateFeatureJson);
+    }
+
     public MatchResult roomScore(
-            long batchId,
+            MatchingSchemeService.Policy policy,
             String studentFeatureJson,
             List<String> roommateFeatureJson) {
-        MatchingSchemeService.Policy policy = schemeService.policyForBatch(batchId);
-        return calculate(
-                studentFeatureJson,
-                roommateFeatureJson,
-                policy.weights(),
-                policy.conflictRules());
+        return calculate(studentFeatureJson, roommateFeatureJson, policy.weights(), policy.conflictRules());
     }
 
     public MatchResult roomScore(String studentFeatureJson, List<String> roommateFeatureJson) {
-        return calculate(
-                studentFeatureJson,
-                roommateFeatureJson,
-                FALLBACK_WEIGHTS,
-                FALLBACK_RULES);
+        return calculate(studentFeatureJson, roommateFeatureJson, FALLBACK_WEIGHTS, FALLBACK_RULES);
     }
 
     public Map<String, Object> normalizeAnswers(Map<String, Object> answers) {
-        Map<String, Object> normalized = new LinkedHashMap<>();
-        normalized.putAll(answers);
-        for (String key : List.of("airConditionerTemperature", "summerAirConditionerTemperature", "winterHeatingTemperature")) {
+        Map<String, Object> normalized = new LinkedHashMap<>(answers);
+        for (String key : List.of(
+                "airConditionerTemperature",
+                "summerAirConditionerTemperature",
+                "winterHeatingTemperature")) {
             Object value = normalized.get(key);
             if (value == null) continue;
             Double temperature = number(value);
@@ -94,7 +93,6 @@ public class MatchingService {
         if (roommateFeatureJson.isEmpty()) {
             return result(100.0, List.of("当前为空房间，可优先选择床位"), List.of(), 0);
         }
-
         Map<String, Object> student = parse(studentFeatureJson);
         List<Map<String, Object>> roommates = roommateFeatureJson.stream()
                 .map(this::parse)
@@ -112,106 +110,42 @@ public class MatchingService {
             dimensionCount = Math.max(dimensionCount, pair.dimensionCount());
         }
         double score = Math.round(total / roommates.size() * 10.0) / 10.0;
-
-        Set<String> recommendationReasons = new LinkedHashSet<>();
-        Set<String> conflictReasons = new LinkedHashSet<>();
-        compareTag(
-                student,
-                roommates,
-                "sleepTimeMinutes",
-                rule(rules, "sleepTimeWarningMinutes", 60),
-                "入睡时间接近",
-                "入睡时间差异较大",
-                recommendationReasons,
-                conflictReasons);
-        compareTag(
-                student,
-                roommates,
-                "cleaningFrequency",
-                rule(rules, "cleaningWarningDifference", 1),
-                "卫生习惯接近",
-                "卫生频率存在差异",
-                recommendationReasons,
-                conflictReasons);
-        compareTag(
-                student,
-                roommates,
-                "gamingVoiceFrequency",
-                rule(rules, "gamingVoiceWarningDifference", 1),
-                "娱乐语音习惯接近",
-                "游戏或语音频率存在差异",
-                recommendationReasons,
-                conflictReasons);
-        compareTag(
-                student,
-                roommates,
-                "summerAirConditionerTemperature",
-                2,
-                "夏季空调温度偏好接近",
-                "空调使用偏好存在差异",
-                recommendationReasons,
-                conflictReasons);
-        compareTag(
-                student,
-                roommates,
-                "summerOvernightAirConditioner",
-                1,
-                "夏季夜间空调习惯接近",
-                "空调使用偏好存在差异",
-                recommendationReasons,
-                conflictReasons);
-        compareTag(
-                student,
-                roommates,
-                "winterHeatingAcceptance",
-                1,
-                "冬季制热接受度接近",
-                "空调使用偏好存在差异",
-                recommendationReasons,
-                conflictReasons);
-        compareTag(
-                student,
-                roommates,
-                "afterLightsActivity",
-                1,
-                "熄灯后活动习惯接近",
-                "熄灯后活动习惯存在差异",
-                recommendationReasons,
-                conflictReasons);
-        compareTag(
-                student,
-                roommates,
-                "alarmSnooze",
-                1,
-                "闹钟习惯接近",
-                "闹钟响铃习惯存在差异",
-                recommendationReasons,
-                conflictReasons);
-        compareTag(
-                student,
-                roommates,
-                "strongFoodOdorAcceptance",
-                1,
-                "宿舍饮食气味接受度接近",
-                "宿舍饮食气味接受度存在差异",
-                recommendationReasons,
-                conflictReasons);
-        compareTag(student, roommates, "wakeTimeMinutes", 60, "起床时间接近", "起床时间差异较大", recommendationReasons, conflictReasons);
-        compareTag(student, roommates, "noiseTolerance", 1, "噪声接受度接近", "噪声接受度存在差异", recommendationReasons, conflictReasons);
-        compareTag(student, roommates, "tidinessRequirement", 1, "整洁要求接近", "整洁要求存在差异", recommendationReasons, conflictReasons);
-        compareTag(student, roommates, "studyFrequency", 1, "学习频率接近", "学习频率存在差异", recommendationReasons, conflictReasons);
-        compareTag(student, roommates, "socialActivity", 1, "社交活跃度接近", "社交活跃度存在差异", recommendationReasons, conflictReasons);
+        Set<String> positives = new LinkedHashSet<>();
+        Set<String> warnings = new LinkedHashSet<>();
+        compareTag(student, roommates, "sleepTimeMinutes", rule(rules, "sleepTimeWarningMinutes", 60),
+                "入睡时间接近", "入睡时间差异较大", positives, warnings);
+        compareTag(student, roommates, "cleaningFrequency", rule(rules, "cleaningWarningDifference", 1),
+                "卫生习惯接近", "卫生频率存在差异", positives, warnings);
+        compareTag(student, roommates, "gamingVoiceFrequency", rule(rules, "gamingVoiceWarningDifference", 1),
+                "娱乐语音习惯接近", "游戏或语音频率存在差异", positives, warnings);
+        compareTag(student, roommates, "summerAirConditionerTemperature", 2,
+                "夏季空调温度偏好接近", "空调使用偏好存在差异", positives, warnings);
+        compareTag(student, roommates, "summerOvernightAirConditioner", 1,
+                "夏季夜间空调习惯接近", "空调使用偏好存在差异", positives, warnings);
+        compareTag(student, roommates, "winterHeatingAcceptance", 1,
+                "冬季制热接受度接近", "空调使用偏好存在差异", positives, warnings);
+        compareTag(student, roommates, "afterLightsActivity", 1,
+                "熄灯后活动习惯接近", "熄灯后活动习惯存在差异", positives, warnings);
+        compareTag(student, roommates, "alarmSnooze", 1,
+                "闹钟习惯接近", "闹钟响铃习惯存在差异", positives, warnings);
+        compareTag(student, roommates, "strongFoodOdorAcceptance", 1,
+                "宿舍饮食气味接受度接近", "宿舍饮食气味接受度存在差异", positives, warnings);
+        compareTag(student, roommates, "wakeTimeMinutes", 60,
+                "起床时间接近", "起床时间差异较大", positives, warnings);
+        compareTag(student, roommates, "noiseTolerance", 1,
+                "噪声接受度接近", "噪声接受度存在差异", positives, warnings);
+        compareTag(student, roommates, "tidinessRequirement", 1,
+                "整洁要求接近", "整洁要求存在差异", positives, warnings);
+        compareTag(student, roommates, "studyFrequency", 1,
+                "学习频率接近", "学习频率存在差异", positives, warnings);
+        compareTag(student, roommates, "socialActivity", 1,
+                "社交活跃度接近", "社交活跃度存在差异", positives, warnings);
         if (hasSmokingConflict(student, roommates)) {
-            conflictReasons.add("吸烟接受偏好存在冲突");
+            warnings.add("吸烟接受偏好存在冲突");
         } else if (student.containsKey("smokingAcceptance")) {
-            recommendationReasons.add("吸烟接受偏好无明显冲突");
+            positives.add("吸烟接受偏好无明显冲突");
         }
-
-        return result(
-                score,
-                recommendationReasons.stream().limit(6).toList(),
-                conflictReasons.stream().limit(6).toList(),
-                dimensionCount);
+        return result(score, positives.stream().limit(6).toList(), warnings.stream().limit(6).toList(), dimensionCount);
     }
 
     private MatchResult result(
@@ -238,14 +172,10 @@ public class MatchingService {
         int dimensionCount = 0;
         for (String key : MatchingSchemeService.SUPPORTED_WEIGHT_KEYS) {
             double weight = weights.getOrDefault(key, 0.0);
-            if (weight <= 0) {
-                continue;
-            }
+            if (weight <= 0) continue;
             Double a = number(left.get(key));
             Double b = number(right.get(key));
-            if (a == null || b == null) {
-                continue;
-            }
+            if (a == null || b == null) continue;
             double range = dimensionRange(key);
             double difference = key.contains("Minutes")
                     ? circularMinuteDifference(a, b)
@@ -254,9 +184,7 @@ public class MatchingService {
             maximum += weight;
             dimensionCount++;
         }
-        if (maximum == 0) {
-            return new PairResult(80.0, 0);
-        }
+        if (maximum == 0) return new PairResult(80.0, 0);
         double score = 100.0 * (1.0 - weightedDifference / maximum);
         if (smokingConflict(left.get("smokingAcceptance"), right.get("smokingAcceptance"))) {
             score -= rule(rules, "smokingConflictPenalty", 25);
@@ -265,18 +193,12 @@ public class MatchingService {
     }
 
     private double dimensionRange(String key) {
-        if (key.contains("Minutes")) {
-            return 720.0;
-        }
-        if (key.contains("Temperature")) {
-            return 10.0;
-        }
+        if (key.contains("Minutes")) return 720.0;
+        if (key.contains("Temperature")) return 10.0;
         return 5.0;
     }
 
-    private boolean hasSmokingConflict(
-            Map<String, Object> student,
-            List<Map<String, Object>> roommates) {
+    private boolean hasSmokingConflict(Map<String, Object> student, List<Map<String, Object>> roommates) {
         Object own = student.get("smokingAcceptance");
         return roommates.stream()
                 .map(map -> map.get("smokingAcceptance"))
@@ -300,9 +222,7 @@ public class MatchingService {
             Set<String> positives,
             Set<String> warnings) {
         Double own = number(student.get(key));
-        if (own == null) {
-            return;
-        }
+        if (own == null) return;
         double average = roommates.stream()
                 .map(map -> number(map.get(key)))
                 .filter(value -> value != null)
@@ -312,11 +232,8 @@ public class MatchingService {
         double difference = key.contains("Minutes")
                 ? circularMinuteDifference(own, average)
                 : Math.abs(own - average);
-        if (difference <= threshold) {
-            positives.add(positive);
-        } else {
-            warnings.add(warning);
-        }
+        if (difference <= threshold) positives.add(positive);
+        else warnings.add(warning);
     }
 
     private double rule(Map<String, Double> rules, String key, double fallback) {
@@ -341,8 +258,7 @@ public class MatchingService {
         return Math.min(difference, 1440.0 - difference);
     }
 
-    private record PairResult(double score, int dimensionCount) {
-    }
+    private record PairResult(double score, int dimensionCount) { }
 
     public record MatchResult(
             double score,
@@ -350,6 +266,5 @@ public class MatchingService {
             List<String> warnings,
             List<String> recommendationReasons,
             List<String> conflictReasons,
-            int dimensionCount) {
-    }
+            int dimensionCount) { }
 }
