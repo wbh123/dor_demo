@@ -98,6 +98,20 @@ export function useNotificationCenter(capabilities: NotificationCapabilities) {
     if (!capabilities.canNotificationSend()) return
     message.value = ''
     await execute(async () => {
+      if (scheduledAt.value && selectedTemplateRevisionId.value) {
+        const response = await api.post<ObjectSuccessResponse>(
+          '/api/v1/admin/governance/notifications/preflight',
+          {
+            criteria: criteriaPayload(),
+            templateRevisionId: Number(selectedTemplateRevisionId.value),
+            variables: {},
+          },
+        )
+        preview.value = (response.data.data ?? {}) as DataObject
+        recipientCount.value = Number(preview.value.recipientCount ?? 0)
+        return
+      }
+
       const response = await api.post<ObjectSuccessResponse>(
         '/api/v1/admin/governance/notifications/recipients/count',
         { criteria: criteriaPayload() },
@@ -110,7 +124,7 @@ export function useNotificationCenter(capabilities: NotificationCapabilities) {
         contentZhCn: templateDraft.contentZhCn,
         titleEnUs: templateDraft.titleEnUs,
         contentEnUs: templateDraft.contentEnUs,
-        direct: !scheduledAt.value,
+        direct: true,
       }
     })
   }
