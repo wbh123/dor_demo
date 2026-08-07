@@ -67,7 +67,7 @@ require("to=\"/admin/profile/password\"" in shell, "school administrator sidebar
 require("subtitle(chinese: string, english: string)" in i18n and "locale.value === 'zh-CN' ? chinese : english" in i18n, "bilingual subtitle selection remains reversed")
 
 require("welcome-token-toolbar" in dashboard and "插入学生信息" in dashboard and "token-toolbar" not in welcome_editor, "welcome token toolbar must be centralized around the active editor")
-require("<strong>汉语</strong>" in dashboard and "<strong>英语</strong>" in dashboard, "welcome language cards are not named 汉语 and 英语")
+require("<strong>汉语</strong>" in dashboard and "<strong>英语</strong>" in dashboard, "welcome language cards are not named 汉语 and英语")
 require("<strong>美国</strong>" not in dashboard, "welcome editor still presents English as United States")
 require("美国卡片" not in dashboard, "welcome copy still ties English fallback to the United States")
 require("message:" not in auth_contract.split("WelcomeData:", 1)[1].split("CurrentUserData:", 1)[0], "welcome OpenAPI still exposes the legacy message field")
@@ -88,7 +88,12 @@ require("admin/bed-confirmations" not in router, "legacy standalone bed-confirma
 require("实际床位核查" not in shell, "legacy standalone bed-confirmation menu still exists")
 require("reviewFilter" in bed_confirmation and "全部核查状态" in bed_confirmation, "actual-bed review has no dropdown filter")
 
-require("RoomBedScene3D" in student_admin and "placementRoomId" in student_admin, "student accommodation adjustment does not use the visual bed selector and room dropdown")
+require(
+    "DormitoryBedSelector" in student_admin
+    and "placementBeds" in student_admin
+    and "placementBedId" in student_admin,
+    "student accommodation adjustment does not use the shared dormitory bed selector",
+)
 for field in ("current_building_name", "current_room_number", "current_bed_code", "selection_review_status", "declared_bed_code"):
     require(field in student_service, f"student list query misses accommodation field: {field}")
 require("TRANSFER_MANUAL" not in student_service, "legacy transfer-student enrollment source remains accepted")
