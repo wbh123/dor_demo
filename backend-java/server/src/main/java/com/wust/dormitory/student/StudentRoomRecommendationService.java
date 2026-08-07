@@ -1,5 +1,6 @@
 package com.wust.dormitory.student;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wust.dormitory.common.error.BusinessException;
 import com.wust.dormitory.matching.BatchRecommendationPolicyService;
 import com.wust.dormitory.matching.MatchingService;
@@ -7,11 +8,14 @@ import com.wust.dormitory.matching.RecommendationSampler;
 import com.wust.dormitory.matching.RecommendationStrategy;
 import com.wust.dormitory.residency.ResidencyPolicyService;
 import com.wust.dormitory.security.CurrentUser;
+import com.wust.dormitory.student.mapper.StudentRoomRecommendationMapper;
+import com.wust.dormitory.student.model.persistence.AvailableBedRow;
+import com.wust.dormitory.student.model.persistence.AvailableBedTypeRow;
+import com.wust.dormitory.student.model.persistence.RoomRecommendationCandidateRow;
+import com.wust.dormitory.student.model.persistence.RoommateFeatureRow;
 import com.wust.dormitory.subscription.FeatureAccessService;
 import com.wust.dormitory.subscription.FeatureCodes;
 import org.springframework.http.HttpStatus;
-import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
-import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.nio.ByteBuffer;
@@ -32,7 +36,7 @@ import java.util.stream.Collectors;
 public class StudentRoomRecommendationService {
     static final String ALGORITHM_VERSION = "room-recommendation-v2";
 
-    private final NamedParameterJdbcTemplate jdbc;
+    private final StudentRoomRecommendationMapper mapper;
     private final MatchingService matchingService;
     private final ResidencyPolicyService policy;
     private final StudentPreferenceService preferenceService;
@@ -41,31 +45,25 @@ public class StudentRoomRecommendationService {
     private final SecureRandom secureRandom;
 
     public StudentRoomRecommendationService(
-            NamedParameterJdbcTemplate jdbc,
+            StudentRoomRecommendationMapper mapper,
             MatchingService matchingService,
             ResidencyPolicyService policy,
             StudentPreferenceService preferenceService,
             FeatureAccessService featureAccessService,
             BatchRecommendationPolicyService recommendationPolicyService) {
-        this(
-                jdbc,
-                matchingService,
-                policy,
-                preferenceService,
-                featureAccessService,
-                recommendationPolicyService,
-                new SecureRandom());
+        this(mapper, matchingService, policy, preferenceService, featureAccessService,
+                recommendationPolicyService, new SecureRandom());
     }
 
     StudentRoomRecommendationService(
-            NamedParameterJdbcTemplate jdbc,
+            StudentRoomRecommendationMapper mapper,
             MatchingService matchingService,
             ResidencyPolicyService policy,
             StudentPreferenceService preferenceService,
             FeatureAccessService featureAccessService,
             BatchRecommendationPolicyService recommendationPolicyService,
             SecureRandom secureRandom) {
-        this.jdbc = jdbc;
+        this.mapper = mapper;
         this.matchingService = matchingService;
         this.policy = policy;
         this.preferenceService = preferenceService;
@@ -75,89 +73,11 @@ public class StudentRoomRecommendationService {
     }
 
     public List<Map<String, Object>> rooms(long batchId, CurrentUser user) {
-        requireAccessibleBatch(batchId, user.studentId());
-        Map<String, Object> batch = policy.batch(batchId);
-        BatchRecommendationPolicyService.Policy recommendationPolicy =
-                recommendationPolicyService.forBatch(batchId);
-        Map<String, Object> student = policy.student(user.studentId());
-        String feature = featureJson(batchId, user.studentId());
-        String mode = String.valueOf(batch.get("selection_mode"));
-        List<Map<String, Object>> result = new ArrayList<>();
-
-        for (Long roomId : policy.roomIdsForBatch(batchId)) {
-            Map<String, Object> room = policy.room(roomId, false);
-            try {
-                policy.requireStudentEligibleForRoom(student, batch, room);
-                policy.requireRoomLockedByBatch(batchId, roomId);
-            } catch (BusinessException ignored) {
-                continue;
-            }
-            int activeResidents = policy.activeResidentCount(roomId);
-            int unknownBedResidents = policy.unknownBedResidentCount(roomId);
-            int available = "BED".equals(mode)
-                    ? (unknownBedResidents == 0 ? policy.availableBedCount(batchId, roomId) : 0)
-                    : policy.availableCapacity(roomId);
-            if (available <= 0) {
-                continue;
-            }
-
-            List<String> roommateFeatures = jdbc.query("""
-                    SELECT COALESCE(sf.feature_vector_json, spp.feature_vector_json) AS feature_vector_json
-                    FROM room_assignment ra
-                    LEFT JOIN student_feature sf ON sf.student_id=ra.student_id AND sf.batch_id=:batchId
-                    LEFT JOIN student_preference_profile spp ON spp.student_id=ra.student_id
-                    WHERE ra.room_id=:roomId AND ra.assignment_status='ACTIVE'
-                      AND COALESCE(sf.feature_vector_json, spp.feature_vector_json) IS NOT NULL
-                    ORDER BY ra.assigned_at
-                    """, new MapSqlParameterSource().addValue("batchId", batchId).addValue("roomId", roomId),
-                    (rs, rowNum) -> rs.getString(1));
-            int missingPreferenceCount = activeResidents - roommateFeatures.size();
-            boolean recommendationEnabled = featureAccessService.has(FeatureCodes.P2_ROOM_RECOMMENDATION);
-            MatchingService.MatchResult match = recommendationEnabled
-                    ? matchingService.roomScore(batchId, feature, roommateFeatures)
-                    : matchingService.roomScore("", List.of());
-            Map<String, Object> view = new LinkedHashMap<>(room);
-            view.put("selectionMode", mode);
-            view.put("allowedRecommendationStrategies", recommendationPolicy.allowedNames());
-            view.put("defaultRecommendationStrategy", recommendationPolicy.defaultStrategy().name());
-            view.put("activeResidentCount", activeResidents);
-            view.put("confirmedBedCount", activeResidents - unknownBedResidents);
-            view.put("unconfirmedBedCount", unknownBedResidents);
-            view.put("bedMappingComplete", unknownBedResidents == 0);
-            view.put("availableCount", available);
-            view.put("matchScore", match.score());
-            view.put("matches", match.matches());
-            view.put("warnings", match.warnings());
-            view.put("recommendationReasons", match.recommendationReasons());
-            view.put("conflictReasons", match.conflictReasons());
-            view.put("dimensionCount", match.dimensionCount());
-            view.put("preferenceCompleted", preferenceService.completed(user.studentId()));
-            view.put("missingPreferenceCount", Math.max(0, missingPreferenceCount));
-            view.put("recommendationEnabled", recommendationEnabled);
-            Map<String, Integer> bedTypes = availableBedTypes(batchId, roomId);
-            view.put("availableLoftBedCount", bedTypes.getOrDefault("LOFT_BED_DESK", 0));
-            view.put("availableBunkUpperCount", bedTypes.getOrDefault("BUNK_UPPER", 0));
-            view.put("availableBunkLowerCount", bedTypes.getOrDefault("BUNK_LOWER", 0));
-            String bedWarning = bedPreferenceWarning(feature, bedTypes);
-            if (bedWarning != null) {
-                List<String> warnings = new ArrayList<>(match.conflictReasons());
-                warnings.add(bedWarning);
-                view.put("conflictReasons", warnings.stream().distinct().limit(7).toList());
-            }
-            view.put("selectionHint", "ROOM".equals(mode)
-                    ? "选择后仅确定寝室，具体床位由寝室成员自行协商"
-                    : "进入寝室后选择当前批次范围内的真实可用床位");
-            result.add(view);
-        }
-        result.sort(Comparator
-                .comparingDouble((Map<String, Object> room) -> -score(room))
-                .thenComparing(this::stableRoomKey));
-        return result;
+        return candidateRooms(batchId, null, user);
     }
 
     public Map<String, Object> room(long batchId, long roomId, CurrentUser user) {
-        return rooms(batchId, user).stream()
-                .filter(room -> ((Number) room.get("id")).longValue() == roomId)
+        return candidateRooms(batchId, roomId, user).stream()
                 .findFirst()
                 .orElseThrow(() -> new BusinessException(
                         "ROOM_NOT_CANDIDATE",
@@ -176,17 +96,13 @@ public class StudentRoomRecommendationService {
             long batchId,
             RecommendationStrategy strategy,
             CurrentUser user) {
-        BatchRecommendationPolicyService.Policy recommendationPolicy =
-                recommendationPolicyService.forBatch(batchId);
+        BatchRecommendationPolicyService.Policy recommendationPolicy = recommendationPolicyService.forBatch(batchId);
         recommendationPolicy.requireAllowed(strategy);
         featureAccessService.require(strategy.requiredFeatureCode());
         Map<String, Object> batch = policy.batch(batchId);
         List<Map<String, Object>> candidates = rooms(batchId, user);
         if (candidates.isEmpty()) {
-            throw new BusinessException(
-                    "NO_AVAILABLE_ROOM",
-                    "当前没有符合条件的可用寝室",
-                    HttpStatus.CONFLICT);
+            throw new BusinessException("NO_AVAILABLE_ROOM", "当前没有符合条件的可用寝室", HttpStatus.CONFLICT);
         }
 
         long seed = secureRandom.nextLong();
@@ -198,10 +114,7 @@ public class StudentRoomRecommendationService {
             case BEST_MATCH -> RecommendationSampler.bestMatch(legalCandidates);
             case TRUE_RANDOM -> RecommendationSampler.trueRandom(legalCandidates, random);
             case MATCH_WEIGHTED_RANDOM -> RecommendationSampler.weightedRandom(
-                    legalCandidates,
-                    random,
-                    recommendationPolicy.baseWeight(),
-                    recommendationPolicy.temperature());
+                    legalCandidates, random, recommendationPolicy.baseWeight(), recommendationPolicy.temperature());
         };
         Map<String, Object> selectedRoom = selected.value();
 
@@ -215,7 +128,6 @@ public class StudentRoomRecommendationService {
         response.put("selectionMode", String.valueOf(batch.get("selection_mode")));
         response.put("room", selectedRoom);
         response.put("matchScore", selected.score());
-
         if (featureAccessService.has(FeatureCodes.P2_RECOMMENDATION_EXPLANATION)) {
             response.put("explanation", explanation(strategy));
         }
@@ -225,53 +137,165 @@ public class StudentRoomRecommendationService {
         return response;
     }
 
+    private List<Map<String, Object>> candidateRooms(long batchId, Long requestedRoomId, CurrentUser user) {
+        requireAccessibleBatch(batchId, user.studentId());
+        Map<String, Object> batch = policy.batch(batchId);
+        Map<String, Object> student = policy.student(user.studentId());
+        BatchRecommendationPolicyService.Policy recommendationPolicy = recommendationPolicyService.forBatch(batchId);
+        String feature = featureJson(batchId, user.studentId());
+        String mode = String.valueOf(batch.get("selection_mode"));
+
+        List<RoomRecommendationCandidateRow> eligible = mapper.findCandidateRooms(batchId, requestedRoomId).stream()
+                .filter(row -> isEligible(student, batch, row))
+                .filter(row -> availableCount(mode, row) > 0)
+                .toList();
+        if (eligible.isEmpty()) {
+            return List.of();
+        }
+
+        List<Long> roomIds = eligible.stream().map(RoomRecommendationCandidateRow::id).toList();
+        Map<Long, List<String>> roommateFeatures = roommateFeatures(batchId, roomIds);
+        Map<Long, Map<String, Integer>> bedTypes = availableBedTypes(batchId, roomIds);
+        boolean recommendationEnabled = featureAccessService.has(FeatureCodes.P2_ROOM_RECOMMENDATION);
+        boolean preferenceCompleted = preferenceService.completed(user.studentId());
+        String bedPreference = bedPreference(feature);
+
+        List<Map<String, Object>> result = new ArrayList<>(eligible.size());
+        for (RoomRecommendationCandidateRow row : eligible) {
+            List<String> features = roommateFeatures.getOrDefault(row.id(), List.of());
+            MatchingService.MatchResult match = recommendationEnabled
+                    ? matchingService.roomScore(batchId, feature, features)
+                    : matchingService.roomScore("", List.of());
+            Map<String, Integer> counts = bedTypes.getOrDefault(row.id(), Map.of());
+            Map<String, Object> view = new LinkedHashMap<>(row.toRoomMap());
+            int activeResidents = row.activeResidents();
+            int unknownBedResidents = row.unknownBedResidents();
+            view.put("selectionMode", mode);
+            view.put("allowedRecommendationStrategies", recommendationPolicy.allowedNames());
+            view.put("defaultRecommendationStrategy", recommendationPolicy.defaultStrategy().name());
+            view.put("activeResidentCount", activeResidents);
+            view.put("confirmedBedCount", activeResidents - unknownBedResidents);
+            view.put("unconfirmedBedCount", unknownBedResidents);
+            view.put("bedMappingComplete", unknownBedResidents == 0);
+            view.put("availableCount", availableCount(mode, row));
+            view.put("matchScore", match.score());
+            view.put("matches", match.matches());
+            view.put("warnings", match.warnings());
+            view.put("recommendationReasons", match.recommendationReasons());
+            view.put("conflictReasons", match.conflictReasons());
+            view.put("dimensionCount", match.dimensionCount());
+            view.put("preferenceCompleted", preferenceCompleted);
+            view.put("missingPreferenceCount", Math.max(0, activeResidents - features.size()));
+            view.put("recommendationEnabled", recommendationEnabled);
+            view.put("availableLoftBedCount", counts.getOrDefault("LOFT_BED_DESK", 0));
+            view.put("availableBunkUpperCount", counts.getOrDefault("BUNK_UPPER", 0));
+            view.put("availableBunkLowerCount", counts.getOrDefault("BUNK_LOWER", 0));
+            addBedWarning(view, match, bedPreference, counts);
+            view.put("selectionHint", "ROOM".equals(mode)
+                    ? "选择后仅确定寝室，具体床位由寝室成员自行协商"
+                    : "进入寝室后选择当前批次范围内的真实可用床位");
+            result.add(view);
+        }
+        result.sort(Comparator.comparingDouble((Map<String, Object> room) -> -score(room))
+                .thenComparing(this::stableRoomKey));
+        return result;
+    }
+
+    private boolean isEligible(
+            Map<String, Object> student,
+            Map<String, Object> batch,
+            RoomRecommendationCandidateRow row) {
+        try {
+            policy.requireStudentEligibleForRoom(student, batch, row.toRoomMap());
+            return true;
+        } catch (BusinessException ignored) {
+            return false;
+        }
+    }
+
+    private int availableCount(String mode, RoomRecommendationCandidateRow row) {
+        if ("BED".equals(mode)) {
+            return row.unknownBedResidents() == 0 ? row.availableBeds() : 0;
+        }
+        return Math.max(0, (row.capacity() == null ? 0 : row.capacity()) - row.activeResidents());
+    }
+
+    private Map<Long, List<String>> roommateFeatures(long batchId, List<Long> roomIds) {
+        Map<Long, List<String>> grouped = new LinkedHashMap<>();
+        for (RoommateFeatureRow row : mapper.findRoommateFeatures(batchId, roomIds)) {
+            grouped.computeIfAbsent(row.roomId(), ignored -> new ArrayList<>()).add(row.featureVectorJson());
+        }
+        return grouped;
+    }
+
+    private Map<Long, Map<String, Integer>> availableBedTypes(long batchId, List<Long> roomIds) {
+        Map<Long, Map<String, Integer>> grouped = new LinkedHashMap<>();
+        for (AvailableBedTypeRow row : mapper.findAvailableBedTypes(batchId, roomIds)) {
+            grouped.computeIfAbsent(row.roomId(), ignored -> new LinkedHashMap<>()).put(row.bedType(), row.count());
+        }
+        return grouped;
+    }
+
     private Map<String, Object> selectBed(
             long batchId,
             Map<String, Object> room,
             RecommendationStrategy strategy,
             SplittableRandom random) {
         long roomId = ((Number) room.get("id")).longValue();
-        List<Map<String, Object>> beds = jdbc.queryForList("""
-                SELECT target_bed.id, target_bed.bed_code,
-                       target_bed.bed_type, target_bed.position_index
-                FROM bed target_bed
-                JOIN room target_room ON target_room.id=target_bed.room_id
-                JOIN dormitory_floor target_floor ON target_floor.id=target_room.floor_id
-                WHERE target_bed.room_id=:roomId
-                  AND target_bed.operational_status='ENABLED'
-                  AND (
-                      EXISTS (
-                          SELECT 1 FROM batch_bed_scope scope
-                          WHERE scope.batch_id=:batchId AND scope.bed_id=target_bed.id
-                      )
-                      OR EXISTS (
-                          SELECT 1 FROM batch_room_scope scope
-                          WHERE scope.batch_id=:batchId AND scope.room_id=target_room.id
-                      )
-                      OR EXISTS (
-                          SELECT 1 FROM batch_building_scope scope
-                          WHERE scope.batch_id=:batchId
-                            AND scope.building_id=target_floor.building_id
-                      )
-                  )
-                  AND NOT EXISTS (
-                      SELECT 1 FROM room_assignment ra
-                      WHERE ra.bed_id=target_bed.id AND ra.assignment_status='ACTIVE'
-                  )
-                ORDER BY target_bed.position_index, target_bed.id
-                """, new MapSqlParameterSource()
-                .addValue("roomId", roomId)
-                .addValue("batchId", batchId));
+        List<AvailableBedRow> beds = mapper.findAvailableBeds(batchId, roomId);
         if (beds.isEmpty()) {
             throw new BusinessException(
                     "NO_AVAILABLE_BED",
                     "推荐寝室当前没有属于本批次的真实可用床位",
                     HttpStatus.CONFLICT);
         }
-        if (strategy == RecommendationStrategy.TRUE_RANDOM) {
-            return beds.get(random.nextInt(beds.size()));
+        AvailableBedRow selected = strategy == RecommendationStrategy.TRUE_RANDOM
+                ? beds.get(random.nextInt(beds.size()))
+                : beds.getFirst();
+        return selected.toMap();
+    }
+
+    private void requireAccessibleBatch(long batchId, long studentId) {
+        if (!mapper.isBatchAccessible(batchId, studentId)) {
+            throw new BusinessException("BATCH_NOT_ACCESSIBLE", "当前选寝活动不可访问", HttpStatus.FORBIDDEN);
         }
-        return beds.getFirst();
+    }
+
+    private String featureJson(long batchId, long studentId) {
+        String feature = mapper.findBatchFeature(batchId, studentId);
+        return feature == null || feature.isBlank() ? preferenceService.featureJson(studentId) : feature;
+    }
+
+    private String bedPreference(String featureJson) {
+        if (featureJson == null || featureJson.isBlank()) {
+            return "";
+        }
+        try {
+            return new ObjectMapper().readTree(featureJson).path("bedPreference").asText("");
+        } catch (Exception ignored) {
+            return "";
+        }
+    }
+
+    private void addBedWarning(
+            Map<String, Object> view,
+            MatchingService.MatchResult match,
+            String preference,
+            Map<String, Integer> counts) {
+        int loft = counts.getOrDefault("LOFT_BED_DESK", 0);
+        int bunk = counts.getOrDefault("BUNK_UPPER", 0) + counts.getOrDefault("BUNK_LOWER", 0);
+        String warning = null;
+        if ("LOFT_BED_DESK".equals(preference) && loft == 0 && bunk > 0) {
+            warning = "仅剩上下铺";
+        } else if (("BUNK_UPPER".equals(preference) || "BUNK_LOWER".equals(preference))
+                && bunk == 0 && loft > 0) {
+            warning = "仅剩上床下桌";
+        }
+        if (warning != null) {
+            List<String> warnings = new ArrayList<>(match.conflictReasons());
+            warnings.add(warning);
+            view.put("conflictReasons", warnings.stream().distinct().limit(7).toList());
+        }
     }
 
     private String explanation(RecommendationStrategy strategy) {
@@ -284,11 +308,9 @@ public class StudentRoomRecommendationService {
 
     private String candidateVersion(List<Map<String, Object>> candidates) {
         String material = candidates.stream()
-                .map(room -> stableRoomKey(room)
-                        + ':' + String.valueOf(room.getOrDefault("state_version", 0))
-                        + ':' + String.valueOf(room.getOrDefault("availableCount", 0)))
-                .sorted()
-                .collect(Collectors.joining("|"));
+                .map(room -> stableRoomKey(room) + ':' + room.getOrDefault("state_version", 0)
+                        + ':' + room.getOrDefault("availableCount", 0))
+                .sorted().collect(Collectors.joining("|"));
         return digest(material.getBytes(StandardCharsets.UTF_8)).substring(0, 24);
     }
 
@@ -311,85 +333,8 @@ public class StudentRoomRecommendationService {
 
     private String stableRoomKey(Map<String, Object> room) {
         return String.valueOf(room.getOrDefault("building_code", room.getOrDefault("building_name", "")))
-                + '/' + String.valueOf(room.getOrDefault("floor_number", ""))
-                + '/' + String.valueOf(room.getOrDefault("room_number", ""))
+                + '/' + room.getOrDefault("floor_number", "")
+                + '/' + room.getOrDefault("room_number", "")
                 + '/' + String.format("%020d", ((Number) room.get("id")).longValue());
-    }
-
-    private void requireAccessibleBatch(long batchId, long studentId) {
-        Integer count = jdbc.queryForObject("""
-                SELECT COUNT(*)
-                FROM selection_batch batch
-                JOIN batch_student_eligibility eligibility
-                  ON eligibility.batch_id=batch.id
-                 AND eligibility.student_id=:studentId
-                WHERE batch.id=:batchId
-                  AND eligibility.eligibility_status='ELIGIBLE'
-                  AND batch.batch_status IN ('PUBLISHED','OPEN','PAUSED')
-                """, new MapSqlParameterSource()
-                .addValue("batchId", batchId)
-                .addValue("studentId", studentId), Integer.class);
-        if (count == null || count != 1) {
-            throw new BusinessException(
-                    "BATCH_NOT_ACCESSIBLE",
-                    "当前选寝活动不可访问",
-                    HttpStatus.FORBIDDEN);
-        }
-    }
-
-    private String featureJson(long batchId, long studentId) {
-        List<String> rows = jdbc.query("""
-                SELECT feature_vector_json
-                FROM student_feature
-                WHERE batch_id=:batchId AND student_id=:studentId
-                """, new MapSqlParameterSource()
-                .addValue("batchId", batchId)
-                .addValue("studentId", studentId),
-                (rs, rowNum) -> rs.getString(1));
-        return rows.isEmpty() ? preferenceService.featureJson(studentId) : rows.getFirst();
-    }
-
-    private Map<String, Integer> availableBedTypes(long batchId, long roomId) {
-        List<Map<String, Object>> rows = jdbc.queryForList("""
-                SELECT b.bed_type, COUNT(*) AS amount
-                FROM bed b
-                WHERE b.room_id=:roomId AND b.operational_status='ENABLED'
-                  AND NOT EXISTS (SELECT 1 FROM room_assignment ra WHERE ra.bed_id=b.id AND ra.assignment_status='ACTIVE')
-                  AND (EXISTS (SELECT 1 FROM batch_bed_scope s WHERE s.batch_id=:batchId AND s.bed_id=b.id)
-                    OR EXISTS (SELECT 1 FROM batch_room_scope s WHERE s.batch_id=:batchId AND s.room_id=:roomId)
-                    OR EXISTS (SELECT 1 FROM batch_building_scope bs JOIN dormitory_floor f ON f.building_id=bs.building_id
-                               JOIN room r ON r.floor_id=f.id WHERE bs.batch_id=:batchId AND r.id=:roomId))
-                GROUP BY b.bed_type
-                """, Map.of("batchId", batchId, "roomId", roomId));
-        Map<String, Integer> result = new LinkedHashMap<>();
-        rows.forEach(row -> result.put(
-                String.valueOf(row.get("bed_type")),
-                ((Number) row.get("amount")).intValue()));
-        return result;
-    }
-
-    private String bedPreferenceWarning(String featureJson, Map<String, Integer> counts) {
-        if (featureJson == null || featureJson.isBlank()) {
-            return null;
-        }
-        String preference;
-        try {
-            preference = String.valueOf(new com.fasterxml.jackson.databind.ObjectMapper()
-                    .readTree(featureJson)
-                    .path("bedPreference")
-                    .asText(""));
-        } catch (Exception ignored) {
-            return null;
-        }
-        int loft = counts.getOrDefault("LOFT_BED_DESK", 0);
-        int bunk = counts.getOrDefault("BUNK_UPPER", 0) + counts.getOrDefault("BUNK_LOWER", 0);
-        if ("LOFT_BED_DESK".equals(preference) && loft == 0 && bunk > 0) {
-            return "仅剩上下铺";
-        }
-        if (("BUNK_UPPER".equals(preference) || "BUNK_LOWER".equals(preference))
-                && bunk == 0 && loft > 0) {
-            return "仅剩上床下桌";
-        }
-        return null;
     }
 }
