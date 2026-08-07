@@ -34,7 +34,8 @@ def main() -> None:
         require(method in mapper, f"mapper method missing: {method}")
         require(f'id="{method}"' in xml, f"mapper XML statement missing: {method}")
 
-    require("WITH SCOPED_ROOMS AS" in normalized, "candidate query must build scoped rooms once")
+    require("WITH SCOPED_ROOMS AS ( SELECT ROOM_ID FROM ACTIVE_BATCH_ROOM_LOCK WHERE BATCH_ID = #{BATCHID} )" in normalized,
+            "candidate rooms must reuse the materialized active batch room lock set")
     require("WITH SCOPED_BEDS AS" in normalized, "bed query must build scoped beds once")
     require("RESIDENT_STATS AS" in normalized, "candidate query must pre-aggregate resident statistics")
     require("FROM SCOPED_ROOMS SCOPED JOIN ROOM_ASSIGNMENT ASSIGNMENT" in normalized,
@@ -49,10 +50,14 @@ def main() -> None:
             "occupied-bed anti-join must match bed_id after room/status")
     require("OCCUPIED_BEDS AS" not in normalized,
             "do not scan all active occupied beds into a global CTE")
-    require("GROUP BY BED.ROOM_ID, BED.BED_TYPE" in normalized, "bed type counts must be grouped for all rooms")
-    require("ASSIGNMENT.ROOM_ID IN" in normalized, "roommate features must be fetched in one room-id batch")
-    require("BED.ROOM_ID IN" in normalized, "bed type counts must be fetched in one room-id batch")
-    require("<FOREACH COLLECTION=\"ROOMIDS\"" in normalized, "room-id batch queries must use MyBatis foreach")
+    require("GROUP BY BED.ROOM_ID, BED.BED_TYPE" in normalized,
+            "bed type counts must be grouped for all rooms")
+    require("ASSIGNMENT.ROOM_ID IN" in normalized,
+            "roommate features must be fetched in one room-id batch")
+    require("BED.ROOM_ID IN" in normalized,
+            "bed type counts must be fetched in one room-id batch")
+    require("<FOREACH COLLECTION=\"ROOMIDS\"" in normalized,
+            "room-id batch queries must use MyBatis foreach")
 
     require("StudentRoomRecommendationMapper" in service, "service must depend on recommendation mapper")
     require("policy.room(" not in service, "recommendation loop must not re-read each room")
