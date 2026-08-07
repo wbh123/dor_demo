@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.wust.dormitory.matching.mapper.MatchingSchemeMapper">
+    <sql id="schemeColumns">
+        scheme.id, scheme.scheme_code, scheme.scheme_name,
+        scheme.revision, scheme.algorithm_version,
+        scheme.weights_json, scheme.conflict_rules_json,
+        scheme.allowed_recommendation_strategies_json,
+        scheme.default_recommendation_strategy,
+        scheme.weighted_random_base_weight,
+        scheme.weighted_random_temperature,
+        scheme.enabled, scheme.version, scheme.change_reason,
+        scheme.published_at, scheme.created_at, scheme.updated_at,
+        creator.display_name AS created_by_name,
+        COALESCE(batch_usage.batch_count, 0) AS batch_count
+    </sql>
+
+    <select id="findSchemes" resultType="map">
+        WITH batch_usage AS (
+            SELECT matching_weight_scheme_id, COUNT(*) AS batch_count
+            FROM selection_batch
+            WHERE matching_weight_scheme_id IS NOT NULL
+            GROUP BY matching_weight_scheme_id
+        )
+        SELECT <include refid="schemeColumns"/>
+        FROM matching_weight_scheme scheme
+        LEFT JOIN app_user creator ON creator.id = scheme.created_by
+        LEFT JOIN batch_usage ON batch_usage.matching_weight_scheme_id = scheme.id
+        ORDER BY scheme.scheme_code, scheme.revision DESC
+    </select>
+
+    <select id="countSchemeCode" resultType="int">
+        SELECT COUNT(*)
+        FROM matching_weight_scheme
+        WHERE scheme_code = #{code}
+    </select>
+
+    <select id="findScheme" resultType="map">
+        WITH batch_usage AS (
+            SELECT matching_weight_scheme_id, COUNT(*) AS batch_count
+            FROM selection_batch
+            WHERE matching_weight_scheme_id = #{id}
+            GROUP BY matching_weight_scheme_id
+        )
+        SELECT <include refid="schemeColumns"/>
+        FROM matching_weight_scheme scheme
+        LEFT JOIN app_user creator ON creator.id = scheme.created_by
+        LEFT JOIN batch_usage ON batch_usage.matching_weight_scheme_id = scheme.id
+        WHERE scheme.id = #{id}
+    </select>
+
+    <select id="findSchemeForUpdate" resultType="map">
+        SELECT id, scheme_code, scheme_name, revision, algorithm_version,
+               weights_json, conflict_rules_json,
+               allowed_recommendation_strategies_json,
+               default_recommendation_strategy,
+               weighted_random_base_weight, weighted_random_temperature,
+               enabled, version, change_reason, published_at, created_at, updated_at, created_by
+        FROM matching_weight_scheme
+        WHERE id = #{id}
+        FOR UPDATE
+    </select>
+
+    <update id="claimVersion">
+        UPDATE matching_weight_scheme
+        SET version = version + 1
+        WHERE id = #{id}
+          AND version = #{expectedVersion}
+    </update>
+
+    <select id="findLatestRevisionForUpdate" resultType="int">
+        SELECT revision
+        FROM matching_weight_scheme
+        WHERE scheme_code = #{code}
+        ORDER BY revision DESC
+        LIMIT 1
+        FOR UPDATE
+    </select>
+
+    <update id="deactivateAll">
+        UPDATE matching_weight_scheme
+        SET enabled = 0
+        WHERE enabled = 1
+    </update>
+
+    <insert id="insertScheme" parameterType="map" useGeneratedKeys="true" keyProperty="id" keyColumn="id">
+        INSERT INTO matching_weight_scheme
+        (scheme_code, scheme_name, revision, algorithm_version,
+         weights_json, conflict_rules_json,
+         allowed_recommendation_strategies_json,
+         default_recommendation_strategy,
+         weighted_random_base_weight, weighted_random_temperature,
+         enabled, version, created_by, change_reason, published_at)
+        VALUES
+        (#{code}, #{name}, #{revision}, #{algorithmVersion},
+         CAST(#{weights} AS JSON), CAST(#{rules} AS JSON),
+         CAST(#{allowedStrategies} AS JSON), #{defaultStrategy},
+         #{baseWeight}, #{temperature},
+         #{enabled}, 0, #{createdBy}, #{reason}, #{publishedAt})
+    </insert>
+
+    <select id="findPolicySchemeIdForBatch" resultType="long">
+        SELECT matching_weight_scheme_id
+        FROM selection_batch
+        WHERE id = #{batchId}
+    </select>
+
+    <select id="findPolicyScheme" resultType="map">
+        SELECT id, scheme_code, scheme_name, revision, algorithm_version,
+               weights_json, conflict_rules_json,
+               allowed_recommendation_strategies_json,
+               default_recommendation_strategy,
+               weighted_random_base_weight, weighted_random_temperature
+        FROM matching_weight_scheme
+        WHERE id = #{schemeId}
+    </select>
+</mapper>

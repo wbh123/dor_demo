@@ -135,14 +135,20 @@ require(team_controller, (
 ), "verified team invite and cancellation endpoints are incomplete")
 team_service = read(
     "backend-java/server/src/main/java/com/wust/dormitory/student/VerifiedTeamInvitationService.java")
+team_mapper = read(
+    "backend-java/server/src/main/resources/mapper/student/VerifiedTeamInvitationMapper.xml")
 require(team_service, (
     "INVITEE_IDENTITY_MISMATCH",
     "TEAM_INVITATION_PENDING_DUPLICATE",
-    "ON DUPLICATE KEY UPDATE",
-    "member_status IN ('JOINED','LOCKED')",
     "TEAM_INVITATION_CANCELLED",
-    "member_status='INVITED'",
+    "findInvitationGuards",
 ), "verified invitation identity, multi-invite creation or cancellation is incomplete")
+require(team_mapper, (
+    "ON DUPLICATE KEY UPDATE",
+    "member.member_status IN ('JOINED', 'LOCKED')",
+    "invitation_status = 'PENDING'",
+    "member_status = 'INVITED'",
+), "verified invitation persistence and status transitions are incomplete")
 team_response_service = read(
     "backend-java/server/src/main/java/com/wust/dormitory/student/TeamInvitationResponseService.java")
 require(team_response_service, (

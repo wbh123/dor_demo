@@ -3,11 +3,9 @@ package com.wust.dormitory.student;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wust.dormitory.audit.AuditService;
 import com.wust.dormitory.security.CurrentUser;
+import com.wust.dormitory.student.mapper.VerifiedTeamInvitationMapper;
 import org.junit.jupiter.api.Test;
-import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
-import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 
-import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -21,12 +19,12 @@ import static org.mockito.Mockito.when;
 class VerifiedTeamInvitationFirstInviteTest {
     @Test
     void firstVerifiedInvitationCreatesTeamBeforeWritingInvitation() {
-        NamedParameterJdbcTemplate jdbc = mock(NamedParameterJdbcTemplate.class);
+        VerifiedTeamInvitationMapper mapper = mock(VerifiedTeamInvitationMapper.class);
         TeamService teamService = mock(TeamService.class);
         TeamFormationService formationService = mock(TeamFormationService.class);
         AuditService auditService = mock(AuditService.class);
         VerifiedTeamInvitationService service = new VerifiedTeamInvitationService(
-                jdbc,
+                mapper,
                 teamService,
                 formationService,
                 auditService,
@@ -39,34 +37,33 @@ class VerifiedTeamInvitationFirstInviteTest {
                 "STUDENT");
 
         when(formationService.currentBatchId(user.studentId())).thenReturn(7L);
-        when(jdbc.queryForList(
-                anyString(),
-                org.mockito.ArgumentMatchers.any(MapSqlParameterSource.class)))
-                .thenReturn(List.of(Map.of(
+        when(mapper.findEligibleInvitee(7L, "202600000011", "受邀学生"))
+                .thenReturn(Map.of(
                         "id", 101L,
                         "student_number", "202600000011",
                         "student_name", "受邀学生",
-                        "gender", "F")))
-                .thenReturn(List.of());
+                        "gender", "F"));
+        when(mapper.findLeaderTeamForUpdate(7L, 100L))
+                .thenReturn(null)
+                .thenReturn(Map.of(
+                        "id", 31L,
+                        "batch_id", 7L,
+                        "team_status", "FORMING",
+                        "member_role", "LEADER",
+                        "team_max_size", 5,
+                        "inviter_gender", "F"));
         when(formationService.create(user)).thenReturn(Map.of(
                 "id", 31L,
                 "batch_id", 7L,
                 "team_status", "FORMING",
                 "member_role", "LEADER",
                 "team_max_size", 5));
-        when(jdbc.queryForList(anyString(), anyMap()))
-                .thenReturn(List.of(Map.of("gender", "F")));
-        when(jdbc.queryForObject(anyString(), anyMap(), eq(Integer.class)))
-                .thenReturn(1);
-        when(jdbc.queryForObject(
-                anyString(),
-                org.mockito.ArgumentMatchers.any(MapSqlParameterSource.class),
-                eq(Integer.class)))
-                .thenReturn(0, 0);
-        when(jdbc.update(
-                anyString(),
-                org.mockito.ArgumentMatchers.any(MapSqlParameterSource.class)))
-                .thenReturn(1);
+        when(mapper.findInvitationGuards(31L, 7L, 101L)).thenReturn(Map.of(
+                "occupied_count", 1,
+                "joined_elsewhere", 0,
+                "duplicate_pending", 0));
+        when(mapper.upsertInvitedMember(31L, 7L, 101L)).thenReturn(1);
+        when(mapper.insertInvitation(eq(31L), eq(100L), eq(101L), anyString())).thenReturn(1);
 
         Map<String, Object> result = service.invite(
                 "202600000011",

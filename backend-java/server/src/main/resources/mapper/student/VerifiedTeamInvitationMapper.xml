@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.wust.dormitory.student.mapper.VerifiedTeamInvitationMapper">
+    <select id="findEligibleInvitee" resultType="map">
+        SELECT invitee.id,
+               invitee.student_number,
+               invitee.student_name,
+               invitee.gender
+        FROM batch_student_eligibility eligibility
+        JOIN student invitee ON invitee.id = eligibility.student_id
+        WHERE eligibility.batch_id = #{batchId}
+          AND eligibility.eligibility_status = 'ELIGIBLE'
+          AND invitee.student_number = #{studentNumber}
+          AND invitee.student_name = #{studentName}
+        LIMIT 2
+    </select>
+
+    <select id="findLeaderTeamForUpdate" resultType="map">
+        SELECT team.id,
+               team.batch_id,
+               team.team_status,
+               member.member_role,
+               batch_record.team_max_size,
+               inviter.gender AS inviter_gender
+        FROM selection_team_member member
+        JOIN selection_team team ON team.id = member.team_id
+        JOIN selection_batch batch_record ON batch_record.id = team.batch_id
+        JOIN student inviter ON inviter.id = member.student_id
+        WHERE member.batch_id = #{batchId}
+          AND member.student_id = #{studentId}
+          AND member.member_status IN ('JOINED', 'LOCKED')
+          AND team.team_status IN ('FORMING', 'LOCKED', 'SELECTING')
+        LIMIT 1
+        FOR UPDATE
+    </select>
+
+    <select id="findInvitationGuards" resultType="map">
+        SELECT COALESCE(member_stats.joined_count, 0)
+                 + COALESCE(invitation_stats.pending_count, 0) AS occupied_count,
+               COALESCE(invitee_membership.joined_elsewhere, 0) AS joined_elsewhere,
+               COALESCE(duplicate_invitation.duplicate_pending, 0) AS duplicate_pending
+        FROM (SELECT 1 AS seed) seed
+        LEFT JOIN (
+            SELECT COUNT(*) AS joined_count
+            FROM selection_team_member member
+            WHERE member.team_id = #{teamId}
+              AND member.member_status IN ('JOINED', 'LOCKED')
+        ) member_stats ON 1 = 1
+        LEFT JOIN (
+            SELECT COUNT(*) AS pending_count
+            FROM team_invitation invitation
+            WHERE invitation.team_id = #{teamId}
+              AND invitation.invitation_status = 'PENDING'
+              AND invitation.expires_at &gt; CURRENT_TIMESTAMP(3)
+        ) invitation_stats ON 1 = 1
+        LEFT JOIN (
+            SELECT COUNT(*) AS joined_elsewhere
+            FROM selection_team_member member
+            WHERE member.batch_id = #{batchId}
+              AND member.student_id = #{inviteeStudentId}
+              AND member.member_status IN ('JOINED', 'LOCKED')
+        ) invitee_membership ON 1 = 1
+        LEFT JOIN (
+            SELECT COUNT(*) AS duplicate_pending
+            FROM team_invitation invitation
+            WHERE invitation.team_id = #{teamId}
+              AND invitation.invitee_student_id = #{inviteeStudentId}
+              AND invitation.invitation_status = 'PENDING'
+              AND invitation.expires_at &gt; CURRENT_TIMESTAMP(3)
+        ) duplicate_invitation ON 1 = 1
+    </select>
+
+    <insert id="upsertInvitedMember">
+        INSERT INTO selection_team_member
+        (team_id, batch_id, student_id, member_role, member_status)
+        VALUES (#{teamId}, #{batchId}, #{studentId}, 'MEMBER', 'INVITED')
+        ON DUPLICATE KEY UPDATE
+            member_role = 'MEMBER',
+            member_status = 'INVITED',
+            joined_at = NULL,
+            left_at = NULL
+    </insert>
+
+    <insert id="insertInvitation">
+        INSERT INTO team_invitation
+        (team_id, inviter_student_id, invitee_student_id,
+         invitation_status, invitation_token, expires_at)
+        VALUES (#{teamId}, #{inviterId}, #{inviteeId}, 'PENDING', #{token},
+                DATE_ADD(CURRENT_TIMESTAMP(3), INTERVAL 24 HOUR))
+    </insert>
+
+    <select id="hasPendingInvitation" resultType="int">
+        SELECT COUNT(*)
+        FROM team_invitation invitation
+        JOIN selection_team team ON team.id = invitation.team_id
+        WHERE invitation.team_id = #{teamId}
+          AND invitation.invitee_student_id = #{studentId}
+          AND invitation.invitation_status = 'PENDING'
+          AND invitation.expires_at &gt; CURRENT_TIMESTAMP(3)
+          AND team.team_status = 'FORMING'
+    </select>
+
+    <select id="findPendingInvitationForUpdate" resultType="map">
+        SELECT invitation.id AS invitation_id,
+               invitation.invitee_student_id,
+               student.student_number,
+               student.student_name,
+               team.team_status,
+               team.leader_student_id
+        FROM team_invitation invitation
+        JOIN selection_team team ON team.id = invitation.team_id
+        JOIN student ON student.id = invitation.invitee_student_id
+        WHERE invitation.team_id = #{teamId}
+          AND invitation.invitee_student_id = #{inviteeStudentId}
+          AND invitation.invitation_status = 'PENDING'
+          AND invitation.expires_at &gt; CURRENT_TIMESTAMP(3)
+        LIMIT 1
+        FOR UPDATE
+    </select>
+
+    <update id="cancelInvitation">
+        UPDATE team_invitation
+        SET invitation_status = 'CANCELLED',
+            responded_at = CURRENT_TIMESTAMP(3)
+        WHERE id = #{invitationId}
+          AND invitation_status = 'PENDING'
+    </update>
+
+    <update id="removeInvitedMember">
+        UPDATE selection_team_member
+        SET member_status = 'REMOVED',
+            left_at = CURRENT_TIMESTAMP(3)
+        WHERE team_id = #{teamId}
+          AND student_id = #{studentId}
+          AND member_status = 'INVITED'
+    </update>
+
+    <insert id="insertCancellationNotification">
+        INSERT INTO student_notification
+        (student_id, notification_type, title_key, message_key, parameters_json)
+        VALUES (#{studentId}, 'TEAM_INVITATION_CANCELLED',
+                'notification.invitationWithdrawn.title',
+                'notification.invitationWithdrawn.message',
+                CAST(#{parameters} AS JSON))
+    </insert>
+</mapper>

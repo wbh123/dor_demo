@@ -75,7 +75,10 @@ for token in ("executionKey", "MAX_NOTIFICATION_RECIPIENTS", "chunk", "scheduled
 require("NotificationChannel.IN_APP" in notification_dispatch,
         "this delivery implements only the in-app notification channel")
 
-snapshot = read("backend-java/server/src/main/java/com/wust/dormitory/analytics/BatchAnalyticsSnapshotService.java")
+snapshot = (
+    read("backend-java/server/src/main/java/com/wust/dormitory/analytics/BatchAnalyticsSnapshotService.java")
+    + read("backend-java/server/src/main/resources/mapper/analytics/BatchAnalyticsSnapshotMapper.xml")
+)
 for token in ("metricVersion", "snapshot", "FINISHED", "immutable", "updatedAt"):
     require(token in snapshot, f"historical snapshot behavior missing: {token}")
 metric = read("backend-java/server/src/main/java/com/wust/dormitory/analytics/MetricDefinition.java")
