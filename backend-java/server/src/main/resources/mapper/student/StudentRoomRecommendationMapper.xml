@@ -75,23 +75,9 @@
 
     <select id="findCandidateRooms" resultMap="RoomRecommendationCandidateResultMap">
         WITH scoped_rooms AS (
-            SELECT scope.room_id
-            FROM batch_room_scope scope
-            WHERE scope.batch_id = #{batchId}
-            UNION
-            SELECT room.id
-            FROM batch_building_scope scope
-            JOIN dormitory_floor floor
-              ON floor.building_id = scope.building_id
-            JOIN room
-              ON room.floor_id = floor.id
-            WHERE scope.batch_id = #{batchId}
-            UNION
-            SELECT bed.room_id
-            FROM batch_bed_scope scope
-            JOIN bed
-              ON bed.id = scope.bed_id
-            WHERE scope.batch_id = #{batchId}
+            SELECT room_id
+            FROM active_batch_room_lock
+            WHERE batch_id = #{batchId}
         ),
         scoped_beds AS (
             SELECT scope.bed_id
@@ -162,9 +148,6 @@
           ON floor.id = room.floor_id
         JOIN dormitory_building building
           ON building.id = floor.building_id
-        JOIN active_batch_room_lock active_lock
-          ON active_lock.batch_id = #{batchId}
-         AND active_lock.room_id = room.id
         LEFT JOIN resident_stats
           ON resident_stats.room_id = room.id
         LEFT JOIN available_beds
