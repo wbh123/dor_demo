@@ -38,11 +38,15 @@ for token in (
         "FROM student WHERE gender = 'F'",
         "FROM room) AS room_count",
         "FROM bed WHERE operational_status = 'ENABLED'",
-        "FROM bed_assignment) AS active_assignment_count",
+        "COUNT(DISTINCT student_id)",
+        "FROM room_assignment",
+        "assignment_status = 'ACTIVE'",
         "batch_status IN ('PUBLISHED', 'OPEN', 'PAUSED')",
 ):
     if token not in xml:
-        raise AssertionError(f"工作台统计缺少既有业务口径：{token}")
+        raise AssertionError(f"工作台统计缺少当前业务口径：{token}")
+if "FROM bed_assignment) AS active_assignment_count" in xml:
+    raise AssertionError("已分配人数不得继续按历史/当前床位分配行数统计")
 if "SELECT *" in xml:
     raise AssertionError("AdminDashboardMapper XML 不得使用 SELECT *")
 
