@@ -2,6 +2,7 @@ package com.wust.dormitory.admin;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wust.dormitory.audit.AuditService;
+import com.wust.dormitory.residency.AdminBedSwapService;
 import com.wust.dormitory.residency.ResidencyPolicyService;
 import com.wust.dormitory.residency.ResidencyService;
 import com.wust.dormitory.roomchange.RoomChangeService;
@@ -77,8 +78,17 @@ class AdminRuntimeMySqlIntegrationTest {
     void residencyAdjustmentContextExecutesAgainstMySql84() {
         ResidencyService residencyService = mock(ResidencyService.class);
         when(residencyService.current(100L)).thenReturn(Map.of("resident", false));
+        AdminResidencyAdjustmentMapper adjustmentMapper = mock(AdminResidencyAdjustmentMapper.class);
+        when(adjustmentMapper.findCompatibleBeds(100L, -1L, null)).thenReturn(List.of(Map.of(
+                "bed_id", 22L,
+                "room_id", 12L,
+                "swap_required", 0)));
         AdminStudentResidencyAdjustmentService service =
-                new AdminStudentResidencyAdjustmentService(jdbc, residencyService);
+                new AdminStudentResidencyAdjustmentService(
+                        jdbc,
+                        residencyService,
+                        adjustmentMapper,
+                        mock(AdminBedSwapService.class));
 
         Map<String, Object> result = service.context(100L);
 
