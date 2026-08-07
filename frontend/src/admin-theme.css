@@ -1,0 +1,18 @@
+html[data-wust-theme='green']{
+  --primary:#16845b;
+  --primary-dark:#0f6545;
+  --accent:#2f9b72;
+  --success:#16845b;
+  --shadow:0 16px 40px rgba(20,105,75,.09);
+}
+html[data-wust-theme='green'] .sidebar{background:linear-gradient(180deg,#0d533d 0%,#093c2d 100%)}
+html[data-wust-theme='green'] .school-brand{background:linear-gradient(180deg,rgba(13,83,61,.98),rgba(13,83,61,.92))}
+html[data-wust-theme='green'] .brand-mark{background:linear-gradient(135deg,#1ca46f,#0f7751);box-shadow:0 10px 24px rgba(22,132,91,.28)}
+html[data-wust-theme='green'] .button.primary{box-shadow:0 8px 20px rgba(22,132,91,.22)}
+html[data-wust-theme='green'] .button.secondary{color:#176648;background:#edf9f4;border-color:#d1ecdf}
+html[data-wust-theme='green'] .input:focus{border-color:#55a989;box-shadow:0 0 0 4px rgba(22,132,91,.10)}
+html[data-wust-theme='green'] .segment button.active{color:#176648}
+html[data-wust-theme='green'] .question-number{color:#176648;background:#eaf7f1}
+html[data-wust-theme='green'] .choice-item input:checked + span{color:#176648;border-color:#68b79a;background:#edf9f4;box-shadow:0 0 0 3px rgba(22,132,91,.08)}
+html[data-wust-theme='green'] .progress-pill{color:#176648;background:#eaf7f1}
+html[data-wust-theme='green'] .login-hero{background:radial-gradient(circle at 75% 20%,rgba(68,174,132,.45),transparent 30%),linear-gradient(145deg,#083e2e,#12694c 55%,#198258)}
