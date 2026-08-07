@@ -5,7 +5,7 @@ import ActionConfirmDialog from '../../components/common/ActionConfirmDialog.vue
 import RoomBedScene3D from '../../components/student/RoomBedScene3D.vue'
 import TeamBedAssignmentPanel, { type TeamMemberAssignment } from '../../components/student/TeamBedAssignmentPanel.vue'
 import { api, subscribeRoomEvents } from '../../api/client'
-import type { DataObject, ListSuccessResponse, ObjectSuccessResponse } from '../../api/types'
+import type { DataObject, ObjectSuccessResponse } from '../../api/types'
 import { bedTypeLabel } from '../../utils/bedLabels'
 
 const route = useRoute()
@@ -47,7 +47,6 @@ const dropdownValue = computed(() => isTeamMode.value ? '' : (selectedBedIds.val
 const sceneDisabled = computed(() => submitting.value || !teamNoticeAccepted.value || (isTeamMode.value && holdToken.value.length > 0))
 
 onMounted(async () => {
-  await loadTeamMembers()
   await load()
   timer = window.setInterval(() => {
     now.value = Date.now()
@@ -66,24 +65,28 @@ onBeforeUnmount(() => {
   if (toastTimer) window.clearTimeout(toastTimer)
 })
 
-async function loadTeamMembers() {
-  if (!teamId) return
-  try {
-    const response = await api.get<ListSuccessResponse>(`/api/v1/student/teams/${teamId}/selection-members`)
-    teamMembers.value = (response.data.data ?? []) as DataObject[]
-    memberAssignments.value = teamMembers.value.map(member => ({ studentId: Number(member.studentId), bedId: 0 }))
-  } catch (reason) {
-    error.value = reason instanceof Error ? reason.message : '队伍成员加载失败'
-  }
-}
-
 async function load(showLoading = true) {
   if (showLoading) loading.value = true
   try {
-    const response = await api.get<ObjectSuccessResponse>(`/api/v1/student/batches/${batchId}/rooms/${roomId}`)
+    const query = teamId ? `?teamId=${encodeURIComponent(String(teamId))}` : ''
+    const response = await api.get<ObjectSuccessResponse>(`/api/v1/student/batches/${batchId}/rooms/${roomId}/selection/bootstrap${query}`)
     const data = (response.data.data ?? {}) as DataObject
     room.value = (data.room ?? {}) as DataObject
     beds.value = (data.beds ?? []) as DataObject[]
+    const incomingMembers = Array.isArray(data.teamMembers) ? data.teamMembers as DataObject[] : []
+    if (isTeamMode.value) {
+      const currentAssignments = new Map(memberAssignments.value.map(item => [Number(item.studentId), Number(item.bedId)]))
+      teamMembers.value = incomingMembers
+      if (!holdToken.value) {
+        memberAssignments.value = incomingMembers.map(member => ({
+          studentId: Number(member.studentId),
+          bedId: currentAssignments.get(Number(member.studentId)) ?? 0,
+        }))
+        selectedBedIds.value = memberAssignments.value.map(item => Number(item.bedId)).filter(Boolean)
+      }
+    }
+    const serverTime = Date.parse(String(data.serverTime ?? ''))
+    if (Number.isFinite(serverTime)) now.value = serverTime
   } catch (reason) {
     error.value = reason instanceof Error ? reason.message : '房间加载失败'
   } finally {
@@ -108,6 +111,16 @@ function showToast(text: string) {
   toastMessage.value = text
   if (toastTimer) window.clearTimeout(toastTimer)
   toastTimer = window.setTimeout(() => { toastMessage.value = ''; toastTimer = undefined }, 3000)
+}
+function markHeldBeds(bedIds: number[]) {
+  const held = new Set(bedIds)
+  beds.value = beds.value.map(bed => held.has(Number(bed.id)) ? { ...bed, status: 'HELD_BY_ME' } : bed)
+}
+function markBedsAvailable(bedIds: number[]) {
+  const released = new Set(bedIds)
+  beds.value = beds.value.map(bed => released.has(Number(bed.id)) && bed.status === 'HELD_BY_ME'
+    ? { ...bed, status: 'AVAILABLE' }
+    : bed)
 }
 async function selectFromDropdown(event: Event) {
   const bedId = Number((event.target as HTMLSelectElement).value)
@@ -150,8 +163,8 @@ async function createHold() {
   try {
     const bedIds = isTeamMode.value ? orderedTeamBedIds.value : [...selectedBedIds.value]
     await requestHold(bedIds)
+    markHeldBeds(bedIds)
     if (isTeamMode.value) message.value = `${memberCount.value}个成员床位已整体临时保留，请在倒计时内确认。`
-    await load(false)
   } catch (reason) {
     if (!isTeamMode.value) selectedBedIds.value = []
     error.value = reason instanceof Error ? reason.message : '床位保留失败'
@@ -163,8 +176,8 @@ async function switchIndividualBed(nextBed: DataObject) {
   if (!previousBedId || !previousToken || !nextBedId) return
   submitting.value = true; error.value = ''; message.value = ''; let previousReleased = false
   try {
-    await releaseIndividualHold(previousBedId, previousToken); previousReleased = true; holdToken.value = ''; expiresAt.value = null; selectedBedIds.value = [nextBedId]
-    await requestHold([nextBedId]); await load(false)
+    await releaseIndividualHold(previousBedId, previousToken); previousReleased = true; markBedsAvailable([previousBedId]); holdToken.value = ''; expiresAt.value = null; selectedBedIds.value = [nextBedId]
+    await requestHold([nextBedId]); markHeldBeds([nextBedId])
   } catch (reason) {
     if (previousReleased) { holdToken.value = ''; expiresAt.value = null; selectedBedIds.value = []; error.value = reason instanceof Error ? `原床位已释放，但新床位保留失败：${reason.message}` : '原床位已释放，但新床位保留失败，请重新选择。'; await load(false) }
     else error.value = reason instanceof Error ? `当前床位释放失败，尚未切换：${reason.message}` : '当前床位释放失败，尚未切换。'
@@ -177,7 +190,7 @@ async function releaseHold() {
   try {
     if (isTeamMode.value) await api.post(`/api/v1/student/batches/${batchId}/teams/${teamId}/release`, { bedIds, token: holdToken.value })
     else await releaseIndividualHold(bedIds[0], holdToken.value)
-    resetHold(true); showToast('已释放当前选择，可以重新选择床位。')
+    markBedsAvailable(bedIds); resetHold(false); showToast('已释放当前选择，可以重新选择床位。')
   } catch (reason) { error.value = reason instanceof Error ? reason.message : '床位释放失败' }
   finally { submitting.value = false }
 }
