@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.wust.dormitory.admin.mapper.BatchCopyMapper">
+    <select id="findSourceBatchForUpdate" resultType="map">
+        SELECT id,
+               batch_code,
+               batch_name,
+               batch_status,
+               selection_mode,
+               separate_student_categories,
+               questionnaire_version_id,
+               matching_weight_scheme_id,
+               rule_template_id,
+               hold_duration_seconds,
+               hold_renewal_limit,
+               allow_team,
+               team_min_size,
+               team_max_size,
+               allow_student_random,
+               unselected_strategy,
+               rule_version
+        FROM selection_batch
+        WHERE id = #{batchId}
+        FOR UPDATE
+    </select>
+
+    <select id="countBatchCode" resultType="int">
+        SELECT COUNT(*)
+        FROM selection_batch
+        WHERE batch_code = #{batchCode}
+    </select>
+
+    <select id="validateTemplateReferences" resultType="map">
+        SELECT EXISTS(
+                   SELECT 1 FROM questionnaire_version WHERE id = #{questionnaireId}
+               ) AS questionnaire_exists,
+               EXISTS(
+                   SELECT 1 FROM matching_weight_scheme WHERE id = #{schemeId}
+               ) AS scheme_exists,
+               EXISTS(
+                   SELECT 1 FROM batch_rule_template WHERE id = #{ruleTemplateId}
+               ) AS rule_template_exists
+    </select>
+
+    <select id="findScopeCounts" resultType="map">
+        SELECT SUM(scope_type = 'BUILDING') AS building_count,
+               SUM(scope_type = 'ROOM') AS room_count,
+               SUM(scope_type = 'BED') AS bed_count
+        FROM (
+            SELECT 'BUILDING' AS scope_type
+            FROM batch_building_scope
+            WHERE batch_id = #{batchId}
+            UNION ALL
+            SELECT 'ROOM'
+            FROM batch_room_scope
+            WHERE batch_id = #{batchId}
+            UNION ALL
+            SELECT 'BED'
+            FROM batch_bed_scope
+            WHERE batch_id = #{batchId}
+        ) scopes
+    </select>
+
+    <select id="findUnavailableResources" resultType="string">
+        SELECT resource_message
+        FROM (
+            SELECT 1 AS resource_order,
+                   b.building_code AS sort_building,
+                   0 AS sort_floor,
+                   '' AS sort_room,
+                   0 AS sort_bed,
+                   CONCAT('楼栋', b.building_name, '(', b.building_code, ')未启用') AS resource_message
+            FROM batch_building_scope scope
+            JOIN dormitory_building b ON b.id = scope.building_id
+            WHERE scope.batch_id = #{batchId}
+              AND b.enabled &lt;&gt; 1
+            UNION ALL
+            SELECT 2,
+                   b.building_code,
+                   f.floor_number,
+                   r.room_number,
+                   0,
+                   CONCAT('房间', b.building_name, '-', r.room_number,
+                          '状态为', r.operational_status)
+            FROM batch_room_scope scope
+            JOIN room r ON r.id = scope.room_id
+            JOIN dormitory_floor f ON f.id = r.floor_id
+            JOIN dormitory_building b ON b.id = f.building_id
+            WHERE scope.batch_id = #{batchId}
+              AND (b.enabled &lt;&gt; 1 OR r.operational_status &lt;&gt; 'ENABLED')
+            UNION ALL
+            SELECT 3,
+                   b.building_code,
+                   f.floor_number,
+                   r.room_number,
+                   bed.position_index,
+                   CONCAT('床位', b.building_name, '-', r.room_number, '-', bed.bed_code,
+                          '状态为', bed.operational_status)
+            FROM batch_bed_scope scope
+            JOIN bed ON bed.id = scope.bed_id
+            JOIN room r ON r.id = bed.room_id
+            JOIN dormitory_floor f ON f.id = r.floor_id
+            JOIN dormitory_building b ON b.id = f.building_id
+            WHERE scope.batch_id = #{batchId}
+              AND (b.enabled &lt;&gt; 1
+                   OR r.operational_status &lt;&gt; 'ENABLED'
+                   OR bed.operational_status &lt;&gt; 'ENABLED')
+        ) unavailable
+        ORDER BY resource_order, sort_building, sort_floor, sort_room, sort_bed
+        LIMIT #{limit}
+    </select>
+
+    <insert id="insertBatch" parameterType="map" useGeneratedKeys="true" keyProperty="id" keyColumn="id">
+        INSERT INTO selection_batch
+        (batch_code, batch_name, batch_status,
+         selection_mode, separate_student_categories,
+         questionnaire_version_id, matching_weight_scheme_id, rule_template_id,
+         start_at, end_at, hold_duration_seconds, hold_renewal_limit,
+         allow_team, team_min_size, team_max_size,
+         allow_student_random, unselected_strategy, rule_version, created_by)
+        VALUES
+        (#{batchCode}, #{batchName}, 'DRAFT',
+         #{selectionMode}, #{separateStudentCategories},
+         #{questionnaireVersionId}, #{matchingWeightSchemeId}, #{ruleTemplateId},
+         #{startAt}, #{endAt}, #{holdDurationSeconds}, #{holdRenewalLimit},
+         #{allowTeam}, #{teamMinSize}, #{teamMaxSize},
+         #{allowStudentRandom}, #{unselectedStrategy}, #{ruleVersion}, #{createdBy})
+    </insert>
+
+    <insert id="copyBuildingScope">
+        INSERT INTO batch_building_scope (batch_id, building_id)
+        SELECT #{newBatchId}, building_id
+        FROM batch_building_scope
+        WHERE batch_id = #{sourceBatchId}
+    </insert>
+
+    <insert id="copyRoomScope">
+        INSERT INTO batch_room_scope (batch_id, room_id)
+        SELECT #{newBatchId}, room_id
+        FROM batch_room_scope
+        WHERE batch_id = #{sourceBatchId}
+    </insert>
+
+    <insert id="copyBedScope">
+        INSERT INTO batch_bed_scope (batch_id, bed_id)
+        SELECT #{newBatchId}, bed_id
+        FROM batch_bed_scope
+        WHERE batch_id = #{sourceBatchId}
+    </insert>
+</mapper>
