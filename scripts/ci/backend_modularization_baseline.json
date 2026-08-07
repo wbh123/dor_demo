@@ -21,7 +21,6 @@
     "backend-java/server/src/main/java/com/wust/dormitory/student/StudentRoomRecommendationService.java": 345,
     "backend-java/server/src/main/java/com/wust/dormitory/student/StudentService.java": 669,
     "backend-java/server/src/main/java/com/wust/dormitory/student/TeamService.java": 748,
-    "backend-java/server/src/main/java/com/wust/dormitory/subscription/EntitlementAdminService.java": 407,
     "backend-java/server/src/main/java/com/wust/dormitory/waitlist/WaitlistService.java": 904
   },
   "large_controllers": {
