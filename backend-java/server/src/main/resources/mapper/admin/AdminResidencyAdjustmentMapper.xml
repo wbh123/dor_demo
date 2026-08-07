@@ -5,84 +5,27 @@
 <mapper namespace="com.wust.dormitory.admin.AdminResidencyAdjustmentMapper">
     <select id="findCompatibleBeds" resultType="map">
         WITH compatible_beds AS (
-            SELECT bed.id AS bed_id,
-                   bed.room_id,
-                   bed.bed_code,
-                   bed.bed_type,
-                   bed.position_index,
-                   layout.layout_x,
-                   layout.layout_z,
-                   layout.rotation_degrees,
-                   bed.operational_status,
-                   room.room_number,
-                   room.capacity,
-                   room.resident_scope,
-                   floor.floor_number,
-                   building.id AS building_id,
-                   building.building_code,
-                   building.building_name,
-                   EXISTS(
-                     SELECT 1
-                     FROM active_batch_room_lock room_lock
-                     WHERE room_lock.room_id=room.id
-                   ) AS room_locked,
+            SELECT bed.id AS bed_id, bed.room_id, bed.bed_code, bed.bed_type,
+                   bed.position_index, layout.layout_x, layout.layout_z,
+                   layout.rotation_degrees, bed.operational_status,
+                   room.room_number, room.capacity, room.resident_scope,
+                   floor.floor_number, building.id AS building_id,
+                   building.building_code, building.building_name,
+                   EXISTS(SELECT 1 FROM active_batch_room_lock room_lock WHERE room_lock.room_id=room.id) AS room_locked,
                    CASE
-                     WHEN EXISTS (
-                       SELECT 1
-                       FROM room_exchange_participant_lock exchange_lock
-                       JOIN room_assignment exchange_residency
-                         ON exchange_residency.student_id=exchange_lock.student_id
-                        AND exchange_residency.assignment_status='ACTIVE'
-                        AND exchange_residency.bed_id=bed.id
-                     ) THEN 'ROOM_EXCHANGE'
-                     WHEN EXISTS (
-                       SELECT 1
-                       FROM room_assignment residency
-                       WHERE residency.bed_id=bed.id
-                         AND residency.assignment_status='ACTIVE'
-                     ) THEN 'RESIDENCY'
-                     WHEN EXISTS (
-                       SELECT 1
-                       FROM bed_assignment assignment
-                       WHERE assignment.bed_id=bed.id
-                         AND assignment.assignment_status='ACTIVE'
-                     ) THEN 'ALLOCATION'
-                     WHEN EXISTS (
-                       SELECT 1
-                       FROM bed_confirmation_request confirmation
-                       WHERE confirmation.declared_bed_id=bed.id
-                         AND confirmation.request_status='PENDING'
-                     ) THEN 'PENDING_CONFIRMATION'
+                     WHEN EXISTS (SELECT 1 FROM room_exchange_participant_lock exchange_lock JOIN room_assignment exchange_residency ON exchange_residency.student_id=exchange_lock.student_id AND exchange_residency.assignment_status='ACTIVE' AND exchange_residency.bed_id=bed.id) THEN 'ROOM_EXCHANGE'
+                     WHEN EXISTS (SELECT 1 FROM room_assignment residency WHERE residency.bed_id=bed.id AND residency.assignment_status='ACTIVE') THEN 'RESIDENCY'
+                     WHEN EXISTS (SELECT 1 FROM bed_assignment assignment WHERE assignment.bed_id=bed.id AND assignment.assignment_status='ACTIVE') THEN 'ALLOCATION'
+                     WHEN EXISTS (SELECT 1 FROM bed_confirmation_request confirmation WHERE confirmation.declared_bed_id=bed.id AND confirmation.request_status='PENDING') THEN 'PENDING_CONFIRMATION'
                      ELSE 'AVAILABLE'
                    END AS occupancy_source,
                    COALESCE(
-                     (
-                       SELECT residency.student_id
-                       FROM room_assignment residency
-                       WHERE residency.bed_id=bed.id
-                         AND residency.assignment_status='ACTIVE'
-                       ORDER BY residency.assigned_at DESC, residency.id DESC
-                       LIMIT 1
-                     ),
-                     (
-                       SELECT assignment.student_id
-                       FROM bed_assignment assignment
-                       WHERE assignment.bed_id=bed.id
-                         AND assignment.assignment_status='ACTIVE'
-                       ORDER BY assignment.assigned_at DESC, assignment.id DESC
-                       LIMIT 1
-                     ),
-                     (
-                       SELECT confirmation.student_id
-                       FROM bed_confirmation_request confirmation
-                       WHERE confirmation.declared_bed_id=bed.id
-                         AND confirmation.request_status='PENDING'
-                       ORDER BY confirmation.submitted_at, confirmation.id
-                       LIMIT 1
-                     )
+                     (SELECT residency.student_id FROM room_assignment residency WHERE residency.bed_id=bed.id AND residency.assignment_status='ACTIVE' ORDER BY residency.assigned_at DESC,residency.id DESC LIMIT 1),
+                     (SELECT assignment.student_id FROM bed_assignment assignment WHERE assignment.bed_id=bed.id AND assignment.assignment_status='ACTIVE' ORDER BY assignment.assigned_at DESC,assignment.id DESC LIMIT 1),
+                     (SELECT confirmation.student_id FROM bed_confirmation_request confirmation WHERE confirmation.declared_bed_id=bed.id AND confirmation.request_status='PENDING' ORDER BY confirmation.submitted_at,confirmation.id LIMIT 1)
                    ) AS occupant_student_id
             FROM student
-            JOIN bed
+            CROSS JOIN bed
             JOIN room ON room.id=bed.room_id
             LEFT JOIN room_bed_layout layout ON layout.bed_id=bed.id
             JOIN dormitory_floor floor ON floor.id=room.floor_id
@@ -92,49 +35,27 @@
               AND room.operational_status='ENABLED'
               AND bed.operational_status='ENABLED'
               AND room.gender_restriction=student.gender
-              AND (
-                (student.student_category='DOMESTIC'
-                 AND room.resident_scope IN ('DOMESTIC_ONLY','MIXED'))
-                OR (student.student_category='INTERNATIONAL'
-                    AND room.resident_scope IN ('INTERNATIONAL_ONLY','MIXED'))
-              )
+              AND ((student.student_category='DOMESTIC' AND room.resident_scope IN ('DOMESTIC_ONLY','MIXED')) OR (student.student_category='INTERNATIONAL' AND room.resident_scope IN ('INTERNATIONAL_ONLY','MIXED')))
               AND (#{currentBedId} IS NULL OR bed.id&lt;&gt;#{currentBedId})
-              AND (
-                room.id=#{currentRoomId}
-                OR (SELECT COUNT(*)
-                    FROM room_assignment resident
-                    WHERE resident.room_id=room.id
-                      AND resident.assignment_status='ACTIVE') &lt; room.capacity
-              )
+              AND (room.id=#{currentRoomId} OR (SELECT COUNT(*) FROM room_assignment resident WHERE resident.room_id=room.id AND resident.assignment_status='ACTIVE') &lt; room.capacity)
         )
         SELECT compatible_beds.*,
                CASE WHEN compatible_beds.occupancy_source='AVAILABLE' THEN 0 ELSE 1 END AS occupied,
                occupant.student_number AS occupant_student_number,
                occupant.student_name AS occupant_student_name,
-               CONCAT(compatible_beds.building_name, ' ', compatible_beds.room_number,
-                      ' · ', compatible_beds.bed_code) AS display_name,
+               CONCAT(compatible_beds.building_name,' ',compatible_beds.room_number,' · ',compatible_beds.bed_code) AS display_name,
                CASE
                  WHEN compatible_beds.room_locked=1 THEN '该寝室正被选寝批次锁定，暂不能调整'
-                 WHEN compatible_beds.occupancy_source='ROOM_EXCHANGE' THEN CONCAT('该床位由', COALESCE(occupant.student_name,'学生'), '使用，且正在办理寝室交换')
-                 WHEN compatible_beds.occupancy_source='RESIDENCY' THEN CONCAT('该床位已有在住学生：', COALESCE(occupant.student_name,'未知学生'), '，选择后可交换床位')
-                 WHEN compatible_beds.occupancy_source='ALLOCATION' THEN CONCAT('该床位已分配给：', COALESCE(occupant.student_name,'未知学生'), '，选择后可交换床位')
-                 WHEN compatible_beds.occupancy_source='PENDING_CONFIRMATION' THEN CONCAT('该床位正在等待', COALESCE(occupant.student_name,'学生'), '核查，暂不能调整')
+                 WHEN compatible_beds.occupancy_source='ROOM_EXCHANGE' THEN CONCAT('该床位由',COALESCE(occupant.student_name,'学生'),'使用，且正在办理寝室交换')
+                 WHEN compatible_beds.occupancy_source='RESIDENCY' THEN CONCAT('该床位已有在住学生：',COALESCE(occupant.student_name,'未知学生'),'，选择后可交换床位')
+                 WHEN compatible_beds.occupancy_source='ALLOCATION' THEN CONCAT('该床位已分配给：',COALESCE(occupant.student_name,'未知学生'),'，选择后可交换床位')
+                 WHEN compatible_beds.occupancy_source='PENDING_CONFIRMATION' THEN CONCAT('该床位正在等待',COALESCE(occupant.student_name,'学生'),'核查，暂不能调整')
                  ELSE NULL
                END AS blocking_reason,
-               CASE
-                 WHEN compatible_beds.room_locked=0
-                  AND compatible_beds.occupancy_source IN ('AVAILABLE','RESIDENCY','ALLOCATION')
-                 THEN 1 ELSE 0
-               END AS selectable,
-               CASE
-                 WHEN compatible_beds.occupancy_source IN ('RESIDENCY','ALLOCATION')
-                 THEN 1 ELSE 0
-               END AS swap_required
+               CASE WHEN compatible_beds.room_locked=0 AND compatible_beds.occupancy_source IN ('AVAILABLE','RESIDENCY','ALLOCATION') THEN 1 ELSE 0 END AS selectable,
+               CASE WHEN compatible_beds.occupancy_source IN ('RESIDENCY','ALLOCATION') THEN 1 ELSE 0 END AS swap_required
         FROM compatible_beds
         LEFT JOIN student occupant ON occupant.id=compatible_beds.occupant_student_id
-        ORDER BY compatible_beds.building_code,
-                 compatible_beds.floor_number,
-                 compatible_beds.room_number,
-                 compatible_beds.bed_code
+        ORDER BY compatible_beds.building_code,compatible_beds.floor_number,compatible_beds.room_number,compatible_beds.bed_code
     </select>
 </mapper>
