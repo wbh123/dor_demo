@@ -1,0 +1,21 @@
+.feature-page .permission-groups{display:grid;gap:12px}
+.feature-page .permission-group{padding:14px!important}
+.feature-page .permission-group>header{margin-bottom:10px!important}
+.feature-page .permission-group>header p{margin:3px 0 0;font-size:12px}
+.feature-page .feature-list,.feature-page .compact-feature-grid{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px!important}
+.feature-page .feature-list>article{display:grid!important;grid-template-columns:auto minmax(0,1fr) auto!important;align-items:center!important;gap:8px!important;min-height:72px!important;padding:9px 10px!important;border-radius:11px!important}
+.feature-page .feature-info{min-width:0}
+.feature-page .feature-info>div{display:flex;align-items:center;gap:6px;min-width:0}
+.feature-page .feature-info strong{overflow:hidden;font-size:13px;text-overflow:ellipsis;white-space:nowrap}
+.feature-page .feature-info>div>span,.feature-page .feature-status-bubble{display:inline-flex;flex:0 0 auto;align-items:center;padding:2px 6px;border-radius:999px;background:var(--surface-soft,#f3f6fa);color:var(--text-muted);font-size:10px;font-weight:700}
+.feature-page .feature-info p{display:-webkit-box;margin:3px 0 0;overflow:hidden;color:var(--text-muted);font-size:11px;line-height:1.35;-webkit-box-orient:vertical;-webkit-line-clamp:2}
+.feature-page .feature-info small{display:none}
+.feature-page .feature-actions{gap:5px!important}
+.feature-page .feature-actions .restore{max-width:76px;padding:4px 6px!important;font-size:10px}
+.feature-page .batch-feature-check{margin:0!important}
+.feature-page .summary-grid{grid-template-columns:repeat(4,minmax(0,1fr));gap:8px!important}
+.feature-page .summary-grid article{padding:12px!important}
+.feature-page .toolbar{padding:12px!important}
+.feature-page .batch-controls{position:sticky;z-index:15;bottom:10px;padding:10px 12px!important;box-shadow:0 10px 30px rgba(15,23,42,.15)}
+@media(max-width:1200px){.feature-page .feature-list{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:760px){.feature-page .feature-list,.feature-page .summary-grid{grid-template-columns:1fr}.feature-page .batch-controls{position:static}}

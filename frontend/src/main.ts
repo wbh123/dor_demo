@@ -7,6 +7,7 @@ import { installTransientSuccessNotices } from './utils/installTransientSuccessN
 import './style.css'
 import './ux-refinement.css'
 import './room-selection-refinement.css'
+import './room-list-card-refinement.css'
 import './phase2-room-layout.css'
 import './room-scene-geometry-fix.css'
 import './matching-operations.css'
@@ -20,6 +21,8 @@ import './admin-layout-canvas-refinement.css'
 import './admin-operations-refinement.css'
 import './overlay-refinement.css'
 import './admin-density-refinement.css'
+import './brand-layout-refinement.css'
+import './platform-feature-compact.css'
 
 createApp(App).use(pinia).use(router).mount('#app')
 useI18n().installDomI18n()

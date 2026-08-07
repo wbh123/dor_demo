@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.wust.dormitory.notification.NotificationOptionMapper">
+    <select id="searchStudents" resultType="map">
+        SELECT student.id AS value,
+               CONCAT(student.student_name, ' · ', student.student_number) AS label,
+               CONCAT(COALESCE(major.major_name, '未设置专业'), ' · ',
+                      CASE student.gender WHEN 'M' THEN '男生' ELSE '女生' END) AS description
+        FROM student
+        LEFT JOIN major ON major.id=student.major_id
+        WHERE #{keyword}&lt;&gt;''
+          AND (
+            student.student_number LIKE CONCAT(#{keyword}, '%')
+            OR student.student_name LIKE CONCAT(#{keyword}, '%')
+          )
+        ORDER BY CASE WHEN student.student_number=#{keyword} THEN 0 ELSE 1 END,
+                 student.student_number
+        LIMIT 20
+    </select>
+
+    <select id="listBatches" resultType="map">
+        SELECT batch.id AS value,
+               batch.batch_name AS label,
+               CONCAT(batch.batch_status, ' · ',
+                      DATE_FORMAT(batch.open_at, '%Y-%m-%d %H:%i'), ' 至 ',
+                      DATE_FORMAT(batch.close_at, '%Y-%m-%d %H:%i')) AS description
+        FROM selection_batch batch
+        WHERE batch.batch_status NOT IN ('CANCELLED')
+        ORDER BY batch.created_at DESC, batch.id DESC
+        LIMIT 100
+    </select>
+
+    <select id="listMajors" resultType="map">
+        SELECT major.id AS value,
+               CONCAT(major.major_code, ' · ', major.major_name) AS label,
+               CASE WHEN major.enabled=1 THEN '启用' ELSE '停用' END AS description
+        FROM major
+        ORDER BY major.enabled DESC, major.major_code
+    </select>
+
+    <select id="listBuildings" resultType="map">
+        SELECT building.id AS value,
+               CONCAT(building.building_code, ' · ', building.building_name) AS label,
+               CASE WHEN building.enabled=1 THEN '正常开放' ELSE '已停用' END AS description
+        FROM dormitory_building building
+        ORDER BY building.enabled DESC, building.building_code
+    </select>
+</mapper>

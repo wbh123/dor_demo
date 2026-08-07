@@ -1,0 +1,14 @@
+.room-list-page .room-card-grid {
+  align-items: stretch;
+}
+
+.room-list-page .room-selection-card {
+  height: 100%;
+}
+
+.room-list-page .conflict-reason-list,
+.room-list-page .roommate-preference-list {
+  max-height: 120px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}

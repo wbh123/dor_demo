@@ -1,25 +1,36 @@
 openapi: 3.0.3
 info:
   title: 双人寝室与床位交换接口
-  version: 1.0.0
+  version: 1.1.0
 paths:
   /api/v1/student/room-exchanges/candidates:
     get:
       tags: [RoomExchange]
       operationId: listRoomExchangeCandidates
-      summary: 按完整或部分学号查询可发起交换的在住学生
+      summary: 按学号、姓名、楼栋和寝室号精确查询交换对象
+      description: 四项信息必须同时精确匹配；不提供模糊搜索或学生枚举。
       security: [{ bearerAuth: [] }]
       parameters:
         - name: studentNumber
           in: query
           required: true
-          description: 完整或部分学号；不支持姓名查询
-          schema:
-            type: string
-            minLength: 1
-            maxLength: 32
+          schema: { type: string, pattern: '^\d{12}$' }
+        - name: studentName
+          in: query
+          required: true
+          schema: { type: string, minLength: 1, maxLength: 128 }
+        - name: buildingId
+          in: query
+          required: true
+          schema: { type: integer, format: int64, minimum: 1 }
+        - name: roomNumber
+          in: query
+          required: true
+          schema: { type: string, minLength: 1, maxLength: 32 }
       responses:
-        '200': { $ref: '#/components/responses/ListSuccess' }
+        '200': { $ref: '#/components/responses/ObjectSuccess' }
+        '400': { $ref: '#/components/responses/ErrorResponse' }
+        '404': { $ref: '#/components/responses/ErrorResponse' }
         '409': { $ref: '#/components/responses/ErrorResponse' }
   /api/v1/student/room-exchanges:
     get:

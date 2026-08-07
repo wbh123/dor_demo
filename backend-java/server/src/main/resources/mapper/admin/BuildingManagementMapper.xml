@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.wust.dormitory.admin.mapper.BuildingManagementMapper">
+    <select id="listDetails" resultType="map">
+        SELECT building.id,
+               building.building_code,
+               building.building_name,
+               building.gender_restriction,
+               building.education_level_scope,
+               building.resident_scope,
+               building.enabled,
+               campus.campus_name,
+               COALESCE(MAX(floor.floor_number), 0) AS floor_count,
+               COUNT(DISTINCT room.id) AS room_count,
+               COUNT(DISTINCT CASE WHEN bed.operational_status&lt;&gt;'RETIRED' THEN bed.id END) AS bed_count,
+               COUNT(DISTINCT CASE WHEN residency.assignment_status='ACTIVE' THEN residency.student_id END) AS resident_count
+        FROM dormitory_building building
+        JOIN campus ON campus.id=building.campus_id
+        LEFT JOIN dormitory_floor floor ON floor.building_id=building.id
+        LEFT JOIN room ON room.floor_id=floor.id
+        LEFT JOIN bed ON bed.room_id=room.id
+        LEFT JOIN room_assignment residency ON residency.room_id=room.id
+        GROUP BY building.id, building.building_code, building.building_name,
+                 building.gender_restriction, building.education_level_scope,
+                 building.resident_scope, building.enabled, campus.campus_name
+        ORDER BY building.building_code, building.id
+    </select>
+
+    <select id="findForUpdate" resultType="map">
+        SELECT building.id,
+               building.building_code,
+               building.building_name,
+               building.gender_restriction,
+               building.education_level_scope,
+               building.resident_scope,
+               building.enabled,
+               COALESCE((
+                 SELECT MAX(floor.floor_number)
+                 FROM dormitory_floor floor
+                 WHERE floor.building_id=building.id
+               ), 0) AS floor_count
+        FROM dormitory_building building
+        WHERE building.id=#{buildingId}
+        FOR UPDATE
+    </select>
+
+    <select id="countDuplicateCode" resultType="int">
+        SELECT COUNT(*)
+        FROM dormitory_building
+        WHERE building_code=#{buildingCode}
+          AND id&lt;&gt;#{buildingId}
+    </select>
+
+    <select id="countIncompatibleRooms" resultType="int">
+        SELECT COUNT(*)
+        FROM room
+        JOIN dormitory_floor floor ON floor.id=room.floor_id
+        WHERE floor.building_id=#{buildingId}
+          AND (
+            (#{gender}&lt;&gt;'MIXED' AND room.gender_restriction&lt;&gt;#{gender})
+            OR (#{educationScope}&lt;&gt;'MIXED' AND room.education_level_scope&lt;&gt;#{educationScope})
+            OR (#{residentScope}&lt;&gt;'MIXED' AND room.resident_scope&lt;&gt;#{residentScope})
+          )
+    </select>
+
+    <select id="countRoomsAboveFloor" resultType="int">
+        SELECT COUNT(*)
+        FROM room
+        JOIN dormitory_floor floor ON floor.id=room.floor_id
+        WHERE floor.building_id=#{buildingId}
+          AND floor.floor_number&gt;#{floorCount}
+    </select>
+
+    <update id="updateBuilding">
+        UPDATE dormitory_building
+        SET building_code=#{buildingCode},
+            building_name=#{buildingName},
+            gender_restriction=#{gender},
+            education_level_scope=#{educationScope},
+            resident_scope=#{residentScope},
+            enabled=#{enabled}
+        WHERE id=#{buildingId}
+    </update>
+
+    <update id="enableFloorsWithinRange">
+        UPDATE dormitory_floor
+        SET enabled=1
+        WHERE building_id=#{buildingId}
+          AND floor_number&lt;=#{floorCount}
+    </update>
+
+    <update id="disableFloorsAboveRange">
+        UPDATE dormitory_floor
+        SET enabled=0
+        WHERE building_id=#{buildingId}
+          AND floor_number&gt;#{floorCount}
+    </update>
+
+    <insert id="insertFloorIfMissing">
+        INSERT INTO dormitory_floor (building_id, floor_number, floor_name, enabled)
+        SELECT #{buildingId}, #{floorNumber}, #{floorName}, 1
+        WHERE NOT EXISTS (
+            SELECT 1
+            FROM dormitory_floor
+            WHERE building_id=#{buildingId}
+              AND floor_number=#{floorNumber}
+        )
+    </insert>
+</mapper>
