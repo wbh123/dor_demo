@@ -1,6 +1,8 @@
 package com.wust.dormitory.residency;
 
 import com.wust.dormitory.common.error.BusinessException;
+import com.wust.dormitory.residency.mapper.RoomOccupancySnapshotMapper;
+import com.wust.dormitory.residency.model.persistence.RoomOccupancySnapshotRow;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
@@ -17,36 +19,42 @@ import java.util.Set;
 public class BatchRoomLockService {
     private final NamedParameterJdbcTemplate jdbc;
     private final ResidencyPolicyService policy;
+    private final RoomOccupancySnapshotMapper roomOccupancySnapshotMapper;
 
     public BatchRoomLockService(
             NamedParameterJdbcTemplate jdbc,
-            ResidencyPolicyService policy) {
+            ResidencyPolicyService policy,
+            RoomOccupancySnapshotMapper roomOccupancySnapshotMapper) {
         this.jdbc = jdbc;
         this.policy = policy;
+        this.roomOccupancySnapshotMapper = roomOccupancySnapshotMapper;
     }
 
     public Map<String, Object> preview(long batchId) {
         Map<String, Object> batch = policy.batch(batchId);
         Set<Long> roomIds = policy.roomIdsForBatch(batchId);
+        List<RoomOccupancySnapshotRow> snapshots = roomIds.isEmpty()
+                ? List.of()
+                : roomOccupancySnapshotMapper.findSnapshots(batchId, new ArrayList<>(roomIds));
         List<Map<String, Object>> rooms = new ArrayList<>();
         List<Map<String, Object>> blockers = new ArrayList<>();
         int totalCapacity = 0;
         int availableCapacity = 0;
 
-        for (Long roomId : roomIds) {
-            Map<String, Object> room = policy.room(roomId, false);
-            int activeResidents = policy.activeResidentCount(roomId);
-            int unknownBeds = policy.unknownBedResidentCount(roomId);
-            int remaining = Math.max(0, ((Number) room.get("capacity")).intValue() - activeResidents);
-            totalCapacity += ((Number) room.get("capacity")).intValue();
+        for (RoomOccupancySnapshotRow snapshot : snapshots) {
+            Map<String, Object> room = snapshot.roomMap();
+            int activeResidents = snapshot.activeResidents();
+            int unknownBeds = snapshot.unknownBeds();
+            int remaining = snapshot.remainingCapacity();
+            totalCapacity += snapshot.capacity();
             availableCapacity += remaining;
 
             List<Map<String, Object>> roomIssues = new ArrayList<>();
-            if (!"ENABLED".equals(String.valueOf(room.get("operational_status")))) {
+            if (!"ENABLED".equals(snapshot.operationalStatus())) {
                 roomIssues.add(issue("ROOM_NOT_AVAILABLE", "寝室当前不可用"));
             }
             if (((Number) batch.get("separate_student_categories")).intValue() == 1
-                    && "MIXED".equals(String.valueOf(room.get("resident_scope")))) {
+                    && "MIXED".equals(snapshot.residentScope())) {
                 roomIssues.add(issue(
                         "MIXED_ROOM_NOT_ALLOWED",
                         "当前批次要求国内生和国际生分开选寝，混住宿舍不能加入批次"));
@@ -56,23 +64,13 @@ public class BatchRoomLockService {
                         "ROOM_BED_MAPPING_REQUIRED",
                         unknownBeds + "名在住学生尚未确认实际床位，不能开放选床模式"));
             }
-            List<Map<String, Object>> conflicts = jdbc.queryForList("""
-                    SELECT l.batch_id, b.batch_code, b.batch_name, b.batch_status,
-                           l.selection_mode, l.locked_at
-                    FROM active_batch_room_lock l
-                    JOIN selection_batch b ON b.id=l.batch_id
-                    WHERE l.room_id=:roomId AND l.batch_id<>:batchId
-                    """, new MapSqlParameterSource()
-                    .addValue("roomId", roomId)
-                    .addValue("batchId", batchId));
-            if (!conflicts.isEmpty()) {
+            if (snapshot.conflictBatchName() != null) {
                 roomIssues.add(issue(
                         "ROOM_ACTIVE_BATCH_CONFLICT",
-                        "该寝室正在被批次“" + conflicts.getFirst().get("batch_name") + "”使用"));
+                        "该寝室正在被批次“" + snapshot.conflictBatchName() + "”使用"));
             }
 
-            Map<String, Object> view = new LinkedHashMap<>();
-            view.putAll(room);
+            Map<String, Object> view = new LinkedHashMap<>(room);
             view.put("activeResidents", activeResidents);
             view.put("confirmedBeds", activeResidents - unknownBeds);
             view.put("unconfirmedBeds", unknownBeds);
