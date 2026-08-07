@@ -41,7 +41,7 @@ const roomKeyword = ref('')
 const minimumAvailableBeds = ref(0)
 const roomPage = ref(1)
 const roomColumnCount = ref(4)
-const ROOM_ROWS_PER_PAGE = 3
+const ROOM_ROWS_PER_PAGE = 4
 const { subtitle, translateError } = useI18n()
 
 const selectionMode = computed(() => String(rooms.value[0]?.selectionMode ?? 'BED'))
