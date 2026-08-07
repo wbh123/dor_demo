@@ -1,0 +1,42 @@
+{
+  "java_line_limit": 300,
+  "controller_operation_limit": 12,
+  "large_java_files": {
+    "backend-java/server/src/main/java/com/wust/dormitory/admin/AdminController.java": 505,
+    "backend-java/server/src/main/java/com/wust/dormitory/admin/AdminService.java": 497,
+    "backend-java/server/src/main/java/com/wust/dormitory/admin/BatchCopyService.java": 364,
+    "backend-java/server/src/main/java/com/wust/dormitory/admin/BatchRuleTemplateService.java": 468,
+    "backend-java/server/src/main/java/com/wust/dormitory/admin/RoomImportService.java": 382,
+    "backend-java/server/src/main/java/com/wust/dormitory/admin/RoomLayoutService.java": 585,
+    "backend-java/server/src/main/java/com/wust/dormitory/admin/RoomManagementService.java": 384,
+    "backend-java/server/src/main/java/com/wust/dormitory/admin/SpreadsheetSupport.java": 342,
+    "backend-java/server/src/main/java/com/wust/dormitory/admin/StudentAdminService.java": 318,
+    "backend-java/server/src/main/java/com/wust/dormitory/admin/SystemSettingService.java": 316,
+    "backend-java/server/src/main/java/com/wust/dormitory/allocation/AdminAllocationService.java": 638,
+    "backend-java/server/src/main/java/com/wust/dormitory/allocation/OptimizedAllocationRunService.java": 728,
+    "backend-java/server/src/main/java/com/wust/dormitory/analytics/BatchAnalyticsSnapshotService.java": 400,
+    "backend-java/server/src/main/java/com/wust/dormitory/bedconfirmation/BedConfirmationService.java": 416,
+    "backend-java/server/src/main/java/com/wust/dormitory/importworkflow/ImportMutationService.java": 416,
+    "backend-java/server/src/main/java/com/wust/dormitory/matching/MatchingSchemeService.java": 469,
+    "backend-java/server/src/main/java/com/wust/dormitory/matching/MatchingService.java": 355,
+    "backend-java/server/src/main/java/com/wust/dormitory/notification/NotificationDispatchService.java": 302,
+    "backend-java/server/src/main/java/com/wust/dormitory/residency/ResidencyPolicyService.java": 330,
+    "backend-java/server/src/main/java/com/wust/dormitory/residency/ResidencyService.java": 494,
+    "backend-java/server/src/main/java/com/wust/dormitory/roomchange/RoomChangeService.java": 504,
+    "backend-java/server/src/main/java/com/wust/dormitory/roomexchange/RoomExchangeService.java": 647,
+    "backend-java/server/src/main/java/com/wust/dormitory/student/StudentController.java": 351,
+    "backend-java/server/src/main/java/com/wust/dormitory/student/StudentRoomRecommendationService.java": 395,
+    "backend-java/server/src/main/java/com/wust/dormitory/student/StudentService.java": 669,
+    "backend-java/server/src/main/java/com/wust/dormitory/student/TeamService.java": 748,
+    "backend-java/server/src/main/java/com/wust/dormitory/student/VerifiedTeamInvitationService.java": 361,
+    "backend-java/server/src/main/java/com/wust/dormitory/subscription/EntitlementAdminService.java": 407,
+    "backend-java/server/src/main/java/com/wust/dormitory/waitlist/WaitlistService.java": 904
+  },
+  "large_controllers": {
+    "backend-java/server/src/main/java/com/wust/dormitory/admin/AdminController.java": 36,
+    "backend-java/server/src/main/java/com/wust/dormitory/admin/AdminGovernanceController.java": 24,
+    "backend-java/server/src/main/java/com/wust/dormitory/platform/PlatformManagementController.java": 18,
+    "backend-java/server/src/main/java/com/wust/dormitory/student/StudentController.java": 30,
+    "backend-java/server/src/main/java/com/wust/dormitory/waitlist/WaitlistController.java": 14
+  }
+}
