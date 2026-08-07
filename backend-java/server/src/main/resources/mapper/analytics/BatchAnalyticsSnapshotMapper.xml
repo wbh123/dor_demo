@@ -1,0 +1,318 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.wust.dormitory.analytics.mapper.BatchAnalyticsSnapshotMapper">
+    <select id="findBatch" resultType="map">
+        SELECT id, batch_status, start_at, finished_at
+        FROM selection_batch
+        WHERE id = #{batchId}
+        FOR UPDATE
+    </select>
+
+    <select id="findSnapshot" resultType="map">
+        SELECT id, batch_id, metric_version, metrics_json, dimensions_json,
+               source_basis, data_updated_at, immutable, created_at
+        FROM batch_analytics_snapshot
+        WHERE batch_id = #{batchId}
+          AND metric_version = #{metricVersion}
+        LIMIT 1
+    </select>
+
+    <select id="findMissingFinishedBatchIds" resultType="long">
+        SELECT batch.id
+        FROM selection_batch batch
+        LEFT JOIN batch_analytics_snapshot snapshot
+               ON snapshot.batch_id = batch.id
+              AND snapshot.metric_version = #{metricVersion}
+        WHERE batch.batch_status = 'FINISHED'
+          AND snapshot.id IS NULL
+        ORDER BY batch.finished_at, batch.id
+        LIMIT #{limit}
+    </select>
+
+    <insert id="insertStudentFacts">
+        INSERT IGNORE INTO batch_analytics_student_fact
+        (batch_id, student_id, major_id, grade_year, degree_level, student_category,
+         campus_id, building_id, room_id, bed_id, room_type, assignment_method, match_score,
+         self_selected, team_selected, unified_allocated, unassigned, recommendation_adopted,
+         room_changed, exchanged, waitlist_requested, waitlist_assigned, manual_adjusted, snapshot_at)
+        WITH
+        batch_context AS (
+            SELECT id, start_at, COALESCE(finished_at, CURRENT_TIMESTAMP(3)) AS finished_at
+            FROM selection_batch
+            WHERE id = #{batchId}
+        ),
+        ranked_residency AS (
+            SELECT residency.id,
+                   residency.student_id,
+                   residency.batch_id,
+                   residency.room_id,
+                   residency.bed_id,
+                   residency.assignment_method,
+                   ROW_NUMBER() OVER (
+                       PARTITION BY residency.student_id
+                       ORDER BY residency.id DESC
+                   ) AS row_number
+            FROM room_assignment residency
+            JOIN batch_context batch
+              ON residency.assigned_at &lt;= batch.finished_at
+             AND (residency.batch_id = batch.id OR residency.batch_id IS NULL)
+        ),
+        latest_residency AS (
+            SELECT id, student_id, batch_id, room_id, bed_id, assignment_method
+            FROM ranked_residency
+            WHERE row_number = 1
+        ),
+        student_context AS (
+            SELECT eligibility.batch_id,
+                   student.id AS student_id,
+                   student.major_id,
+                   student.grade_year,
+                   student.degree_level,
+                   student.student_category,
+                   building.campus_id,
+                   building.id AS building_id,
+                   COALESCE(residency.room_id, assigned_bed.room_id) AS room_id,
+                   COALESCE(residency.bed_id, assignment.bed_id) AS bed_id,
+                   room.room_type,
+                   COALESCE(assignment.assignment_method, residency.assignment_method) AS assignment_method,
+                   assignment.allocation_run_id
+            FROM batch_student_eligibility eligibility
+            JOIN student ON student.id = eligibility.student_id
+            JOIN batch_context batch ON batch.id = eligibility.batch_id
+            LEFT JOIN bed_assignment assignment
+                   ON assignment.batch_id = eligibility.batch_id
+                  AND assignment.student_id = student.id
+                  AND assignment.assignment_status = 'ACTIVE'
+            LEFT JOIN latest_residency residency ON residency.student_id = student.id
+            LEFT JOIN bed assigned_bed ON assigned_bed.id = assignment.bed_id
+            LEFT JOIN room ON room.id = COALESCE(residency.room_id, assigned_bed.room_id)
+            LEFT JOIN dormitory_floor floor ON floor.id = room.floor_id
+            LEFT JOIN dormitory_building building ON building.id = floor.building_id
+            WHERE eligibility.eligibility_status = 'ELIGIBLE'
+        ),
+        allocation_score AS (
+            SELECT result.allocation_run_id,
+                   result.student_id,
+                   result.bed_id,
+                   MAX(result.score) AS score
+            FROM allocation_run_result result
+            JOIN student_context context
+              ON context.allocation_run_id = result.allocation_run_id
+             AND context.student_id = result.student_id
+             AND context.bed_id = result.bed_id
+            GROUP BY result.allocation_run_id, result.student_id, result.bed_id
+        ),
+        optimization_score AS (
+            SELECT run.batch_id,
+                   candidate.student_id,
+                   candidate.bed_id,
+                   MAX(candidate.score) AS score
+            FROM allocation_optimization_run run
+            JOIN allocation_optimization_candidate candidate ON candidate.run_id = run.id
+            JOIN student_context context
+              ON context.batch_id = run.batch_id
+             AND context.student_id = candidate.student_id
+             AND context.bed_id = candidate.bed_id
+            WHERE run.run_status = 'SUBMITTED'
+            GROUP BY run.batch_id, candidate.student_id, candidate.bed_id
+        ),
+        recommendation_fact AS (
+            SELECT request.batch_id,
+                   request.student_id,
+                   MAX(CAST(JSON_UNQUOTE(JSON_EXTRACT(request.response_json, '$.matchScore')) AS DECIMAL(10,4))) AS score,
+                   1 AS recommendation_adopted
+            FROM student_recommendation_request request
+            JOIN student_context context
+              ON context.batch_id = request.batch_id
+             AND context.student_id = request.student_id
+            JOIN batch_context batch ON batch.id = request.batch_id
+            WHERE request.created_at &lt;= batch.finished_at
+              AND (
+                  CAST(JSON_UNQUOTE(JSON_EXTRACT(request.response_json, '$.bed.id')) AS UNSIGNED) = context.bed_id
+                  OR CAST(JSON_UNQUOTE(JSON_EXTRACT(request.response_json, '$.room.id')) AS UNSIGNED) = context.room_id
+              )
+            GROUP BY request.batch_id, request.student_id
+        ),
+        room_change_fact AS (
+            SELECT source_residency.batch_id,
+                   request.student_id,
+                   1 AS room_changed
+            FROM room_change_request request
+            JOIN room_assignment source_residency ON source_residency.id = request.source_residency_id
+            JOIN batch_context batch ON batch.id = source_residency.batch_id
+            WHERE request.request_status = 'EXECUTED'
+              AND request.executed_at &lt;= batch.finished_at
+            GROUP BY source_residency.batch_id, request.student_id
+        ),
+        exchange_events AS (
+            SELECT initiator_source.batch_id,
+                   request.initiator_student_id AS student_id
+            FROM room_exchange_request request
+            JOIN room_assignment initiator_source ON initiator_source.id = request.initiator_residency_id
+            JOIN batch_context batch ON batch.id = initiator_source.batch_id
+            WHERE request.request_status = 'EXECUTED'
+              AND request.executed_at &lt;= batch.finished_at
+            UNION ALL
+            SELECT target_source.batch_id,
+                   request.target_student_id AS student_id
+            FROM room_exchange_request request
+            JOIN room_assignment target_source ON target_source.id = request.target_residency_id
+            JOIN batch_context batch ON batch.id = target_source.batch_id
+            WHERE request.request_status = 'EXECUTED'
+              AND request.executed_at &lt;= batch.finished_at
+        ),
+        exchange_fact AS (
+            SELECT batch_id, student_id, 1 AS exchanged
+            FROM exchange_events
+            GROUP BY batch_id, student_id
+        ),
+        waitlist_fact AS (
+            SELECT context.batch_id,
+                   context.student_id,
+                   MAX(CASE WHEN waitlist.id IS NOT NULL THEN 1 ELSE 0 END) AS waitlist_requested,
+                   MAX(CASE WHEN waitlist.entry_status = 'ASSIGNED'
+                                  AND waitlist.assigned_at BETWEEN batch.start_at AND batch.finished_at
+                            THEN 1 ELSE 0 END) AS waitlist_assigned
+            FROM student_context context
+            JOIN batch_context batch ON batch.id = context.batch_id
+            LEFT JOIN waitlist_entry waitlist
+                   ON waitlist.student_id = context.student_id
+                  AND waitlist.joined_at BETWEEN batch.start_at AND batch.finished_at
+            GROUP BY context.batch_id, context.student_id
+        )
+        SELECT context.batch_id,
+               context.student_id,
+               context.major_id,
+               context.grade_year,
+               context.degree_level,
+               context.student_category,
+               context.campus_id,
+               context.building_id,
+               context.room_id,
+               context.bed_id,
+               context.room_type,
+               context.assignment_method,
+               COALESCE(allocation_score.score, optimization_score.score, recommendation_fact.score),
+               CASE WHEN context.assignment_method IN ('SELF_SELECT','STUDENT_RANDOM','ROOM_SELECT','BED_SELECT') THEN 1 ELSE 0 END,
+               CASE WHEN context.assignment_method IN ('TEAM_SELECT','TEAM_ROOM_SELECT','TEAM_BED_SELECT') THEN 1 ELSE 0 END,
+               CASE WHEN context.assignment_method IN ('ADMIN_RANDOM','ADMIN_OPTIMIZED') THEN 1 ELSE 0 END,
+               CASE WHEN context.room_id IS NULL AND context.bed_id IS NULL THEN 1 ELSE 0 END,
+               COALESCE(recommendation_fact.recommendation_adopted, 0),
+               COALESCE(room_change_fact.room_changed, 0),
+               COALESCE(exchange_fact.exchanged, 0),
+               COALESCE(waitlist_fact.waitlist_requested, 0),
+               COALESCE(waitlist_fact.waitlist_assigned, 0),
+               CASE WHEN context.assignment_method IN ('MANUAL_ADJUSTMENT','DIRECT_ROOM','DIRECT_BED') THEN 1 ELSE 0 END,
+               #{snapshotAt}
+        FROM student_context context
+        LEFT JOIN allocation_score
+               ON allocation_score.allocation_run_id = context.allocation_run_id
+              AND allocation_score.student_id = context.student_id
+              AND allocation_score.bed_id = context.bed_id
+        LEFT JOIN optimization_score
+               ON optimization_score.batch_id = context.batch_id
+              AND optimization_score.student_id = context.student_id
+              AND optimization_score.bed_id = context.bed_id
+        LEFT JOIN recommendation_fact
+               ON recommendation_fact.batch_id = context.batch_id
+              AND recommendation_fact.student_id = context.student_id
+        LEFT JOIN room_change_fact
+               ON room_change_fact.batch_id = context.batch_id
+              AND room_change_fact.student_id = context.student_id
+        LEFT JOIN exchange_fact
+               ON exchange_fact.batch_id = context.batch_id
+              AND exchange_fact.student_id = context.student_id
+        LEFT JOIN waitlist_fact
+               ON waitlist_fact.batch_id = context.batch_id
+              AND waitlist_fact.student_id = context.student_id
+    </insert>
+
+    <select id="findAggregateMetrics" resultType="map">
+        WITH
+        fact_metrics AS (
+            SELECT COUNT(*) AS participant_count,
+                   COALESCE(SUM(self_selected), 0) AS self_selection_count,
+                   COALESCE(SUM(team_selected), 0) AS team_selection_count,
+                   COALESCE(SUM(unified_allocated), 0) AS unified_allocation_count,
+                   COALESCE(SUM(unassigned), 0) AS unassigned_count,
+                   COALESCE(SUM(recommendation_adopted), 0) AS recommendation_adoption_count,
+                   COALESCE(AVG(match_score), 0) AS average_match_score,
+                   COALESCE(MIN(match_score), 0) AS minimum_match_score,
+                   COALESCE(SUM(room_changed), 0) AS room_change_count,
+                   COALESCE(SUM(exchanged), 0) AS exchange_count,
+                   COALESCE(SUM(waitlist_requested), 0) AS waitlist_request_count,
+                   COALESCE(SUM(waitlist_assigned), 0) AS waitlist_assignment_count,
+                   COALESCE(SUM(CASE WHEN unassigned = 0 THEN 1 ELSE 0 END), 0) AS assigned_count
+            FROM batch_analytics_student_fact
+            WHERE batch_id = #{batchId}
+        ),
+        eligibility_metrics AS (
+            SELECT COUNT(*) AS student_total
+            FROM batch_student_eligibility
+            WHERE batch_id = #{batchId}
+        ),
+        history_metrics AS (
+            SELECT COUNT(*) AS manual_adjustment_count
+            FROM assignment_history
+            WHERE batch_id = #{batchId}
+              AND event_type = 'ADJUSTED'
+        ),
+        scope_room_ids AS (
+            SELECT room_id FROM batch_room_scope WHERE batch_id = #{batchId}
+            UNION
+            SELECT bed.room_id
+            FROM batch_bed_scope scope
+            JOIN bed ON bed.id = scope.bed_id
+            WHERE scope.batch_id = #{batchId}
+            UNION
+            SELECT room.id
+            FROM batch_building_scope scope
+            JOIN dormitory_floor floor ON floor.building_id = scope.building_id
+            JOIN room ON room.floor_id = floor.id
+            WHERE scope.batch_id = #{batchId}
+        ),
+        capacity_metrics AS (
+            SELECT COALESCE(SUM(room.capacity), 0) AS total_capacity
+            FROM room
+            JOIN scope_room_ids scope ON scope.room_id = room.id
+        ),
+        timing_metrics AS (
+            SELECT COALESCE(TIMESTAMPDIFF(SECOND, COALESCE(published_at, created_at), finished_at), 0)
+                     AS completion_duration_seconds
+            FROM selection_batch
+            WHERE id = #{batchId}
+        )
+        SELECT eligibility_metrics.student_total,
+               fact_metrics.participant_count,
+               fact_metrics.self_selection_count,
+               fact_metrics.team_selection_count,
+               fact_metrics.unified_allocation_count,
+               fact_metrics.unassigned_count,
+               fact_metrics.recommendation_adoption_count,
+               fact_metrics.average_match_score,
+               fact_metrics.minimum_match_score,
+               fact_metrics.room_change_count,
+               fact_metrics.exchange_count,
+               fact_metrics.waitlist_request_count,
+               fact_metrics.waitlist_assignment_count,
+               history_metrics.manual_adjustment_count,
+               CASE WHEN capacity_metrics.total_capacity = 0 THEN 0
+                    ELSE fact_metrics.assigned_count * 1.0 / capacity_metrics.total_capacity END AS bed_utilization_rate,
+               timing_metrics.completion_duration_seconds
+        FROM fact_metrics
+        CROSS JOIN eligibility_metrics
+        CROSS JOIN history_metrics
+        CROSS JOIN capacity_metrics
+        CROSS JOIN timing_metrics
+    </select>
+
+    <insert id="insertSnapshot">
+        INSERT INTO batch_analytics_snapshot
+        (batch_id, metric_version, metrics_json, dimensions_json,
+         source_basis, data_updated_at, immutable)
+        VALUES (#{batchId}, #{metricVersion}, CAST(#{metricsJson} AS JSON), CAST(#{dimensionsJson} AS JSON),
+                'BATCH_FINAL_RESULT', #{updatedAt}, 1)
+    </insert>
+</mapper>
