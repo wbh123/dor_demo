@@ -36,7 +36,7 @@
               AND bed.operational_status='ENABLED'
               AND room.gender_restriction=student.gender
               AND ((student.student_category='DOMESTIC' AND room.resident_scope IN ('DOMESTIC_ONLY','MIXED')) OR (student.student_category='INTERNATIONAL' AND room.resident_scope IN ('INTERNATIONAL_ONLY','MIXED')))
-              AND (#{currentBedId} IS NULL OR bed.id&lt;&gt;#{currentBedId})
+              AND (#{currentBedId,jdbcType=BIGINT} IS NULL OR bed.id&lt;&gt;#{currentBedId,jdbcType=BIGINT})
               AND (room.id=#{currentRoomId} OR (SELECT COUNT(*) FROM room_assignment resident WHERE resident.room_id=room.id AND resident.assignment_status='ACTIVE') &lt; room.capacity)
         )
         SELECT compatible_beds.*,
