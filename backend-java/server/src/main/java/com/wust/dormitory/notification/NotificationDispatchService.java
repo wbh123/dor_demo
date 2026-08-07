@@ -73,6 +73,40 @@ public class NotificationDispatchService {
     }
 
     @Transactional
+    public Map<String, Object> sendDirect(
+            NotificationRecipientResolver.RecipientCriteria criteria,
+            String titleZhCn,
+            String contentZhCn,
+            String titleEnUs,
+            String contentEnUs,
+            String reason,
+            CurrentUser operator) {
+        featureAccessService.require(FeatureCodes.P3_NOTIFICATION_SEND);
+        List<Long> recipients = recipientResolver.resolve(criteria);
+        enforceRecipientLimit(recipients.size());
+        String normalizedTitleZhCn = requiredText(titleZhCn, "请填写通知标题");
+        String normalizedContentZhCn = requiredText(contentZhCn, "请填写通知正文");
+        requireReason(reason);
+
+        Map<String, Object> parameters = new LinkedHashMap<>();
+        parameters.put("directTitleZhCn", normalizedTitleZhCn);
+        parameters.put("directContentZhCn", normalizedContentZhCn);
+        parameters.put("directTitleEnUs", clean(titleEnUs));
+        parameters.put("directContentEnUs", clean(contentEnUs));
+        parameters.put("operatorName", operator.displayName());
+        notificationService.sendInAppBulk(
+                recipients,
+                "ADMIN_NOTIFICATION",
+                "notification.direct.title",
+                "notification.direct.message",
+                parameters);
+        return Map.of(
+                "recipientCount", recipients.size(),
+                "channel", NotificationChannel.IN_APP.name(),
+                "direct", true);
+    }
+
+    @Transactional
     public Map<String, Object> schedule(
             NotificationRecipientResolver.RecipientCriteria criteria,
             long templateRevisionId,
@@ -300,5 +334,17 @@ public class NotificationDispatchService {
             throw new BusinessException("NOTIFICATION_REASON_REQUIRED", "发送通知必须填写原因");
         }
         return reason.trim();
+    }
+
+    private String requiredText(String value, String message) {
+        String normalized = clean(value);
+        if (normalized.isEmpty()) {
+            throw new BusinessException("NOTIFICATION_CONTENT_REQUIRED", message);
+        }
+        return normalized;
+    }
+
+    private String clean(String value) {
+        return value == null ? "" : value.trim();
     }
 }
