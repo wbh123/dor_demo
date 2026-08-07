@@ -37,8 +37,18 @@ def main() -> None:
     require("WITH SCOPED_ROOMS AS" in normalized, "candidate query must build scoped rooms once")
     require("WITH SCOPED_BEDS AS" in normalized, "bed query must build scoped beds once")
     require("RESIDENT_STATS AS" in normalized, "candidate query must pre-aggregate resident statistics")
-    require("OCCUPIED_BEDS AS" in normalized, "bed availability must use a reusable occupied-bed set")
-    require("LEFT JOIN OCCUPIED_BEDS" in normalized, "bed availability should use anti-join instead of row-correlated NOT EXISTS")
+    require("FROM SCOPED_ROOMS SCOPED JOIN ROOM_ASSIGNMENT ASSIGNMENT" in normalized,
+            "resident statistics must be restricted to current scoped rooms")
+    require("LEFT JOIN ROOM_ASSIGNMENT OCCUPIED" in normalized,
+            "bed availability must anti-join room_assignment directly")
+    require("OCCUPIED.ROOM_ID = BED.ROOM_ID" in normalized,
+            "occupied-bed anti-join must lead with room_id to match the residency composite index")
+    require("OCCUPIED.ASSIGNMENT_STATUS = 'ACTIVE'" in normalized,
+            "occupied-bed anti-join must filter active residencies in the join")
+    require("OCCUPIED.BED_ID = BED.ID" in normalized,
+            "occupied-bed anti-join must match bed_id after room/status")
+    require("OCCUPIED_BEDS AS" not in normalized,
+            "do not scan all active occupied beds into a global CTE")
     require("GROUP BY BED.ROOM_ID, BED.BED_TYPE" in normalized, "bed type counts must be grouped for all rooms")
     require("ASSIGNMENT.ROOM_ID IN" in normalized, "roommate features must be fetched in one room-id batch")
     require("BED.ROOM_ID IN" in normalized, "bed type counts must be fetched in one room-id batch")
