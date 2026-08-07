@@ -2,56 +2,16 @@
 import { ref } from 'vue'
 import WelcomeMessageEditor from './WelcomeMessageEditor.vue'
 
-export interface NotificationTemplateDraft {
-  templateId?: number
-  templateCode: string
-  templateName: string
-  titleZhCn: string
-  contentZhCn: string
-  titleEnUs: string
-  contentEnUs: string
-  enabled: boolean
-  creationReason: string
-}
-
-const props = defineProps<{ modelValue: NotificationTemplateDraft; busy?: boolean }>()
-const emit = defineEmits<{ 'update:modelValue': [value: NotificationTemplateDraft]; save: [] }>()
-const variables = ['studentName','studentNumber','batchName','buildingName','roomNumber','bedCode','openAt','closeAt','actionUrl']
-const tokenExamples: Record<string, string> = {
-  studentName: '张同学', studentNumber: '202600000001', batchName: '秋季选寝',
-  buildingName: '青菱公寓1栋', roomNumber: '301', bedCode: 'A床',
-  openAt: '8月20日 09:00', closeAt: '8月22日 18:00', actionUrl: '系统内相关页面',
-}
-const zhEditor = ref<InstanceType<typeof WelcomeMessageEditor> | null>(null)
-const enEditor = ref<InstanceType<typeof WelcomeMessageEditor> | null>(null)
-const activeLocale = ref<'zh'|'en'>('zh')
-
-function update<K extends keyof NotificationTemplateDraft>(key: K, value: NotificationTemplateDraft[K]) {
-  emit('update:modelValue', { ...props.modelValue, [key]: value })
-}
-function insert(name: string) {
-  const editor = activeLocale.value === 'en' ? enEditor.value : zhEditor.value
-  editor?.insertToken(name)
-}
+export interface NotificationTemplateDraft { templateId?:number;templateCode:string;templateName:string;titleZhCn:string;contentZhCn:string;titleEnUs:string;contentEnUs:string;enabled:boolean;creationReason:string }
+const props=defineProps<{modelValue:NotificationTemplateDraft;busy?:boolean}>();const emit=defineEmits<{ 'update:modelValue':[value:NotificationTemplateDraft];save:[] }>()
+const variables=['studentName','studentNumber','batchName','buildingName','roomNumber','bedCode','openAt','closeAt','actionUrl']
+const variableLabels:Record<string,string>={studentName:'学生姓名',studentNumber:'学号',batchName:'批次名称',buildingName:'楼栋',roomNumber:'寝室号',bedCode:'床位',openAt:'开放时间',closeAt:'结束时间',actionUrl:'相关页面'}
+const tokenExamples:Record<string,string>={studentName:'张同学',studentNumber:'202600000001',batchName:'秋季选寝',buildingName:'青菱公寓1栋',roomNumber:'301',bedCode:'A床',openAt:'8月20日 09:00',closeAt:'8月22日 18:00',actionUrl:'系统内相关页面'}
+const zhEditor=ref<InstanceType<typeof WelcomeMessageEditor>|null>(null);const enEditor=ref<InstanceType<typeof WelcomeMessageEditor>|null>(null);const activeLocale=ref<'zh'|'en'>('zh')
+function update<K extends keyof NotificationTemplateDraft>(key:K,value:NotificationTemplateDraft[K]){emit('update:modelValue',{...props.modelValue,[key]:value})}
+function insert(name:string){const editor=activeLocale.value==='en'?enEditor.value:zhEditor.value;editor?.insertToken(name)}
 </script>
-
-<template>
-  <div class="notification-template-editor">
-    <div class="form-grid two-column">
-      <label><span>模板编号</span><input class="input generated-code" :value="modelValue.templateCode" readonly placeholder="保存新模板后由系统自动生成" /></label>
-      <label><span>模板名称</span><input class="input" :value="modelValue.templateName" placeholder="例如：选寝开始提醒" @input="update('templateName', ($event.target as HTMLInputElement).value)" /></label>
-    </div>
-    <div class="variable-toolbar"><strong>插入学生信息</strong><button v-for="name in variables" :key="name" class="button ghost small" type="button" @click="insert(name)">{{ name }}</button><span>插入到当前正在编辑的正文光标位置</span></div>
-    <div class="language-grid">
-      <section><header><strong>汉语</strong><span>zh-CN</span></header><input class="input" :value="modelValue.titleZhCn" placeholder="中文标题" @input="update('titleZhCn', ($event.target as HTMLInputElement).value)" /><WelcomeMessageEditor ref="zhEditor" :model-value="modelValue.contentZhCn" :token-examples="tokenExamples" :maxlength="5000" placeholder="输入中文通知正文，可插入学生信息" @focus="activeLocale='zh'" @update:model-value="update('contentZhCn',$event)" /></section>
-      <section><header><strong>英语</strong><span>en-US</span></header><input class="input" :value="modelValue.titleEnUs" placeholder="English title" @input="update('titleEnUs', ($event.target as HTMLInputElement).value)" /><WelcomeMessageEditor ref="enEditor" :model-value="modelValue.contentEnUs" :token-examples="tokenExamples" :maxlength="5000" placeholder="English content (optional)" @focus="activeLocale='en'" @update:model-value="update('contentEnUs',$event)" /></section>
-    </div>
-    <label><span>保存为模板的原因</span><textarea class="input" rows="3" :value="modelValue.creationReason" placeholder="仅在保存模板时需要填写" @input="update('creationReason', ($event.target as HTMLTextAreaElement).value)" /></label>
-    <label class="inline-check"><input type="checkbox" :checked="modelValue.enabled" @change="update('enabled', ($event.target as HTMLInputElement).checked)" /><span>保存后启用该模板修订</span></label>
-    <div class="button-row"><button class="button secondary" type="button" :disabled="busy || !modelValue.templateName.trim() || modelValue.creationReason.trim().length<2" @click="emit('save')">{{ busy ? '保存中…' : modelValue.templateId ? '保存为新修订' : '将当前内容保存为模板' }}</button></div>
-  </div>
-</template>
-
+<template><div class="notification-template-editor"><div class="form-grid two-column"><label><span>模板编号</span><input class="input generated-code" :value="modelValue.templateCode" readonly placeholder="保存新模板后由系统自动生成" /></label><label><span>模板名称</span><input class="input" :value="modelValue.templateName" placeholder="例如：选寝开始提醒" @input="update('templateName',($event.target as HTMLInputElement).value)" /></label></div><div class="variable-toolbar"><strong>插入学生信息</strong><button v-for="name in variables" :key="name" class="variable-chip" type="button" :title="`插入 {{${name}}}`" @click="insert(name)">{{ variableLabels[name] }}</button><span>插入到当前正文光标位置</span></div><div class="language-grid"><section><header><strong>汉语</strong><span>zh-CN</span></header><input class="input" :value="modelValue.titleZhCn" placeholder="中文标题" @input="update('titleZhCn',($event.target as HTMLInputElement).value)" /><WelcomeMessageEditor ref="zhEditor" :model-value="modelValue.contentZhCn" :token-examples="tokenExamples" :maxlength="5000" placeholder="输入中文通知正文，可插入学生信息" @focus="activeLocale='zh'" @update:model-value="update('contentZhCn',$event)" /></section><section><header><strong>英语</strong><span>en-US</span></header><input class="input" :value="modelValue.titleEnUs" placeholder="English title" @input="update('titleEnUs',($event.target as HTMLInputElement).value)" /><WelcomeMessageEditor ref="enEditor" :model-value="modelValue.contentEnUs" :token-examples="tokenExamples" :maxlength="5000" placeholder="English content (optional)" @focus="activeLocale='en'" @update:model-value="update('contentEnUs',$event)" /></section></div><label><span>保存为模板的原因</span><textarea class="input" rows="3" :value="modelValue.creationReason" placeholder="仅在保存模板时需要填写" @input="update('creationReason',($event.target as HTMLTextAreaElement).value)" /></label><label class="inline-check"><input type="checkbox" :checked="modelValue.enabled" @change="update('enabled',($event.target as HTMLInputElement).checked)" /><span>保存后启用该模板修订</span></label><div class="button-row"><button class="button secondary" type="button" :disabled="busy||!modelValue.templateName.trim()||modelValue.creationReason.trim().length<2" @click="emit('save')">{{ busy?'保存中…':modelValue.templateId?'保存为新修订':'将当前内容保存为模板' }}</button></div></div></template>
 <style scoped>
-.notification-template-editor{display:grid;gap:14px}.generated-code{background:var(--surface-soft);color:var(--text-muted)}.variable-toolbar{display:flex;align-items:center;gap:7px;flex-wrap:wrap}.variable-toolbar>span{margin-left:auto;color:var(--text-muted);font-size:11px}.language-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.language-grid section{display:grid;grid-template-rows:auto auto minmax(170px,1fr);gap:10px;padding:14px;border:1px solid var(--border);border-radius:14px}.language-grid header{display:flex;justify-content:space-between}.language-grid header span{color:var(--text-muted);font-size:12px}.notification-template-editor>label{display:grid;gap:7px}.inline-check{display:flex!important;align-items:center;gap:8px}@media(max-width:760px){.language-grid{grid-template-columns:1fr}.variable-toolbar>span{width:100%;margin-left:0}}
+.notification-template-editor{display:grid;gap:14px}.generated-code{background:var(--surface-soft);color:var(--text-muted)}.variable-toolbar{display:flex;align-items:center;gap:7px;flex-wrap:wrap}.variable-toolbar>span{margin-left:auto;color:var(--text-muted);font-size:11px}.variable-chip{padding:5px 9px;border:1px solid color-mix(in srgb,var(--primary) 25%,var(--border));border-radius:999px;background:color-mix(in srgb,var(--primary) 7%,var(--panel));color:var(--primary);font-size:11px;font-weight:750;cursor:pointer}.language-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.language-grid section{display:grid;grid-template-rows:auto auto minmax(170px,1fr);gap:10px;padding:14px;border:1px solid var(--border);border-radius:14px}.language-grid header{display:flex;justify-content:space-between}.language-grid header span{color:var(--text-muted);font-size:12px}.notification-template-editor>label{display:grid;gap:7px}.inline-check{display:flex!important;align-items:center;gap:8px}@media(max-width:760px){.language-grid{grid-template-columns:1fr}.variable-toolbar>span{width:100%;margin-left:0}}
 </style>
