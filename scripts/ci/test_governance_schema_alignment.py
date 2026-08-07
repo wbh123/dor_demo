@@ -22,7 +22,10 @@ def require(condition: bool, message: str) -> None:
         errors.append(message)
 
 
-snapshot = read("backend-java/server/src/main/java/com/wust/dormitory/analytics/BatchAnalyticsSnapshotService.java")
+snapshot = (
+    read("backend-java/server/src/main/java/com/wust/dormitory/analytics/BatchAnalyticsSnapshotService.java")
+    + read("backend-java/server/src/main/resources/mapper/analytics/BatchAnalyticsSnapshotMapper.xml")
+)
 historical = read("backend-java/server/src/main/java/com/wust/dormitory/analytics/HistoricalAnalyticsService.java")
 lifecycle = read("backend-java/server/src/main/java/com/wust/dormitory/admin/BatchLifecycleService.java")
 audit = read("backend-java/server/src/main/java/com/wust/dormitory/audit/AuditQueryService.java")
