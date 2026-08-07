@@ -40,7 +40,7 @@
                          ON exchange_residency.student_id=exchange_lock.student_id
                         AND exchange_residency.assignment_status='ACTIVE'
                         AND exchange_residency.bed_id=bed.id
-                       ORDER BY exchange_lock.exchange_request_id
+                       ORDER BY exchange_lock.exchange_id
                        LIMIT 1
                      ),
                      (
