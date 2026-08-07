@@ -12,10 +12,12 @@ def read(path: str) -> str:
 
 class RequestedResidencyGovernanceRegressionTest(unittest.TestCase):
     def test_residency_adjustment_joins_layout_table(self):
-        source = read("backend-java/server/src/main/java/com/wust/dormitory/admin/AdminStudentResidencyAdjustmentService.java")
-        self.assertIn("LEFT JOIN room_bed_layout layout ON layout.bed_id=bed.id", source)
-        self.assertIn("layout.layout_x", source)
-        self.assertNotIn("bed.layout_x", source)
+        service = read("backend-java/server/src/main/java/com/wust/dormitory/admin/AdminStudentResidencyAdjustmentService.java")
+        mapper = read("backend-java/server/src/main/resources/mapper/admin/AdminResidencyAdjustmentMapper.xml")
+        self.assertIn("adjustmentMapper.findCompatibleBeds", service)
+        self.assertIn("LEFT JOIN room_bed_layout layout ON layout.bed_id=bed.id", mapper)
+        self.assertIn("layout.layout_x", mapper)
+        self.assertNotIn("bed.layout_x", mapper)
 
     def test_student_assignment_prefers_latest_actual_bed(self):
         source = read("backend-java/server/src/main/java/com/wust/dormitory/student/StudentService.java")
