@@ -15,4 +15,10 @@ public interface NotificationOptionMapper {
     List<Map<String, Object>> listMajors();
 
     List<Map<String, Object>> listBuildings();
+
+    List<Map<String, Object>> listGradeYears();
+
+    List<Map<String, Object>> listDegreeLevels();
+
+    List<Map<String, Object>> listStudentCategories();
 }
