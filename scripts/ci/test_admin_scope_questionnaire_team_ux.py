@@ -133,28 +133,6 @@ require(team_controller, (
     '"/teams/{teamId}/invitations/{studentId}"',
     "cancelTeamInvitation",
 ), "verified team invite and cancellation endpoints are incomplete")
-team_candidate_controller = read(
-    "backend-java/server/src/main/java/com/wust/dormitory/student/TeamInvitationCandidateController.java")
-team_candidate_service = read(
-    "backend-java/server/src/main/java/com/wust/dormitory/student/TeamInvitationCandidateService.java")
-team_candidate_mapper = read(
-    "backend-java/server/src/main/resources/mapper/student/TeamInvitationCandidateMapper.xml")
-require(team_candidate_controller, (
-    '"/api/v1/student/team-invitations/candidates"',
-    "@RequestParam(required = false) String keyword",
-), "team invitation candidate endpoint is missing")
-require(team_candidate_service, (
-    "keyword.length() < 2",
-    "formationService.currentBatchId",
-    "mapper.searchCandidates",
-), "team invitation candidate search must be scoped to the current batch")
-require(team_candidate_mapper, (
-    "eligibility.eligibility_status='ELIGIBLE'",
-    "candidate.gender=inviter.gender",
-    "candidate.id<>#{studentId}",
-    "candidate.student_number LIKE",
-    "candidate.student_name LIKE",
-), "team invitation candidate query must constrain eligible same-gender classmates")
 team_service = read(
     "backend-java/server/src/main/java/com/wust/dormitory/student/VerifiedTeamInvitationService.java")
 require(team_service, (
@@ -176,16 +154,12 @@ require(team_response_service, (
 
 team_view = read("frontend/src/views/student/TeamView.vue")
 require(team_view, (
-    "RemoteEntitySelect",
-    "inviteCandidateOptions",
-    "searchInviteCandidates",
-    "/team-invitations/candidates",
-    "selectedInviteeId",
-    "studentName",
+    "inviteStudentName",
+    "studentName }",
     "cancelInvitation",
     "TransientNotice",
     "/team-invitations/verified",
-), "team page must search eligible candidates, validate identity, cancel invitations and use popup notices")
+), "team page must validate identity, cancel invitations and use popup notices")
 
 spreadsheet = read("backend-java/server/src/main/java/com/wust/dormitory/admin/SpreadsheetSupport.java")
 require(spreadsheet, (
