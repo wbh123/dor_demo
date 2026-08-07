@@ -20,24 +20,36 @@
             <arg column="building_name" javaType="java.lang.String"/>
             <arg column="active_residents" javaType="int"/>
             <arg column="unknown_beds" javaType="int"/>
+            <arg column="available_beds" javaType="int"/>
             <arg column="conflict_batch_id" javaType="java.lang.Long"/>
             <arg column="conflict_batch_name" javaType="java.lang.String"/>
             <arg column="conflict_selection_mode" javaType="java.lang.String"/>
         </constructor>
     </resultMap>
 
-    <select id="findSnapshots" resultMap="RoomOccupancySnapshotResultMap">
+    <select id="findSnapshot" resultMap="RoomOccupancySnapshotResultMap">
         WITH resident_stats AS (
             SELECT ra.room_id,
                    COUNT(*) AS active_residents,
                    SUM(CASE WHEN ra.bed_id IS NULL THEN 1 ELSE 0 END) AS unknown_beds
             FROM room_assignment ra
             WHERE ra.assignment_status = 'ACTIVE'
-              AND ra.room_id IN
-              <foreach collection="roomIds" item="roomId" open="(" separator="," close=")">
-                  #{roomId}
-              </foreach>
+              AND ra.room_id = #{roomId}
             GROUP BY ra.room_id
+        ),
+        bed_stats AS (
+            SELECT bed.room_id,
+                   SUM(CASE
+                           WHEN bed.operational_status = 'ENABLED' AND occupied.id IS NULL THEN 1
+                           ELSE 0
+                       END) AS available_beds
+            FROM bed
+            LEFT JOIN room_assignment occupied
+                   ON occupied.room_id = bed.room_id
+                  AND occupied.bed_id = bed.id
+                  AND occupied.assignment_status = 'ACTIVE'
+            WHERE bed.room_id = #{roomId}
+            GROUP BY bed.room_id
         )
         SELECT r.id,
                r.room_number,
@@ -51,15 +63,73 @@
                b.id AS building_id,
                b.building_code,
                b.building_name,
-               COALESCE(stats.active_residents, 0) AS active_residents,
-               COALESCE(stats.unknown_beds, 0) AS unknown_beds,
+               COALESCE(residents.active_residents, 0) AS active_residents,
+               COALESCE(residents.unknown_beds, 0) AS unknown_beds,
+               COALESCE(beds.available_beds, 0) AS available_beds,
+               NULL AS conflict_batch_id,
+               NULL AS conflict_batch_name,
+               NULL AS conflict_selection_mode
+        FROM room r
+        JOIN dormitory_floor f ON f.id = r.floor_id
+        JOIN dormitory_building b ON b.id = f.building_id
+        LEFT JOIN resident_stats residents ON residents.room_id = r.id
+        LEFT JOIN bed_stats beds ON beds.room_id = r.id
+        WHERE r.id = #{roomId}
+    </select>
+
+    <select id="findSnapshots" resultMap="RoomOccupancySnapshotResultMap">
+        WITH resident_stats AS (
+            SELECT ra.room_id,
+                   COUNT(*) AS active_residents,
+                   SUM(CASE WHEN ra.bed_id IS NULL THEN 1 ELSE 0 END) AS unknown_beds
+            FROM room_assignment ra
+            WHERE ra.assignment_status = 'ACTIVE'
+              AND ra.room_id IN
+              <foreach collection="roomIds" item="roomId" open="(" separator="," close=")">
+                  #{roomId}
+              </foreach>
+            GROUP BY ra.room_id
+        ),
+        bed_stats AS (
+            SELECT bed.room_id,
+                   SUM(CASE
+                           WHEN bed.operational_status = 'ENABLED' AND occupied.id IS NULL THEN 1
+                           ELSE 0
+                       END) AS available_beds
+            FROM bed
+            LEFT JOIN room_assignment occupied
+                   ON occupied.room_id = bed.room_id
+                  AND occupied.bed_id = bed.id
+                  AND occupied.assignment_status = 'ACTIVE'
+            WHERE bed.room_id IN
+            <foreach collection="roomIds" item="roomId" open="(" separator="," close=")">
+                #{roomId}
+            </foreach>
+            GROUP BY bed.room_id
+        )
+        SELECT r.id,
+               r.room_number,
+               r.room_type,
+               r.capacity,
+               r.gender_restriction,
+               r.resident_scope,
+               r.operational_status,
+               r.state_version,
+               f.floor_number,
+               b.id AS building_id,
+               b.building_code,
+               b.building_name,
+               COALESCE(residents.active_residents, 0) AS active_residents,
+               COALESCE(residents.unknown_beds, 0) AS unknown_beds,
+               COALESCE(beds.available_beds, 0) AS available_beds,
                conflict_lock.batch_id AS conflict_batch_id,
                conflict_batch.batch_name AS conflict_batch_name,
                conflict_lock.selection_mode AS conflict_selection_mode
         FROM room r
         JOIN dormitory_floor f ON f.id = r.floor_id
         JOIN dormitory_building b ON b.id = f.building_id
-        LEFT JOIN resident_stats stats ON stats.room_id = r.id
+        LEFT JOIN resident_stats residents ON residents.room_id = r.id
+        LEFT JOIN bed_stats beds ON beds.room_id = r.id
         LEFT JOIN active_batch_room_lock conflict_lock
                ON conflict_lock.room_id = r.id
               AND conflict_lock.batch_id &lt;&gt; #{batchId}
@@ -69,5 +139,38 @@
             #{roomId}
         </foreach>
         ORDER BY r.id
+    </select>
+
+    <select id="countAvailableBedsForBatch" resultType="int">
+        WITH scoped_beds AS (
+            SELECT scope.bed_id
+            FROM batch_bed_scope scope
+            JOIN bed scoped_bed ON scoped_bed.id = scope.bed_id
+            WHERE scope.batch_id = #{batchId}
+              AND scoped_bed.room_id = #{roomId}
+            UNION
+            SELECT bed.id
+            FROM batch_room_scope scope
+            JOIN bed ON bed.room_id = scope.room_id
+            WHERE scope.batch_id = #{batchId}
+              AND scope.room_id = #{roomId}
+            UNION
+            SELECT bed.id
+            FROM batch_building_scope scope
+            JOIN dormitory_floor floor ON floor.building_id = scope.building_id
+            JOIN room room_scope ON room_scope.floor_id = floor.id
+            JOIN bed ON bed.room_id = room_scope.id
+            WHERE scope.batch_id = #{batchId}
+              AND room_scope.id = #{roomId}
+        )
+        SELECT COUNT(*)
+        FROM scoped_beds scoped
+        JOIN bed ON bed.id = scoped.bed_id
+        LEFT JOIN room_assignment occupied
+               ON occupied.room_id = bed.room_id
+              AND occupied.bed_id = bed.id
+              AND occupied.assignment_status = 'ACTIVE'
+        WHERE bed.operational_status = 'ENABLED'
+          AND occupied.id IS NULL
     </select>
 </mapper>

@@ -4,7 +4,6 @@
   "large_java_files": {
     "backend-java/server/src/main/java/com/wust/dormitory/admin/AdminController.java": 505,
     "backend-java/server/src/main/java/com/wust/dormitory/admin/AdminService.java": 497,
-    "backend-java/server/src/main/java/com/wust/dormitory/admin/BatchCopyService.java": 364,
     "backend-java/server/src/main/java/com/wust/dormitory/admin/BatchRuleTemplateService.java": 468,
     "backend-java/server/src/main/java/com/wust/dormitory/admin/RoomImportService.java": 382,
     "backend-java/server/src/main/java/com/wust/dormitory/admin/RoomLayoutService.java": 585,
@@ -15,8 +14,6 @@
     "backend-java/server/src/main/java/com/wust/dormitory/bedconfirmation/BedConfirmationService.java": 416,
     "backend-java/server/src/main/java/com/wust/dormitory/importworkflow/ImportMutationService.java": 416,
     "backend-java/server/src/main/java/com/wust/dormitory/matching/MatchingSchemeService.java": 469,
-    "backend-java/server/src/main/java/com/wust/dormitory/notification/NotificationDispatchService.java": 302,
-    "backend-java/server/src/main/java/com/wust/dormitory/residency/ResidencyPolicyService.java": 330,
     "backend-java/server/src/main/java/com/wust/dormitory/residency/ResidencyService.java": 494,
     "backend-java/server/src/main/java/com/wust/dormitory/roomchange/RoomChangeService.java": 504,
     "backend-java/server/src/main/java/com/wust/dormitory/roomexchange/RoomExchangeService.java": 647,

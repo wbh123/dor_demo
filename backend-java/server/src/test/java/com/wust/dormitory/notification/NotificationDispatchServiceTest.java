@@ -2,13 +2,13 @@ package com.wust.dormitory.notification;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wust.dormitory.common.error.BusinessException;
+import com.wust.dormitory.notification.mapper.NotificationDispatchMapper;
 import com.wust.dormitory.subscription.FeatureAccessService;
 import com.wust.dormitory.subscription.FeatureCodes;
 import com.wust.dormitory.subscription.QuotaCodes;
 import com.wust.dormitory.subscription.SubscriptionService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
@@ -19,15 +19,13 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.ArgumentMatchers.anyMap;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 class NotificationDispatchServiceTest {
-    private NamedParameterJdbcTemplate jdbc;
+    private NotificationDispatchMapper mapper;
     private FeatureAccessService featureAccessService;
     private SubscriptionService subscriptionService;
     private NotificationRecipientResolver recipientResolver;
@@ -36,13 +34,13 @@ class NotificationDispatchServiceTest {
 
     @BeforeEach
     void setUp() {
-        jdbc = mock(NamedParameterJdbcTemplate.class);
+        mapper = mock(NotificationDispatchMapper.class);
         featureAccessService = mock(FeatureAccessService.class);
         subscriptionService = mock(SubscriptionService.class);
         recipientResolver = mock(NotificationRecipientResolver.class);
         notificationService = mock(NotificationService.class);
         service = new NotificationDispatchService(
-                jdbc, featureAccessService, subscriptionService,
+                mapper, featureAccessService, subscriptionService,
                 recipientResolver, notificationService, new ObjectMapper());
         when(subscriptionService.currentSubscription()).thenReturn(new SubscriptionService.CurrentSubscription(
                 1L, 1L, 1, 8L, "STANDARD", "标准版", 1,
@@ -50,14 +48,14 @@ class NotificationDispatchServiceTest {
                 LocalDateTime.of(2026, 1, 1, 0, 0), null, false));
         when(subscriptionService.quotasForPlanRevision(8L))
                 .thenReturn(Map.of(QuotaCodes.MAX_NOTIFICATION_RECIPIENTS, 3L));
-        when(jdbc.queryForList(anyString(), anyMap())).thenReturn(List.of(Map.of(
+        when(mapper.findTemplateRevision(5L)).thenReturn(Map.of(
                 "id", 5L,
                 "title_zh_cn", "通知",
                 "content_zh_cn", "内容",
                 "title_en_us", "Notice",
                 "content_en_us", "Content",
                 "title_key", "notification.template.test.title",
-                "message_key", "notification.template.test.message")));
+                "message_key", "notification.template.test.message"));
     }
 
     @Test
@@ -85,7 +83,7 @@ class NotificationDispatchServiceTest {
         template.put("content_en_us", null);
         template.put("title_key", "notification.template.test.title");
         template.put("message_key", "notification.template.test.message");
-        when(jdbc.queryForList(anyString(), anyMap())).thenReturn(List.of(template));
+        when(mapper.findTemplateRevision(5L)).thenReturn(template);
 
         Map<String, Object> result = service.preflight(criteria, 5L, Map.of());
 
@@ -105,12 +103,12 @@ class NotificationDispatchServiceTest {
 
     @Test
     void anotherWorkerCannotDispatchTaskAfterAtomicClaimFails() {
-        when(jdbc.queryForList(anyString(), anyMap())).thenReturn(List.of(Map.of(
+        when(mapper.findDueTasks()).thenReturn(List.of(Map.of(
                 "id", 99L,
                 "executionKey", "unique-execution-key",
                 "template_revision_id", 5L,
                 "variables_json", "{}")));
-        when(jdbc.update(anyString(), anyMap())).thenReturn(0);
+        when(mapper.claimTask(99L)).thenReturn(0);
 
         int completed = service.dispatchDue();
 

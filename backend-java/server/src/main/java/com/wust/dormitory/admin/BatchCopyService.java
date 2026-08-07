@@ -1,5 +1,6 @@
 package com.wust.dormitory.admin;
 
+import com.wust.dormitory.admin.mapper.BatchCopyMapper;
 import com.wust.dormitory.audit.AuditService;
 import com.wust.dormitory.common.error.BusinessException;
 import com.wust.dormitory.security.CurrentUser;
@@ -7,14 +8,10 @@ import com.wust.dormitory.subscription.FeatureAccessService;
 import com.wust.dormitory.subscription.FeatureCodes;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpStatus;
-import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
-import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
-import org.springframework.jdbc.support.GeneratedKeyHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -23,15 +20,15 @@ import java.util.Map;
 public class BatchCopyService {
     private static final int MAX_RESOURCE_ERRORS = 20;
 
-    private final NamedParameterJdbcTemplate jdbc;
+    private final BatchCopyMapper mapper;
     private final AuditService auditService;
     private final FeatureAccessService featureAccessService;
 
     public BatchCopyService(
-            NamedParameterJdbcTemplate jdbc,
+            BatchCopyMapper mapper,
             AuditService auditService,
             FeatureAccessService featureAccessService) {
-        this.jdbc = jdbc;
+        this.mapper = mapper;
         this.auditService = auditService;
         this.featureAccessService = featureAccessService;
     }
@@ -64,7 +61,8 @@ public class BatchCopyService {
                     "源批次没有配置楼栋、房间或床位开放范围，不能复制");
         }
 
-        List<String> unavailableResources = unavailableResources(sourceBatchId);
+        List<String> unavailableResources = mapper.findUnavailableResources(
+                sourceBatchId, MAX_RESOURCE_ERRORS);
         if (!unavailableResources.isEmpty()) {
             throw new BusinessException(
                     "BATCH_COPY_RESOURCE_UNAVAILABLE",
@@ -73,9 +71,9 @@ public class BatchCopyService {
         }
 
         long newBatchId = insertBatch(source, normalized, operator);
-        int copiedBuildings = copyBuildingScope(sourceBatchId, newBatchId);
-        int copiedRooms = copyRoomScope(sourceBatchId, newBatchId);
-        int copiedBeds = copyBedScope(sourceBatchId, newBatchId);
+        int copiedBuildings = mapper.copyBuildingScope(sourceBatchId, newBatchId);
+        int copiedRooms = mapper.copyRoomScope(sourceBatchId, newBatchId);
+        int copiedBeds = mapper.copyBedScope(sourceBatchId, newBatchId);
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("id", newBatchId);
@@ -83,7 +81,7 @@ public class BatchCopyService {
         result.put("batchStatus", "DRAFT");
         result.put("selectionMode", source.get("selection_mode"));
         result.put("separateStudentCategories",
-                ((Number) source.get("separate_student_categories")).intValue() == 1);
+                number(source.get("separate_student_categories")) == 1);
         result.put("ruleTemplateId", source.get("rule_template_id"));
         result.put("buildingScopeCount", copiedBuildings);
         result.put("roomScopeCount", copiedRooms);
@@ -96,7 +94,7 @@ public class BatchCopyService {
         before.put("sourceBatchStatus", source.get("batch_status"));
         before.put("selectionMode", source.get("selection_mode"));
         before.put("separateStudentCategories",
-                ((Number) source.get("separate_student_categories")).intValue() == 1);
+                number(source.get("separate_student_categories")) == 1);
         before.put("ruleTemplateId", source.get("rule_template_id"));
 
         auditService.success(
@@ -129,32 +127,18 @@ public class BatchCopyService {
     }
 
     private Map<String, Object> sourceBatchForUpdate(long sourceBatchId) {
-        List<Map<String, Object>> rows = jdbc.queryForList("""
-                SELECT id, batch_code, batch_name, batch_status,
-                       selection_mode, separate_student_categories,
-                       questionnaire_version_id, matching_weight_scheme_id, rule_template_id,
-                       hold_duration_seconds, hold_renewal_limit,
-                       allow_team, team_min_size, team_max_size,
-                       allow_student_random, unselected_strategy, rule_version
-                FROM selection_batch
-                WHERE id=:batchId
-                FOR UPDATE
-                """, Map.of("batchId", sourceBatchId));
-        if (rows.isEmpty()) {
+        Map<String, Object> source = mapper.findSourceBatchForUpdate(sourceBatchId);
+        if (source == null || source.isEmpty()) {
             throw new BusinessException(
                     "BATCH_NOT_FOUND",
                     "选寝批次不存在",
                     HttpStatus.NOT_FOUND);
         }
-        return rows.getFirst();
+        return source;
     }
 
     private void ensureBatchCodeAvailable(String batchCode) {
-        Integer count = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM selection_batch WHERE batch_code=:batchCode",
-                Map.of("batchCode", batchCode),
-                Integer.class);
-        if (count != null && count > 0) {
+        if (mapper.countBatchCode(batchCode) > 0) {
             throw new BusinessException(
                     "BATCH_CODE_CONFLICT",
                     "批次编码已存在，请更换后重试",
@@ -171,16 +155,14 @@ public class BatchCopyService {
                     "BATCH_COPY_TEMPLATE_INCOMPLETE",
                     "源批次缺少个人偏好版本、匹配方案或批次规则模板，不能复制");
         }
-        int questionnaireCount = count(
-                "SELECT COUNT(*) FROM questionnaire_version WHERE id=:id",
-                Map.of("id", questionnaireId));
-        int schemeCount = count(
-                "SELECT COUNT(*) FROM matching_weight_scheme WHERE id=:id",
-                Map.of("id", schemeId));
-        int ruleTemplateCount = count(
-                "SELECT COUNT(*) FROM batch_rule_template WHERE id=:id",
-                Map.of("id", ruleTemplateId));
-        if (questionnaireCount != 1 || schemeCount != 1 || ruleTemplateCount != 1) {
+        Map<String, Object> references = mapper.validateTemplateReferences(
+                ((Number) questionnaireId).longValue(),
+                ((Number) schemeId).longValue(),
+                ((Number) ruleTemplateId).longValue());
+        if (references == null
+                || number(references.get("questionnaire_exists")) != 1
+                || number(references.get("scheme_exists")) != 1
+                || number(references.get("rule_template_exists")) != 1) {
             throw new BusinessException(
                     "BATCH_COPY_TEMPLATE_INCOMPLETE",
                     "源批次引用的个人偏好版本、匹配方案或批次规则模板已经不存在");
@@ -188,155 +170,53 @@ public class BatchCopyService {
     }
 
     private ScopeCounts scopeCounts(long batchId) {
+        Map<String, Object> counts = mapper.findScopeCounts(batchId);
         return new ScopeCounts(
-                count("SELECT COUNT(*) FROM batch_building_scope WHERE batch_id=:batchId",
-                        Map.of("batchId", batchId)),
-                count("SELECT COUNT(*) FROM batch_room_scope WHERE batch_id=:batchId",
-                        Map.of("batchId", batchId)),
-                count("SELECT COUNT(*) FROM batch_bed_scope WHERE batch_id=:batchId",
-                        Map.of("batchId", batchId)));
-    }
-
-    private List<String> unavailableResources(long batchId) {
-        List<String> result = new ArrayList<>();
-        result.addAll(jdbc.queryForList("""
-                SELECT CONCAT('楼栋', b.building_name, '(', b.building_code, ')未启用')
-                FROM batch_building_scope scope
-                JOIN dormitory_building b ON b.id=scope.building_id
-                WHERE scope.batch_id=:batchId AND b.enabled<>1
-                ORDER BY b.building_code
-                LIMIT 20
-                """, Map.of("batchId", batchId), String.class));
-
-        if (result.size() < MAX_RESOURCE_ERRORS) {
-            result.addAll(jdbc.queryForList("""
-                    SELECT CONCAT('房间', b.building_name, '-', r.room_number,
-                                  '状态为', r.operational_status)
-                    FROM batch_room_scope scope
-                    JOIN room r ON r.id=scope.room_id
-                    JOIN dormitory_floor f ON f.id=r.floor_id
-                    JOIN dormitory_building b ON b.id=f.building_id
-                    WHERE scope.batch_id=:batchId
-                      AND (b.enabled<>1 OR r.operational_status<>'ENABLED')
-                    ORDER BY b.building_code, f.floor_number, r.room_number
-                    LIMIT 20
-                    """, Map.of("batchId", batchId), String.class));
-        }
-
-        if (result.size() < MAX_RESOURCE_ERRORS) {
-            result.addAll(jdbc.queryForList("""
-                    SELECT CONCAT('床位', b.building_name, '-', r.room_number, '-', bed.bed_code,
-                                  '状态为', bed.operational_status)
-                    FROM batch_bed_scope scope
-                    JOIN bed ON bed.id=scope.bed_id
-                    JOIN room r ON r.id=bed.room_id
-                    JOIN dormitory_floor f ON f.id=r.floor_id
-                    JOIN dormitory_building b ON b.id=f.building_id
-                    WHERE scope.batch_id=:batchId
-                      AND (b.enabled<>1 OR r.operational_status<>'ENABLED'
-                           OR bed.operational_status<>'ENABLED')
-                    ORDER BY b.building_code, f.floor_number, r.room_number, bed.position_index
-                    LIMIT 20
-                    """, Map.of("batchId", batchId), String.class));
-        }
-
-        if (result.size() > MAX_RESOURCE_ERRORS) {
-            return List.copyOf(result.subList(0, MAX_RESOURCE_ERRORS));
-        }
-        return List.copyOf(result);
+                number(counts == null ? null : counts.get("building_count")),
+                number(counts == null ? null : counts.get("room_count")),
+                number(counts == null ? null : counts.get("bed_count")));
     }
 
     private long insertBatch(
             Map<String, Object> source,
             CopyCommand command,
             CurrentUser operator) {
-        GeneratedKeyHolder keyHolder = new GeneratedKeyHolder();
+        Map<String, Object> batch = new LinkedHashMap<>();
+        batch.put("batchCode", command.batchCode());
+        batch.put("batchName", command.batchName());
+        batch.put("selectionMode", source.get("selection_mode"));
+        batch.put("separateStudentCategories", source.get("separate_student_categories"));
+        batch.put("questionnaireVersionId", source.get("questionnaire_version_id"));
+        batch.put("matchingWeightSchemeId", source.get("matching_weight_scheme_id"));
+        batch.put("ruleTemplateId", source.get("rule_template_id"));
+        batch.put("startAt", command.startAt());
+        batch.put("endAt", command.endAt());
+        batch.put("holdDurationSeconds", source.get("hold_duration_seconds"));
+        batch.put("holdRenewalLimit", source.get("hold_renewal_limit"));
+        batch.put("allowTeam", source.get("allow_team"));
+        batch.put("teamMinSize", source.get("team_min_size"));
+        batch.put("teamMaxSize", source.get("team_max_size"));
+        batch.put("allowStudentRandom", source.get("allow_student_random"));
+        batch.put("unselectedStrategy", source.get("unselected_strategy"));
+        batch.put("ruleVersion", source.get("rule_version"));
+        batch.put("createdBy", operator.userId());
         try {
-            jdbc.update("""
-                    INSERT INTO selection_batch
-                    (batch_code, batch_name, batch_status,
-                     selection_mode, separate_student_categories,
-                     questionnaire_version_id, matching_weight_scheme_id, rule_template_id,
-                     start_at, end_at, hold_duration_seconds, hold_renewal_limit,
-                     allow_team, team_min_size, team_max_size,
-                     allow_student_random, unselected_strategy, rule_version, created_by)
-                    VALUES
-                    (:batchCode, :batchName, 'DRAFT',
-                     :selectionMode, :separateStudentCategories,
-                     :questionnaireVersionId, :matchingWeightSchemeId, :ruleTemplateId,
-                     :startAt, :endAt, :holdDurationSeconds, :holdRenewalLimit,
-                     :allowTeam, :teamMinSize, :teamMaxSize,
-                     :allowStudentRandom, :unselectedStrategy, :ruleVersion, :createdBy)
-                    """, new MapSqlParameterSource()
-                    .addValue("batchCode", command.batchCode())
-                    .addValue("batchName", command.batchName())
-                    .addValue("selectionMode", source.get("selection_mode"))
-                    .addValue("separateStudentCategories", source.get("separate_student_categories"))
-                    .addValue("questionnaireVersionId", source.get("questionnaire_version_id"))
-                    .addValue("matchingWeightSchemeId", source.get("matching_weight_scheme_id"))
-                    .addValue("ruleTemplateId", source.get("rule_template_id"))
-                    .addValue("startAt", command.startAt())
-                    .addValue("endAt", command.endAt())
-                    .addValue("holdDurationSeconds", source.get("hold_duration_seconds"))
-                    .addValue("holdRenewalLimit", source.get("hold_renewal_limit"))
-                    .addValue("allowTeam", source.get("allow_team"))
-                    .addValue("teamMinSize", source.get("team_min_size"))
-                    .addValue("teamMaxSize", source.get("team_max_size"))
-                    .addValue("allowStudentRandom", source.get("allow_student_random"))
-                    .addValue("unselectedStrategy", source.get("unselected_strategy"))
-                    .addValue("ruleVersion", source.get("rule_version"))
-                    .addValue("createdBy", operator.userId()),
-                    keyHolder,
-                    new String[]{"id"});
+            mapper.insertBatch(batch);
         } catch (DuplicateKeyException exception) {
             throw new BusinessException(
                     "BATCH_CODE_CONFLICT",
                     "批次编码已存在，请更换后重试",
                     HttpStatus.CONFLICT);
         }
-        Number key = keyHolder.getKey();
-        if (key == null) {
+        Object rawId = batch.get("id");
+        if (!(rawId instanceof Number id)) {
             throw new IllegalStateException("批次复制成功但没有返回新批次编号");
         }
-        return key.longValue();
+        return id.longValue();
     }
 
-    private int copyBuildingScope(long sourceBatchId, long newBatchId) {
-        return jdbc.update("""
-                INSERT INTO batch_building_scope (batch_id, building_id)
-                SELECT :newBatchId, building_id
-                FROM batch_building_scope
-                WHERE batch_id=:sourceBatchId
-                """, Map.of(
-                "sourceBatchId", sourceBatchId,
-                "newBatchId", newBatchId));
-    }
-
-    private int copyRoomScope(long sourceBatchId, long newBatchId) {
-        return jdbc.update("""
-                INSERT INTO batch_room_scope (batch_id, room_id)
-                SELECT :newBatchId, room_id
-                FROM batch_room_scope
-                WHERE batch_id=:sourceBatchId
-                """, Map.of(
-                "sourceBatchId", sourceBatchId,
-                "newBatchId", newBatchId));
-    }
-
-    private int copyBedScope(long sourceBatchId, long newBatchId) {
-        return jdbc.update("""
-                INSERT INTO batch_bed_scope (batch_id, bed_id)
-                SELECT :newBatchId, bed_id
-                FROM batch_bed_scope
-                WHERE batch_id=:sourceBatchId
-                """, Map.of(
-                "sourceBatchId", sourceBatchId,
-                "newBatchId", newBatchId));
-    }
-
-    private int count(String sql, Map<String, ?> parameters) {
-        Integer result = jdbc.queryForObject(sql, parameters, Integer.class);
-        return result == null ? 0 : result;
+    private int number(Object value) {
+        return value == null ? 0 : ((Number) value).intValue();
     }
 
     public record CopyCommand(

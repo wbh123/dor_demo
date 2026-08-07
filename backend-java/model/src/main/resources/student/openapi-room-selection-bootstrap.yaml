@@ -1,0 +1,36 @@
+openapi: 3.0.3
+info: { title: Student room selection bootstrap, version: 1.0.0 }
+paths:
+  /api/v1/student/batches/{batchId}/rooms/{roomId}/selection/bootstrap:
+    get:
+      tags: [StudentRoomSelectionBootstrap]
+      operationId: getStudentRoomSelectionBootstrap
+      summary: 获取具体寝室床位选择首屏数据
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/BatchId'
+        - $ref: '#/components/parameters/RoomId'
+        - name: teamId
+          in: query
+          required: false
+          schema: { type: integer, format: int64 }
+      responses:
+        '200': { $ref: '#/components/responses/ObjectSuccess' }
+        '403': { $ref: '#/components/responses/ErrorResponse' }
+components:
+  parameters:
+    BatchId: { name: batchId, in: path, required: true, schema: { type: integer, format: int64 } }
+    RoomId: { name: roomId, in: path, required: true, schema: { type: integer, format: int64 } }
+  responses:
+    ObjectSuccess:
+      description: success
+      content:
+        application/json:
+          schema: { $ref: '../common-response/openapi-common-response.yaml#/components/schemas/ObjectSuccessResponse' }
+    ErrorResponse:
+      description: error
+      content:
+        application/json:
+          schema: { $ref: '../common-response/openapi-common-response.yaml#/components/schemas/ErrorResponse' }
+  securitySchemes:
+    bearerAuth: { type: http, scheme: bearer, bearerFormat: Token }

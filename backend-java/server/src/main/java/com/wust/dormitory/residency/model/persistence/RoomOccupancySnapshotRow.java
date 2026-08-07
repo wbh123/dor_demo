@@ -18,6 +18,7 @@ public record RoomOccupancySnapshotRow(
         String buildingName,
         int activeResidents,
         int unknownBeds,
+        int availableBeds,
         Long conflictBatchId,
         String conflictBatchName,
         String conflictSelectionMode) {

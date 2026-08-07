@@ -1,6 +1,8 @@
 package com.wust.dormitory.residency;
 
 import com.wust.dormitory.common.error.BusinessException;
+import com.wust.dormitory.residency.mapper.RoomOccupancySnapshotMapper;
+import com.wust.dormitory.residency.model.persistence.RoomOccupancySnapshotRow;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
@@ -14,9 +16,13 @@ import java.util.Set;
 @Service
 public class ResidencyPolicyService {
     private final NamedParameterJdbcTemplate jdbc;
+    private final RoomOccupancySnapshotMapper snapshotMapper;
 
-    public ResidencyPolicyService(NamedParameterJdbcTemplate jdbc) {
+    public ResidencyPolicyService(
+            NamedParameterJdbcTemplate jdbc,
+            RoomOccupancySnapshotMapper snapshotMapper) {
         this.jdbc = jdbc;
+        this.snapshotMapper = snapshotMapper;
     }
 
     public Map<String, Object> student(long studentId) {
@@ -38,6 +44,9 @@ public class ResidencyPolicyService {
     }
 
     public Map<String, Object> room(long roomId, boolean forUpdate) {
+        if (!forUpdate) {
+            return snapshot(roomId).roomMap();
+        }
         String suffix = forUpdate ? " FOR UPDATE" : "";
         return one("""
                 SELECT r.id, r.room_number, r.room_type, r.capacity,
@@ -167,70 +176,23 @@ public class ResidencyPolicyService {
     }
 
     public int activeResidentCount(long roomId) {
-        Integer count = jdbc.queryForObject("""
-                SELECT COUNT(*) FROM room_assignment
-                WHERE room_id=:roomId AND assignment_status='ACTIVE'
-                """, Map.of("roomId", roomId), Integer.class);
-        return count == null ? 0 : count;
+        return snapshot(roomId).activeResidents();
     }
 
     public int unknownBedResidentCount(long roomId) {
-        Integer count = jdbc.queryForObject("""
-                SELECT COUNT(*) FROM room_assignment
-                WHERE room_id=:roomId AND assignment_status='ACTIVE' AND bed_id IS NULL
-                """, Map.of("roomId", roomId), Integer.class);
-        return count == null ? 0 : count;
+        return snapshot(roomId).unknownBeds();
     }
 
     public int availableCapacity(long roomId) {
-        Map<String, Object> room = room(roomId, false);
-        return Math.max(0, number(room.get("capacity")) - activeResidentCount(roomId));
+        return snapshot(roomId).remainingCapacity();
     }
 
     public int availableBedCount(long roomId) {
-        Integer count = jdbc.queryForObject("""
-                SELECT COUNT(*)
-                FROM bed b
-                WHERE b.room_id=:roomId AND b.operational_status='ENABLED'
-                  AND NOT EXISTS (
-                      SELECT 1 FROM room_assignment ra
-                      WHERE ra.bed_id=b.id AND ra.assignment_status='ACTIVE'
-                  )
-                """, Map.of("roomId", roomId), Integer.class);
-        return count == null ? 0 : count;
+        return snapshot(roomId).availableBeds();
     }
 
     public int availableBedCount(long batchId, long roomId) {
-        Integer count = jdbc.queryForObject("""
-                SELECT COUNT(*)
-                FROM bed target_bed
-                JOIN room target_room ON target_room.id=target_bed.room_id
-                JOIN dormitory_floor target_floor ON target_floor.id=target_room.floor_id
-                WHERE target_bed.room_id=:roomId
-                  AND target_bed.operational_status='ENABLED'
-                  AND (
-                      EXISTS (
-                          SELECT 1 FROM batch_bed_scope scope
-                          WHERE scope.batch_id=:batchId AND scope.bed_id=target_bed.id
-                      )
-                      OR EXISTS (
-                          SELECT 1 FROM batch_room_scope scope
-                          WHERE scope.batch_id=:batchId AND scope.room_id=target_room.id
-                      )
-                      OR EXISTS (
-                          SELECT 1 FROM batch_building_scope scope
-                          WHERE scope.batch_id=:batchId
-                            AND scope.building_id=target_floor.building_id
-                      )
-                  )
-                  AND NOT EXISTS (
-                      SELECT 1 FROM room_assignment ra
-                      WHERE ra.bed_id=target_bed.id AND ra.assignment_status='ACTIVE'
-                  )
-                """, new MapSqlParameterSource()
-                .addValue("batchId", batchId)
-                .addValue("roomId", roomId), Integer.class);
-        return count == null ? 0 : count;
+        return snapshotMapper.countAvailableBedsForBatch(batchId, roomId);
     }
 
     public Map<String, Object> requireAvailableBed(long roomId, long bedId) {
@@ -310,6 +272,14 @@ public class ResidencyPolicyService {
                     "寝室剩余容量不足，当前可容纳" + Math.max(0, remaining) + "人",
                     HttpStatus.CONFLICT);
         }
+    }
+
+    private RoomOccupancySnapshotRow snapshot(long roomId) {
+        RoomOccupancySnapshotRow snapshot = snapshotMapper.findSnapshot(roomId);
+        if (snapshot == null) {
+            throw new BusinessException("ROOM_NOT_FOUND", "宿舍不存在", HttpStatus.NOT_FOUND);
+        }
+        return snapshot;
     }
 
     private Map<String, Object> one(
