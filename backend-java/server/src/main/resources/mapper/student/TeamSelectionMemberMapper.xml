@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.wust.dormitory.student.TeamSelectionMemberMapper">
+    <select id="countLeaderAccess" resultType="int">
+        SELECT COUNT(*)
+        FROM selection_team team
+        JOIN selection_team_member member
+          ON member.team_id=team.id
+         AND member.student_id=#{studentId}
+        WHERE team.id=#{teamId}
+          AND member.member_role='LEADER'
+          AND member.member_status IN ('JOINED','LOCKED')
+          AND team.team_status IN ('FORMING','LOCKED','SELECTING')
+    </select>
+
+    <select id="findConfirmedMembers" resultType="map">
+        SELECT member.student_id AS studentId,
+               student.student_number AS studentNumber,
+               student.student_name AS studentName,
+               member.member_role AS memberRole,
+               member.member_status AS memberStatus,
+               major.major_name AS majorName
+        FROM selection_team_member member
+        JOIN student ON student.id=member.student_id
+        LEFT JOIN major ON major.id=student.major_id
+        WHERE member.team_id=#{teamId}
+          AND member.member_status IN ('JOINED','LOCKED')
+        ORDER BY CASE member.member_role WHEN 'LEADER' THEN 0 ELSE 1 END,
+                 student.student_number
+    </select>
+</mapper>
