@@ -16,7 +16,8 @@
     </select>
 
     <select id="findConfirmedMembers" resultType="map">
-        SELECT member.student_id AS studentId,
+        SELECT member.id AS memberSequence,
+               member.student_id AS studentId,
                student.student_number AS studentNumber,
                student.student_name AS studentName,
                member.member_role AS memberRole,
@@ -27,7 +28,6 @@
         LEFT JOIN major ON major.id=student.major_id
         WHERE member.team_id=#{teamId}
           AND member.member_status IN ('JOINED','LOCKED')
-        ORDER BY CASE member.member_role WHEN 'LEADER' THEN 0 ELSE 1 END,
-                 student.student_number
+        ORDER BY member.member_role='LEADER' DESC, member.id
     </select>
 </mapper>
