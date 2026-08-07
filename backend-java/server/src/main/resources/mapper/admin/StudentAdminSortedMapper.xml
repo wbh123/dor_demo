@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.wust.dormitory.admin.mapper.StudentAdminSortedMapper">
+    <resultMap id="StudentAdminDetailResultMap"
+               type="com.wust.dormitory.admin.model.persistence.StudentAdminDetailRow">
+        <constructor>
+            <idArg column="id" javaType="long"/>
+            <arg column="student_number" javaType="java.lang.String"/>
+            <arg column="student_name" javaType="java.lang.String"/>
+            <arg column="gender" javaType="java.lang.String"/>
+            <arg column="nationality_code" javaType="java.lang.String"/>
+            <arg column="student_category" javaType="java.lang.String"/>
+            <arg column="enrollment_source" javaType="java.lang.String"/>
+            <arg column="phone_number" javaType="java.lang.String"/>
+            <arg column="degree_level" javaType="java.lang.String"/>
+            <arg column="grade_year" javaType="java.lang.Integer"/>
+            <arg column="major_id" javaType="long"/>
+            <arg column="major_code" javaType="java.lang.String"/>
+            <arg column="major_name" javaType="java.lang.String"/>
+            <arg column="account_status" javaType="java.lang.String"/>
+            <arg column="currently_resident" javaType="boolean"/>
+            <arg column="current_residency_id" javaType="java.lang.Long"/>
+            <arg column="current_building_name" javaType="java.lang.String"/>
+            <arg column="current_room_number" javaType="java.lang.String"/>
+            <arg column="current_bed_code" javaType="java.lang.String"/>
+            <arg column="current_bed_type" javaType="java.lang.String"/>
+            <arg column="selection_review_status" javaType="java.lang.String"/>
+            <arg column="declared_bed_code" javaType="java.lang.String"/>
+            <arg column="declared_bed_type" javaType="java.lang.String"/>
+        </constructor>
+    </resultMap>
+
+    <sql id="Filters">
+        <where>
+            <if test="keywordPattern != null">
+                (s.student_number LIKE #{keywordPattern}
+                 OR s.student_name LIKE #{keywordPattern}
+                 OR s.phone_number LIKE #{keywordPattern})
+            </if>
+            <if test="gender != null">AND s.gender = #{gender}</if>
+            <if test="majorId != null">AND s.major_id = #{majorId}</if>
+            <if test="studentCategory != null">AND s.student_category = #{studentCategory}</if>
+            <if test="enrollmentSource != null">AND s.enrollment_source = #{enrollmentSource}</if>
+        </where>
+    </sql>
+
+    <select id="countStudents" resultType="java.lang.Long">
+        SELECT COUNT(*) FROM student s <include refid="Filters"/>
+    </select>
+
+    <select id="findStudents" resultMap="StudentAdminDetailResultMap">
+        WITH filtered_students AS (
+            SELECT s.id,
+                   s.student_number,
+                   s.student_name,
+                   s.gender,
+                   s.nationality_code,
+                   s.student_category,
+                   s.enrollment_source,
+                   s.phone_number,
+                   s.degree_level,
+                   s.grade_year,
+                   s.major_id,
+                   m.major_code,
+                   m.major_name,
+                   u.account_status
+            FROM student s
+            JOIN major m ON m.id = s.major_id
+            LEFT JOIN app_user u ON u.student_id = s.id
+            <include refid="Filters"/>
+            ORDER BY
+            <choose>
+                <when test="sortField == 'studentName'">s.student_name</when>
+                <when test="sortField == 'gender'">s.gender</when>
+                <when test="sortField == 'majorName'">m.major_name</when>
+                <when test="sortField == 'accountStatus'">u.account_status</when>
+                <when test="sortField == 'gradeYear'">s.grade_year</when>
+                <when test="sortField == 'studentCategory'">s.student_category</when>
+                <when test="sortField == 'degreeLevel'">s.degree_level</when>
+                <otherwise>s.student_number</otherwise>
+            </choose>
+            <choose>
+                <when test="sortDirection == 'desc'">DESC</when>
+                <otherwise>ASC</otherwise>
+            </choose>, s.student_number ASC, s.id ASC
+            LIMIT #{limit} OFFSET #{offset}
+        ),
+        active_residency AS (
+            SELECT ra.id, ra.student_id, ra.room_id, ra.bed_id,
+                   ROW_NUMBER() OVER (PARTITION BY ra.student_id ORDER BY ra.assigned_at DESC, ra.id DESC) AS row_number
+            FROM room_assignment ra
+            JOIN filtered_students fs ON fs.id = ra.student_id
+            WHERE ra.assignment_status = 'ACTIVE'
+        ),
+        pending_confirmation AS (
+            SELECT request.id, request.residency_id, request.declared_bed_id, request.request_status,
+                   ROW_NUMBER() OVER (PARTITION BY request.residency_id ORDER BY request.submitted_at DESC, request.id DESC) AS row_number
+            FROM bed_confirmation_request request
+            JOIN active_residency active_ra ON active_ra.id = request.residency_id AND active_ra.row_number = 1
+            WHERE request.request_status = 'PENDING'
+        )
+        SELECT s.id,
+               s.student_number,
+               s.student_name,
+               s.gender,
+               s.nationality_code,
+               s.student_category,
+               s.enrollment_source,
+               s.phone_number,
+               s.degree_level,
+               s.grade_year,
+               s.major_id,
+               s.major_code,
+               s.major_name,
+               s.account_status,
+               (active_ra.id IS NOT NULL) AS currently_resident,
+               active_ra.id AS current_residency_id,
+               current_building.building_name AS current_building_name,
+               current_room.room_number AS current_room_number,
+               current_bed.bed_code AS current_bed_code,
+               current_bed.bed_type AS current_bed_type,
+               pending_request.request_status AS selection_review_status,
+               declared_bed.bed_code AS declared_bed_code,
+               declared_bed.bed_type AS declared_bed_type
+        FROM filtered_students s
+        LEFT JOIN active_residency active_ra ON active_ra.student_id = s.id AND active_ra.row_number = 1
+        LEFT JOIN room current_room ON current_room.id = active_ra.room_id
+        LEFT JOIN dormitory_floor current_floor ON current_floor.id = current_room.floor_id
+        LEFT JOIN dormitory_building current_building ON current_building.id = current_floor.building_id
+        LEFT JOIN bed current_bed ON current_bed.id = active_ra.bed_id
+        LEFT JOIN pending_confirmation pending_request ON pending_request.residency_id = active_ra.id AND pending_request.row_number = 1
+        LEFT JOIN bed declared_bed ON declared_bed.id = pending_request.declared_bed_id
+        ORDER BY
+        <choose>
+            <when test="sortField == 'studentName'">s.student_name</when>
+            <when test="sortField == 'gender'">s.gender</when>
+            <when test="sortField == 'majorName'">s.major_name</when>
+            <when test="sortField == 'accountStatus'">s.account_status</when>
+            <when test="sortField == 'gradeYear'">s.grade_year</when>
+            <when test="sortField == 'studentCategory'">s.student_category</when>
+            <when test="sortField == 'degreeLevel'">s.degree_level</when>
+            <otherwise>s.student_number</otherwise>
+        </choose>
+        <choose>
+            <when test="sortDirection == 'desc'">DESC</when>
+            <otherwise>ASC</otherwise>
+        </choose>, s.student_number ASC, s.id ASC
+    </select>
+</mapper>
