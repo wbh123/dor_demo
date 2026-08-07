@@ -3,7 +3,6 @@ package com.wust.dormitory.auth;
 import com.wust.dormitory.common.error.BusinessException;
 import com.wust.dormitory.security.AuthTokenService;
 import com.wust.dormitory.security.CurrentUser;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
@@ -19,8 +18,6 @@ public class AuthService {
     private final NamedParameterJdbcTemplate jdbc;
     private final PasswordEncoder passwordEncoder;
     private final AuthTokenService tokenService;
-    @Value("${WUST_DORMITORY_PASSWORD_STRENGTH_ENABLED:false}")
-    private boolean passwordStrengthEnabled;
 
     public AuthService(NamedParameterJdbcTemplate jdbc, PasswordEncoder passwordEncoder,
                        AuthTokenService tokenService) {
@@ -67,7 +64,6 @@ public class AuthService {
 
     @Transactional
     public void activate(String studentNumber, String studentName, String password) {
-        requirePassword(password);
         List<Map<String, Object>> rows = jdbc.queryForList("""
                 SELECT s.id AS student_id, s.student_name, u.id AS user_id,
                        u.password_hash, u.account_status
@@ -97,7 +93,14 @@ public class AuthService {
         if (user == null || !"ADMIN".equals(user.userType())) {
             throw new BusinessException("ADMIN_PASSWORD_FORBIDDEN", "只有学校管理员可以在此修改密码", HttpStatus.FORBIDDEN);
         }
-        requirePassword(newPassword);
+        if (newPassword == null || newPassword.length() < 12 || newPassword.length() > 72
+                || !newPassword.matches(".*[A-Z].*")
+                || !newPassword.matches(".*[a-z].*")
+                || !newPassword.matches(".*[0-9].*")
+                || !newPassword.matches(".*[^A-Za-z0-9].*")) {
+            throw new BusinessException("PASSWORD_POLICY_INVALID",
+                    "新密码需为12至72位，并同时包含大写字母、小写字母、数字和特殊字符");
+        }
         String hash = jdbc.queryForObject("SELECT password_hash FROM app_user WHERE id=:id",
                 Map.of("id", user.userId()), String.class);
         if (hash == null || currentPassword == null || !passwordEncoder.matches(currentPassword, hash)) {
@@ -107,20 +110,6 @@ public class AuthService {
                 new MapSqlParameterSource().addValue("hash", passwordEncoder.encode(newPassword))
                         .addValue("id", user.userId()));
         tokenService.revokeUser(user.userId());
-    }
-
-    private void requirePassword(String password) {
-        if (password == null || password.isEmpty() || password.length() > 72) {
-            throw new BusinessException("PASSWORD_POLICY_INVALID", "密码不能为空且最多72位");
-        }
-        if (passwordStrengthEnabled && (password.length() < 12
-                || !password.matches(".*[A-Z].*")
-                || !password.matches(".*[a-z].*")
-                || !password.matches(".*[0-9].*")
-                || !password.matches(".*[^A-Za-z0-9].*"))) {
-            throw new BusinessException("PASSWORD_POLICY_INVALID",
-                    "新密码需为12至72位，并同时包含大写字母、小写字母、数字和特殊字符");
-        }
     }
 
     public record LoginResult(String accessToken, long expiresInSeconds, CurrentUser user) {
