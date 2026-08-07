@@ -9,7 +9,6 @@
     "backend-java/server/src/main/java/com/wust/dormitory/admin/RoomImportService.java": 382,
     "backend-java/server/src/main/java/com/wust/dormitory/admin/RoomLayoutService.java": 585,
     "backend-java/server/src/main/java/com/wust/dormitory/admin/RoomManagementService.java": 384,
-    "backend-java/server/src/main/java/com/wust/dormitory/admin/SpreadsheetSupport.java": 342,
     "backend-java/server/src/main/java/com/wust/dormitory/admin/StudentAdminService.java": 318,
     "backend-java/server/src/main/java/com/wust/dormitory/admin/SystemSettingService.java": 316,
     "backend-java/server/src/main/java/com/wust/dormitory/allocation/AdminAllocationService.java": 638,

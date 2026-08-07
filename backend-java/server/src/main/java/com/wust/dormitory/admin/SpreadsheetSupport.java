@@ -19,7 +19,6 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -39,7 +38,8 @@ public final class SpreadsheetSupport {
                 : file.getOriginalFilename().toLowerCase(Locale.ROOT);
         try {
             if (name.endsWith(".csv")) {
-                return readCsv(new String(file.getBytes(), StandardCharsets.UTF_8));
+                return SpreadsheetTextSupport.readCsv(
+                        new String(file.getBytes(), StandardCharsets.UTF_8));
             }
             if (name.endsWith(".xlsx") || name.endsWith(".xls")) {
                 try (Workbook workbook = WorkbookFactory.create(file.getInputStream())) {
@@ -62,10 +62,11 @@ public final class SpreadsheetSupport {
             List<String> instructions) {
         StringBuilder text = new StringBuilder("\uFEFF");
         for (String instruction : instructions) {
-            text.append(csvLine(List.of("# " + instruction))).append('\n');
+            text.append(SpreadsheetTextSupport.csvLine(List.of("# " + instruction)))
+                    .append('\n');
         }
-        text.append(csvLine(headers)).append('\n');
-        text.append(csvLine(example)).append('\n');
+        text.append(SpreadsheetTextSupport.csvLine(headers)).append('\n');
+        text.append(SpreadsheetTextSupport.csvLine(example)).append('\n');
         return text.toString().getBytes(StandardCharsets.UTF_8);
     }
 
@@ -118,7 +119,7 @@ public final class SpreadsheetSupport {
         for (Sheet sheet : workbook) {
             for (Row row : sheet) {
                 String joined = rowValues(row, formatter).stream()
-                        .map(SpreadsheetSupport::normalizeHeader)
+                        .map(SpreadsheetTextSupport::normalizeHeader)
                         .reduce((left, right) -> left + "," + right)
                         .orElse("");
                 if (joined.contains("学号")
@@ -140,10 +141,12 @@ public final class SpreadsheetSupport {
             if (values.stream().allMatch(String::isBlank)) continue;
             if (values.getFirst().startsWith("#")) continue;
             if (headers == null) {
-                headers = values.stream().map(SpreadsheetSupport::normalizeHeader).toList();
+                headers = values.stream()
+                        .map(SpreadsheetTextSupport::normalizeHeader)
+                        .toList();
                 continue;
             }
-            rows.add(map(headers, values));
+            rows.add(SpreadsheetTextSupport.map(headers, values));
         }
         return rows;
     }
@@ -156,83 +159,6 @@ public final class SpreadsheetSupport {
             values.add(cell == null ? "" : formatter.formatCellValue(cell).trim());
         }
         return values;
-    }
-
-    private static List<Map<String, String>> readCsv(String source) {
-        List<List<String>> parsed = parseCsv(source.replace("\uFEFF", ""));
-        int headerIndex = -1;
-        for (int index = 0; index < parsed.size(); index++) {
-            List<String> values = parsed.get(index);
-            if (values.stream().allMatch(String::isBlank)) continue;
-            if (values.getFirst().trim().startsWith("#")) continue;
-            headerIndex = index;
-            break;
-        }
-        if (headerIndex < 0) return List.of();
-        List<String> headers = parsed.get(headerIndex).stream()
-                .map(SpreadsheetSupport::normalizeHeader)
-                .toList();
-        List<Map<String, String>> rows = new ArrayList<>();
-        for (int index = headerIndex + 1; index < parsed.size(); index++) {
-            List<String> values = parsed.get(index);
-            if (values.stream().allMatch(String::isBlank)) continue;
-            if (values.getFirst().trim().startsWith("#")) continue;
-            rows.add(map(headers, values));
-        }
-        return rows;
-    }
-
-    private static List<List<String>> parseCsv(String source) {
-        List<List<String>> rows = new ArrayList<>();
-        List<String> row = new ArrayList<>();
-        StringBuilder cell = new StringBuilder();
-        boolean quoted = false;
-        for (int index = 0; index < source.length(); index++) {
-            char current = source.charAt(index);
-            if (quoted) {
-                if (current == '"'
-                        && index + 1 < source.length()
-                        && source.charAt(index + 1) == '"') {
-                    cell.append('"');
-                    index++;
-                } else if (current == '"') {
-                    quoted = false;
-                } else {
-                    cell.append(current);
-                }
-            } else if (current == '"') {
-                quoted = true;
-            } else if (current == ',') {
-                row.add(cell.toString().trim());
-                cell.setLength(0);
-            } else if (current == '\n') {
-                row.add(cell.toString().trim());
-                cell.setLength(0);
-                rows.add(row);
-                row = new ArrayList<>();
-            } else if (current != '\r') {
-                cell.append(current);
-            }
-        }
-        row.add(cell.toString().trim());
-        if (row.size() > 1 || !row.getFirst().isBlank()) rows.add(row);
-        return rows;
-    }
-
-    private static Map<String, String> map(List<String> headers, List<String> values) {
-        Map<String, String> result = new LinkedHashMap<>();
-        for (int index = 0; index < headers.size(); index++) {
-            result.put(headers.get(index), index < values.size() ? values.get(index).trim() : "");
-        }
-        return result;
-    }
-
-    private static String normalizeHeader(String value) {
-        return value.trim().toLowerCase(Locale.ROOT)
-                .replace(" ", "")
-                .replace("_", "")
-                .replace("(", "（")
-                .replace(")", "）");
     }
 
     private static void writeInstructionSheet(
@@ -331,12 +257,5 @@ public final class SpreadsheetSupport {
         for (int index = 0; index < values.size(); index++) {
             row.createCell(index).setCellValue(values.get(index));
         }
-    }
-
-    private static String csvLine(List<String> values) {
-        return values.stream()
-                .map(value -> "\"" + value.replace("\"", "\"\"") + "\"")
-                .reduce((left, right) -> left + "," + right)
-                .orElse("");
     }
 }
