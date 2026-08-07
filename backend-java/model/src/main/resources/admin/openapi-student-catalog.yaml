@@ -1,0 +1,65 @@
+openapi: 3.0.3
+info:
+  title: Wust Dormitory Select 学生目录查询接口
+  version: 1.0.0
+paths:
+  /api/v1/admin/student-catalog:
+    get:
+      tags: [AdminStudentCatalog]
+      operationId: getAdminStudentCatalog
+      summary: 分页筛选并排序查询学生目录
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: keyword
+          schema: { type: string }
+        - in: query
+          name: gender
+          schema: { type: string }
+        - in: query
+          name: majorId
+          schema: { type: integer, format: int64 }
+        - in: query
+          name: studentCategory
+          schema: { type: string }
+        - in: query
+          name: enrollmentSource
+          schema: { type: string }
+        - in: query
+          name: page
+          schema: { type: integer, format: int32, minimum: 1, default: 1 }
+        - in: query
+          name: size
+          schema: { type: integer, format: int32, minimum: 1, maximum: 100, default: 20 }
+        - in: query
+          name: sortField
+          schema:
+            type: string
+            default: studentNumber
+            enum: [studentNumber, studentName, gender, majorName, accountStatus, gradeYear, studentCategory, degreeLevel, currentlyResident, currentBuildingName]
+        - in: query
+          name: sortDirection
+          schema: { type: string, default: asc, enum: [asc, desc] }
+      responses:
+        '200':
+          description: 学生目录分页结果
+          content:
+            application/json:
+              schema:
+                $ref: '../common-response/openapi-common-response.yaml#/components/schemas/ObjectSuccessResponse'
+        '401': { $ref: '#/components/responses/ErrorResponse' }
+        '403': { $ref: '#/components/responses/ErrorResponse' }
+components:
+  responses:
+    ErrorResponse:
+      description: 业务错误
+      content:
+        application/json:
+          schema:
+            $ref: '../common-response/openapi-common-response.yaml#/components/schemas/ErrorResponse'
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: Token

@@ -26,6 +26,7 @@ function logout() {
         <RouterLink to="/platform/subscription" exact-active-class="custom-active">服务订阅</RouterLink>
         <RouterLink to="/platform/features" exact-active-class="custom-active">功能授权</RouterLink>
         <RouterLink to="/platform/quotas" exact-active-class="custom-active">资源配额</RouterLink>
+        <RouterLink to="/platform/site-metadata" exact-active-class="custom-active">学校与登录页</RouterLink>
         <RouterLink to="/platform/audit" exact-active-class="custom-active">操作审计</RouterLink>
         <RouterLink to="/platform/profile/password" exact-active-class="custom-active">修改密码</RouterLink>
       </nav>

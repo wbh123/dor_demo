@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.wust.dormitory.notification.NotificationRecipientCurrentMapper">
+    <select id="findRecipients" resultType="long">
+        SELECT DISTINCT student_record.id
+        FROM student student_record
+        LEFT JOIN batch_student_eligibility eligibility
+          ON eligibility.student_id = student_record.id
+        LEFT JOIN room_assignment residency
+          ON residency.student_id = student_record.id
+         AND residency.assignment_status = 'ACTIVE'
+        LEFT JOIN room room_record ON room_record.id = residency.room_id
+        LEFT JOIN dormitory_floor floor_record ON floor_record.id = room_record.floor_id
+        LEFT JOIN dormitory_building building_record ON building_record.id = floor_record.building_id
+        WHERE student_record.housing_eligibility = 'ELIGIBLE'
+        <if test="batchIds != null and !batchIds.isEmpty()">
+            AND eligibility.batch_id IN
+            <foreach collection="batchIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+        </if>
+        <if test="majorIds != null and !majorIds.isEmpty()">
+            AND student_record.major_id IN
+            <foreach collection="majorIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+        </if>
+        <if test="gradeYears != null and !gradeYears.isEmpty()">
+            AND student_record.grade_year IN
+            <foreach collection="gradeYears" item="value" open="(" separator="," close=")">#{value}</foreach>
+        </if>
+        <if test="degreeLevels != null and !degreeLevels.isEmpty()">
+            AND student_record.degree_level IN
+            <foreach collection="degreeLevels" item="value" open="(" separator="," close=")">#{value}</foreach>
+        </if>
+        <if test="studentCategories != null and !studentCategories.isEmpty()">
+            AND student_record.student_category IN
+            <foreach collection="studentCategories" item="value" open="(" separator="," close=")">#{value}</foreach>
+        </if>
+        <if test="buildingIds != null and !buildingIds.isEmpty()">
+            AND building_record.id IN
+            <foreach collection="buildingIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+        </if>
+        <if test="unselectedOnly">
+            AND NOT EXISTS (
+                SELECT 1
+                FROM bed_assignment assignment_record
+                WHERE assignment_record.student_id = student_record.id
+                  AND assignment_record.assignment_status = 'ACTIVE'
+                <if test="batchIds != null and !batchIds.isEmpty()">
+                    AND assignment_record.batch_id IN
+                    <foreach collection="batchIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+                </if>
+            )
+        </if>
+        <if test="pendingReviewOnly">
+            AND EXISTS (
+                SELECT 1
+                FROM bed_confirmation_request confirmation_record
+                WHERE confirmation_record.student_id = student_record.id
+                  AND confirmation_record.request_status = 'PENDING'
+            )
+        </if>
+        ORDER BY student_record.id
+    </select>
+</mapper>

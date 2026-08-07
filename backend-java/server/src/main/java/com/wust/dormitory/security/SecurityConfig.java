@@ -37,6 +37,7 @@ public class SecurityConfig {
                                 "/api/v1/auth/login",
                                 "/api/v1/auth/activate",
                                 "/api/v1/platform/login",
+                                "/api/v1/public/site-config",
                                 "/actuator/health"
                         ).permitAll()
                         .requestMatchers("/api/v1/platform/**").hasRole("SYSTEM_ADMIN")

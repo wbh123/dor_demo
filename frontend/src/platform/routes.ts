@@ -17,6 +17,7 @@ export const platformRoutes: RouteRecordRaw[] = [
       { path: 'subscription', name: 'platform-subscription', component: () => import('../views/platform/PlatformSubscriptionView.vue') },
       { path: 'features', name: 'platform-features', component: () => import('../views/platform/PlatformFeaturesView.vue') },
       { path: 'quotas', name: 'platform-quotas', component: () => import('../views/platform/PlatformQuotasView.vue') },
+      { path: 'site-metadata', name: 'platform-site-metadata', component: () => import('../views/platform/PlatformSiteMetadataView.vue') },
       { path: 'audit', name: 'platform-audit', component: () => import('../views/platform/PlatformAuditView.vue') },
       { path: 'profile/password', name: 'platform-password', component: () => import('../views/platform/PlatformPasswordView.vue'), meta: { allowPasswordChange: true } },
     ],

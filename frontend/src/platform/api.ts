@@ -100,6 +100,10 @@ export const platformApi = {
     method: 'POST', body: JSON.stringify(payload),
   }),
   audit: (limit = 100) => request<Record<string, unknown>[]>(`/audit?limit=${limit}`),
+  siteMetadata: () => request<{ data?: Record<string, unknown> }>('/site-metadata'),
+  updateSiteMetadata: (payload: Record<string, unknown>) => request<{ data?: Record<string, unknown> }>('/site-metadata', {
+    method: 'PUT', body: JSON.stringify(payload),
+  }),
   clearRedis: (reason: string, confirmation: 'CLEAR_REDIS') => request<RedisClearResult>('/redis/clear', {
     method: 'POST', body: JSON.stringify({ reason, confirmation }),
   }),
