@@ -210,13 +210,9 @@ public class StudentAdminService {
     }
 
     private Map<String, Object> one(long id) {
-        List<Map<String, Object>> rows = jdbc.queryForList("""
-                SELECT id, student_number, student_name, gender, major_id,
-                       nationality_code, student_category, enrollment_source,
-                       phone_number, degree_level, grade_year
-                FROM student
-                WHERE id=:id
-                """, Map.of("id", id));
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                "SELECT * FROM student WHERE id=:id",
+                Map.of("id", id));
         if (rows.isEmpty()) {
             throw new BusinessException(
                     "STUDENT_NOT_FOUND", "学生不存在", HttpStatus.NOT_FOUND);
