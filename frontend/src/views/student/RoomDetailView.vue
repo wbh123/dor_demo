@@ -94,50 +94,20 @@ async function load(showLoading = true) {
   }
 }
 
-function acceptTeamNotice() {
-  teamNoticeAccepted.value = true
-  teamNoticeOpen.value = false
-}
-function cancelTeamNotice() {
-  teamNoticeOpen.value = false
-  void router.back()
-}
-function updateMemberAssignments(value: TeamMemberAssignment[]) {
-  if (holdToken.value) return
-  memberAssignments.value = value
-  selectedBedIds.value = value.map(item => Number(item.bedId)).filter(Boolean)
-}
-function showToast(text: string) {
-  toastMessage.value = text
-  if (toastTimer) window.clearTimeout(toastTimer)
-  toastTimer = window.setTimeout(() => { toastMessage.value = ''; toastTimer = undefined }, 3000)
-}
-function markHeldBeds(bedIds: number[]) {
-  const held = new Set(bedIds)
-  beds.value = beds.value.map(bed => held.has(Number(bed.id)) ? { ...bed, status: 'HELD_BY_ME' } : bed)
-}
-function markBedsAvailable(bedIds: number[]) {
-  const released = new Set(bedIds)
-  beds.value = beds.value.map(bed => released.has(Number(bed.id)) && bed.status === 'HELD_BY_ME'
-    ? { ...bed, status: 'AVAILABLE' }
-    : bed)
-}
-async function selectFromDropdown(event: Event) {
-  const bedId = Number((event.target as HTMLSelectElement).value)
-  if (!bedId) return
-  const bed = beds.value.find(item => Number(item.id) === bedId)
-  if (bed) await selectBed(bed)
-}
+function acceptTeamNotice() { teamNoticeAccepted.value = true; teamNoticeOpen.value = false }
+function cancelTeamNotice() { teamNoticeOpen.value = false; void router.back() }
+function updateMemberAssignments(value: TeamMemberAssignment[]) { if (holdToken.value) return; memberAssignments.value = value; selectedBedIds.value = value.map(item => Number(item.bedId)).filter(Boolean) }
+function showToast(text: string) { toastMessage.value = text; if (toastTimer) window.clearTimeout(toastTimer); toastTimer = window.setTimeout(() => { toastMessage.value = ''; toastTimer = undefined }, 3000) }
+function markHeldBeds(bedIds:number[]){const held=new Set(bedIds);beds.value=beds.value.map(bed=>held.has(Number(bed.id))?{...bed,status:'HELD_BY_ME'}:bed)}
+function markBedsAvailable(bedIds:number[]){const released=new Set(bedIds);beds.value=beds.value.map(bed=>released.has(Number(bed.id))&&bed.status==='HELD_BY_ME'?{...bed,status:'AVAILABLE'}:bed)}
+async function selectFromDropdown(event: Event) { const bedId = Number((event.target as HTMLSelectElement).value); if (!bedId) return; const bed = beds.value.find(item => Number(item.id) === bedId); if (bed) await selectBed(bed) }
 async function selectBed(bed: DataObject) {
   if (submitting.value || !teamNoticeAccepted.value) return
   const bedId = Number(bed.id)
   if (isTeamMode.value) {
     if (holdToken.value || bed.status !== 'AVAILABLE') return
     const already = memberAssignments.value.find(item => item.bedId === bedId)
-    if (already) {
-      updateMemberAssignments(memberAssignments.value.map(item => item.studentId === already.studentId ? { ...item, bedId: 0 } : item))
-      return
-    }
+    if (already) { updateMemberAssignments(memberAssignments.value.map(item => item.studentId === already.studentId ? { ...item, bedId: 0 } : item)); return }
     const target = memberAssignments.value.find(item => !item.bedId)
     if (target) updateMemberAssignments(memberAssignments.value.map(item => item.studentId === target.studentId ? { ...item, bedId } : item))
     return
@@ -170,49 +140,14 @@ async function createHold() {
     error.value = reason instanceof Error ? reason.message : '床位保留失败'
   } finally { submitting.value = false }
 }
-async function releaseIndividualHold(bedId: number, token: string) { await api.post(`/api/v1/student/batches/${batchId}/beds/${bedId}/release`, { token }) }
-async function switchIndividualBed(nextBed: DataObject) {
-  const previousBedId = selectedBedIds.value[0]; const previousToken = holdToken.value; const nextBedId = Number(nextBed.id)
-  if (!previousBedId || !previousToken || !nextBedId) return
-  submitting.value = true; error.value = ''; message.value = ''; let previousReleased = false
-  try {
-    await releaseIndividualHold(previousBedId, previousToken); previousReleased = true; markBedsAvailable([previousBedId]); holdToken.value = ''; expiresAt.value = null; selectedBedIds.value = [nextBedId]
-    await requestHold([nextBedId]); markHeldBeds([nextBedId])
-  } catch (reason) {
-    if (previousReleased) { holdToken.value = ''; expiresAt.value = null; selectedBedIds.value = []; error.value = reason instanceof Error ? `原床位已释放，但新床位保留失败：${reason.message}` : '原床位已释放，但新床位保留失败，请重新选择。'; await load(false) }
-    else error.value = reason instanceof Error ? `当前床位释放失败，尚未切换：${reason.message}` : '当前床位释放失败，尚未切换。'
-  } finally { submitting.value = false }
-}
-async function releaseHold() {
-  const bedIds = isTeamMode.value ? orderedTeamBedIds.value : selectedBedIds.value
-  if (!holdToken.value || !bedIds.length) return
-  submitting.value = true; error.value = ''; message.value = ''
-  try {
-    if (isTeamMode.value) await api.post(`/api/v1/student/batches/${batchId}/teams/${teamId}/release`, { bedIds, token: holdToken.value })
-    else await releaseIndividualHold(bedIds[0], holdToken.value)
-    markBedsAvailable(bedIds); resetHold(false); showToast('已释放当前选择，可以重新选择床位。')
-  } catch (reason) { error.value = reason instanceof Error ? reason.message : '床位释放失败' }
-  finally { submitting.value = false }
-}
-async function confirmSelection() {
-  const bedIds = isTeamMode.value ? orderedTeamBedIds.value : selectedBedIds.value
-  if (!holdToken.value || !bedIds.length) return
-  submitting.value = true; error.value = ''
-  try {
-    if (isTeamMode.value) {
-      await api.post(`/api/v1/student/batches/${batchId}/teams/${teamId}/confirm`, { bedIds, token: holdToken.value })
-      await router.replace('/student/teams')
-    } else {
-      await api.post(`/api/v1/student/batches/${batchId}/beds/${bedIds[0]}/confirm`, { token: holdToken.value })
-      await router.replace('/student')
-    }
-  } catch (reason) { error.value = reason instanceof Error ? reason.message : '最终确认失败' }
-  finally { submitting.value = false }
-}
-function resetHold(refresh: boolean) { holdToken.value = ''; expiresAt.value = null; if (!isTeamMode.value) selectedBedIds.value = []; if (refresh) void load(false) }
-function canChooseBed(bed: DataObject) { const selected = selectedBedIds.value.includes(Number(bed.id)); if (selected && !isTeamMode.value) return true; if (isTeamMode.value && holdToken.value) return false; return bed.status === 'AVAILABLE' }
-function statusText(status: unknown) { return ({ AVAILABLE:'可选择', HELD:'暂时被其他同学保留', HELD_BY_ME:'已为你保留', ASSIGNED:'已有同学选择', DISABLED:'暂不可用' } as Record<string,string>)[String(status)] ?? String(status) }
-function bedTypeText(value: unknown) { return bedTypeLabel(value) }
+async function releaseIndividualHold(bedId:number,token:string){await api.post(`/api/v1/student/batches/${batchId}/beds/${bedId}/release`,{token})}
+async function switchIndividualBed(nextBed:DataObject){const previousBedId=selectedBedIds.value[0];const previousToken=holdToken.value;const nextBedId=Number(nextBed.id);if(!previousBedId||!previousToken||!nextBedId)return;submitting.value=true;error.value='';message.value='';let previousReleased=false;try{await releaseIndividualHold(previousBedId,previousToken);previousReleased=true;markBedsAvailable([previousBedId]);holdToken.value='';expiresAt.value=null;selectedBedIds.value=[nextBedId];await requestHold([nextBedId]);markHeldBeds([nextBedId])}catch(reason){if(previousReleased){holdToken.value='';expiresAt.value=null;selectedBedIds.value=[];error.value=reason instanceof Error?`原床位已释放，但新床位保留失败：${reason.message}`:'原床位已释放，但新床位保留失败，请重新选择。';await load(false)}else error.value=reason instanceof Error?`当前床位释放失败，尚未切换：${reason.message}`:'当前床位释放失败，尚未切换。'}finally{submitting.value=false}}
+async function releaseHold(){const bedIds=isTeamMode.value?orderedTeamBedIds.value:selectedBedIds.value;if(!holdToken.value||!bedIds.length)return;submitting.value=true;error.value='';message.value='';try{if(isTeamMode.value)await api.post(`/api/v1/student/batches/${batchId}/teams/${teamId}/release`,{bedIds,token:holdToken.value});else await releaseIndividualHold(bedIds[0],holdToken.value);markBedsAvailable(bedIds);resetHold(false);showToast('已释放当前选择，可以重新选择床位。')}catch(reason){error.value=reason instanceof Error?reason.message:'床位释放失败'}finally{submitting.value=false}}
+async function confirmSelection(){const bedIds=isTeamMode.value?orderedTeamBedIds.value:selectedBedIds.value;if(!holdToken.value||!bedIds.length)return;submitting.value=true;error.value='';try{if(isTeamMode.value){await api.post(`/api/v1/student/batches/${batchId}/teams/${teamId}/confirm`,{bedIds,token:holdToken.value});await router.replace('/student/teams')}else{await api.post(`/api/v1/student/batches/${batchId}/beds/${bedIds[0]}/confirm`,{token:holdToken.value});await router.replace('/student')}}catch(reason){error.value=reason instanceof Error?reason.message:'最终确认失败'}finally{submitting.value=false}}
+function resetHold(refresh:boolean){holdToken.value='';expiresAt.value=null;if(!isTeamMode.value)selectedBedIds.value=[];if(refresh)void load(false)}
+function canChooseBed(bed:DataObject){const selected=selectedBedIds.value.includes(Number(bed.id));if(selected&&!isTeamMode.value)return true;if(isTeamMode.value&&holdToken.value)return false;return bed.status==='AVAILABLE'}
+function statusText(status:unknown){return({AVAILABLE:'可选择',HELD:'暂时被其他同学保留',HELD_BY_ME:'已为你保留',ASSIGNED:'已有同学选择',DISABLED:'暂不可用'} as Record<string,string>)[String(status)]??String(status)}
+function bedTypeText(value:unknown){return bedTypeLabel(value)}
 </script>
 
 <template>
@@ -220,20 +155,13 @@ function bedTypeText(value: unknown) { return bedTypeLabel(value) }
     <Transition name="toast"><div v-if="toastMessage" class="selection-toast" role="status" aria-live="polite"><span class="selection-toast-icon">✓</span><span>{{ toastMessage }}</span></div></Transition>
     <div class="page-title split-title room-detail-heading"><div><span class="eyebrow">ROOM LAYOUT</span><h2>{{ room.building_name }} · {{ room.room_number }} 室</h2><p v-if="isTeamMode">队长需要为每名已确认队友分别确定床位，所有床位必须位于当前寝室。</p><p v-else>{{ room.floor_number }} 层 · {{ room.capacity }}个床位。可以直接点击三维图像中的床位进行选择。</p></div><button class="button ghost" @click="router.back()">返回房间列表</button></div>
     <p v-if="loading" class="panel empty-state">正在同步房间床位…</p><p v-if="error" class="alert error">{{ error }}</p><p v-if="message" class="alert success compact-alert">{{ message }}</p>
-
     <section v-if="!loading" class="panel room-layout-panel compact-room-layout-panel">
       <TeamBedAssignmentPanel v-if="isTeamMode" :members="teamMembers" :beds="beds.filter(bed=>bed.status==='AVAILABLE'||selectedBedIds.includes(Number(bed.id)))" :member-assignments="memberAssignments" :disabled="sceneDisabled" @update:member-assignments="updateMemberAssignments" />
-
-      <div class="bed-selection-toolbar compact-bed-selection-toolbar">
-        <label v-if="!isTeamMode" class="bed-select-field"><span>床位下拉选择</span><select class="bed-select-control" :value="dropdownValue" :disabled="submitting" @change="selectFromDropdown"><option value="">请选择床位</option><option v-for="bed in beds" :key="`option-${String(bed.id)}`" :value="String(bed.id)" :disabled="!canChooseBed(bed)">{{ bed.bed_code }}床 · {{ bedTypeText(bed.bed_type) }} · {{ selectedBedIds.includes(Number(bed.id)) ? '已选中' : statusText(bed.status) }}</option></select></label>
-        <div class="selection-overview-grid"><div class="selected-bed-summary" :class="{active:selectedBeds.length>0}" aria-live="polite"><span>{{ selectedBeds.length ? '当前选择' : '尚未选择' }}</span><strong v-if="selectedBeds.length">{{ selectedBeds.map(bed=>`${String(bed.bed_code)}床`).join('、') }}</strong><small v-if="selectedBeds.length">{{ selectedBeds.map(bed=>bedTypeText(bed.bed_type)).join('、') }}</small><small v-else>{{ isTeamMode ? '请在队友卡片中逐人确定床位' : '请从下拉框或三维床位中选择' }}</small></div><div class="selection-hold-card" :class="{active:Boolean(holdToken)}" aria-live="polite"><div class="selection-hold-status"><span>临时保留</span><strong>{{ holdToken ? '床位已临时预留，请在倒计时结束前确认' : '完成床位安排后将整体临时预留' }}</strong></div><div v-if="holdToken" class="countdown compact-countdown enlarged-countdown">{{ remainingSeconds }}<small>秒</small></div><div class="selection-hold-actions"><button class="button ghost" :disabled="!holdToken||submitting" @click="releaseHold">主动释放</button><button class="button primary" :disabled="!holdToken||submitting||remainingSeconds<=0" @click="confirmSelection">{{ submitting?'正在处理…':isTeamMode?'确认小组选寝':'确认当前床位' }}</button></div></div></div>
-      </div>
-
+      <div class="bed-selection-toolbar compact-bed-selection-toolbar"><label v-if="!isTeamMode" class="bed-select-field"><span>床位下拉选择</span><select class="bed-select-control" :value="dropdownValue" :disabled="submitting" @change="selectFromDropdown"><option value="">请选择床位</option><option v-for="bed in beds" :key="`option-${String(bed.id)}`" :value="String(bed.id)" :disabled="!canChooseBed(bed)">{{ bed.bed_code }}床 · {{ bedTypeText(bed.bed_type) }} · {{ selectedBedIds.includes(Number(bed.id)) ? '已选中' : statusText(bed.status) }}</option></select></label><div class="selection-overview-grid"><div class="selected-bed-summary" :class="{active:selectedBeds.length>0}" aria-live="polite"><span>{{ selectedBeds.length?'当前选择':'尚未选择' }}</span><strong v-if="selectedBeds.length">{{ selectedBeds.map(bed=>`${String(bed.bed_code)}床`).join('、') }}</strong><small v-if="selectedBeds.length">{{ selectedBeds.map(bed=>bedTypeText(bed.bed_type)).join('、') }}</small><small v-else>{{ isTeamMode?'请在队友卡片中逐人确定床位':'请从下拉框或三维床位中选择' }}</small></div><div class="selection-hold-card" :class="{active:Boolean(holdToken)}" aria-live="polite"><div class="selection-hold-status"><span>临时保留</span><strong>{{ holdToken?'床位已临时预留，请在倒计时结束前确认':'完成床位安排后将整体临时预留' }}</strong></div><div v-if="holdToken" class="countdown compact-countdown enlarged-countdown">{{ remainingSeconds }}<small>秒</small></div><div class="selection-hold-actions"><button class="button ghost" :disabled="!holdToken||submitting" @click="releaseHold">主动释放</button><button class="button primary" :disabled="!holdToken||submitting||remainingSeconds<=0" @click="confirmSelection">{{ submitting?'正在处理…':isTeamMode?'确认小组选寝':'确认当前床位' }}</button></div></div></div></div>
       <RoomBedScene3D :beds="beds" :selected-bed-ids="selectedBedIds" :disabled="sceneDisabled" @select="selectBed" />
       <div class="scene-legend compact-scene-legend" aria-label="床位状态说明"><span class="legend-available">可选择</span><span class="legend-selected">已选中</span><span class="legend-held">暂时保留</span><span class="legend-assigned">已有同学选择</span></div>
       <div v-if="isTeamMode&&!holdToken" class="button-row centered"><button class="button primary" :disabled="!selectionReady||submitting||!teamNoticeAccepted" @click="createHold">整体保留 {{ memberCount }} 个成员床位</button></div>
     </section>
-
     <ActionConfirmDialog :open="teamNoticeOpen" title="组队选床说明" message="所有床位由队长统一确定，请先与队友确认沟通好寝室和床位安排后再进行操作。" detail="系统只保留已经确认加入的队友；未确认邀请会在锁定队伍时自动取消并立即失效。" confirm-text="已沟通，开始选床" cancel-text="返回" @confirm="acceptTeamNotice" @cancel="cancelTeamNotice" />
   </div>
 </template>
