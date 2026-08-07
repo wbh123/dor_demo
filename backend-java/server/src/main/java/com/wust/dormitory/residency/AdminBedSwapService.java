@@ -199,7 +199,7 @@ public class AdminBedSwapService {
                     HttpStatus.CONFLICT);
         }
         if (placement.allocationId() != null) {
-            mapper.updateActiveAllocation(placement.studentId(), bedId);
+            mapper.updateActiveAllocation(placement.studentId(), bedId, operatorId);
         }
     }
 
