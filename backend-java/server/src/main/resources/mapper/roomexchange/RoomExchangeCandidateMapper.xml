@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.wust.dormitory.roomexchange.RoomExchangeCandidateMapper">
+    <select id="findExactCandidate" resultType="map">
+        SELECT target.id AS target_student_id,
+               target.student_number,
+               target.student_name,
+               building.id AS building_id,
+               building.building_name,
+               room.id AS room_id,
+               room.room_number,
+               bed.id AS bed_id,
+               bed.bed_code,
+               bed.bed_type
+        FROM student target
+        JOIN room_assignment target_residency
+          ON target_residency.student_id=target.id
+         AND target_residency.assignment_status='ACTIVE'
+        JOIN room ON room.id=target_residency.room_id
+        JOIN dormitory_floor floor ON floor.id=room.floor_id
+        JOIN dormitory_building building ON building.id=floor.building_id
+        LEFT JOIN bed ON bed.id=target_residency.bed_id
+        JOIN student requester ON requester.id=#{requesterStudentId}
+        WHERE target.id&lt;&gt;#{requesterStudentId}
+          AND target.student_number=#{studentNumber}
+          AND target.student_name=#{studentName}
+          AND building.id=#{buildingId}
+          AND room.room_number=#{roomNumber}
+          AND target.gender=requester.gender
+          AND target.student_category=requester.student_category
+          AND NOT EXISTS (
+            SELECT 1
+            FROM room_exchange_participant_lock participant_lock
+            WHERE participant_lock.student_id=target.id
+          )
+        LIMIT 1
+    </select>
+
+    <select id="listCandidateBuildings" resultType="map">
+        SELECT DISTINCT building.id AS value,
+               CONCAT(building.building_code, ' · ', building.building_name) AS label
+        FROM dormitory_building building
+        JOIN dormitory_floor floor ON floor.building_id=building.id
+        JOIN room ON room.floor_id=floor.id
+        JOIN room_assignment residency
+          ON residency.room_id=room.id
+         AND residency.assignment_status='ACTIVE'
+        JOIN student target ON target.id=residency.student_id
+        JOIN student requester ON requester.id=#{requesterStudentId}
+        WHERE building.enabled=1
+          AND target.gender=requester.gender
+          AND target.student_category=requester.student_category
+        ORDER BY label
+    </select>
+</mapper>
