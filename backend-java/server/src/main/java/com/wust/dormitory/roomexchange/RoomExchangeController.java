@@ -16,16 +16,28 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 public class RoomExchangeController implements RoomExchangeApi {
     private final RoomExchangeService service;
+    private final RoomExchangeCandidateService candidateService;
 
-    public RoomExchangeController(RoomExchangeService service) {
+    public RoomExchangeController(
+            RoomExchangeService service,
+            RoomExchangeCandidateService candidateService) {
         this.service = service;
+        this.candidateService = candidateService;
     }
 
     @Override
-    public ResponseEntity<ListSuccessResponse> listRoomExchangeCandidates(String studentNumber) {
+    public ResponseEntity<ObjectSuccessResponse> listRoomExchangeCandidates(
+            String studentNumber,
+            String studentName,
+            Long buildingId,
+            String roomNumber) {
         CurrentUser student = SecurityUsers.requireStudent();
-        return ResponseEntity.ok(ResponseFactory.list(
-                service.candidates(student.studentId(), studentNumber)));
+        return ResponseEntity.ok(ResponseFactory.object(candidateService.exactCandidate(
+                student.studentId(),
+                studentNumber,
+                studentName,
+                buildingId,
+                roomNumber)));
     }
 
     @Override
