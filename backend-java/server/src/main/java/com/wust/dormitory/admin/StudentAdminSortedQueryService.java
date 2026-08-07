@@ -15,7 +15,8 @@ import java.util.Set;
 public class StudentAdminSortedQueryService {
     private static final Set<String> SORT_FIELDS = Set.of(
             "studentNumber", "studentName", "gender", "majorName",
-            "accountStatus", "gradeYear", "studentCategory", "degreeLevel");
+            "accountStatus", "gradeYear", "studentCategory", "degreeLevel",
+            "currentlyResident", "currentBuildingName");
 
     private final StudentAdminSortedMapper mapper;
 
