@@ -14,17 +14,21 @@ welcome_logo_large = (
  )
 )
 horizontal_login_brand = all(token in login for token in (
+ 'assets/logo-title-right.png',
+ 'legacyBrandLogo',
+ 'fallbackBrandLogo',
  'brand-image-surface',
  'hero-brand-surface',
  'card-brand-surface',
  'background:#fff',
- 'max-height:64px;object-fit:contain',
- 'max-height:48px;object-fit:contain',
+ 'height:64px;object-fit:contain',
+ 'height:48px;object-fit:contain',
 ))
 checks={
  'sanitized institution defaults': all('示例大学' in text for text in (shell,login,runner)),
- 'BASE-safe shell logo': "${publicBase}assert/logo-only.png" in shell and "import.meta.env.BASE_URL" in shell,
- 'no root-only logo path': "'/assert/logo-only.png'" not in shell,
+ 'BASE-safe shell logo': "${publicBase}assets/logo-only.png" in shell and "import.meta.env.BASE_URL" in shell,
+ 'public demo emblem fallback': "${publicBase}assert/logo-only.png" in shell and 'fallbackLogo' in shell,
+ 'no root-only logo path': "'/assets/logo-only.png'" not in shell,
  'welcome blocks router': '<RouterView v-if="!auth.welcomeRequired" />' in shell,
  'welcome heading row and content order': welcome_logo_large and all(token in shell for token in ('welcome-modal-heading','welcome-school-logo','welcome-modal-message','welcome-start-button')),
  'horizontal high-contrast login brand': horizontal_login_brand,
