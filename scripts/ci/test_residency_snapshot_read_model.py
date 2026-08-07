@@ -35,6 +35,17 @@ for method_name in ("activeResidentCount", "unknownBedResidentCount", "available
     if "jdbc." in body or "SELECT " in body or "NOT EXISTS" in body:
         raise AssertionError(f"{method_name} 必须委托快照读模型，不得直接执行 SQL")
 
+batch_marker = "public int availableBedCount(long batchId, long roomId)"
+if batch_marker not in service:
+    raise AssertionError("缺少批次可用床位兼容方法")
+batch_start = service.index(batch_marker)
+batch_end = service.find("\n    public ", batch_start + len(batch_marker))
+batch_body = service[batch_start:batch_end]
+if "jdbc." in batch_body or "SELECT " in batch_body or "EXISTS" in batch_body:
+    raise AssertionError("批次可用床位统计必须委托 Mapper，不得在 Service 保留相关子查询")
+if "countAvailableBedsForBatch" not in mapper or "countAvailableBedsForBatch" not in service:
+    raise AssertionError("批次可用床位统计必须使用类型化 Mapper")
+
 room_start = service.index("public Map<String, Object> room(long roomId, boolean forUpdate)")
 room_end = service.find("\n    public ", room_start + 20)
 room_body = service[room_start:room_end]
@@ -51,6 +62,8 @@ if "operational_status = 'ENABLED'" not in xml:
     raise AssertionError("可用床位统计必须只统计 ENABLED 床位")
 if "LEFT JOIN room_assignment" not in xml:
     raise AssertionError("可用床位统计应通过集合化反连接/聚合避免逐床相关子查询")
+if "scoped_beds" not in xml:
+    raise AssertionError("批次可用床位必须先集合化批次床位范围")
 if "SELECT *" in xml:
     raise AssertionError("住宿快照 XML 禁止 SELECT *")
 
