@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.wust.dormitory.residency.mapper.RoomOccupancySnapshotMapper">
+    <resultMap id="RoomOccupancySnapshotResultMap"
+               type="com.wust.dormitory.residency.model.persistence.RoomOccupancySnapshotRow">
+        <constructor>
+            <idArg column="id" javaType="long"/>
+            <arg column="room_number" javaType="java.lang.String"/>
+            <arg column="room_type" javaType="java.lang.String"/>
+            <arg column="capacity" javaType="int"/>
+            <arg column="gender_restriction" javaType="java.lang.String"/>
+            <arg column="resident_scope" javaType="java.lang.String"/>
+            <arg column="operational_status" javaType="java.lang.String"/>
+            <arg column="state_version" javaType="long"/>
+            <arg column="floor_number" javaType="int"/>
+            <arg column="building_id" javaType="long"/>
+            <arg column="building_code" javaType="java.lang.String"/>
+            <arg column="building_name" javaType="java.lang.String"/>
+            <arg column="active_residents" javaType="int"/>
+            <arg column="unknown_beds" javaType="int"/>
+            <arg column="conflict_batch_id" javaType="java.lang.Long"/>
+            <arg column="conflict_batch_name" javaType="java.lang.String"/>
+            <arg column="conflict_selection_mode" javaType="java.lang.String"/>
+        </constructor>
+    </resultMap>
+
+    <select id="findSnapshots" resultMap="RoomOccupancySnapshotResultMap">
+        WITH resident_stats AS (
+            SELECT ra.room_id,
+                   COUNT(*) AS active_residents,
+                   SUM(CASE WHEN ra.bed_id IS NULL THEN 1 ELSE 0 END) AS unknown_beds
+            FROM room_assignment ra
+            WHERE ra.assignment_status = 'ACTIVE'
+              AND ra.room_id IN
+              <foreach collection="roomIds" item="roomId" open="(" separator="," close=")">
+                  #{roomId}
+              </foreach>
+            GROUP BY ra.room_id
+        )
+        SELECT r.id,
+               r.room_number,
+               r.room_type,
+               r.capacity,
+               r.gender_restriction,
+               r.resident_scope,
+               r.operational_status,
+               r.state_version,
+               f.floor_number,
+               b.id AS building_id,
+               b.building_code,
+               b.building_name,
+               COALESCE(stats.active_residents, 0) AS active_residents,
+               COALESCE(stats.unknown_beds, 0) AS unknown_beds,
+               conflict_lock.batch_id AS conflict_batch_id,
+               conflict_batch.batch_name AS conflict_batch_name,
+               conflict_lock.selection_mode AS conflict_selection_mode
+        FROM room r
+        JOIN dormitory_floor f ON f.id = r.floor_id
+        JOIN dormitory_building b ON b.id = f.building_id
+        LEFT JOIN resident_stats stats ON stats.room_id = r.id
+        LEFT JOIN active_batch_room_lock conflict_lock
+               ON conflict_lock.room_id = r.id
+              AND conflict_lock.batch_id &lt;&gt; #{batchId}
+        LEFT JOIN selection_batch conflict_batch ON conflict_batch.id = conflict_lock.batch_id
+        WHERE r.id IN
+        <foreach collection="roomIds" item="roomId" open="(" separator="," close=")">
+            #{roomId}
+        </foreach>
+        ORDER BY r.id
+    </select>
+</mapper>

@@ -39,6 +39,11 @@ residency = read("frontend/src/views/admin/AdminResidencyView.vue")
 bed_confirmation = read("frontend/src/views/admin/AdminBedConfirmationView.vue")
 student_admin = read("frontend/src/views/admin/AdminDataView.vue")
 student_service = read("backend-java/server/src/main/java/com/wust/dormitory/admin/StudentAdminService.java")
+student_query_contract = "\n".join((
+    student_service,
+    read("backend-java/server/src/main/resources/mapper/admin/StudentAdminMapper.xml"),
+    read("backend-java/server/src/main/java/com/wust/dormitory/admin/model/persistence/StudentAdminDetailRow.java"),
+))
 batch = "\n".join((
     read("frontend/src/views/admin/AdminBatchView.vue"),
     read("frontend/src/features/admin-batch/components/BatchScopeDialog.vue"),
@@ -95,7 +100,7 @@ require(
     "student accommodation adjustment does not use the shared dormitory bed selector",
 )
 for field in ("current_building_name", "current_room_number", "current_bed_code", "selection_review_status", "declared_bed_code"):
-    require(field in student_service, f"student list query misses accommodation field: {field}")
+    require(field in student_query_contract, f"student list query misses accommodation field: {field}")
 require("TRANSFER_MANUAL" not in student_service, "legacy transfer-student enrollment source remains accepted")
 require("住宿状态" in student_admin and "宿舍与床位" in student_admin, "student table does not show residence and selection locations")
 

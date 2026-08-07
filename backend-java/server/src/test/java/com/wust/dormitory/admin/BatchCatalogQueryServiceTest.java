@@ -29,6 +29,7 @@ class BatchCatalogQueryServiceTest {
         StudentAdminMapper studentAdminMapper = mock(StudentAdminMapper.class);
         AdminDashboardMapper adminDashboardMapper = mock(AdminDashboardMapper.class);
         BatchCatalogMapper batchCatalogMapper = mock(BatchCatalogMapper.class);
+        ReferenceDataCacheService referenceDataCacheService = mock(ReferenceDataCacheService.class);
         BatchCatalogRow row = mock(BatchCatalogRow.class);
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("id", 8L);
@@ -53,7 +54,8 @@ class BatchCatalogQueryServiceTest {
                 adminCatalogMapper,
                 studentAdminMapper,
                 adminDashboardMapper,
-                batchCatalogMapper);
+                batchCatalogMapper,
+                referenceDataCacheService);
 
         List<Map<String, Object>> result = service.batches();
 

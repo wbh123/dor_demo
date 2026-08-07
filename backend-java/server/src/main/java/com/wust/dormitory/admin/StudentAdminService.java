@@ -1,5 +1,8 @@
 package com.wust.dormitory.admin;
 
+import com.wust.dormitory.admin.mapper.StudentAdminMapper;
+import com.wust.dormitory.admin.model.persistence.StudentAdminDetailRow;
+import com.wust.dormitory.admin.model.query.StudentAdminDetailQuery;
 import com.wust.dormitory.audit.AuditService;
 import com.wust.dormitory.common.error.BusinessException;
 import com.wust.dormitory.security.CurrentUser;
@@ -18,12 +21,15 @@ import java.util.Map;
 public class StudentAdminService {
     private final NamedParameterJdbcTemplate jdbc;
     private final AuditService auditService;
+    private final StudentAdminMapper studentAdminMapper;
 
     public StudentAdminService(
             NamedParameterJdbcTemplate jdbc,
-            AuditService auditService) {
+            AuditService auditService,
+            StudentAdminMapper studentAdminMapper) {
         this.jdbc = jdbc;
         this.auditService = auditService;
+        this.studentAdminMapper = studentAdminMapper;
     }
 
     public Map<String, Object> students(
@@ -36,73 +42,19 @@ public class StudentAdminService {
             int size) {
         int safePage = Math.max(1, page);
         int safeSize = Math.min(Math.max(1, size), 200);
-        StringBuilder where = new StringBuilder(" WHERE 1=1 ");
-        MapSqlParameterSource parameters = new MapSqlParameterSource();
-        if (keyword != null && !keyword.isBlank()) {
-            where.append(" AND (s.student_number LIKE :keyword OR s.student_name LIKE :keyword ")
-                    .append("OR s.phone_number LIKE :keyword) ");
-            parameters.addValue("keyword", "%" + keyword.trim() + "%");
-        }
-        if (gender != null && !gender.isBlank()) {
-            where.append(" AND s.gender=:gender ");
-            parameters.addValue("gender", gender);
-        }
-        if (majorId != null) {
-            where.append(" AND s.major_id=:majorId ");
-            parameters.addValue("majorId", majorId);
-        }
-        if (studentCategory != null && !studentCategory.isBlank()) {
-            where.append(" AND s.student_category=:studentCategory ");
-            parameters.addValue("studentCategory", studentCategory);
-        }
-        if (enrollmentSource != null && !enrollmentSource.isBlank()) {
-            where.append(" AND s.enrollment_source=:enrollmentSource ");
-            parameters.addValue("enrollmentSource", enrollmentSource);
-        }
-        Integer totalValue = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM student s" + where,
-                parameters,
-                Integer.class);
-        parameters.addValue("limit", safeSize)
-                .addValue("offset", (safePage - 1) * safeSize);
-        List<Map<String, Object>> items = jdbc.queryForList("""
-                SELECT s.id, s.student_number, s.student_name, s.gender,
-                       s.nationality_code, s.student_category,
-                       s.enrollment_source, s.phone_number, s.degree_level, s.grade_year, s.major_id,
-                       m.major_code, m.major_name, u.account_status,
-                       (active_ra.id IS NOT NULL) AS currently_resident,
-                       active_ra.id AS current_residency_id,
-                       current_building.building_name AS current_building_name,
-                       current_room.room_number AS current_room_number,
-                       current_bed.bed_code AS current_bed_code,
-                       current_bed.bed_type AS current_bed_type,
-                       pending_request.request_status AS selection_review_status,
-                       declared_bed.bed_code AS declared_bed_code,
-                       declared_bed.bed_type AS declared_bed_type
-                FROM student s
-                JOIN major m ON m.id=s.major_id
-                LEFT JOIN app_user u ON u.student_id=s.id
-                LEFT JOIN room_assignment active_ra ON active_ra.id=(
-                    SELECT ra.id FROM room_assignment ra
-                    WHERE ra.student_id=s.id AND ra.assignment_status='ACTIVE'
-                    ORDER BY ra.assigned_at DESC, ra.id DESC LIMIT 1
-                )
-                LEFT JOIN room current_room ON current_room.id=active_ra.room_id
-                LEFT JOIN dormitory_floor current_floor ON current_floor.id=current_room.floor_id
-                LEFT JOIN dormitory_building current_building ON current_building.id=current_floor.building_id
-                LEFT JOIN bed current_bed ON current_bed.id=active_ra.bed_id
-                LEFT JOIN bed_confirmation_request pending_request ON pending_request.id=(
-                    SELECT request.id FROM bed_confirmation_request request
-                    WHERE request.residency_id=active_ra.id AND request.request_status='PENDING'
-                    ORDER BY request.submitted_at DESC, request.id DESC LIMIT 1
-                )
-                LEFT JOIN bed declared_bed ON declared_bed.id=pending_request.declared_bed_id
-                """ + where + " ORDER BY s.student_number LIMIT :limit OFFSET :offset", parameters);
-        return Map.of(
-                "page", safePage,
-                "size", safeSize,
-                "total", totalValue == null ? 0 : totalValue,
-                "items", items);
+        StudentAdminDetailQuery query = new StudentAdminDetailQuery(
+                normalizedPattern(keyword),
+                normalized(gender),
+                majorId,
+                normalized(studentCategory),
+                normalized(enrollmentSource),
+                safeSize,
+                (safePage - 1) * safeSize);
+        int total = Math.toIntExact(studentAdminMapper.countDetailedStudents(query));
+        List<Map<String, Object>> items = studentAdminMapper.findDetailedStudents(query).stream()
+                .map(StudentAdminDetailRow::asResponseMap)
+                .toList();
+        return Map.of("page", safePage, "size", safeSize, "total", total, "items", items);
     }
 
     @Transactional
@@ -132,13 +84,8 @@ public class StudentAdminService {
                     .addValue("username", command.studentNumber())
                     .addValue("displayName", command.studentName()));
             auditService.success(
-                    operator,
-                    "STUDENT_CREATE",
-                    "STUDENT",
-                    studentId,
-                    "学生资料录入",
-                    null,
-                    command);
+                    operator, "STUDENT_CREATE", "STUDENT", studentId,
+                    "学生资料录入", null, command);
             return studentId;
         }
 
@@ -164,13 +111,8 @@ public class StudentAdminService {
                 WHERE student_id=:id
                 """, update);
         auditService.success(
-                operator,
-                "STUDENT_UPDATE",
-                "STUDENT",
-                id,
-                "学生资料修改",
-                before,
-                command);
+                operator, "STUDENT_UPDATE", "STUDENT", id,
+                "学生资料修改", before, command);
         return id;
     }
 
@@ -187,29 +129,21 @@ public class StudentAdminService {
                         "SELECT id FROM student WHERE student_number=:number",
                         Map.of("number", command.studentNumber()),
                         (rs, rowNum) -> rs.getLong(1));
-                StudentCommand importCommand = command.withEnrollmentSource("BATCH_IMPORT");
-                saveStudent(existing.isEmpty() ? null : existing.getFirst(), importCommand, operator);
+                saveStudent(
+                        existing.isEmpty() ? null : existing.getFirst(),
+                        command.withEnrollmentSource("BATCH_IMPORT"),
+                        operator);
                 success++;
             } catch (RuntimeException exception) {
                 errors.add(Map.of(
                         "row", index + 1,
                         "studentNumber", command.studentNumber(),
-                        "message", exception.getMessage() == null
-                                ? "导入失败"
-                                : exception.getMessage()));
+                        "message", exception.getMessage() == null ? "导入失败" : exception.getMessage()));
             }
         }
         auditService.success(
-                operator,
-                "STUDENT_IMPORT",
-                "STUDENT",
-                null,
-                "批量导入",
-                null,
-                Map.of(
-                        "total", commands.size(),
-                        "success", success,
-                        "failed", errors.size()));
+                operator, "STUDENT_IMPORT", "STUDENT", null, "批量导入", null,
+                Map.of("total", commands.size(), "success", success, "failed", errors.size()));
         return Map.of(
                 "total", commands.size(),
                 "success", success,
@@ -269,8 +203,7 @@ public class StudentAdminService {
     private void ensureMajorEnabled(long majorId) {
         Integer count = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM major WHERE id=:id AND enabled=1",
-                Map.of("id", majorId),
-                Integer.class);
+                Map.of("id", majorId), Integer.class);
         if (count == null || count == 0) {
             throw new BusinessException("MAJOR_NOT_AVAILABLE", "专业不存在或已禁用");
         }
@@ -282,11 +215,18 @@ public class StudentAdminService {
                 Map.of("id", id));
         if (rows.isEmpty()) {
             throw new BusinessException(
-                    "STUDENT_NOT_FOUND",
-                    "学生不存在",
-                    HttpStatus.NOT_FOUND);
+                    "STUDENT_NOT_FOUND", "学生不存在", HttpStatus.NOT_FOUND);
         }
         return rows.getFirst();
+    }
+
+    private String normalized(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
+    }
+
+    private String normalizedPattern(String value) {
+        String normalized = normalized(value);
+        return normalized == null ? null : "%" + normalized + "%";
     }
 
     public record StudentCommand(

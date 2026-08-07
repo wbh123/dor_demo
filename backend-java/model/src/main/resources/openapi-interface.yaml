@@ -210,6 +210,8 @@ paths:
     $ref: 'student/openapi-preference-policy.yaml#/paths/~1api~1v1~1student~1preferences'
   /api/v1/student/batches/{batchId}/selection-readiness:
     $ref: 'student/openapi-preference-policy.yaml#/paths/~1api~1v1~1student~1batches~1{batchId}~1selection-readiness'
+  /api/v1/student/batches/{batchId}/selection/bootstrap:
+    $ref: 'student/openapi-selection-bootstrap.yaml#/paths/~1api~1v1~1student~1batches~1{batchId}~1selection~1bootstrap'
   /api/v1/student/batches/{batchId}/assignment/cancel:
     $ref: 'student/openapi-preference-policy.yaml#/paths/~1api~1v1~1student~1batches~1{batchId}~1assignment~1cancel'
   /api/v1/student/profile:

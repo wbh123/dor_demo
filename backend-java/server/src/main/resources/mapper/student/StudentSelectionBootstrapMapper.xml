@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.wust.dormitory.student.mapper.StudentSelectionBootstrapMapper">
+    <resultMap id="ActiveTeamResultMap"
+               type="com.wust.dormitory.student.model.persistence.StudentSelectionActiveTeamRow">
+        <constructor>
+            <idArg column="id" javaType="long"/>
+            <arg column="batch_id" javaType="long"/>
+            <arg column="team_status" javaType="java.lang.String"/>
+            <arg column="leader_student_id" javaType="long"/>
+            <arg column="member_role" javaType="java.lang.String"/>
+            <arg column="member_status" javaType="java.lang.String"/>
+        </constructor>
+    </resultMap>
+
+    <select id="findActiveTeam" resultMap="ActiveTeamResultMap">
+        SELECT t.id,
+               t.batch_id,
+               t.team_status,
+               t.leader_student_id,
+               tm.member_role,
+               tm.member_status
+        FROM selection_team_member tm
+        JOIN selection_team t ON t.id = tm.team_id
+        WHERE tm.student_id = #{studentId}
+          AND t.batch_id = #{batchId}
+          AND tm.member_status IN ('JOINED', 'LOCKED')
+          AND t.team_status IN ('FORMING', 'LOCKED', 'SELECTING')
+        ORDER BY t.created_at DESC, t.id DESC
+        LIMIT 1
+    </select>
+</mapper>

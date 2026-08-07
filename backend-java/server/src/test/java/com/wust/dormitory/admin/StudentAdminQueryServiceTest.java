@@ -29,6 +29,7 @@ class StudentAdminQueryServiceTest {
         StudentAdminMapper studentAdminMapper = mock(StudentAdminMapper.class);
         AdminDashboardMapper dashboardMapper = mock(AdminDashboardMapper.class);
         BatchCatalogMapper batchCatalogMapper = mock(BatchCatalogMapper.class);
+        ReferenceDataCacheService referenceDataCacheService = mock(ReferenceDataCacheService.class);
         StudentCatalogQuery expectedQuery = new StudentCatalogQuery(
                 "%2026%",
                 "F",
@@ -54,7 +55,8 @@ class StudentAdminQueryServiceTest {
                 adminCatalogMapper,
                 studentAdminMapper,
                 dashboardMapper,
-                batchCatalogMapper);
+                batchCatalogMapper,
+                referenceDataCacheService);
         Map<String, Object> result = service.students(" 2026 ", "F", 9L, 0, 500);
 
         verify(studentAdminMapper).countStudents(expectedQuery);
@@ -80,6 +82,7 @@ class StudentAdminQueryServiceTest {
         StudentAdminMapper studentAdminMapper = mock(StudentAdminMapper.class);
         AdminDashboardMapper dashboardMapper = mock(AdminDashboardMapper.class);
         BatchCatalogMapper batchCatalogMapper = mock(BatchCatalogMapper.class);
+        ReferenceDataCacheService referenceDataCacheService = mock(ReferenceDataCacheService.class);
         StudentCatalogQuery expectedQuery = new StudentCatalogQuery(
                 null,
                 null,
@@ -96,7 +99,8 @@ class StudentAdminQueryServiceTest {
                 adminCatalogMapper,
                 studentAdminMapper,
                 dashboardMapper,
-                batchCatalogMapper);
+                batchCatalogMapper,
+                referenceDataCacheService);
         Map<String, Object> result = service.students(" ", "", null, 3, 10);
 
         verify(studentAdminMapper).countStudents(expectedQuery);

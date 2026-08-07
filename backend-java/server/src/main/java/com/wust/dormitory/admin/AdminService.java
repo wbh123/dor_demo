@@ -9,7 +9,6 @@ import com.wust.dormitory.admin.mapper.StudentAdminMapper;
 import com.wust.dormitory.admin.model.persistence.AdminDashboardStatsRow;
 import com.wust.dormitory.admin.model.persistence.BatchCatalogRow;
 import com.wust.dormitory.admin.model.persistence.BuildingCatalogRow;
-import com.wust.dormitory.admin.model.persistence.MajorCatalogRow;
 import com.wust.dormitory.admin.model.persistence.StudentCatalogRow;
 import com.wust.dormitory.admin.model.query.StudentCatalogQuery;
 import com.wust.dormitory.audit.AuditService;
@@ -40,8 +39,7 @@ public class AdminService {
             "OPEN", Set.of("PAUSED", "CLOSED"),
             "PAUSED", Set.of("OPEN", "CLOSED"),
             "CLOSED", Set.of("ALLOCATING", "FINISHED"),
-            "ALLOCATING", Set.of("FINISHED", "CLOSED")
-    );
+            "ALLOCATING", Set.of("FINISHED", "CLOSED"));
 
     private final NamedParameterJdbcTemplate jdbc;
     private final ObjectMapper objectMapper;
@@ -50,6 +48,7 @@ public class AdminService {
     private final StudentAdminMapper studentAdminMapper;
     private final AdminDashboardMapper adminDashboardMapper;
     private final BatchCatalogMapper batchCatalogMapper;
+    private final ReferenceDataCacheService referenceDataCacheService;
 
     public AdminService(
             NamedParameterJdbcTemplate jdbc,
@@ -58,7 +57,8 @@ public class AdminService {
             AdminCatalogMapper adminCatalogMapper,
             StudentAdminMapper studentAdminMapper,
             AdminDashboardMapper adminDashboardMapper,
-            BatchCatalogMapper batchCatalogMapper) {
+            BatchCatalogMapper batchCatalogMapper,
+            ReferenceDataCacheService referenceDataCacheService) {
         this.jdbc = jdbc;
         this.objectMapper = objectMapper;
         this.auditService = auditService;
@@ -66,6 +66,7 @@ public class AdminService {
         this.studentAdminMapper = studentAdminMapper;
         this.adminDashboardMapper = adminDashboardMapper;
         this.batchCatalogMapper = batchCatalogMapper;
+        this.referenceDataCacheService = referenceDataCacheService;
     }
 
     public Map<String, Object> dashboard() {
@@ -74,9 +75,7 @@ public class AdminService {
     }
 
     public List<Map<String, Object>> majors(Boolean enabled) {
-        return adminCatalogMapper.findMajors(enabled).stream()
-                .map(MajorCatalogRow::asResponseMap)
-                .toList();
+        return referenceDataCacheService.majors(enabled);
     }
 
     @Transactional
@@ -91,6 +90,7 @@ public class AdminService {
                     .addValue("name", command.majorName())
                     .addValue("enabled", command.enabled() ? 1 : 0), keyHolder, new String[]{"id"});
             long newId = keyHolder.getKey().longValue();
+            referenceDataCacheService.invalidateMajors();
             auditService.success(operator, "MAJOR_CREATE", "MAJOR", newId, null, null, command);
             return newId;
         }
@@ -100,6 +100,7 @@ public class AdminService {
                 """, new MapSqlParameterSource()
                 .addValue("id", id).addValue("code", command.majorCode())
                 .addValue("name", command.majorName()).addValue("enabled", command.enabled() ? 1 : 0));
+        referenceDataCacheService.invalidateMajors();
         auditService.success(operator, "MAJOR_UPDATE", "MAJOR", id, null, before, command);
         return id;
     }
@@ -196,7 +197,6 @@ public class AdminService {
                 .map(BuildingCatalogRow::asResponseMap)
                 .toList();
     }
-
 
     @Transactional
     public void updateRoom(long roomId, RoomCommand command, CurrentUser operator) {
@@ -384,7 +384,6 @@ public class AdminService {
                 "reused", false, "summary", preview.get("summary"));
     }
 
-
     private Map<String, Object> buildAllocation(long batchId, long randomSeed) {
         ensureBatchExists(batchId);
         List<Map<String, Object>> students = jdbc.queryForList("""
@@ -433,8 +432,7 @@ public class AdminService {
                     "bedId", bed.get("bed_id"),
                     "roomId", bed.get("room_id"),
                     "room", bed.get("building_name") + " " + bed.get("room_number") + "-" + bed.get("bed_code"),
-                    "score", 100.0
-            ));
+                    "score", 100.0));
         }
         Map<String, Object> summary = Map.of("studentCount", students.size(), "availableBedCount", beds.size(),
                 "assignedCount", assignments.size(), "unassignedCount", unassigned.size(), "randomSeed", randomSeed);
