@@ -3,6 +3,7 @@ package com.wust.dormitory.student;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wust.dormitory.common.error.BusinessException;
 import com.wust.dormitory.matching.BatchRecommendationPolicyService;
+import com.wust.dormitory.matching.MatchingSchemeService;
 import com.wust.dormitory.matching.MatchingService;
 import com.wust.dormitory.matching.RecommendationSampler;
 import com.wust.dormitory.matching.RecommendationStrategy;
@@ -73,11 +74,11 @@ public class StudentRoomRecommendationService {
     }
 
     public List<Map<String, Object>> rooms(long batchId, CurrentUser user) {
-        return candidateRooms(batchId, null, user);
+        return candidateRooms(batchId, null, user, null, null);
     }
 
     public Map<String, Object> room(long batchId, long roomId, CurrentUser user) {
-        return candidateRooms(batchId, roomId, user).stream()
+        return candidateRooms(batchId, roomId, user, null, null).stream()
                 .findFirst()
                 .orElseThrow(() -> new BusinessException(
                         "ROOM_NOT_CANDIDATE",
@@ -92,15 +93,13 @@ public class StudentRoomRecommendationService {
         return recommend(batchId, RecommendationStrategy.TRUE_RANDOM, user);
     }
 
-    public Map<String, Object> recommend(
-            long batchId,
-            RecommendationStrategy strategy,
-            CurrentUser user) {
+    public Map<String, Object> recommend(long batchId, RecommendationStrategy strategy, CurrentUser user) {
         BatchRecommendationPolicyService.Policy recommendationPolicy = recommendationPolicyService.forBatch(batchId);
         recommendationPolicy.requireAllowed(strategy);
         featureAccessService.require(strategy.requiredFeatureCode());
         Map<String, Object> batch = policy.batch(batchId);
-        List<Map<String, Object>> candidates = rooms(batchId, user);
+        List<Map<String, Object>> candidates = candidateRooms(
+                batchId, null, user, batch, recommendationPolicy);
         if (candidates.isEmpty()) {
             throw new BusinessException("NO_AVAILABLE_ROOM", "当前没有符合条件的可用寝室", HttpStatus.CONFLICT);
         }
@@ -137,11 +136,18 @@ public class StudentRoomRecommendationService {
         return response;
     }
 
-    private List<Map<String, Object>> candidateRooms(long batchId, Long requestedRoomId, CurrentUser user) {
+    private List<Map<String, Object>> candidateRooms(
+            long batchId,
+            Long requestedRoomId,
+            CurrentUser user,
+            Map<String, Object> preloadedBatch,
+            BatchRecommendationPolicyService.Policy preloadedRecommendationPolicy) {
         requireAccessibleBatch(batchId, user.studentId());
-        Map<String, Object> batch = policy.batch(batchId);
+        Map<String, Object> batch = preloadedBatch == null ? policy.batch(batchId) : preloadedBatch;
         Map<String, Object> student = policy.student(user.studentId());
-        BatchRecommendationPolicyService.Policy recommendationPolicy = recommendationPolicyService.forBatch(batchId);
+        BatchRecommendationPolicyService.Policy recommendationPolicy = preloadedRecommendationPolicy == null
+                ? recommendationPolicyService.forBatch(batchId)
+                : preloadedRecommendationPolicy;
         String feature = featureJson(batchId, user.studentId());
         String mode = String.valueOf(batch.get("selection_mode"));
 
@@ -149,14 +155,15 @@ public class StudentRoomRecommendationService {
                 .filter(row -> isEligible(student, batch, row))
                 .filter(row -> availableCount(mode, row) > 0)
                 .toList();
-        if (eligible.isEmpty()) {
-            return List.of();
-        }
+        if (eligible.isEmpty()) return List.of();
 
         List<Long> roomIds = eligible.stream().map(RoomRecommendationCandidateRow::id).toList();
         Map<Long, List<String>> roommateFeatures = roommateFeatures(batchId, roomIds);
         Map<Long, Map<String, Integer>> bedTypes = availableBedTypes(batchId, roomIds);
         boolean recommendationEnabled = featureAccessService.has(FeatureCodes.P2_ROOM_RECOMMENDATION);
+        MatchingSchemeService.Policy matchingPolicy = recommendationEnabled
+                ? matchingService.policyForBatch(batchId)
+                : null;
         boolean preferenceCompleted = preferenceService.completed(user.studentId());
         String bedPreference = bedPreference(feature);
 
@@ -164,7 +171,7 @@ public class StudentRoomRecommendationService {
         for (RoomRecommendationCandidateRow row : eligible) {
             List<String> features = roommateFeatures.getOrDefault(row.id(), List.of());
             MatchingService.MatchResult match = recommendationEnabled
-                    ? matchingService.roomScore(batchId, feature, features)
+                    ? matchingService.roomScore(matchingPolicy, feature, features)
                     : matchingService.roomScore("", List.of());
             Map<String, Integer> counts = bedTypes.getOrDefault(row.id(), Map.of());
             Map<String, Object> view = new LinkedHashMap<>(row.toRoomMap());
@@ -267,9 +274,7 @@ public class StudentRoomRecommendationService {
     }
 
     private String bedPreference(String featureJson) {
-        if (featureJson == null || featureJson.isBlank()) {
-            return "";
-        }
+        if (featureJson == null || featureJson.isBlank()) return "";
         try {
             return new ObjectMapper().readTree(featureJson).path("bedPreference").asText("");
         } catch (Exception ignored) {
