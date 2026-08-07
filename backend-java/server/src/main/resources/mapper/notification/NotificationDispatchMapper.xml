@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.wust.dormitory.notification.mapper.NotificationDispatchMapper">
+    <select id="findTemplateRevision" resultType="map">
+        SELECT revision.id,
+               revision.title_zh_cn,
+               revision.content_zh_cn,
+               revision.title_en_us,
+               revision.content_en_us,
+               CONCAT('notification.template.', template.template_code, '.title') AS title_key,
+               CONCAT('notification.template.', template.template_code, '.message') AS message_key
+        FROM notification_template_revision revision
+        JOIN notification_template template ON template.id = revision.template_id
+        WHERE revision.id = #{templateRevisionId}
+          AND template.enabled = 1
+    </select>
+
+    <insert id="insertTask" parameterType="map" useGeneratedKeys="true" keyProperty="id" keyColumn="id">
+        INSERT INTO notification_send_task
+        (execution_key, task_status, channel, template_revision_id,
+         recipient_criteria_json, variables_json, recipient_count,
+         scheduled_at, time_zone, chunk_size, created_by, creation_reason)
+        VALUES
+        (#{executionKey}, 'SCHEDULED', 'IN_APP', #{templateRevisionId},
+         CAST(#{criteria} AS JSON), CAST(#{variables} AS JSON), #{recipientCount},
+         #{scheduledAt}, #{timeZone}, #{chunkSize}, #{createdBy}, #{reason})
+    </insert>
+
+    <insert id="insertRecipients">
+        INSERT INTO notification_recipient
+        (send_task_id, student_id, delivery_status)
+        VALUES
+        <foreach collection="studentIds" item="studentId" separator=",">
+            (#{taskId}, #{studentId}, 'PENDING')
+        </foreach>
+    </insert>
+
+    <select id="findDueTasks" resultType="map">
+        SELECT id,
+               execution_key AS executionKey,
+               template_revision_id,
+               variables_json
+        FROM notification_send_task
+        WHERE task_status = 'SCHEDULED'
+          AND scheduled_at &lt;= CURRENT_TIMESTAMP(3)
+        ORDER BY scheduled_at, id
+        LIMIT 20
+        FOR UPDATE SKIP LOCKED
+    </select>
+
+    <update id="claimTask">
+        UPDATE notification_send_task
+        SET task_status = 'RUNNING',
+            started_at = CURRENT_TIMESTAMP(3)
+        WHERE id = #{taskId}
+          AND task_status = 'SCHEDULED'
+    </update>
+
+    <update id="markSucceeded">
+        UPDATE notification_send_task
+        SET task_status = 'SUCCEEDED',
+            completed_at = CURRENT_TIMESTAMP(3)
+        WHERE id = #{taskId}
+          AND task_status = 'RUNNING'
+    </update>
+
+    <update id="markFailed">
+        UPDATE notification_send_task
+        SET task_status = 'FAILED',
+            failure_reason = #{reason},
+            completed_at = CURRENT_TIMESTAMP(3)
+        WHERE id = #{taskId}
+    </update>
+
+    <update id="cancelScheduledTask">
+        UPDATE notification_send_task
+        SET task_status = 'CANCELLED',
+            cancelled_by = #{operatorId},
+            cancelled_at = CURRENT_TIMESTAMP(3)
+        WHERE id = #{taskId}
+          AND task_status = 'SCHEDULED'
+    </update>
+
+    <select id="findStatusPage" resultType="map">
+        SELECT task.id,
+               task.execution_key,
+               task.task_status,
+               task.channel,
+               task.recipient_count,
+               task.scheduled_at,
+               task.time_zone,
+               task.failure_reason,
+               task.created_at,
+               task.started_at,
+               task.completed_at,
+               SUM(recipient.delivery_status = 'DELIVERED') AS delivered_count,
+               SUM(recipient.delivery_status = 'FAILED') AS failed_count
+        FROM notification_send_task task
+        LEFT JOIN notification_recipient recipient
+               ON recipient.send_task_id = task.id
+        GROUP BY task.id
+        ORDER BY task.id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="findPendingRecipients" resultType="long">
+        SELECT student_id
+        FROM notification_recipient
+        WHERE send_task_id = #{taskId}
+          AND delivery_status = 'PENDING'
+        ORDER BY id
+        LIMIT #{limit}
+    </select>
+
+    <update id="markRecipientsDelivered">
+        UPDATE notification_recipient
+        SET delivery_status = 'DELIVERED',
+            delivered_at = CURRENT_TIMESTAMP(3)
+        WHERE send_task_id = #{taskId}
+          AND delivery_status = 'PENDING'
+          AND student_id IN
+          <foreach collection="studentIds" item="studentId" open="(" separator="," close=")">
+              #{studentId}
+          </foreach>
+    </update>
+</mapper>
