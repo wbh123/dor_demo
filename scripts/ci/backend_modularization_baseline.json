@@ -35,7 +35,6 @@
   "large_controllers": {
     "backend-java/server/src/main/java/com/wust/dormitory/admin/AdminController.java": 36,
     "backend-java/server/src/main/java/com/wust/dormitory/admin/AdminGovernanceController.java": 24,
-    "backend-java/server/src/main/java/com/wust/dormitory/platform/PlatformManagementController.java": 18,
     "backend-java/server/src/main/java/com/wust/dormitory/student/StudentController.java": 30,
     "backend-java/server/src/main/java/com/wust/dormitory/waitlist/WaitlistController.java": 14
   }
