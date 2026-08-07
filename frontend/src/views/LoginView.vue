@@ -6,6 +6,8 @@ import type { ActivateRequest, DataObject, LoginRequest, ObjectSuccessResponse }
 import { useAuthStore } from '../stores/auth'
 
 const fallbackInstitutionName = String(import.meta.env.VITE_INSTITUTION_NAME || '示例大学')
+const fallbackLoginHeroTitle = String(import.meta.env.VITE_LOGIN_HERO_TITLE || '宿舍智能选择系统')
+const fallbackLoginHeroDescription = String(import.meta.env.VITE_LOGIN_HERO_DESCRIPTION || '查看开放批次、完善个人偏好，并在开放时段完成寝室选择。')
 const operatorName = String(import.meta.env.VITE_OPERATOR_NAME || '')
 const icpRecord = String(import.meta.env.VITE_ICP_RECORD || '')
 const loginServiceName = String(import.meta.env.VITE_LOGIN_SERVICE_NAME || '学生宿舍服务')
@@ -32,7 +34,7 @@ const brandLogo = computed(() => String(branding.value.horizontalLogoUrl ?? fall
 const loginFrameHtml = computed(() => {
   const imageUrl = String(loginContent.value.imageUrl ?? '').trim()
   const html = String(loginContent.value.html ?? '').trim()
-    || '<h1>宿舍智能选择系统</h1><p>查看开放批次、完善个人偏好，并在开放时段完成寝室选择。</p>'
+    || `<h1>${escapeAttribute(fallbackLoginHeroTitle)}</h1><p>${escapeAttribute(fallbackLoginHeroDescription)}</p>`
   const image = imageUrl ? `<img src="${escapeAttribute(imageUrl)}" alt="登录页展示图片">` : ''
   return `<!doctype html><html><head><meta charset="utf-8"><style>html,body{margin:0;width:100%;height:100%;overflow:hidden;background:transparent;color:#fff;font-family:Inter,"Microsoft YaHei",sans-serif}body{display:grid;align-content:center;gap:18px;padding:6px 0;box-sizing:border-box}h1,h2,h3,p,ul,ol{margin:0}h1{max-width:720px;font-size:clamp(34px,4vw,58px);line-height:1.08}h2{font-size:28px}p,li{max-width:720px;font-size:15px;line-height:1.78;color:rgba(255,255,255,.86)}img{display:block;max-width:min(720px,100%);max-height:260px;object-fit:contain;object-position:left center}</style></head><body>${image}${html}</body></html>`
 })
