@@ -87,7 +87,9 @@
         UPDATE bed_assignment
         SET bed_id=#{bedId},
             assignment_method='MANUAL_ADJUSTMENT',
-            updated_at=CURRENT_TIMESTAMP(3)
+            assigned_by=#{operatorId},
+            assigned_at=CURRENT_TIMESTAMP(3),
+            version=version+1
         WHERE student_id=#{studentId}
           AND assignment_status='ACTIVE'
     </update>
