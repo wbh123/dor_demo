@@ -37,8 +37,9 @@ if "FOR UPDATE" not in xml:
     raise AssertionError("源批次读取必须保留 FOR UPDATE")
 if "UNION ALL" not in xml or "LIMIT #{limit}" not in xml:
     raise AssertionError("不可用资源必须集合化为一次 UNION ALL 查询并统一限量")
-if xml.count("questionnaire_version") != 1 or xml.count("matching_weight_scheme") != 1 or xml.count("batch_rule_template") != 1:
-    raise AssertionError("模板引用必须一次聚合校验，不能拆成三条查询")
+for table in ("questionnaire_version", "matching_weight_scheme", "batch_rule_template"):
+    if xml.count(f"FROM {table}") != 1:
+        raise AssertionError(f"模板引用表 {table} 必须只在一次聚合校验中访问")
 if "SELECT *" in xml:
     raise AssertionError("批次复制 XML 禁止 SELECT *")
 
