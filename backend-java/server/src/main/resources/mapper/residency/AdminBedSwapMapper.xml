@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.wust.dormitory.residency.AdminBedSwapMapper">
+    <select id="findActiveResidencyForUpdate" resultType="map">
+        SELECT assignment.id AS residency_id,
+               assignment.student_id,
+               assignment.room_id,
+               assignment.bed_id,
+               assignment.batch_id,
+               assignment.team_id,
+               assignment.source_selection_mode,
+               assignment.assignment_method
+        FROM room_assignment assignment
+        WHERE assignment.student_id=#{studentId}
+          AND assignment.assignment_status='ACTIVE'
+        FOR UPDATE
+    </select>
+
+    <select id="findActiveAllocationForUpdate" resultType="map">
+        SELECT assignment.id AS allocation_id,
+               assignment.student_id,
+               assignment.bed_id,
+               bed.room_id,
+               assignment.batch_id,
+               assignment.team_id,
+               assignment.assignment_method
+        FROM bed_assignment assignment
+        JOIN bed ON bed.id=assignment.bed_id
+        WHERE assignment.student_id=#{studentId}
+          AND assignment.assignment_status='ACTIVE'
+        ORDER BY assignment.assigned_at DESC, assignment.id DESC
+        LIMIT 1
+        FOR UPDATE
+    </select>
+
+    <select id="findBedForUpdate" resultType="map">
+        SELECT bed.id AS bed_id,
+               bed.room_id,
+               bed.bed_code,
+               bed.bed_type,
+               bed.operational_status,
+               room.room_number,
+               room.gender_restriction,
+               room.education_level_scope,
+               room.resident_scope,
+               room.operational_status AS room_status,
+               floor.floor_number,
+               building.id AS building_id,
+               building.building_name
+        FROM bed
+        JOIN room ON room.id=bed.room_id
+        JOIN dormitory_floor floor ON floor.id=room.floor_id
+        JOIN dormitory_building building ON building.id=floor.building_id
+        WHERE bed.id=#{bedId}
+        FOR UPDATE
+    </select>
+
+    <select id="countStudentRoomCompatible" resultType="int">
+        SELECT COUNT(*)
+        FROM student
+        JOIN room ON room.id=#{roomId}
+        WHERE student.id=#{studentId}
+          AND room.operational_status='ENABLED'
+          AND room.gender_restriction=student.gender
+          AND (
+            (student.student_category='DOMESTIC' AND room.resident_scope IN ('DOMESTIC_ONLY','MIXED'))
+            OR (student.student_category='INTERNATIONAL' AND room.resident_scope IN ('INTERNATIONAL_ONLY','MIXED'))
+          )
+    </select>
+
+    <update id="updateResidencyPlacement">
+        UPDATE room_assignment
+        SET room_id=#{roomId},
+            bed_id=#{bedId},
+            source_selection_mode='DIRECT',
+            assignment_method='MANUAL_ADJUSTMENT',
+            assigned_by=#{operatorId},
+            bed_confirmed_at=CURRENT_TIMESTAMP(3),
+            updated_at=CURRENT_TIMESTAMP(3)
+        WHERE id=#{residencyId}
+          AND assignment_status='ACTIVE'
+    </update>
+
+    <update id="updateActiveAllocation">
+        UPDATE bed_assignment
+        SET bed_id=#{bedId},
+            assignment_method='MANUAL_ADJUSTMENT',
+            updated_at=CURRENT_TIMESTAMP(3)
+        WHERE student_id=#{studentId}
+          AND assignment_status='ACTIVE'
+    </update>
+
+    <insert id="insertResidencyHistory">
+        INSERT INTO room_assignment_history
+        (room_assignment_id, student_id, room_id, bed_id, event_type,
+         operator_user_id, reason, previous_data, current_data, occurred_at)
+        VALUES (#{residencyId}, #{studentId}, #{roomId}, #{bedId}, 'BED_CHANGED',
+                #{operatorId}, #{reason}, CAST(#{previousJson} AS JSON),
+                CAST(#{currentJson} AS JSON), CURRENT_TIMESTAMP(3))
+    </insert>
+</mapper>
