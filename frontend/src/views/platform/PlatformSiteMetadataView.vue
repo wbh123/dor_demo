@@ -17,8 +17,8 @@ onMounted(load)
 async function load() {
   loading.value = true; error.value = ''; message.value = ''
   try {
-    const response = await platformApi.get('/api/v1/platform/site-metadata')
-    const data = (response.data?.data ?? {}) as PlatformObject
+    const response = await platformApi.siteMetadata()
+    const data = (response.data ?? {}) as PlatformObject
     const brandingData = (data.branding ?? {}) as PlatformObject
     const loginData = (data.login ?? {}) as PlatformObject
     branding.schoolName = String(brandingData.schoolName ?? '')
@@ -34,9 +34,7 @@ async function save() {
   if (saving.value) return
   saving.value = true; error.value = ''; message.value = ''
   try {
-    await platformApi.put('/api/v1/platform/site-metadata', {
-      branding: { ...branding }, login: { ...login }, schoolAdminEditable: schoolAdminEditable.value,
-    })
+    await platformApi.updateSiteMetadata({ branding: { ...branding }, login: { ...login }, schoolAdminEditable: schoolAdminEditable.value })
     message.value = '学校元数据与登录页配置已保存。'
   } catch (reason) { error.value = reason instanceof Error ? reason.message : '保存失败' }
   finally { saving.value = false }
