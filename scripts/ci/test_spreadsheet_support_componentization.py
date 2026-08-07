@@ -23,11 +23,18 @@ if TEXT.exists() and len(text_source.splitlines()) > 300:
 for token in (
     "SpreadsheetTextSupport.readCsv",
     "SpreadsheetTextSupport.csvLine",
-    "SpreadsheetTextSupport.normalizeHeader",
     "SpreadsheetTextSupport.map",
 ):
     if token not in main_source:
         errors.append(f"SpreadsheetSupport 未委托文本职责：{token}")
+if not any(
+    token in main_source
+    for token in (
+        "SpreadsheetTextSupport::normalizeHeader",
+        "SpreadsheetTextSupport.normalizeHeader",
+    )
+):
+    errors.append("SpreadsheetSupport 未委托文本职责：SpreadsheetTextSupport.normalizeHeader")
 
 for method in ("readCsv", "parseCsv", "normalizeHeader", "csvLine"):
     if f"private static" in main_source and f" {method}(" in main_source:
