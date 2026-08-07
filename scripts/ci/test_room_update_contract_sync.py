@@ -58,13 +58,15 @@ for token in (
     if token not in target:
         raise AssertionError(f"房间编辑后端契约不同步：{token}")
 
+frontend_compact = "".join(frontend.split())
 for token in (
         "type EducationScope = 'UNDERGRADUATE_ONLY' | 'GRADUATE_ONLY' | 'MIXED'",
         "educationLevelScope: EducationScope",
         "editForm.educationLevelScope = String(room.education_level_scope ?? 'MIXED') as EducationScope",
         "v-model=\"editForm.educationLevelScope\"",
 ):
-    if token not in frontend:
+    compact_token = "".join(token.split())
+    if compact_token not in frontend_compact:
         raise AssertionError(f"房间编辑前端契约不同步：{token}")
 
 print("Effective room update OpenAPI/controller/service/frontend contract passed")
