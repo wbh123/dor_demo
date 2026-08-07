@@ -3,28 +3,32 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 SERVICE = ROOT / "backend-java/server/src/main/java/com/wust/dormitory/admin/AdminService.java"
+CACHE = ROOT / "backend-java/server/src/main/java/com/wust/dormitory/admin/ReferenceDataCacheService.java"
 MAPPER = ROOT / "backend-java/server/src/main/java/com/wust/dormitory/admin/mapper/AdminCatalogMapper.java"
 MAJOR_ROW = ROOT / "backend-java/server/src/main/java/com/wust/dormitory/admin/model/persistence/MajorCatalogRow.java"
 BUILDING_ROW = ROOT / "backend-java/server/src/main/java/com/wust/dormitory/admin/model/persistence/BuildingCatalogRow.java"
 XML = ROOT / "backend-java/server/src/main/resources/mapper/admin/AdminCatalogMapper.xml"
 TEST = ROOT / "backend-java/server/src/test/java/com/wust/dormitory/admin/AdminCatalogQueryServiceTest.java"
 
-for path in (SERVICE, MAPPER, MAJOR_ROW, BUILDING_ROW, XML, TEST):
+for path in (SERVICE, CACHE, MAPPER, MAJOR_ROW, BUILDING_ROW, XML, TEST):
     if not path.exists():
         raise AssertionError(f"缺少专业或楼栋目录 MyBatis 文件：{path.relative_to(ROOT)}")
 
 service = SERVICE.read_text(encoding="utf-8")
+cache = CACHE.read_text(encoding="utf-8")
 mapper = MAPPER.read_text(encoding="utf-8")
 xml = XML.read_text(encoding="utf-8")
 major_row = MAJOR_ROW.read_text(encoding="utf-8")
 building_row = BUILDING_ROW.read_text(encoding="utf-8")
 
-for method_name, call in (
-        ("majors", "adminCatalogMapper.findMajors"),
-        ("buildings", "adminCatalogMapper.findBuildings"),
-):
-    if call not in service:
-        raise AssertionError(f"AdminService.{method_name} 必须委托 AdminCatalogMapper")
+if "referenceDataCacheService.majors(enabled)" not in service:
+    raise AssertionError("AdminService.majors 必须委托专业目录读穿缓存")
+if "adminCatalogMapper.findMajors(enabled)" not in cache:
+    raise AssertionError("专业目录缓存未命中时必须回源 AdminCatalogMapper")
+if "adminCatalogMapper.findBuildings" not in service:
+    raise AssertionError("AdminService.buildings 必须委托 AdminCatalogMapper")
+
+for method_name in ("majors", "buildings"):
     start = service.index(f"public List<Map<String, Object>> {method_name}")
     next_method = service.find("\n    public ", start + 10)
     next_transaction = service.find("\n    @Transactional", start + 10)
