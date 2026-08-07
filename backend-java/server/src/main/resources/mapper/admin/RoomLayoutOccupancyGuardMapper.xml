@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.wust.dormitory.admin.RoomLayoutOccupancyGuardMapper">
+    <select id="findLayoutBeds" resultType="map">
+        SELECT bed.id,
+               bed.bed_type,
+               bed.bed_frame_id,
+               CASE
+                 WHEN bed.bed_type IN ('BUNK_UPPER','BUNK_LOWER') THEN 'BUNK'
+                 WHEN bed.bed_type='SINGLE_BED' THEN 'SINGLE_BED'
+                 ELSE 'LOFT_BED_DESK'
+               END AS layout_unit_type
+        FROM bed
+        WHERE bed.room_id=#{roomId}
+          AND bed.operational_status&lt;&gt;'RETIRED'
+        ORDER BY bed.position_index, bed.id
+    </select>
+</mapper>
