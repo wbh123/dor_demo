@@ -36,13 +36,13 @@
                building.education_level_scope,
                building.resident_scope,
                building.enabled,
-               COALESCE(MAX(floor.floor_number), 0) AS floor_count
+               COALESCE((
+                 SELECT MAX(floor.floor_number)
+                 FROM dormitory_floor floor
+                 WHERE floor.building_id=building.id
+               ), 0) AS floor_count
         FROM dormitory_building building
-        LEFT JOIN dormitory_floor floor ON floor.building_id=building.id
         WHERE building.id=#{buildingId}
-        GROUP BY building.id, building.building_code, building.building_name,
-                 building.gender_restriction, building.education_level_scope,
-                 building.resident_scope, building.enabled
         FOR UPDATE
     </select>
 
