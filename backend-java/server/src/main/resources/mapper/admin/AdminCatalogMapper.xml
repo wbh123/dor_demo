@@ -31,6 +31,31 @@
         </constructor>
     </resultMap>
 
+    <resultMap id="BuildingStaticResultMap"
+               type="com.wust.dormitory.admin.model.persistence.BuildingStaticRow">
+        <constructor>
+            <idArg column="id" javaType="long"/>
+            <arg column="building_code" javaType="java.lang.String"/>
+            <arg column="building_name" javaType="java.lang.String"/>
+            <arg column="gender_restriction" javaType="java.lang.String"/>
+            <arg column="education_level_scope" javaType="java.lang.String"/>
+            <arg column="resident_scope" javaType="java.lang.String"/>
+            <arg column="enabled" javaType="boolean"/>
+            <arg column="campus_name" javaType="java.lang.String"/>
+        </constructor>
+    </resultMap>
+
+    <resultMap id="FloorCatalogResultMap"
+               type="com.wust.dormitory.admin.model.persistence.FloorCatalogRow">
+        <constructor>
+            <idArg column="id" javaType="long"/>
+            <arg column="building_id" javaType="long"/>
+            <arg column="floor_number" javaType="int"/>
+            <arg column="floor_name" javaType="java.lang.String"/>
+            <arg column="enabled" javaType="boolean"/>
+        </constructor>
+    </resultMap>
+
     <select id="findMajors" resultMap="MajorCatalogResultMap">
         SELECT id,
                major_code,
@@ -75,5 +100,51 @@
                  b.enabled,
                  c.campus_name
         ORDER BY b.building_code
+    </select>
+
+    <sql id="BuildingStaticColumns">
+        building.id,
+        building.building_code,
+        building.building_name,
+        building.gender_restriction,
+        building.education_level_scope,
+        building.resident_scope,
+        building.enabled,
+        campus.campus_name
+    </sql>
+
+    <select id="findAllBuildingStatic" resultMap="BuildingStaticResultMap">
+        SELECT <include refid="BuildingStaticColumns"/>
+        FROM dormitory_building building
+        JOIN campus ON campus.id = building.campus_id
+        ORDER BY building.building_code, building.id
+    </select>
+
+    <select id="findBuildingStatic" resultMap="BuildingStaticResultMap">
+        SELECT <include refid="BuildingStaticColumns"/>
+        FROM dormitory_building building
+        JOIN campus ON campus.id = building.campus_id
+        WHERE building.id = #{buildingId}
+    </select>
+
+    <select id="findAllFloors" resultMap="FloorCatalogResultMap">
+        SELECT floor.id,
+               floor.building_id,
+               floor.floor_number,
+               floor.floor_name,
+               floor.enabled
+        FROM dormitory_floor floor
+        ORDER BY floor.building_id, floor.floor_number, floor.id
+    </select>
+
+    <select id="findFloors" resultMap="FloorCatalogResultMap">
+        SELECT floor.id,
+               floor.building_id,
+               floor.floor_number,
+               floor.floor_name,
+               floor.enabled
+        FROM dormitory_floor floor
+        WHERE floor.building_id = #{buildingId}
+        ORDER BY floor.floor_number, floor.id
     </select>
 </mapper>
