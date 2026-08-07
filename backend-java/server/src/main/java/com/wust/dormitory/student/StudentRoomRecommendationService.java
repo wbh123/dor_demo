@@ -16,6 +16,7 @@ import com.wust.dormitory.student.model.persistence.RoomRecommendationCandidateR
 import com.wust.dormitory.student.model.persistence.RoommateFeatureRow;
 import com.wust.dormitory.subscription.FeatureAccessService;
 import com.wust.dormitory.subscription.FeatureCodes;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
@@ -45,6 +46,7 @@ public class StudentRoomRecommendationService {
     private final BatchRecommendationPolicyService recommendationPolicyService;
     private final SecureRandom secureRandom;
 
+    @Autowired
     public StudentRoomRecommendationService(
             StudentRoomRecommendationMapper mapper,
             MatchingService matchingService,
