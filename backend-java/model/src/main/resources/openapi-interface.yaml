@@ -228,6 +228,8 @@ paths:
     $ref: 'student/openapi-student.yaml#/paths/~1api~1v1~1student~1batches~1{batchId}~1rooms'
   /api/v1/student/batches/{batchId}/rooms/{roomId}:
     $ref: 'student/openapi-student.yaml#/paths/~1api~1v1~1student~1batches~1{batchId}~1rooms~1{roomId}'
+  /api/v1/student/batches/{batchId}/rooms/{roomId}/selection/bootstrap:
+    $ref: 'student/openapi-room-selection-bootstrap.yaml#/paths/~1api~1v1~1student~1batches~1{batchId}~1rooms~1{roomId}~1selection~1bootstrap'
   /api/v1/student/batches/{batchId}/rooms/{roomId}/select:
     $ref: 'student/openapi-room-selection.yaml#/paths/~1api~1v1~1student~1batches~1{batchId}~1rooms~1{roomId}~1select'
   /api/v1/student/batches/{batchId}/personal-selection/prepare:
