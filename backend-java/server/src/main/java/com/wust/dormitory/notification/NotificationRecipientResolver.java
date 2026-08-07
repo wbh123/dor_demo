@@ -8,9 +8,9 @@ import java.util.Set;
 
 @Service
 public class NotificationRecipientResolver {
-    private final NotificationRecipientMapper mapper;
+    private final NotificationRecipientCurrentMapper mapper;
 
-    public NotificationRecipientResolver(NotificationRecipientMapper mapper) {
+    public NotificationRecipientResolver(NotificationRecipientCurrentMapper mapper) {
         this.mapper = mapper;
     }
 
