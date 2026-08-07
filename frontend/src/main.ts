@@ -21,6 +21,7 @@ import './admin-operations-refinement.css'
 import './overlay-refinement.css'
 import './admin-density-refinement.css'
 import './brand-layout-refinement.css'
+import './platform-feature-compact.css'
 
 createApp(App).use(pinia).use(router).mount('#app')
 useI18n().installDomI18n()
