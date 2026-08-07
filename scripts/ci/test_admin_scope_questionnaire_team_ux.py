@@ -74,12 +74,19 @@ require(placement_controller, (
 ), "administrator residency adjustment endpoints are missing")
 placement_service = read(
     "backend-java/server/src/main/java/com/wust/dormitory/admin/AdminStudentResidencyAdjustmentService.java")
+placement_mapper = read(
+    "backend-java/server/src/main/resources/mapper/admin/AdminResidencyAdjustmentMapper.xml")
 require(placement_service, (
     "residencyService.end(",
     "residencyService.assign(",
-    "active_batch_room_lock",
+    "adjustmentMapper.findCompatibleBeds(",
     "RESIDENCY_ADJUSTMENT_TARGET_UNAVAILABLE",
 ), "administrator residency adjustment transaction is incomplete")
+require(placement_mapper, (
+    "active_batch_room_lock",
+    "occupancy_source",
+    "selectable",
+), "administrator residency adjustment mapper must enforce room locks and occupancy")
 
 admin_batch = read("frontend/src/views/admin/AdminBatchView.vue")
 require(admin_batch, (
