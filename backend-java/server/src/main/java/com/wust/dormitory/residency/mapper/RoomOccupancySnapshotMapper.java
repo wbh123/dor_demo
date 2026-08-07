@@ -8,6 +8,8 @@ import java.util.List;
 
 @Mapper
 public interface RoomOccupancySnapshotMapper {
+    RoomOccupancySnapshotRow findSnapshot(@Param("roomId") long roomId);
+
     List<RoomOccupancySnapshotRow> findSnapshots(
             @Param("batchId") long batchId,
             @Param("roomIds") List<Long> roomIds);
