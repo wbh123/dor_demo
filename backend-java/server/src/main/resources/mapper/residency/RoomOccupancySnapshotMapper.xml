@@ -140,4 +140,37 @@
         </foreach>
         ORDER BY r.id
     </select>
+
+    <select id="countAvailableBedsForBatch" resultType="int">
+        WITH scoped_beds AS (
+            SELECT scope.bed_id
+            FROM batch_bed_scope scope
+            JOIN bed scoped_bed ON scoped_bed.id = scope.bed_id
+            WHERE scope.batch_id = #{batchId}
+              AND scoped_bed.room_id = #{roomId}
+            UNION
+            SELECT bed.id
+            FROM batch_room_scope scope
+            JOIN bed ON bed.room_id = scope.room_id
+            WHERE scope.batch_id = #{batchId}
+              AND scope.room_id = #{roomId}
+            UNION
+            SELECT bed.id
+            FROM batch_building_scope scope
+            JOIN dormitory_floor floor ON floor.building_id = scope.building_id
+            JOIN room room_scope ON room_scope.floor_id = floor.id
+            JOIN bed ON bed.room_id = room_scope.id
+            WHERE scope.batch_id = #{batchId}
+              AND room_scope.id = #{roomId}
+        )
+        SELECT COUNT(*)
+        FROM scoped_beds scoped
+        JOIN bed ON bed.id = scoped.bed_id
+        LEFT JOIN room_assignment occupied
+               ON occupied.room_id = bed.room_id
+              AND occupied.bed_id = bed.id
+              AND occupied.assignment_status = 'ACTIVE'
+        WHERE bed.operational_status = 'ENABLED'
+          AND occupied.id IS NULL
+    </select>
 </mapper>
