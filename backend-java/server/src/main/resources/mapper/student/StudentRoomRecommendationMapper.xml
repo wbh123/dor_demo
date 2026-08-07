@@ -1,0 +1,287 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.wust.dormitory.student.mapper.StudentRoomRecommendationMapper">
+
+    <resultMap id="RoomRecommendationCandidateResultMap"
+               type="com.wust.dormitory.student.model.persistence.RoomRecommendationCandidateRow">
+        <constructor>
+            <idArg column="id" javaType="java.lang.Long"/>
+            <arg column="room_number" javaType="java.lang.String"/>
+            <arg column="room_type" javaType="java.lang.String"/>
+            <arg column="capacity" javaType="java.lang.Integer"/>
+            <arg column="gender_restriction" javaType="java.lang.String"/>
+            <arg column="resident_scope" javaType="java.lang.String"/>
+            <arg column="operational_status" javaType="java.lang.String"/>
+            <arg column="state_version" javaType="java.lang.Long"/>
+            <arg column="floor_number" javaType="java.lang.Integer"/>
+            <arg column="building_id" javaType="java.lang.Long"/>
+            <arg column="building_code" javaType="java.lang.String"/>
+            <arg column="building_name" javaType="java.lang.String"/>
+            <arg column="active_resident_count" javaType="java.lang.Integer"/>
+            <arg column="unknown_bed_resident_count" javaType="java.lang.Integer"/>
+            <arg column="available_bed_count" javaType="java.lang.Integer"/>
+        </constructor>
+    </resultMap>
+
+    <resultMap id="RoommateFeatureResultMap"
+               type="com.wust.dormitory.student.model.persistence.RoommateFeatureRow">
+        <constructor>
+            <idArg column="room_id" javaType="java.lang.Long"/>
+            <arg column="feature_vector_json" javaType="java.lang.String"/>
+        </constructor>
+    </resultMap>
+
+    <resultMap id="AvailableBedTypeResultMap"
+               type="com.wust.dormitory.student.model.persistence.AvailableBedTypeRow">
+        <constructor>
+            <idArg column="room_id" javaType="java.lang.Long"/>
+            <arg column="bed_type" javaType="java.lang.String"/>
+            <arg column="amount" javaType="java.lang.Integer"/>
+        </constructor>
+    </resultMap>
+
+    <resultMap id="AvailableBedResultMap"
+               type="com.wust.dormitory.student.model.persistence.AvailableBedRow">
+        <constructor>
+            <idArg column="id" javaType="java.lang.Long"/>
+            <arg column="bed_code" javaType="java.lang.String"/>
+            <arg column="bed_type" javaType="java.lang.String"/>
+            <arg column="position_index" javaType="java.lang.Integer"/>
+        </constructor>
+    </resultMap>
+
+    <select id="isBatchAccessible" resultType="boolean">
+        SELECT EXISTS(
+            SELECT 1
+            FROM selection_batch batch
+            JOIN batch_student_eligibility eligibility
+              ON eligibility.batch_id = batch.id
+             AND eligibility.student_id = #{studentId}
+            WHERE batch.id = #{batchId}
+              AND eligibility.eligibility_status = 'ELIGIBLE'
+              AND batch.batch_status IN ('PUBLISHED', 'OPEN', 'PAUSED')
+        )
+    </select>
+
+    <select id="findBatchFeature" resultType="string">
+        SELECT feature_vector_json
+        FROM student_feature
+        WHERE batch_id = #{batchId}
+          AND student_id = #{studentId}
+        LIMIT 1
+    </select>
+
+    <select id="findCandidateRooms" resultMap="RoomRecommendationCandidateResultMap">
+        WITH scoped_rooms AS (
+            SELECT scope.room_id
+            FROM batch_room_scope scope
+            WHERE scope.batch_id = #{batchId}
+            UNION
+            SELECT room.id
+            FROM batch_building_scope scope
+            JOIN dormitory_floor floor
+              ON floor.building_id = scope.building_id
+            JOIN room
+              ON room.floor_id = floor.id
+            WHERE scope.batch_id = #{batchId}
+            UNION
+            SELECT bed.room_id
+            FROM batch_bed_scope scope
+            JOIN bed
+              ON bed.id = scope.bed_id
+            WHERE scope.batch_id = #{batchId}
+        ),
+        scoped_beds AS (
+            SELECT scope.bed_id
+            FROM batch_bed_scope scope
+            WHERE scope.batch_id = #{batchId}
+            UNION
+            SELECT bed.id
+            FROM batch_room_scope scope
+            JOIN bed
+              ON bed.room_id = scope.room_id
+            WHERE scope.batch_id = #{batchId}
+            UNION
+            SELECT bed.id
+            FROM batch_building_scope scope
+            JOIN dormitory_floor floor
+              ON floor.building_id = scope.building_id
+            JOIN room
+              ON room.floor_id = floor.id
+            JOIN bed
+              ON bed.room_id = room.id
+            WHERE scope.batch_id = #{batchId}
+        ),
+        resident_stats AS (
+            SELECT assignment.room_id,
+                   COUNT(*) AS active_resident_count,
+                   SUM(CASE WHEN assignment.bed_id IS NULL THEN 1 ELSE 0 END)
+                       AS unknown_bed_resident_count
+            FROM room_assignment assignment
+            WHERE assignment.assignment_status = 'ACTIVE'
+            GROUP BY assignment.room_id
+        ),
+        occupied_beds AS (
+            SELECT DISTINCT assignment.bed_id
+            FROM room_assignment assignment
+            WHERE assignment.assignment_status = 'ACTIVE'
+              AND assignment.bed_id IS NOT NULL
+        ),
+        available_beds AS (
+            SELECT bed.room_id,
+                   COUNT(*) AS available_bed_count
+            FROM scoped_beds scoped
+            JOIN bed
+              ON bed.id = scoped.bed_id
+             AND bed.operational_status = 'ENABLED'
+            LEFT JOIN occupied_beds occupied
+              ON occupied.bed_id = bed.id
+            WHERE occupied.bed_id IS NULL
+            GROUP BY bed.room_id
+        )
+        SELECT room.id,
+               room.room_number,
+               room.room_type,
+               room.capacity,
+               room.gender_restriction,
+               room.resident_scope,
+               room.operational_status,
+               room.state_version,
+               floor.floor_number,
+               building.id AS building_id,
+               building.building_code,
+               building.building_name,
+               COALESCE(resident_stats.active_resident_count, 0) AS active_resident_count,
+               COALESCE(resident_stats.unknown_bed_resident_count, 0)
+                   AS unknown_bed_resident_count,
+               COALESCE(available_beds.available_bed_count, 0) AS available_bed_count
+        FROM scoped_rooms scoped
+        JOIN room
+          ON room.id = scoped.room_id
+        JOIN dormitory_floor floor
+          ON floor.id = room.floor_id
+        JOIN dormitory_building building
+          ON building.id = floor.building_id
+        JOIN active_batch_room_lock active_lock
+          ON active_lock.batch_id = #{batchId}
+         AND active_lock.room_id = room.id
+        LEFT JOIN resident_stats
+          ON resident_stats.room_id = room.id
+        LEFT JOIN available_beds
+          ON available_beds.room_id = room.id
+        <if test="roomId != null">
+            WHERE room.id = #{roomId}
+        </if>
+        ORDER BY room.id
+    </select>
+
+    <select id="findRoommateFeatures" resultMap="RoommateFeatureResultMap">
+        SELECT assignment.room_id,
+               COALESCE(batch_feature.feature_vector_json,
+                        preference.feature_vector_json) AS feature_vector_json
+        FROM room_assignment assignment
+        LEFT JOIN student_feature batch_feature
+          ON batch_feature.student_id = assignment.student_id
+         AND batch_feature.batch_id = #{batchId}
+        LEFT JOIN student_preference_profile preference
+          ON preference.student_id = assignment.student_id
+        WHERE assignment.assignment_status = 'ACTIVE'
+          AND assignment.room_id IN
+          <foreach collection="roomIds" item="roomId" open="(" separator="," close=")">
+              #{roomId}
+          </foreach>
+          AND COALESCE(batch_feature.feature_vector_json,
+                       preference.feature_vector_json) IS NOT NULL
+        ORDER BY assignment.room_id, assignment.assigned_at, assignment.id
+    </select>
+
+    <select id="findAvailableBedTypes" resultMap="AvailableBedTypeResultMap">
+        WITH scoped_beds AS (
+            SELECT scope.bed_id
+            FROM batch_bed_scope scope
+            WHERE scope.batch_id = #{batchId}
+            UNION
+            SELECT bed.id
+            FROM batch_room_scope scope
+            JOIN bed
+              ON bed.room_id = scope.room_id
+            WHERE scope.batch_id = #{batchId}
+            UNION
+            SELECT bed.id
+            FROM batch_building_scope scope
+            JOIN dormitory_floor floor
+              ON floor.building_id = scope.building_id
+            JOIN room
+              ON room.floor_id = floor.id
+            JOIN bed
+              ON bed.room_id = room.id
+            WHERE scope.batch_id = #{batchId}
+        ),
+        occupied_beds AS (
+            SELECT DISTINCT assignment.bed_id
+            FROM room_assignment assignment
+            WHERE assignment.assignment_status = 'ACTIVE'
+              AND assignment.bed_id IS NOT NULL
+        )
+        SELECT bed.room_id,
+               bed.bed_type,
+               COUNT(*) AS amount
+        FROM scoped_beds scoped
+        JOIN bed
+          ON bed.id = scoped.bed_id
+         AND bed.operational_status = 'ENABLED'
+        LEFT JOIN occupied_beds occupied
+          ON occupied.bed_id = bed.id
+        WHERE occupied.bed_id IS NULL
+          AND bed.room_id IN
+          <foreach collection="roomIds" item="roomId" open="(" separator="," close=")">
+              #{roomId}
+          </foreach>
+        GROUP BY bed.room_id, bed.bed_type
+    </select>
+
+    <select id="findAvailableBeds" resultMap="AvailableBedResultMap">
+        WITH scoped_beds AS (
+            SELECT scope.bed_id
+            FROM batch_bed_scope scope
+            WHERE scope.batch_id = #{batchId}
+            UNION
+            SELECT bed.id
+            FROM batch_room_scope scope
+            JOIN bed
+              ON bed.room_id = scope.room_id
+            WHERE scope.batch_id = #{batchId}
+            UNION
+            SELECT bed.id
+            FROM batch_building_scope scope
+            JOIN dormitory_floor floor
+              ON floor.building_id = scope.building_id
+            JOIN room
+              ON room.floor_id = floor.id
+            JOIN bed
+              ON bed.room_id = room.id
+            WHERE scope.batch_id = #{batchId}
+        ),
+        occupied_beds AS (
+            SELECT DISTINCT assignment.bed_id
+            FROM room_assignment assignment
+            WHERE assignment.assignment_status = 'ACTIVE'
+              AND assignment.bed_id IS NOT NULL
+        )
+        SELECT bed.id,
+               bed.bed_code,
+               bed.bed_type,
+               bed.position_index
+        FROM scoped_beds scoped
+        JOIN bed
+          ON bed.id = scoped.bed_id
+         AND bed.room_id = #{roomId}
+         AND bed.operational_status = 'ENABLED'
+        LEFT JOIN occupied_beds occupied
+          ON occupied.bed_id = bed.id
+        WHERE occupied.bed_id IS NULL
+        ORDER BY bed.position_index, bed.id
+    </select>
+</mapper>
