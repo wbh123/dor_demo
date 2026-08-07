@@ -23,12 +23,15 @@ public class BuildingManagementService {
 
     private final BuildingManagementMapper mapper;
     private final AuditService auditService;
+    private final ReferenceDataCacheService referenceDataCacheService;
 
     public BuildingManagementService(
             BuildingManagementMapper mapper,
-            AuditService auditService) {
+            AuditService auditService,
+            ReferenceDataCacheService referenceDataCacheService) {
         this.mapper = mapper;
         this.auditService = auditService;
+        this.referenceDataCacheService = referenceDataCacheService;
     }
 
     public List<Map<String, Object>> list() {
@@ -92,6 +95,7 @@ public class BuildingManagementService {
         }
         mapper.enableFloorsWithinRange(buildingId, command.floorCount());
         mapper.disableFloorsAboveRange(buildingId, command.floorCount());
+        referenceDataCacheService.invalidateBuilding(buildingId);
 
         Map<String, Object> after = new LinkedHashMap<>();
         after.put("buildingCode", command.buildingCode().trim());
