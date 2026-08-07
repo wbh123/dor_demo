@@ -1,0 +1,34 @@
+openapi: 3.0.3
+info: { title: Student selection bootstrap, version: 1.0.0 }
+paths:
+  /api/v1/student/batches/{batchId}/selection/bootstrap:
+    get:
+      tags: [StudentSelectionBootstrap]
+      operationId: getStudentSelectionBootstrap
+      summary: 获取学生选寝页面首屏数据
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/BatchId'
+        - name: teamId
+          in: query
+          required: false
+          schema: { type: integer, format: int64 }
+      responses:
+        '200': { $ref: '#/components/responses/ObjectSuccess' }
+        '403': { $ref: '#/components/responses/ErrorResponse' }
+components:
+  parameters:
+    BatchId: { name: batchId, in: path, required: true, schema: { type: integer, format: int64 } }
+  responses:
+    ObjectSuccess:
+      description: success
+      content:
+        application/json:
+          schema: { $ref: '../common-response/openapi-common-response.yaml#/components/schemas/ObjectSuccessResponse' }
+    ErrorResponse:
+      description: error
+      content:
+        application/json:
+          schema: { $ref: '../common-response/openapi-common-response.yaml#/components/schemas/ErrorResponse' }
+  securitySchemes:
+    bearerAuth: { type: http, scheme: bearer, bearerFormat: Token }
