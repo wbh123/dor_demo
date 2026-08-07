@@ -5,6 +5,8 @@ ROOT = Path(__file__).resolve().parents[2]
 OPENAPI = ROOT / "backend-java/model/src/main/resources/student/openapi-student.yaml"
 CONTROLLER = ROOT / "backend-java/server/src/main/java/com/wust/dormitory/student/StudentSelectionBootstrapController.java"
 SERVICE = ROOT / "backend-java/server/src/main/java/com/wust/dormitory/student/StudentSelectionBootstrapService.java"
+MAPPER = ROOT / "backend-java/server/src/main/java/com/wust/dormitory/student/mapper/StudentSelectionBootstrapMapper.java"
+MAPPER_XML = ROOT / "backend-java/server/src/main/resources/mapper/student/StudentSelectionBootstrapMapper.xml"
 STUDENT_CONTROLLER = ROOT / "backend-java/server/src/main/java/com/wust/dormitory/student/StudentController.java"
 VIEW = ROOT / "frontend/src/views/student/RoomListView.vue"
 
@@ -15,14 +17,17 @@ def require(condition: bool, message: str) -> None:
 
 
 def main() -> None:
-    for path in (OPENAPI, CONTROLLER, SERVICE, STUDENT_CONTROLLER, VIEW):
+    for path in (OPENAPI, CONTROLLER, SERVICE, MAPPER, MAPPER_XML, STUDENT_CONTROLLER, VIEW):
         require(path.exists(), f"缺少学生选寝首屏聚合文件：{path.relative_to(ROOT)}")
 
     openapi = OPENAPI.read_text(encoding="utf-8")
     controller = CONTROLLER.read_text(encoding="utf-8")
     service = SERVICE.read_text(encoding="utf-8")
+    mapper = MAPPER.read_text(encoding="utf-8")
+    mapper_xml = MAPPER_XML.read_text(encoding="utf-8")
     student_controller = STUDENT_CONTROLLER.read_text(encoding="utf-8")
     view = VIEW.read_text(encoding="utf-8")
+    normalized_mapper = " ".join(mapper_xml.upper().split())
 
     require("/api/v1/student/batches/{batchId}/selection/bootstrap:" in openapi,
             "OpenAPI 缺少选寝首屏 bootstrap 路由")
@@ -36,7 +41,7 @@ def main() -> None:
             "StudentController 不得吸收 bootstrap 接口")
 
     for token in (
-        "teamService.teams(user)",
+        "bootstrapMapper.findActiveTeam(batchId, user.studentId())",
         "selectionPolicyService.readiness(batchId, user.studentId())",
         "recommendationService.rooms(batchId, user)",
         'result.put("activePersonalTeam"',
@@ -45,8 +50,14 @@ def main() -> None:
         'result.put("requiresPersonalTeamExit"',
     ):
         require(token in service, f"bootstrap 服务缺少聚合内容：{token}")
-    require("teamId == null && activeTeam != null" in service,
+    require("explicitTeamMode" in service and "activeTeam != null" in service,
             "个人模式存在活动队伍时必须跳过昂贵的房间/准备度查询")
+    require("findActiveTeam" in mapper and 'id="findActiveTeam"' in mapper_xml,
+            "bootstrap 必须使用轻量活动队伍 Mapper")
+    require("LIMIT 1" in normalized_mapper,
+            "活动队伍查询只允许返回当前批次最新一条")
+    require("SELECT *" not in normalized_mapper,
+            "bootstrap Mapper 禁止 SELECT *")
 
     require("/selection/bootstrap" in view,
             "RoomListView 必须使用 bootstrap 首屏接口")
