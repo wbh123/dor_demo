@@ -51,7 +51,13 @@
     </select>
 
     <select id="findStudents" resultMap="StudentAdminDetailResultMap">
-        WITH filtered_students AS (
+        WITH active_residency_ranked AS (
+            SELECT ra.id, ra.student_id, ra.room_id, ra.bed_id,
+                   ROW_NUMBER() OVER (PARTITION BY ra.student_id ORDER BY ra.assigned_at DESC, ra.id DESC) AS row_number
+            FROM room_assignment ra
+            WHERE ra.assignment_status = 'ACTIVE'
+        ),
+        filtered_students AS (
             SELECT s.id,
                    s.student_number,
                    s.student_name,
@@ -65,10 +71,20 @@
                    s.major_id,
                    m.major_code,
                    m.major_name,
-                   u.account_status
+                   u.account_status,
+                   active_ra.id AS current_residency_id,
+                   active_ra.room_id AS current_room_id,
+                   active_ra.bed_id AS current_bed_id,
+                   (active_ra.id IS NOT NULL) AS currently_resident,
+                   current_building.building_name AS current_building_name,
+                   current_room.room_number AS current_room_number
             FROM student s
             JOIN major m ON m.id = s.major_id
             LEFT JOIN app_user u ON u.student_id = s.id
+            LEFT JOIN active_residency_ranked active_ra ON active_ra.student_id = s.id AND active_ra.row_number = 1
+            LEFT JOIN room current_room ON current_room.id = active_ra.room_id
+            LEFT JOIN dormitory_floor current_floor ON current_floor.id = current_room.floor_id
+            LEFT JOIN dormitory_building current_building ON current_building.id = current_floor.building_id
             <include refid="Filters"/>
             ORDER BY
             <choose>
@@ -79,26 +95,19 @@
                 <when test="sortField == 'gradeYear'">s.grade_year</when>
                 <when test="sortField == 'studentCategory'">s.student_category</when>
                 <when test="sortField == 'degreeLevel'">s.degree_level</when>
+                <when test="sortField == 'currentlyResident'">(active_ra.id IS NOT NULL)</when>
+                <when test="sortField == 'currentBuildingName'">current_building.building_name</when>
                 <otherwise>s.student_number</otherwise>
             </choose>
-            <choose>
-                <when test="sortDirection == 'desc'">DESC</when>
-                <otherwise>ASC</otherwise>
-            </choose>, s.student_number ASC, s.id ASC
+            <choose><when test="sortDirection == 'desc'">DESC</when><otherwise>ASC</otherwise></choose>,
+            s.student_number ASC, s.id ASC
             LIMIT #{limit} OFFSET #{offset}
-        ),
-        active_residency AS (
-            SELECT ra.id, ra.student_id, ra.room_id, ra.bed_id,
-                   ROW_NUMBER() OVER (PARTITION BY ra.student_id ORDER BY ra.assigned_at DESC, ra.id DESC) AS row_number
-            FROM room_assignment ra
-            JOIN filtered_students fs ON fs.id = ra.student_id
-            WHERE ra.assignment_status = 'ACTIVE'
         ),
         pending_confirmation AS (
             SELECT request.id, request.residency_id, request.declared_bed_id, request.request_status,
                    ROW_NUMBER() OVER (PARTITION BY request.residency_id ORDER BY request.submitted_at DESC, request.id DESC) AS row_number
             FROM bed_confirmation_request request
-            JOIN active_residency active_ra ON active_ra.id = request.residency_id AND active_ra.row_number = 1
+            JOIN filtered_students fs ON fs.current_residency_id = request.residency_id
             WHERE request.request_status = 'PENDING'
         )
         SELECT s.id,
@@ -115,22 +124,18 @@
                s.major_code,
                s.major_name,
                s.account_status,
-               (active_ra.id IS NOT NULL) AS currently_resident,
-               active_ra.id AS current_residency_id,
-               current_building.building_name AS current_building_name,
-               current_room.room_number AS current_room_number,
+               s.currently_resident,
+               s.current_residency_id,
+               s.current_building_name,
+               s.current_room_number,
                current_bed.bed_code AS current_bed_code,
                current_bed.bed_type AS current_bed_type,
                pending_request.request_status AS selection_review_status,
                declared_bed.bed_code AS declared_bed_code,
                declared_bed.bed_type AS declared_bed_type
         FROM filtered_students s
-        LEFT JOIN active_residency active_ra ON active_ra.student_id = s.id AND active_ra.row_number = 1
-        LEFT JOIN room current_room ON current_room.id = active_ra.room_id
-        LEFT JOIN dormitory_floor current_floor ON current_floor.id = current_room.floor_id
-        LEFT JOIN dormitory_building current_building ON current_building.id = current_floor.building_id
-        LEFT JOIN bed current_bed ON current_bed.id = active_ra.bed_id
-        LEFT JOIN pending_confirmation pending_request ON pending_request.residency_id = active_ra.id AND pending_request.row_number = 1
+        LEFT JOIN bed current_bed ON current_bed.id = s.current_bed_id
+        LEFT JOIN pending_confirmation pending_request ON pending_request.residency_id = s.current_residency_id AND pending_request.row_number = 1
         LEFT JOIN bed declared_bed ON declared_bed.id = pending_request.declared_bed_id
         ORDER BY
         <choose>
@@ -141,11 +146,11 @@
             <when test="sortField == 'gradeYear'">s.grade_year</when>
             <when test="sortField == 'studentCategory'">s.student_category</when>
             <when test="sortField == 'degreeLevel'">s.degree_level</when>
+            <when test="sortField == 'currentlyResident'">s.currently_resident</when>
+            <when test="sortField == 'currentBuildingName'">s.current_building_name</when>
             <otherwise>s.student_number</otherwise>
         </choose>
-        <choose>
-            <when test="sortDirection == 'desc'">DESC</when>
-            <otherwise>ASC</otherwise>
-        </choose>, s.student_number ASC, s.id ASC
+        <choose><when test="sortDirection == 'desc'">DESC</when><otherwise>ASC</otherwise></choose>,
+        s.student_number ASC, s.id ASC
     </select>
 </mapper>
