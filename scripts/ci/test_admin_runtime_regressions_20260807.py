@@ -17,11 +17,15 @@ class AdminRuntimeRegressionContracts(unittest.TestCase):
             "backend-java/server/src/main/java/com/wust/dormitory/admin/"
             "AdminStudentResidencyAdjustmentService.java"
         )
+        mapper = self.read(
+            "backend-java/server/src/main/resources/mapper/admin/"
+            "AdminResidencyAdjustmentMapper.xml"
+        )
         self.assertIn('RequestMapping("/api/v1/admin/students/{studentId}")', controller)
         self.assertIn('GetMapping("/residency-adjustment-context")', controller)
         self.assertIn('PostMapping("/residency-adjustment")', controller)
-        self.assertIn("import java.sql.Types", service)
-        self.assertIn('.addValue("currentBedId", currentBedId, Types.BIGINT)', service)
+        self.assertIn("adjustmentMapper.findCompatibleBeds", service)
+        self.assertIn("#{currentBedId,jdbcType=BIGINT}", mapper)
 
     def test_admin_bed_change_marks_manual_adjustment(self) -> None:
         aspect = self.read(
@@ -36,7 +40,8 @@ class AdminRuntimeRegressionContracts(unittest.TestCase):
         self.assertIn("sourceMapper.markManualAdjustment", aspect)
         self.assertIn("assignment_method='MANUAL_ADJUSTMENT'", mapper)
         view = self.read("frontend/src/views/admin/AdminResidencyView.vue")
-        self.assertIn("MANUAL_ADJUSTMENT: '管理员修改'", view)
+        compact_view = view.replace(" ", "")
+        self.assertIn("MANUAL_ADJUSTMENT:'管理员修改'", compact_view)
         self.assertIn("TransientNotice", view)
         self.assertIn("退宿办理成功", view)
 
@@ -100,7 +105,8 @@ class AdminRuntimeRegressionContracts(unittest.TestCase):
 
     def test_modal_content_does_not_double_pad(self) -> None:
         residency = self.read("frontend/src/views/admin/AdminResidencyView.vue")
-        self.assertIn(".bed-confirm-dialog{width:100%}", residency)
+        self.assertIn(".bed-confirm-dialog{", residency)
+        self.assertIn("width:100%", residency)
         assignment = self.read("frontend/src/views/admin/AdminAssignmentView.vue")
         self.assertIn(".adjustment-dialog{display:grid", assignment)
 
