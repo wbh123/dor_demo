@@ -3,10 +3,13 @@ package com.wust.dormitory.admin.mapper;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
+import java.util.List;
 import java.util.Map;
 
 @Mapper
 public interface BuildingManagementMapper {
+    List<Map<String, Object>> listDetails();
+
     Map<String, Object> findForUpdate(@Param("buildingId") long buildingId);
 
     int countDuplicateCode(
