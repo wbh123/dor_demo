@@ -83,7 +83,9 @@ function escapeAttribute(value: string) {
   <div class="login-page">
     <section class="login-hero">
       <div class="hero-content-frame">
-        <img class="hero-school-logo" :src="brandLogo" :alt="`${institutionName}校徽与校名`" @error="fallbackLogo" />
+        <div class="brand-image-surface hero-brand-surface">
+          <img class="hero-school-logo" :src="brandLogo" :alt="`${institutionName}校徽与校名`" @error="fallbackLogo" />
+        </div>
         <iframe class="login-left-frame" title="登录页展示内容" :srcdoc="loginFrameHtml" sandbox="" scrolling="no"></iframe>
       </div>
     </section>
@@ -91,7 +93,9 @@ function escapeAttribute(value: string) {
     <section class="login-panel">
       <div class="login-card auth-card-fixed">
         <div class="school-login-brand">
-          <img class="form-school-logo" :src="brandLogo" :alt="`${institutionName}校徽与校名`" @error="fallbackLogo" />
+          <div class="brand-image-surface card-brand-surface">
+            <img class="form-school-logo" :src="brandLogo" :alt="`${institutionName}校徽与校名`" @error="fallbackLogo" />
+          </div>
           <span>{{ loginServiceName }}</span>
         </div>
         <div class="segment auth-mode-switch"><button :class="{ active: mode === 'login' }" type="button" @click="setMode('login')">登录</button><button :class="{ active: mode === 'activate' }" type="button" @click="setMode('activate')">学生激活</button></div>
@@ -114,5 +118,5 @@ function escapeAttribute(value: string) {
 </template>
 
 <style scoped>
-.login-hero{display:flex;align-items:center}.hero-content-frame{display:grid;grid-template-rows:auto minmax(300px,1fr);gap:20px;width:min(760px,100%);max-height:76vh}.hero-school-logo,.form-school-logo{display:block;width:auto;max-width:100%;height:auto;object-fit:contain;object-position:left center}.hero-school-logo{max-height:92px}.form-school-logo{max-height:62px}.login-left-frame{display:block;width:100%;height:100%;min-height:300px;border:0;background:transparent;overflow:hidden}.school-login-brand{display:grid;justify-items:start;gap:5px;margin-bottom:8px}.school-login-brand>span{color:var(--muted);font-size:12px}.login-panel{display:flex;flex-direction:column;justify-content:center}.auth-card-fixed{width:min(450px,100%);margin:auto;display:flex;flex-direction:column}.auth-mode-switch{margin-bottom:10px}.auth-form-frame{display:flex}.auth-form{display:grid;gap:10px;width:100%}.auth-fields{display:grid;gap:9px}.auth-submit{margin-top:2px}.auth-inline-hint{min-height:36px;margin:0;padding:7px 9px;border-radius:9px;background:var(--soft);color:var(--muted);font-size:12px;line-height:1.4}.auth-inline-hint.error{background:#fff1f2;color:#b42318}.auth-inline-hint.success{background:#ecfdf3;color:#027a48}.login-compliance{display:flex;justify-content:center;gap:12px;flex-wrap:wrap;width:100%;margin-top:auto;padding-top:14px;color:var(--muted);text-align:center;font-size:.7rem}.login-compliance span+span::before{content:"·";margin-right:12px}@media(max-width:760px){.hero-content-frame{grid-template-rows:auto minmax(220px,1fr);gap:12px}.hero-school-logo{max-height:68px}.form-school-logo{max-height:54px}.login-left-frame{min-height:220px}}
+.login-hero{display:flex;align-items:center}.hero-content-frame{display:grid;grid-template-rows:auto minmax(300px,1fr);gap:20px;width:min(760px,100%);max-height:76vh}.brand-image-surface{display:flex;align-items:center;justify-content:flex-start;background:#fff;border:1px solid rgba(15,23,42,.08);box-shadow:0 12px 32px rgba(15,23,42,.12);overflow:hidden}.hero-brand-surface{width:min(500px,92vw);min-height:82px;padding:9px 15px;border-radius:16px}.hero-school-logo{display:block;width:100%;height:64px;object-fit:contain;object-position:left center}.card-brand-surface{width:min(350px,100%);min-height:62px;padding:7px 11px;border-radius:13px}.form-school-logo{display:block;width:100%;height:48px;object-fit:contain;object-position:left center}.login-left-frame{display:block;width:100%;height:100%;min-height:300px;border:0;background:transparent;overflow:hidden}.school-login-brand{display:grid;justify-items:start;gap:5px;margin-bottom:8px}.school-login-brand>span{color:var(--muted);font-size:12px}.login-panel{display:flex;flex-direction:column;justify-content:center}.auth-card-fixed{width:min(450px,100%);margin:auto;display:flex;flex-direction:column}.auth-mode-switch{margin-bottom:10px}.auth-form-frame{display:flex}.auth-form{display:grid;gap:10px;width:100%}.auth-fields{display:grid;gap:9px}.auth-submit{margin-top:2px}.auth-inline-hint{min-height:36px;margin:0;padding:7px 9px;border-radius:9px;background:var(--soft);color:var(--muted);font-size:12px;line-height:1.4}.auth-inline-hint.error{background:#fff1f2;color:#b42318}.auth-inline-hint.success{background:#ecfdf3;color:#027a48}.login-compliance{display:flex;justify-content:center;gap:12px;flex-wrap:wrap;width:100%;margin-top:auto;padding-top:14px;color:var(--muted);text-align:center;font-size:.7rem}.login-compliance span+span::before{content:"·";margin-right:12px}@media(max-width:760px){.hero-content-frame{grid-template-rows:auto minmax(220px,1fr);gap:12px}.hero-brand-surface{min-height:68px}.hero-school-logo{height:50px}.card-brand-surface{min-height:58px}.form-school-logo{height:44px}.login-left-frame{min-height:220px}}
 </style>
