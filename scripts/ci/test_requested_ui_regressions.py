@@ -36,7 +36,7 @@ admin_data = read('frontend/src/views/admin/AdminDataView.vue')
 phone_codes = read('frontend/src/utils/phoneCodes.ts')
 require('student-contact-fields span-2' in admin_data and 'formatPhoneDisplay' in admin_data,
         'student nationality and phone fields are not grouped directly below category selection')
-require("!['CN', 'HK', 'MO', 'TW'].includes(country.code)" in admin_data,
+require("!['CN','HK','MO','TW'].includes(country.code)" in admin_data.replace(' ', ''),
         'international student nationality list still contains China-related regions')
 require('formatPhoneDisplay' in phone_codes and 'phoneDisplayParts' in phone_codes,
         'international phone display is not separated into dial code and local number')
