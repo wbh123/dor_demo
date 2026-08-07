@@ -2,33 +2,41 @@ package com.wust.dormitory.platform;
 
 import com.wust.dormitory.admin.SiteMetadataService;
 import com.wust.dormitory.common.response.ResponseFactory;
+import com.wust.dormitory.model.api.PlatformSiteMetadataApi;
 import com.wust.dormitory.model.dto.ObjectSuccessResponse;
+import com.wust.dormitory.model.dto.PlatformSiteMetadataUpdateRequest;
 import com.wust.dormitory.security.SecurityUsers;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/v1/platform/site-metadata")
-public class PlatformSiteMetadataController {
+public class PlatformSiteMetadataController implements PlatformSiteMetadataApi {
     private final SiteMetadataService service;
 
     public PlatformSiteMetadataController(SiteMetadataService service) {
         this.service = service;
     }
 
-    @GetMapping
-    public ResponseEntity<ObjectSuccessResponse> get() {
+    @Override
+    public ResponseEntity<ObjectSuccessResponse> getPlatformSiteMetadata() {
         SecurityUsers.requireSystemAdmin();
         return ResponseEntity.ok(ResponseFactory.object(service.platformConfig()));
     }
 
-    @PutMapping
-    public ResponseEntity<ObjectSuccessResponse> update(
-            @RequestBody SiteMetadataService.PlatformSiteCommand command) {
+    @Override
+    public ResponseEntity<ObjectSuccessResponse> updatePlatformSiteMetadata(
+            PlatformSiteMetadataUpdateRequest request) {
+        var branding = request.getBranding();
+        var login = request.getLogin();
+        var command = new SiteMetadataService.PlatformSiteCommand(
+                new SiteMetadataService.BrandingCommand(
+                        branding.getSchoolName(),
+                        branding.getSquareLogoUrl(),
+                        branding.getHorizontalLogoUrl()),
+                new SiteMetadataService.LoginContentCommand(
+                        login.getHtml(),
+                        login.getImageUrl()),
+                Boolean.TRUE.equals(request.getSchoolAdminEditable()));
         return ResponseEntity.ok(ResponseFactory.object(
                 service.updatePlatform(command, SecurityUsers.requireSystemAdmin())));
     }
