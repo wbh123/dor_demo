@@ -11,11 +11,13 @@ import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -69,6 +71,28 @@ class NotificationDispatchServiceTest {
         assertEquals("IN_APP", result.get("channel"));
         assertFalse((Boolean) result.get("externalChannelsImplemented"));
         verify(featureAccessService).require(FeatureCodes.P3_NOTIFICATION_SEND);
+    }
+
+    @Test
+    void preflightAllowsTemplateWithMissingEnglishTranslation() {
+        NotificationRecipientResolver.RecipientCriteria criteria = mock(NotificationRecipientResolver.RecipientCriteria.class);
+        when(recipientResolver.resolve(criteria)).thenReturn(List.of(10L));
+        Map<String, Object> template = new LinkedHashMap<>();
+        template.put("id", 5L);
+        template.put("title_zh_cn", "单独提醒");
+        template.put("content_zh_cn", "请尽快完善资料");
+        template.put("title_en_us", null);
+        template.put("content_en_us", null);
+        template.put("title_key", "notification.template.test.title");
+        template.put("message_key", "notification.template.test.message");
+        when(jdbc.queryForList(anyString(), anyMap())).thenReturn(List.of(template));
+
+        Map<String, Object> result = service.preflight(criteria, 5L, Map.of());
+
+        assertEquals("单独提醒", result.get("titleZhCn"));
+        assertEquals("请尽快完善资料", result.get("contentZhCn"));
+        assertNull(result.get("titleEnUs"));
+        assertNull(result.get("contentEnUs"));
     }
 
     @Test
