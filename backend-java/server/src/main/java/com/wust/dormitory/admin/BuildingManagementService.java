@@ -54,14 +54,15 @@ public class BuildingManagementService {
                     "宿舍楼代码已存在",
                     HttpStatus.CONFLICT);
         }
-        if (mapper.countIncompatibleRooms(
-                buildingId,
-                command.gender(),
-                command.educationLevelScope(),
-                command.residentScope()) > 0) {
+        if (scopeChanged(before, command)
+                && mapper.countIncompatibleRooms(
+                        buildingId,
+                        command.gender(),
+                        command.educationLevelScope(),
+                        command.residentScope()) > 0) {
             throw new BusinessException(
                     "BUILDING_SCOPE_CONFLICT",
-                    "现有寝室范围与新的楼栋范围不一致，请先调整相关寝室",
+                    "新的楼栋适用范围与现有寝室不一致，请先调整相关寝室；仅修改名称、代码、状态或楼层时不会触发该限制",
                     HttpStatus.CONFLICT);
         }
         if (mapper.countRoomsAboveFloor(buildingId, command.floorCount()) > 0) {
@@ -109,6 +110,14 @@ public class BuildingManagementService {
                 before,
                 after);
         return after;
+    }
+
+    private boolean scopeChanged(
+            Map<String, Object> before,
+            BuildingUpdateCommand command) {
+        return !command.gender().equals(String.valueOf(before.get("gender_restriction")))
+                || !command.educationLevelScope().equals(String.valueOf(before.get("education_level_scope")))
+                || !command.residentScope().equals(String.valueOf(before.get("resident_scope")));
     }
 
     private void validate(BuildingUpdateCommand command) {
