@@ -47,6 +47,7 @@ public class ResidencyPolicyService {
         if (!forUpdate) {
             return snapshot(roomId).roomMap();
         }
+        String suffix = forUpdate ? " FOR UPDATE" : "";
         return one("""
                 SELECT r.id, r.room_number, r.room_type, r.capacity,
                        r.gender_restriction, r.resident_scope,
@@ -57,8 +58,8 @@ public class ResidencyPolicyService {
                 JOIN dormitory_floor f ON f.id=r.floor_id
                 JOIN dormitory_building b ON b.id=f.building_id
                 WHERE r.id=:id
-                FOR UPDATE
-                """, Map.of("id", roomId), "ROOM_NOT_FOUND", "宿舍不存在");
+                """ + suffix,
+                Map.of("id", roomId), "ROOM_NOT_FOUND", "宿舍不存在");
     }
 
     public Set<Long> roomIdsForBatch(long batchId) {
@@ -84,7 +85,9 @@ public class ResidencyPolicyService {
     public void requireRoomInBatch(long batchId, long roomId) {
         if (!roomIdsForBatch(batchId).contains(roomId)) {
             throw new BusinessException(
-                    "ROOM_OUT_OF_BATCH_SCOPE", "该寝室不属于当前批次可选范围", HttpStatus.FORBIDDEN);
+                    "ROOM_OUT_OF_BATCH_SCOPE",
+                    "该寝室不属于当前批次可选范围",
+                    HttpStatus.FORBIDDEN);
         }
     }
 
@@ -96,19 +99,28 @@ public class ResidencyPolicyService {
                 JOIN dormitory_floor target_floor ON target_floor.id=target_room.floor_id
                 WHERE target_bed.id=:bedId
                   AND (
-                      EXISTS (SELECT 1 FROM batch_bed_scope scope
-                              WHERE scope.batch_id=:batchId AND scope.bed_id=target_bed.id)
-                      OR EXISTS (SELECT 1 FROM batch_room_scope scope
-                                 WHERE scope.batch_id=:batchId AND scope.room_id=target_room.id)
-                      OR EXISTS (SELECT 1 FROM batch_building_scope scope
-                                 WHERE scope.batch_id=:batchId
-                                   AND scope.building_id=target_floor.building_id)
+                      EXISTS (
+                          SELECT 1 FROM batch_bed_scope scope
+                          WHERE scope.batch_id=:batchId AND scope.bed_id=target_bed.id
+                      )
+                      OR EXISTS (
+                          SELECT 1 FROM batch_room_scope scope
+                          WHERE scope.batch_id=:batchId AND scope.room_id=target_room.id
+                      )
+                      OR EXISTS (
+                          SELECT 1 FROM batch_building_scope scope
+                          WHERE scope.batch_id=:batchId
+                            AND scope.building_id=target_floor.building_id
+                      )
                   )
                 """, new MapSqlParameterSource()
-                .addValue("batchId", batchId).addValue("bedId", bedId), Integer.class);
+                .addValue("batchId", batchId)
+                .addValue("bedId", bedId), Integer.class);
         if (count == null || count != 1) {
             throw new BusinessException(
-                    "BED_OUT_OF_BATCH_SCOPE", "该床位不属于当前批次开放范围", HttpStatus.FORBIDDEN);
+                    "BED_OUT_OF_BATCH_SCOPE",
+                    "该床位不属于当前批次开放范围",
+                    HttpStatus.FORBIDDEN);
         }
     }
 
@@ -117,10 +129,13 @@ public class ResidencyPolicyService {
                 SELECT COUNT(*) FROM active_batch_room_lock
                 WHERE batch_id=:batchId AND room_id=:roomId
                 """, new MapSqlParameterSource()
-                .addValue("batchId", batchId).addValue("roomId", roomId), Integer.class);
+                .addValue("batchId", batchId)
+                .addValue("roomId", roomId), Integer.class);
         if (count == null || count != 1) {
             throw new BusinessException(
-                    "ROOM_NOT_ACTIVE_FOR_BATCH", "该寝室当前未开放给本批次选择", HttpStatus.CONFLICT);
+                    "ROOM_NOT_ACTIVE_FOR_BATCH",
+                    "该寝室当前未开放给本批次选择",
+                    HttpStatus.CONFLICT);
         }
     }
 
@@ -141,7 +156,8 @@ public class ResidencyPolicyService {
         if (!roomAllowsCategory(scope, category, separate)) {
             throw new BusinessException(
                     "ROOM_STUDENT_CATEGORY_MISMATCH",
-                    separate ? "当前批次要求国内生和国际生分开选寝，该寝室不符合学生类别"
+                    separate
+                            ? "当前批次要求国内生和国际生分开选寝，该寝室不符合学生类别"
                             : "该寝室的国内生/国际生属性与学生不匹配",
                     HttpStatus.CONFLICT);
         }
@@ -150,7 +166,8 @@ public class ResidencyPolicyService {
     public boolean roomAllowsCategory(String residentScope, String category, boolean separate) {
         if (separate) {
             return ("DOMESTIC".equals(category) && "DOMESTIC_ONLY".equals(residentScope))
-                    || ("INTERNATIONAL".equals(category) && "INTERNATIONAL_ONLY".equals(residentScope));
+                    || ("INTERNATIONAL".equals(category)
+                    && "INTERNATIONAL_ONLY".equals(residentScope));
         }
         if ("DOMESTIC".equals(category)) {
             return "DOMESTIC_ONLY".equals(residentScope) || "MIXED".equals(residentScope);
@@ -183,20 +200,27 @@ public class ResidencyPolicyService {
                 WHERE target_bed.room_id=:roomId
                   AND target_bed.operational_status='ENABLED'
                   AND (
-                      EXISTS (SELECT 1 FROM batch_bed_scope scope
-                              WHERE scope.batch_id=:batchId AND scope.bed_id=target_bed.id)
-                      OR EXISTS (SELECT 1 FROM batch_room_scope scope
-                                 WHERE scope.batch_id=:batchId AND scope.room_id=target_room.id)
-                      OR EXISTS (SELECT 1 FROM batch_building_scope scope
-                                 WHERE scope.batch_id=:batchId
-                                   AND scope.building_id=target_floor.building_id)
+                      EXISTS (
+                          SELECT 1 FROM batch_bed_scope scope
+                          WHERE scope.batch_id=:batchId AND scope.bed_id=target_bed.id
+                      )
+                      OR EXISTS (
+                          SELECT 1 FROM batch_room_scope scope
+                          WHERE scope.batch_id=:batchId AND scope.room_id=target_room.id
+                      )
+                      OR EXISTS (
+                          SELECT 1 FROM batch_building_scope scope
+                          WHERE scope.batch_id=:batchId
+                            AND scope.building_id=target_floor.building_id
+                      )
                   )
                   AND NOT EXISTS (
                       SELECT 1 FROM room_assignment ra
                       WHERE ra.bed_id=target_bed.id AND ra.assignment_status='ACTIVE'
                   )
                 """, new MapSqlParameterSource()
-                .addValue("batchId", batchId).addValue("roomId", roomId), Integer.class);
+                .addValue("batchId", batchId)
+                .addValue("roomId", roomId), Integer.class);
         return count == null ? 0 : count;
     }
 
@@ -213,7 +237,9 @@ public class ResidencyPolicyService {
                 FROM bed b WHERE b.id=:bedId AND b.room_id=:roomId
                 FOR UPDATE
                 """, new MapSqlParameterSource()
-                .addValue("bedId", bedId).addValue("roomId", roomId).getValues(),
+                .addValue("bedId", bedId)
+                .addValue("roomId", roomId)
+                .getValues(),
                 "BED_NOT_IN_ROOM", "床位不属于当前寝室");
         if (!"ENABLED".equals(String.valueOf(bed.get("operational_status")))) {
             throw new BusinessException("BED_NOT_AVAILABLE", "床位当前不可用");
@@ -223,10 +249,13 @@ public class ResidencyPolicyService {
                 WHERE bed_id=:bedId AND assignment_status='ACTIVE'
                   AND (:excludedId IS NULL OR id<>:excludedId)
                 """, new MapSqlParameterSource()
-                .addValue("bedId", bedId).addValue("excludedId", excludedResidencyId), Integer.class);
+                .addValue("bedId", bedId)
+                .addValue("excludedId", excludedResidencyId), Integer.class);
         if (occupied != null && occupied > 0) {
             throw new BusinessException(
-                    "BED_ALREADY_OCCUPIED", "该床位已经被其他在住学生确认", HttpStatus.CONFLICT);
+                    "BED_ALREADY_OCCUPIED",
+                    "该床位已经被其他在住学生确认",
+                    HttpStatus.CONFLICT);
         }
         return bed;
     }
@@ -237,10 +266,13 @@ public class ResidencyPolicyService {
                 WHERE batch_id=:batchId AND student_id=:studentId
                   AND eligibility_status='ELIGIBLE'
                 """, new MapSqlParameterSource()
-                .addValue("batchId", batchId).addValue("studentId", studentId), Integer.class);
+                .addValue("batchId", batchId)
+                .addValue("studentId", studentId), Integer.class);
         if (count == null || count != 1) {
             throw new BusinessException(
-                    "STUDENT_NOT_ELIGIBLE", "学生不在当前批次可选名单中", HttpStatus.FORBIDDEN);
+                    "STUDENT_NOT_ELIGIBLE",
+                    "学生不在当前批次可选名单中",
+                    HttpStatus.FORBIDDEN);
         }
     }
 
@@ -251,7 +283,9 @@ public class ResidencyPolicyService {
                 """, Map.of("studentId", studentId), Integer.class);
         if (count != null && count > 0) {
             throw new BusinessException(
-                    "STUDENT_ALREADY_RESIDENT", "学生已经存在有效寝室归属，不能重复分配", HttpStatus.CONFLICT);
+                    "STUDENT_ALREADY_RESIDENT",
+                    "学生已经存在有效寝室归属，不能重复分配",
+                    HttpStatus.CONFLICT);
         }
     }
 
