@@ -20,6 +20,7 @@ import './admin-layout-canvas-refinement.css'
 import './admin-operations-refinement.css'
 import './overlay-refinement.css'
 import './admin-density-refinement.css'
+import './brand-layout-refinement.css'
 
 createApp(App).use(pinia).use(router).mount('#app')
 useI18n().installDomI18n()
