@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.wust.dormitory.notification.NotificationRecipientMapper">
+    <select id="findRecipients" resultType="long">
+        SELECT DISTINCT student.id
+        FROM student
+        LEFT JOIN batch_student_eligibility eligibility
+          ON eligibility.student_id=student.id
+        LEFT JOIN room_assignment residency
+          ON residency.student_id=student.id
+         AND residency.assignment_status='ACTIVE'
+        LEFT JOIN room ON room.id=residency.room_id
+        LEFT JOIN dormitory_floor floor ON floor.id=room.floor_id
+        LEFT JOIN dormitory_building building ON building.id=floor.building_id
+        WHERE student.student_status='ACTIVE'
+        <if test="batchIds != null and !batchIds.isEmpty()">
+            AND eligibility.batch_id IN
+            <foreach collection="batchIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+        </if>
+        <if test="majorIds != null and !majorIds.isEmpty()">
+            AND student.major_id IN
+            <foreach collection="majorIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+        </if>
+        <if test="gradeYears != null and !gradeYears.isEmpty()">
+            AND student.grade_year IN
+            <foreach collection="gradeYears" item="value" open="(" separator="," close=")">#{value}</foreach>
+        </if>
+        <if test="degreeLevels != null and !degreeLevels.isEmpty()">
+            AND student.degree_level IN
+            <foreach collection="degreeLevels" item="value" open="(" separator="," close=")">#{value}</foreach>
+        </if>
+        <if test="studentCategories != null and !studentCategories.isEmpty()">
+            AND student.student_category IN
+            <foreach collection="studentCategories" item="value" open="(" separator="," close=")">#{value}</foreach>
+        </if>
+        <if test="buildingIds != null and !buildingIds.isEmpty()">
+            AND building.id IN
+            <foreach collection="buildingIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+        </if>
+        <if test="unselectedOnly">
+            AND NOT EXISTS (
+                SELECT 1
+                FROM bed_assignment assignment
+                WHERE assignment.student_id=student.id
+                  AND assignment.assignment_status='ACTIVE'
+                <if test="batchIds != null and !batchIds.isEmpty()">
+                    AND assignment.batch_id IN
+                    <foreach collection="batchIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+                </if>
+            )
+        </if>
+        <if test="pendingReviewOnly">
+            AND student.selection_review_status='PENDING'
+        </if>
+        ORDER BY student.id
+    </select>
+</mapper>
