@@ -27,6 +27,7 @@ class AdminDashboardQueryServiceTest {
         StudentAdminMapper studentAdminMapper = mock(StudentAdminMapper.class);
         AdminDashboardMapper dashboardMapper = mock(AdminDashboardMapper.class);
         BatchCatalogMapper batchCatalogMapper = mock(BatchCatalogMapper.class);
+        ReferenceDataCacheService referenceDataCacheService = mock(ReferenceDataCacheService.class);
         when(dashboardMapper.findStats()).thenReturn(new AdminDashboardStatsRow(
                 6L,
                 500L,
@@ -44,7 +45,8 @@ class AdminDashboardQueryServiceTest {
                 adminCatalogMapper,
                 studentAdminMapper,
                 dashboardMapper,
-                batchCatalogMapper);
+                batchCatalogMapper,
+                referenceDataCacheService);
         Map<String, Object> result = service.dashboard();
 
         verify(dashboardMapper).findStats();
