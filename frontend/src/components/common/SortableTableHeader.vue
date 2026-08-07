@@ -1,6 +1,8 @@
-<script setup lang="ts">
+<script lang="ts">
 export type SortDirection = '' | 'asc' | 'desc'
+</script>
 
+<script setup lang="ts">
 const props = withDefaults(defineProps<{
   label: string
   field: string
@@ -29,13 +31,7 @@ function toggle() {
 </script>
 
 <template>
-  <button
-    class="sortable-table-header"
-    type="button"
-    :title="title"
-    :aria-label="`${label}排序`"
-    @click="toggle"
-  >
+  <button class="sortable-table-header" type="button" :title="title" :aria-label="`${label}排序`" @click="toggle">
     <span>{{ label }}</span>
     <span class="sort-indicator" aria-hidden="true">
       <template v-if="activeField === field && direction === 'asc'">↑</template>
