@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.wust.dormitory.admin.mapper.SiteMetadataMapper">
+    <select id="findValue" resultType="java.lang.String">
+        SELECT setting_value
+        FROM system_setting
+        WHERE setting_key = #{key}
+        LIMIT 1
+    </select>
+
+    <insert id="upsert">
+        INSERT INTO system_setting
+        (setting_key, setting_value, version, updated_by)
+        VALUES (#{key}, #{value}, 0, #{updatedBy})
+        ON DUPLICATE KEY UPDATE
+            setting_value = VALUES(setting_value),
+            version = version + 1,
+            updated_by = VALUES(updated_by)
+    </insert>
+</mapper>
