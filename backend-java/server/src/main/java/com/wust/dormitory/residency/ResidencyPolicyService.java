@@ -192,36 +192,7 @@ public class ResidencyPolicyService {
     }
 
     public int availableBedCount(long batchId, long roomId) {
-        Integer count = jdbc.queryForObject("""
-                SELECT COUNT(*)
-                FROM bed target_bed
-                JOIN room target_room ON target_room.id=target_bed.room_id
-                JOIN dormitory_floor target_floor ON target_floor.id=target_room.floor_id
-                WHERE target_bed.room_id=:roomId
-                  AND target_bed.operational_status='ENABLED'
-                  AND (
-                      EXISTS (
-                          SELECT 1 FROM batch_bed_scope scope
-                          WHERE scope.batch_id=:batchId AND scope.bed_id=target_bed.id
-                      )
-                      OR EXISTS (
-                          SELECT 1 FROM batch_room_scope scope
-                          WHERE scope.batch_id=:batchId AND scope.room_id=target_room.id
-                      )
-                      OR EXISTS (
-                          SELECT 1 FROM batch_building_scope scope
-                          WHERE scope.batch_id=:batchId
-                            AND scope.building_id=target_floor.building_id
-                      )
-                  )
-                  AND NOT EXISTS (
-                      SELECT 1 FROM room_assignment ra
-                      WHERE ra.bed_id=target_bed.id AND ra.assignment_status='ACTIVE'
-                  )
-                """, new MapSqlParameterSource()
-                .addValue("batchId", batchId)
-                .addValue("roomId", roomId), Integer.class);
-        return count == null ? 0 : count;
+        return snapshotMapper.countAvailableBedsForBatch(batchId, roomId);
     }
 
     public Map<String, Object> requireAvailableBed(long roomId, long bedId) {
