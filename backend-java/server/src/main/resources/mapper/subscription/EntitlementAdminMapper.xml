@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.wust.dormitory.subscription.mapper.EntitlementAdminMapper">
+    <select id="findFeatures" resultType="map">
+        SELECT feature_code, feature_name, phase, scope, granularity,
+               action_type, risk_level, enabled_in_program, sort_order
+        FROM feature_catalog
+        ORDER BY sort_order, feature_code
+    </select>
+
+    <select id="findFeatureOverrides" resultType="map">
+        SELECT override_record.id,
+               override_record.subscription_id,
+               override_record.feature_code,
+               override_record.override_type,
+               override_record.effective_from,
+               override_record.effective_until,
+               override_record.change_reason,
+               override_record.created_by,
+               override_record.created_at,
+               feature.feature_name
+        FROM subscription_feature_override override_record
+        JOIN feature_catalog feature ON feature.feature_code = override_record.feature_code
+        ORDER BY override_record.created_at DESC, override_record.id DESC
+    </select>
+
+    <select id="findQuotas" resultType="map">
+        SELECT quota_code, quota_name, unit_name, enabled_in_program, sort_order
+        FROM quota_catalog
+        ORDER BY sort_order, quota_code
+    </select>
+
+    <select id="findQuotaOverrides" resultType="map">
+        SELECT override_record.id,
+               override_record.subscription_id,
+               override_record.quota_code,
+               override_record.quota_value,
+               override_record.effective_from,
+               override_record.effective_until,
+               override_record.change_reason,
+               override_record.created_by,
+               override_record.created_at,
+               quota.quota_name,
+               quota.unit_name
+        FROM subscription_quota_override override_record
+        JOIN quota_catalog quota ON quota.quota_code = override_record.quota_code
+        ORDER BY override_record.created_at DESC, override_record.id DESC
+    </select>
+
+    <select id="findAuditLogs" resultType="map">
+        SELECT id, operation_type, operator_user_id, target_type, target_id,
+               change_reason, before_json, after_json, success, error_code, created_at
+        FROM platform_audit_log
+        ORDER BY id DESC
+        LIMIT #{limit}
+    </select>
+
+    <select id="findFeatureEntitlements" resultType="map">
+        WITH ranked_override AS (
+            SELECT override_record.feature_code,
+                   override_record.override_type,
+                   override_record.created_at,
+                   ROW_NUMBER() OVER (
+                       PARTITION BY override_record.subscription_id, override_record.feature_code
+                       ORDER BY override_record.created_at DESC, override_record.id DESC
+                   ) AS row_number
+            FROM subscription_feature_override override_record
+            WHERE override_record.subscription_id = #{subscriptionId}
+              AND override_record.effective_from &lt;= #{now}
+              AND (override_record.effective_until IS NULL OR override_record.effective_until &gt; #{now})
+        )
+        SELECT feature.feature_code,
+               feature.feature_name,
+               feature.phase,
+               feature.scope,
+               feature.granularity,
+               feature.action_type,
+               feature.risk_level,
+               feature.enabled_in_program,
+               feature.sort_order,
+               CASE WHEN plan_feature.feature_code IS NULL THEN 0 ELSE 1 END AS plan_enabled,
+               active_override.override_type,
+               active_override.created_at AS override_created_at
+        FROM feature_catalog feature
+        LEFT JOIN plan_revision_feature plan_feature
+               ON plan_feature.plan_revision_id = #{planRevisionId}
+              AND plan_feature.feature_code = feature.feature_code
+        LEFT JOIN ranked_override active_override
+               ON active_override.feature_code = feature.feature_code
+              AND active_override.row_number = 1
+        WHERE (#{includeFuture} = TRUE OR feature.enabled_in_program = 1)
+          AND (#{featureCode} IS NULL OR feature.feature_code = #{featureCode})
+        ORDER BY feature.sort_order, feature.feature_code
+    </select>
+
+    <select id="lockFeatureDefinition" resultType="map">
+        SELECT feature.feature_code,
+               feature.enabled_in_program,
+               CASE WHEN plan_feature.feature_code IS NULL THEN 0 ELSE 1 END AS plan_enabled
+        FROM feature_catalog feature
+        LEFT JOIN plan_revision_feature plan_feature
+               ON plan_feature.plan_revision_id = #{planRevisionId}
+              AND plan_feature.feature_code = feature.feature_code
+        WHERE feature.feature_code = #{featureCode}
+        FOR UPDATE
+    </select>
+
+    <select id="findActiveFeatureOverridesForUpdate" resultType="map">
+        SELECT id, override_type
+        FROM subscription_feature_override
+        WHERE subscription_id = #{subscriptionId}
+          AND feature_code = #{featureCode}
+          AND effective_from &lt;= #{now}
+          AND (effective_until IS NULL OR effective_until &gt; #{now})
+        ORDER BY created_at DESC, id DESC
+        FOR UPDATE
+    </select>
+
+    <update id="closeActiveFeatureOverrides">
+        UPDATE subscription_feature_override
+        SET effective_until = CASE
+            WHEN effective_from &gt;= #{now} THEN DATE_ADD(effective_from, INTERVAL 1000 MICROSECOND)
+            ELSE #{now}
+        END
+        WHERE subscription_id = #{subscriptionId}
+          AND feature_code = #{featureCode}
+          AND effective_from &lt;= #{now}
+          AND (effective_until IS NULL OR effective_until &gt; #{now})
+    </update>
+
+    <insert id="insertFeatureOverride" parameterType="map" useGeneratedKeys="true" keyProperty="id" keyColumn="id">
+        INSERT INTO subscription_feature_override
+        (subscription_id, feature_code, override_type, effective_from,
+         effective_until, change_reason, created_by)
+        VALUES (#{subscriptionId}, #{featureCode}, #{overrideType}, #{effectiveFrom},
+                #{effectiveUntil}, #{reason}, #{operatorId})
+    </insert>
+
+    <insert id="insertQuotaOverride" parameterType="map" useGeneratedKeys="true" keyProperty="id" keyColumn="id">
+        INSERT INTO subscription_quota_override
+        (subscription_id, quota_code, quota_value, effective_from,
+         effective_until, change_reason, created_by)
+        VALUES (#{subscriptionId}, #{quotaCode}, #{quotaValue}, #{effectiveFrom},
+                #{effectiveUntil}, #{reason}, #{operatorId})
+    </insert>
+</mapper>
