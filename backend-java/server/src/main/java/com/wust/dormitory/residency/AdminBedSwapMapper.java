@@ -25,7 +25,8 @@ public interface AdminBedSwapMapper {
 
     int updateActiveAllocation(
             @Param("studentId") long studentId,
-            @Param("bedId") long bedId);
+            @Param("bedId") long bedId,
+            @Param("operatorId") long operatorId);
 
     int insertResidencyHistory(
             @Param("residencyId") long residencyId,
