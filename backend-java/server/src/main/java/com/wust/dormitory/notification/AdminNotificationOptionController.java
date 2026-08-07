@@ -42,4 +42,22 @@ public class AdminNotificationOptionController {
         SecurityUsers.requireAdmin();
         return ResponseEntity.ok(ResponseFactory.list(service.buildings()));
     }
+
+    @GetMapping("/grade-years")
+    public ResponseEntity<ListSuccessResponse> gradeYears() {
+        SecurityUsers.requireAdmin();
+        return ResponseEntity.ok(ResponseFactory.list(service.gradeYears()));
+    }
+
+    @GetMapping("/degree-levels")
+    public ResponseEntity<ListSuccessResponse> degreeLevels() {
+        SecurityUsers.requireAdmin();
+        return ResponseEntity.ok(ResponseFactory.list(service.degreeLevels()));
+    }
+
+    @GetMapping("/student-categories")
+    public ResponseEntity<ListSuccessResponse> studentCategories() {
+        SecurityUsers.requireAdmin();
+        return ResponseEntity.ok(ResponseFactory.list(service.studentCategories()));
+    }
 }
