@@ -30,4 +30,16 @@ public class NotificationOptionService {
     public List<Map<String, Object>> buildings() {
         return mapper.listBuildings();
     }
+
+    public List<Map<String, Object>> gradeYears() {
+        return mapper.listGradeYears();
+    }
+
+    public List<Map<String, Object>> degreeLevels() {
+        return mapper.listDegreeLevels();
+    }
+
+    public List<Map<String, Object>> studentCategories() {
+        return mapper.listStudentCategories();
+    }
 }
