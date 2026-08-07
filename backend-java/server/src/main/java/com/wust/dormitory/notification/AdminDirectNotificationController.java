@@ -12,18 +12,18 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/v1/admin/governance/notifications")
 public class AdminDirectNotificationController {
-    private final NotificationDispatchService notificationDispatchService;
+    private final DirectNotificationService directNotificationService;
 
     public AdminDirectNotificationController(
-            NotificationDispatchService notificationDispatchService) {
-        this.notificationDispatchService = notificationDispatchService;
+            DirectNotificationService directNotificationService) {
+        this.directNotificationService = directNotificationService;
     }
 
     @PostMapping("/direct")
     public ResponseEntity<ObjectSuccessResponse> sendDirect(
             @RequestBody DirectNotificationRequest request) {
         return ResponseEntity.ok(ResponseFactory.object(
-                notificationDispatchService.sendDirect(
+                directNotificationService.send(
                         request.criteria(),
                         request.titleZhCn(),
                         request.contentZhCn(),
