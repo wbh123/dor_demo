@@ -1,12 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-
-export interface EntityOption {
-  value: string | number
-  label: string
-  description?: string
-  disabled?: boolean
-}
+import type { EntityOption } from './entitySelectTypes'
 
 const props = withDefaults(defineProps<{
   modelValue: string | number | Array<string | number> | null
@@ -62,40 +56,14 @@ function toggle(option: EntityOption) {
 
 <template>
   <div class="remote-entity-select" :class="{disabled}">
-    <input
-      v-model="keyword"
-      class="input remote-search"
-      type="search"
-      :disabled="disabled"
-      :placeholder="searchPlaceholder"
-      autocomplete="off"
-    />
-
+    <input v-model="keyword" class="input remote-search" type="search" :disabled="disabled" :placeholder="searchPlaceholder" autocomplete="off" />
     <template v-if="multiple">
       <div class="remote-option-list" role="listbox" aria-multiselectable="true">
-        <button
-          v-for="option in options"
-          :key="String(option.value)"
-          type="button"
-          class="remote-option"
-          :class="{selected:selectedValues.has(String(option.value))}"
-          :disabled="disabled || option.disabled"
-          @click="toggle(option)"
-        >
-          <span><strong>{{ option.label }}</strong><small v-if="option.description">{{ option.description }}</small></span>
-          <span class="option-check">{{ selectedValues.has(String(option.value)) ? '✓' : '+' }}</span>
-        </button>
-        <p v-if="loading" class="remote-empty">正在搜索…</p>
-        <p v-else-if="!options.length" class="remote-empty">{{ emptyText }}</p>
+        <button v-for="option in options" :key="String(option.value)" type="button" class="remote-option" :class="{selected:selectedValues.has(String(option.value))}" :disabled="disabled || option.disabled" @click="toggle(option)"><span><strong>{{ option.label }}</strong><small v-if="option.description">{{ option.description }}</small></span><span class="option-check">{{ selectedValues.has(String(option.value)) ? '✓' : '+' }}</span></button>
+        <p v-if="loading" class="remote-empty">正在搜索…</p><p v-else-if="!options.length" class="remote-empty">{{ emptyText }}</p>
       </div>
     </template>
-
-    <select v-else class="input" :disabled="disabled || loading" :value="modelValue == null ? '' : String(modelValue)" @change="updateSingle">
-      <option value="">{{ loading ? '正在加载…' : placeholder }}</option>
-      <option v-for="option in options" :key="String(option.value)" :value="String(option.value)" :disabled="option.disabled">
-        {{ option.label }}{{ option.description ? ` · ${option.description}` : '' }}
-      </option>
-    </select>
+    <select v-else class="input" :disabled="disabled || loading" :value="modelValue == null ? '' : String(modelValue)" @change="updateSingle"><option value="">{{ loading ? '正在加载…' : placeholder }}</option><option v-for="option in options" :key="String(option.value)" :value="String(option.value)" :disabled="option.disabled">{{ option.label }}{{ option.description ? ` · ${option.description}` : '' }}</option></select>
   </div>
 </template>
 
