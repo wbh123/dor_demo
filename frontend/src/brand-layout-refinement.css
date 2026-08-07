@@ -1,0 +1,66 @@
+:root{
+  --brand-logo-size-sidebar:48px;
+  --brand-logo-size-login:72px;
+  --brand-logo-size-welcome:56px;
+  --brand-logo-size-platform:42px;
+}
+
+.school-brand-logo{
+  width:var(--brand-logo-size-sidebar)!important;
+  height:var(--brand-logo-size-sidebar)!important;
+}
+.welcome-school-logo{
+  width:var(--brand-logo-size-welcome)!important;
+  height:var(--brand-logo-size-welcome)!important;
+}
+.login-school-logo,.login-brand-logo,.login-brand img,.login-logo img{
+  width:var(--brand-logo-size-login)!important;
+  height:var(--brand-logo-size-login)!important;
+  object-fit:contain;
+}
+.platform-brand-logo,.platform-logo{
+  width:var(--brand-logo-size-platform)!important;
+  height:var(--brand-logo-size-platform)!important;
+}
+
+/* 新校徽图片已经去除大面积留白，不再通过超大容器补偿旧图片边距。 */
+.logo-safe-layer{object-fit:contain;object-position:center}
+
+/* 欢迎语必须按校徽/标题、正文、按钮的正常文档流排列。 */
+.app-modal-surface:has(.welcome-modal-message){isolation:isolate}
+.app-modal-surface:has(.welcome-modal-message) .app-modal-header{
+  position:relative!important;
+  z-index:2!important;
+  order:1;
+}
+.app-modal-surface:has(.welcome-modal-message) .app-modal-body{
+  position:relative!important;
+  z-index:1!important;
+  order:2;
+}
+.app-modal-surface:has(.welcome-modal-message) .app-modal-footer{
+  position:relative!important;
+  z-index:2!important;
+  order:3;
+}
+.welcome-modal-content,.welcome-modal-message{
+  position:static!important;
+  inset:auto!important;
+  transform:none!important;
+}
+.welcome-modal-message{
+  display:block;
+  max-height:min(34vh,320px);
+  margin:0;
+  overflow:auto;
+  white-space:pre-wrap;
+  overflow-wrap:anywhere;
+}
+
+@media(max-width:640px){
+  :root{
+    --brand-logo-size-sidebar:42px;
+    --brand-logo-size-login:60px;
+    --brand-logo-size-welcome:48px;
+  }
+}
