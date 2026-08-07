@@ -13,6 +13,7 @@ candidate_service = (root / 'backend-java/server/src/main/java/com/wust/dormitor
 candidate_mapper = (root / 'backend-java/server/src/main/resources/mapper/roomexchange/RoomExchangeCandidateMapper.xml').read_text(encoding='utf-8')
 
 compact_room_list = room_list.replace(' ', '')
+compact_room_style = room_list_style.replace(' ', '')
 checks = {
     'candidate rooms keep four responsive rows per page': all(token in room_list for token in (
         'ROOM_ROWS_PER_PAGE = 4', 'roomColumnCount', 'roomPageSize', 'pagedRooms', 'totalRoomPages',
@@ -20,8 +21,9 @@ checks = {
     'room filters reset pagination before slicing': all(token in compact_room_list for token in (
         'watch([keyword,floorFilter,minimumAvailableBeds]', 'roomPage.value=1', 'sortedFilteredRooms',
     )),
-    'room cards are equal height and preference areas are height limited': all(token in room_list_style.replace(' ', '') for token in (
-        '.room-list-page.room-card-grid{', '.room-list-page.room-selection-card{height:100%', 'max-height:120px', 'overflow-y:auto',
+    'room cards are equal height and preference areas are height limited': all(token in compact_room_style for token in (
+        '.room-list-page.room-card-grid{', '.room-list-page.room-selection-card{',
+        'align-items:stretch', 'height:100%', 'max-height:120px', 'overflow-y:auto',
     )),
     'room list renders page metadata and page controls': all(token in room_list for token in (
         'pagedRooms', 'currentRoomStart', 'currentRoomEnd', 'totalRoomPages', '上一页', '下一页',
