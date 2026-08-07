@@ -40,8 +40,10 @@ room_end = service.find("\n    public ", room_start + 20)
 room_body = service[room_start:room_end]
 if "forUpdate" not in room_body or "FOR UPDATE" not in room_body:
     raise AssertionError("写路径 room(..., true) 必须继续保留 FOR UPDATE 语义")
-if "findSnapshot" not in room_body:
-    raise AssertionError("非锁定 room(..., false) 必须走住宿快照 Mapper")
+if "snapshot(roomId)" not in room_body:
+    raise AssertionError("非锁定 room(..., false) 必须走住宿快照 helper")
+if "snapshotMapper.findSnapshot(roomId)" not in service:
+    raise AssertionError("住宿快照 helper 必须最终委托 RoomOccupancySnapshotMapper")
 
 if "assignment_status = 'ACTIVE'" not in xml:
     raise AssertionError("住宿快照必须只统计 ACTIVE 入住记录")
