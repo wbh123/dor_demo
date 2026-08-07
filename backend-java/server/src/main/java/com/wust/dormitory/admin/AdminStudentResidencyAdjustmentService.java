@@ -1,15 +1,14 @@
 package com.wust.dormitory.admin;
 
 import com.wust.dormitory.common.error.BusinessException;
+import com.wust.dormitory.residency.AdminBedSwapService;
 import com.wust.dormitory.residency.ResidencyService;
 import com.wust.dormitory.security.CurrentUser;
 import org.springframework.http.HttpStatus;
-import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.sql.Types;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -18,12 +17,18 @@ import java.util.Map;
 public class AdminStudentResidencyAdjustmentService {
     private final NamedParameterJdbcTemplate jdbc;
     private final ResidencyService residencyService;
+    private final AdminResidencyAdjustmentMapper adjustmentMapper;
+    private final AdminBedSwapService swapService;
 
     public AdminStudentResidencyAdjustmentService(
             NamedParameterJdbcTemplate jdbc,
-            ResidencyService residencyService) {
+            ResidencyService residencyService,
+            AdminResidencyAdjustmentMapper adjustmentMapper,
+            AdminBedSwapService swapService) {
         this.jdbc = jdbc;
         this.residencyService = residencyService;
+        this.adjustmentMapper = adjustmentMapper;
+        this.swapService = swapService;
     }
 
     public Map<String, Object> context(long studentId) {
@@ -36,8 +41,8 @@ public class AdminStudentResidencyAdjustmentService {
         Long currentRoomId = numberOrNull(current.get("room_id"));
         Long currentBedId = numberOrNull(current.get("bed_id"));
 
-        List<Map<String, Object>> availableBeds = availableBeds(
-                student,
+        List<Map<String, Object>> beds = compatibleBeds(
+                studentId,
                 currentRoomId,
                 currentBedId);
         Map<String, Object> result = new LinkedHashMap<>();
@@ -48,7 +53,9 @@ public class AdminStudentResidencyAdjustmentService {
         result.put("studentCategory", student.get("student_category"));
         result.put("resident", !current.isEmpty());
         result.put("currentResidency", current);
-        result.put("availableBeds", availableBeds);
+        result.put("availableBeds", beds);
+        result.put("beds", beds);
+        result.put("hasSwapTargets", beds.stream().anyMatch(this::swapRequired));
         return result;
     }
 
@@ -59,7 +66,7 @@ public class AdminStudentResidencyAdjustmentService {
             String reason,
             CurrentUser operator) {
         String normalizedReason = requiredReason(reason);
-        Map<String, Object> student = student(studentId);
+        student(studentId);
         Map<String, Object> currentResult = residencyService.current(studentId);
         @SuppressWarnings("unchecked")
         Map<String, Object> current = Boolean.TRUE.equals(currentResult.get("resident"))
@@ -74,13 +81,24 @@ public class AdminStudentResidencyAdjustmentService {
                     HttpStatus.CONFLICT);
         }
 
-        Map<String, Object> target = availableBeds(student, currentRoomId, currentBedId).stream()
+        Map<String, Object> target = compatibleBeds(studentId, currentRoomId, currentBedId).stream()
                 .filter(item -> number(item.get("bed_id")) == bedId)
                 .findFirst()
                 .orElseThrow(() -> new BusinessException(
                         "RESIDENCY_ADJUSTMENT_TARGET_UNAVAILABLE",
-                        "目标床位已不可用，可能被占用、处于活动锁定或不符合学生住宿条件",
+                        "目标床位不存在或不符合学生住宿范围",
                         HttpStatus.CONFLICT));
+        if (!booleanValue(target.get("selectable"))) {
+            throw new BusinessException(
+                    "RESIDENCY_ADJUSTMENT_TARGET_LOCKED",
+                    target.get("blocking_reason") == null
+                            ? "目标床位当前不可调整"
+                            : String.valueOf(target.get("blocking_reason")),
+                    HttpStatus.CONFLICT);
+        }
+        if (swapRequired(target)) {
+            return swapService.swapBeds(studentId, bedId, normalizedReason, operator);
+        }
 
         if (!current.isEmpty()) {
             residencyService.end(
@@ -104,6 +122,8 @@ public class AdminStudentResidencyAdjustmentService {
         result.put("previousResidency", current);
         result.put("assignment", assignment);
         result.put("moved", !current.isEmpty());
+        result.put("swapped", false);
+        result.put("message", "学生寝室和床位已更新，来源记录为管理员修改");
         return result;
     }
 
@@ -122,55 +142,24 @@ public class AdminStudentResidencyAdjustmentService {
         return rows.getFirst();
     }
 
-    private List<Map<String, Object>> availableBeds(
-            Map<String, Object> student,
+    private List<Map<String, Object>> compatibleBeds(
+            long studentId,
             Long currentRoomId,
             Long currentBedId) {
-        return jdbc.queryForList("""
-                SELECT bed.id AS bed_id, bed.room_id, bed.bed_code, bed.bed_type,
-                       bed.position_index, layout.layout_x, layout.layout_z, layout.rotation_degrees,
-                       bed.operational_status, room.room_number, room.capacity, room.resident_scope,
-                       floor.floor_number,
-                       building.id AS building_id, building.building_code,
-                       building.building_name,
-                       CONCAT(building.building_name, ' ', room.room_number, ' · ', bed.bed_code)
-                           AS display_name
-                FROM bed
-                LEFT JOIN room_bed_layout layout ON layout.bed_id=bed.id
-                JOIN room ON room.id=bed.room_id
-                JOIN dormitory_floor floor ON floor.id=room.floor_id
-                JOIN dormitory_building building ON building.id=floor.building_id
-                WHERE building.enabled=1
-                  AND room.operational_status='ENABLED'
-                  AND bed.operational_status='ENABLED'
-                  AND room.gender_restriction=:gender
-                  AND (
-                    (:studentCategory='DOMESTIC' AND room.resident_scope IN ('DOMESTIC_ONLY','MIXED'))
-                    OR (:studentCategory='INTERNATIONAL' AND room.resident_scope IN ('INTERNATIONAL_ONLY','MIXED'))
-                  )
-                  AND (:currentBedId IS NULL OR bed.id<>:currentBedId)
-                  AND NOT EXISTS (
-                    SELECT 1 FROM room_assignment occupied
-                    WHERE occupied.bed_id=bed.id
-                      AND occupied.assignment_status='ACTIVE'
-                  )
-                  AND NOT EXISTS (
-                    SELECT 1 FROM active_batch_room_lock room_lock
-                    WHERE room_lock.room_id=room.id
-                  )
-                  AND (
-                    room.id=:currentRoomId
-                    OR (SELECT COUNT(*) FROM room_assignment resident
-                        WHERE resident.room_id=room.id
-                          AND resident.assignment_status='ACTIVE') < room.capacity
-                  )
-                ORDER BY building.building_code, floor.floor_number,
-                         room.room_number, bed.bed_code
-                """, new MapSqlParameterSource()
-                .addValue("gender", student.get("gender"))
-                .addValue("studentCategory", student.get("student_category"))
-                .addValue("currentRoomId", currentRoomId == null ? -1L : currentRoomId)
-                .addValue("currentBedId", currentBedId, Types.BIGINT));
+        return adjustmentMapper.findCompatibleBeds(
+                studentId,
+                currentRoomId == null ? -1L : currentRoomId,
+                currentBedId);
+    }
+
+    private boolean swapRequired(Map<String, Object> target) {
+        return booleanValue(target.get("swap_required"));
+    }
+
+    private boolean booleanValue(Object value) {
+        if (value instanceof Boolean booleanValue) return booleanValue;
+        if (value instanceof Number number) return number.intValue() != 0;
+        return value != null && Boolean.parseBoolean(String.valueOf(value));
     }
 
     private String requiredReason(String reason) {
