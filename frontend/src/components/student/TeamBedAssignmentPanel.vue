@@ -2,11 +2,7 @@
 import { computed } from 'vue'
 import type { DataObject } from '../../api/types'
 import { bedTypeLabel } from '../../utils/bedLabels'
-
-export interface TeamMemberAssignment {
-  studentId: number
-  bedId: number
-}
+import type { TeamMemberAssignment } from './teamSelectionTypes'
 
 const props = defineProps<{
   members: DataObject[]
@@ -14,42 +10,14 @@ const props = defineProps<{
   memberAssignments: TeamMemberAssignment[]
   disabled?: boolean
 }>()
-const emit = defineEmits<{
-  'update:memberAssignments': [value: TeamMemberAssignment[]]
-}>()
-
-const assignmentMap = computed(() => new Map(
-  props.memberAssignments.map(item => [Number(item.studentId), Number(item.bedId)]),
-))
-
-function bedTakenByOther(studentId: number, bedId: number) {
-  return props.memberAssignments.some(item =>
-    Number(item.studentId) !== studentId && Number(item.bedId) === bedId,
-  )
-}
-
-function assign(studentId: number, event: Event) {
-  const bedId = Number((event.target as HTMLSelectElement).value || 0)
-  const next = props.members.map(member => ({
-    studentId: Number(member.studentId),
-    bedId: Number(member.studentId) === studentId
-      ? bedId
-      : Number(assignmentMap.value.get(Number(member.studentId)) ?? 0),
-  }))
-  emit('update:memberAssignments', next)
-}
+const emit = defineEmits<{ 'update:memberAssignments': [value: TeamMemberAssignment[]] }>()
+const assignmentMap = computed(() => new Map(props.memberAssignments.map(item => [Number(item.studentId), Number(item.bedId)])))
+function bedTakenByOther(studentId:number,bedId:number){return props.memberAssignments.some(item=>Number(item.studentId)!==studentId&&Number(item.bedId)===bedId)}
+function assign(studentId:number,event:Event){const bedId=Number((event.target as HTMLSelectElement).value||0);emit('update:memberAssignments',props.members.map(member=>({studentId:Number(member.studentId),bedId:Number(member.studentId)===studentId?bedId:Number(assignmentMap.value.get(Number(member.studentId))??0)})))}
 </script>
 
 <template>
-  <section class="team-bed-assignment-panel">
-    <header><div><strong>队友床位安排</strong><p>所有床位由队长统一确定。每名已确认成员必须选择一张不同床位。</p></div><span>{{ memberAssignments.filter(item => item.bedId).length }}/{{ members.length }}人已安排</span></header>
-    <div class="team-member-bed-grid">
-      <article v-for="member in members" :key="String(member.studentId)" class="team-member-bed-card">
-        <div><strong>{{ member.studentName }}</strong><span>{{ member.studentNumber }} · {{ member.majorName ?? '未设置专业' }}</span><small>{{ member.memberRole === 'LEADER' ? '队长' : '已确认队友' }}</small></div>
-        <label><span>确定床位</span><select class="input" :disabled="disabled" :value="assignmentMap.get(Number(member.studentId)) ?? 0" @change="assign(Number(member.studentId), $event)"><option :value="0">请选择床位</option><option v-for="bed in beds" :key="String(bed.id)" :value="Number(bed.id)" :disabled="bedTakenByOther(Number(member.studentId), Number(bed.id))">{{ bed.bed_code }} · {{ bedTypeLabel(bed.bed_type) }}{{ bedTakenByOther(Number(member.studentId), Number(bed.id)) ? '（已分配给队友）' : '' }}</option></select></label>
-      </article>
-    </div>
-  </section>
+  <section class="team-bed-assignment-panel"><header><div><strong>队友床位安排</strong><p>所有床位由队长统一确定。每名已确认成员必须选择一张不同床位。</p></div><span>{{ memberAssignments.filter(item=>item.bedId).length }}/{{ members.length }}人已安排</span></header><div class="team-member-bed-grid"><article v-for="member in members" :key="String(member.studentId)" class="team-member-bed-card"><div><strong>{{ member.studentName }}</strong><span>{{ member.studentNumber }} · {{ member.majorName ?? '未设置专业' }}</span><small>{{ member.memberRole==='LEADER'?'队长':'已确认队友' }}</small></div><label><span>确定床位</span><select class="input" :disabled="disabled" :value="assignmentMap.get(Number(member.studentId))??0" @change="assign(Number(member.studentId),$event)"><option :value="0">请选择床位</option><option v-for="bed in beds" :key="String(bed.id)" :value="Number(bed.id)" :disabled="bedTakenByOther(Number(member.studentId),Number(bed.id))">{{ bed.bed_code }} · {{ bedTypeLabel(bed.bed_type) }}{{ bedTakenByOther(Number(member.studentId),Number(bed.id))?'（已分配给队友）':'' }}</option></select></label></article></div></section>
 </template>
 
 <style scoped>
