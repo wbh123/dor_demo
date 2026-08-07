@@ -3,6 +3,31 @@
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.wust.dormitory.admin.mapper.BuildingManagementMapper">
+    <select id="listDetails" resultType="map">
+        SELECT building.id,
+               building.building_code,
+               building.building_name,
+               building.gender_restriction,
+               building.education_level_scope,
+               building.resident_scope,
+               building.enabled,
+               campus.campus_name,
+               COALESCE(MAX(floor.floor_number), 0) AS floor_count,
+               COUNT(DISTINCT room.id) AS room_count,
+               COUNT(DISTINCT CASE WHEN bed.operational_status&lt;&gt;'RETIRED' THEN bed.id END) AS bed_count,
+               COUNT(DISTINCT CASE WHEN residency.assignment_status='ACTIVE' THEN residency.student_id END) AS resident_count
+        FROM dormitory_building building
+        JOIN campus ON campus.id=building.campus_id
+        LEFT JOIN dormitory_floor floor ON floor.building_id=building.id
+        LEFT JOIN room ON room.floor_id=floor.id
+        LEFT JOIN bed ON bed.room_id=room.id
+        LEFT JOIN room_assignment residency ON residency.room_id=room.id
+        GROUP BY building.id, building.building_code, building.building_name,
+                 building.gender_restriction, building.education_level_scope,
+                 building.resident_scope, building.enabled, campus.campus_name
+        ORDER BY building.building_code, building.id
+    </select>
+
     <select id="findForUpdate" resultType="map">
         SELECT building.id,
                building.building_code,
