@@ -68,6 +68,6 @@
         <foreach collection="roomIds" item="roomId" open="(" separator="," close=")">
             #{roomId}
         </foreach>
-        ORDER BY b.building_code, f.floor_number, r.room_number, r.id
+        ORDER BY r.id
     </select>
 </mapper>
