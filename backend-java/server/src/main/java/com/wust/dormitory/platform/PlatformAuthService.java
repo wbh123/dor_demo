@@ -5,6 +5,7 @@ import com.wust.dormitory.security.AuthTokenService;
 import com.wust.dormitory.security.CurrentUser;
 import com.wust.dormitory.security.SecurityUsers;
 import com.wust.dormitory.subscription.PlatformAuditService;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -20,6 +21,8 @@ public class PlatformAuthService {
     private final PasswordEncoder passwordEncoder;
     private final AuthTokenService tokenService;
     private final PlatformAuditService auditService;
+    @Value("${WUST_DORMITORY_PASSWORD_STRENGTH_ENABLED:false}")
+    private boolean passwordStrengthEnabled;
 
     public PlatformAuthService(NamedParameterJdbcTemplate jdbc, PasswordEncoder passwordEncoder,
                                AuthTokenService tokenService, PlatformAuditService auditService) {
@@ -35,9 +38,7 @@ public class PlatformAuthService {
                        account_status, display_name, password_change_required
                 FROM app_user WHERE username=:username
                 """, Map.of("username", username));
-        if (rows.size() != 1) {
-            throw invalidLogin();
-        }
+        if (rows.size() != 1) throw invalidLogin();
         Map<String, Object> row = rows.getFirst();
         String hash = (String) row.get("password_hash");
         if (!"SYSTEM_ADMIN".equals(String.valueOf(row.get("user_type")))
@@ -80,11 +81,14 @@ public class PlatformAuthService {
     }
 
     private void validateNewPassword(String password) {
-        if (password == null || password.length() < 12
+        if (password == null || password.isEmpty() || password.length() > 72) {
+            throw new BusinessException("PASSWORD_WEAK", "密码不能为空且最多72位");
+        }
+        if (passwordStrengthEnabled && (password.length() < 12
                 || !password.matches(".*[A-Z].*")
                 || !password.matches(".*[a-z].*")
                 || !password.matches(".*\\d.*")
-                || !password.matches(".*[^A-Za-z0-9].*")) {
+                || !password.matches(".*[^A-Za-z0-9].*"))) {
             throw new BusinessException("PASSWORD_WEAK", "密码至少12位，并包含大小写字母、数字和特殊字符");
         }
     }
