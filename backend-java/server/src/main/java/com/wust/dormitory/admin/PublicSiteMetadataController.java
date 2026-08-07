@@ -1,23 +1,21 @@
 package com.wust.dormitory.admin;
 
 import com.wust.dormitory.common.response.ResponseFactory;
+import com.wust.dormitory.model.api.PublicSiteMetadataApi;
 import com.wust.dormitory.model.dto.ObjectSuccessResponse;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/v1/public/site-config")
-public class PublicSiteMetadataController {
+public class PublicSiteMetadataController implements PublicSiteMetadataApi {
     private final SiteMetadataService service;
 
     public PublicSiteMetadataController(SiteMetadataService service) {
         this.service = service;
     }
 
-    @GetMapping
-    public ResponseEntity<ObjectSuccessResponse> get() {
+    @Override
+    public ResponseEntity<ObjectSuccessResponse> getPublicSiteConfig() {
         return ResponseEntity.ok(ResponseFactory.object(service.publicConfig()));
     }
 }
