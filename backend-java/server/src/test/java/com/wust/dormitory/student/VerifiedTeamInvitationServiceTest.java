@@ -4,13 +4,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wust.dormitory.audit.AuditService;
 import com.wust.dormitory.common.error.BusinessException;
 import com.wust.dormitory.security.CurrentUser;
+import com.wust.dormitory.student.mapper.VerifiedTeamInvitationMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
-import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
-import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 
-import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -21,12 +18,11 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class VerifiedTeamInvitationServiceTest {
-    private NamedParameterJdbcTemplate jdbc;
+    private VerifiedTeamInvitationMapper mapper;
     private TeamService teamService;
     private TeamFormationService formationService;
     private AuditService auditService;
@@ -35,12 +31,12 @@ class VerifiedTeamInvitationServiceTest {
 
     @BeforeEach
     void setUp() {
-        jdbc = mock(NamedParameterJdbcTemplate.class);
+        mapper = mock(VerifiedTeamInvitationMapper.class);
         teamService = mock(TeamService.class);
         formationService = mock(TeamFormationService.class);
         auditService = mock(AuditService.class);
         service = new VerifiedTeamInvitationService(
-                jdbc,
+                mapper,
                 teamService,
                 formationService,
                 auditService,
@@ -56,10 +52,8 @@ class VerifiedTeamInvitationServiceTest {
 
     @Test
     void rejectsNumberAndNameThatDoNotMatchSameEligibleStudent() {
-        when(jdbc.queryForList(
-                anyString(),
-                org.mockito.ArgumentMatchers.any(MapSqlParameterSource.class)))
-                .thenReturn(List.of());
+        when(mapper.findEligibleInvitee(7L, "202600000011", "错误姓名"))
+                .thenReturn(null);
 
         assertThatThrownBy(() -> service.invite(
                 "202600000011",
@@ -82,13 +76,8 @@ class VerifiedTeamInvitationServiceTest {
         assertThat(result)
                 .containsEntry("invited", true)
                 .containsEntry("studentNumber", "202600000011");
-        ArgumentCaptor<String> updateSql = ArgumentCaptor.forClass(String.class);
-        verify(jdbc, times(2)).update(
-                updateSql.capture(),
-                org.mockito.ArgumentMatchers.any(MapSqlParameterSource.class));
-        assertThat(String.join("\n", updateSql.getAllValues()))
-                .contains("ON DUPLICATE KEY UPDATE")
-                .contains("invitation_status, invitation_token");
+        verify(mapper).upsertInvitedMember(31L, 7L, 101L);
+        verify(mapper).insertInvitation(eq(31L), eq(100L), eq(101L), anyString());
         verify(teamService, never()).inviteTeammate(anyString(), eq(user));
     }
 
@@ -103,28 +92,14 @@ class VerifiedTeamInvitationServiceTest {
                 .isInstanceOfSatisfying(BusinessException.class, exception ->
                         assertThat(exception.getCode())
                                 .isEqualTo("TEAM_INVITATION_PENDING_DUPLICATE"));
-        verify(jdbc, never()).update(
-                anyString(),
-                org.mockito.ArgumentMatchers.any(MapSqlParameterSource.class));
+        verify(mapper, never()).upsertInvitedMember(anyLong(), anyLong(), anyLong());
+        verify(mapper, never()).insertInvitation(anyLong(), anyLong(), anyLong(), anyString());
     }
 
     @Test
     void leaderCanCancelPendingInvitationWhileTeamIsForming() {
-        when(jdbc.queryForList(
-                anyString(),
-                org.mockito.ArgumentMatchers.any(MapSqlParameterSource.class)))
-                .thenReturn(List.of(Map.of(
-                        "invitation_id", 55L,
-                        "invitee_student_id", 101L,
-                        "student_number", "202600000011",
-                        "student_name", "受邀学生",
-                        "team_status", "FORMING",
-                        "leader_student_id", 100L)));
-        when(jdbc.update(anyString(), anyMap())).thenReturn(1);
-        when(jdbc.update(
-                anyString(),
-                org.mockito.ArgumentMatchers.any(MapSqlParameterSource.class)))
-                .thenReturn(1);
+        when(mapper.findPendingInvitationForUpdate(7L, 101L))
+                .thenReturn(pendingInvitation());
 
         Map<String, Object> result = service.cancelInvitation(7L, 101L, user);
 
@@ -132,10 +107,9 @@ class VerifiedTeamInvitationServiceTest {
                 .containsEntry("teamId", 7L)
                 .containsEntry("studentId", 101L)
                 .containsEntry("cancelled", true);
-        verify(jdbc).update(anyString(), anyMap());
-        verify(jdbc, times(2)).update(
-                anyString(),
-                org.mockito.ArgumentMatchers.any(MapSqlParameterSource.class));
+        verify(mapper).cancelInvitation(55L);
+        verify(mapper).removeInvitedMember(7L, 101L);
+        verify(mapper).insertCancellationNotification(eq(101L), anyString());
         verify(auditService).success(
                 eq(user),
                 eq("TEAM_INVITATION_CANCELLED"),
@@ -148,26 +122,9 @@ class VerifiedTeamInvitationServiceTest {
 
     @Test
     void removeOrCancelUsesCancellationFlowForPendingInvite() {
-        when(jdbc.queryForObject(
-                anyString(),
-                org.mockito.ArgumentMatchers.any(MapSqlParameterSource.class),
-                eq(Integer.class)))
-                .thenReturn(1);
-        when(jdbc.queryForList(
-                anyString(),
-                org.mockito.ArgumentMatchers.any(MapSqlParameterSource.class)))
-                .thenReturn(List.of(Map.of(
-                        "invitation_id", 55L,
-                        "invitee_student_id", 101L,
-                        "student_number", "202600000011",
-                        "student_name", "受邀学生",
-                        "team_status", "FORMING",
-                        "leader_student_id", 100L)));
-        when(jdbc.update(anyString(), anyMap())).thenReturn(1);
-        when(jdbc.update(
-                anyString(),
-                org.mockito.ArgumentMatchers.any(MapSqlParameterSource.class)))
-                .thenReturn(1);
+        when(mapper.hasPendingInvitation(7L, 101L)).thenReturn(1);
+        when(mapper.findPendingInvitationForUpdate(7L, 101L))
+                .thenReturn(pendingInvitation());
 
         Map<String, Object> result = service.removeOrCancel(7L, 101L, user);
 
@@ -177,11 +134,7 @@ class VerifiedTeamInvitationServiceTest {
 
     @Test
     void removeOrCancelDelegatesAcceptedMemberToTeamService() {
-        when(jdbc.queryForObject(
-                anyString(),
-                org.mockito.ArgumentMatchers.any(MapSqlParameterSource.class),
-                eq(Integer.class)))
-                .thenReturn(0);
+        when(mapper.hasPendingInvitation(7L, 101L)).thenReturn(0);
         when(teamService.removeMember(7L, 101L, user)).thenReturn(Map.of(
                 "teamId", 7L,
                 "studentId", 101L,
@@ -194,35 +147,36 @@ class VerifiedTeamInvitationServiceTest {
     }
 
     private void stubSuccessfulInvitation(int duplicatePending) {
-        when(jdbc.queryForList(
-                anyString(),
-                org.mockito.ArgumentMatchers.any(MapSqlParameterSource.class)))
-                .thenReturn(List.of(Map.of(
+        when(mapper.findEligibleInvitee(7L, "202600000011", "受邀学生"))
+                .thenReturn(Map.of(
                         "id", 101L,
                         "student_number", "202600000011",
                         "student_name", "受邀学生",
-                        "gender", "F")))
-                .thenReturn(List.of(Map.of(
+                        "gender", "F"));
+        when(mapper.findLeaderTeamForUpdate(7L, 100L))
+                .thenReturn(Map.of(
                         "id", 31L,
                         "batch_id", 7L,
                         "team_status", "FORMING",
                         "member_role", "LEADER",
-                        "team_max_size", 5)));
-        when(jdbc.queryForList(anyString(), anyMap()))
-                .thenReturn(List.of(Map.of("gender", "F")));
-        when(jdbc.queryForObject(
-                anyString(),
-                anyMap(),
-                eq(Integer.class)))
-                .thenReturn(1);
-        when(jdbc.queryForObject(
-                anyString(),
-                org.mockito.ArgumentMatchers.any(MapSqlParameterSource.class),
-                eq(Integer.class)))
-                .thenReturn(0, duplicatePending);
-        when(jdbc.update(
-                anyString(),
-                org.mockito.ArgumentMatchers.any(MapSqlParameterSource.class)))
-                .thenReturn(1);
+                        "team_max_size", 5,
+                        "inviter_gender", "F"));
+        when(mapper.findInvitationGuards(31L, 7L, 101L))
+                .thenReturn(Map.of(
+                        "occupied_count", 1,
+                        "joined_elsewhere", 0,
+                        "duplicate_pending", duplicatePending));
+        when(mapper.upsertInvitedMember(31L, 7L, 101L)).thenReturn(1);
+        when(mapper.insertInvitation(eq(31L), eq(100L), eq(101L), anyString())).thenReturn(1);
+    }
+
+    private Map<String, Object> pendingInvitation() {
+        return Map.of(
+                "invitation_id", 55L,
+                "invitee_student_id", 101L,
+                "student_number", "202600000011",
+                "student_name", "受邀学生",
+                "team_status", "FORMING",
+                "leader_student_id", 100L);
     }
 }
