@@ -24,7 +24,9 @@
                (SELECT COUNT(*) FROM student WHERE gender = 'F') AS female_student_count,
                (SELECT COUNT(*) FROM room) AS room_count,
                (SELECT COUNT(*) FROM bed WHERE operational_status = 'ENABLED') AS bed_count,
-               (SELECT COUNT(*) FROM bed_assignment) AS active_assignment_count,
+               (SELECT COUNT(DISTINCT student_id)
+                FROM room_assignment
+                WHERE assignment_status = 'ACTIVE') AS active_assignment_count,
                (SELECT COUNT(*)
                 FROM selection_batch
                 WHERE batch_status IN ('PUBLISHED', 'OPEN', 'PAUSED')) AS open_batch_count
