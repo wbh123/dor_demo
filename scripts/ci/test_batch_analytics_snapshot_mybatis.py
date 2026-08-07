@@ -24,7 +24,7 @@ mapper = MAPPER.read_text(encoding="utf-8")
 xml = XML.read_text(encoding="utf-8")
 for method in (
     "findBatch", "findSnapshot", "findMissingFinishedBatchIds", "insertStudentFacts",
-    "findAggregateMetrics", "findDimensions", "insertSnapshot",
+    "findAggregateMetrics", "insertSnapshot",
 ):
     require(method in mapper, f"analytics mapper method missing: {method}")
     require(f'id="{method}"' in xml, f"analytics mapper XML statement missing: {method}")
@@ -40,6 +40,7 @@ require("PARTICIPANT_COUNT" in upper and "SELF_SELECTION_COUNT" in upper and "TE
 require(upper.count("FROM BATCH_ANALYTICS_STUDENT_FACT") <= 3,
         "analytics metrics should not repeatedly rescan the student fact table")
 require("SELECT *" not in upper, "analytics mapper must not use SELECT *")
+require("findAggregateMetrics" in service, "service must obtain metrics from the one-pass aggregate query")
 
 baseline = BASELINE.read_text(encoding="utf-8")
 require("BatchAnalyticsSnapshotService.java" not in baseline,
