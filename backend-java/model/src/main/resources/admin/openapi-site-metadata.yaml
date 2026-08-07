@@ -1,0 +1,142 @@
+openapi: 3.0.3
+info:
+  title: Wust Dormitory Select 站点元数据接口
+  version: 1.0.0
+paths:
+  /api/v1/public/site-config:
+    get:
+      tags: [PublicSiteMetadata]
+      operationId: getPublicSiteConfig
+      summary: 获取登录页公开站点配置
+      responses:
+        '200':
+          description: 当前公开站点配置
+          content:
+            application/json:
+              schema:
+                $ref: '../common-response/openapi-common-response.yaml#/components/schemas/ObjectSuccessResponse'
+  /api/v1/admin/settings/login-page:
+    get:
+      tags: [AdminSiteMetadata]
+      operationId: getAdminLoginPageSetting
+      summary: 获取学校管理员可维护的登录页配置
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: 当前登录页配置及是否可编辑
+          content:
+            application/json:
+              schema:
+                $ref: '../common-response/openapi-common-response.yaml#/components/schemas/ObjectSuccessResponse'
+        '401': { $ref: '#/components/responses/ErrorResponse' }
+        '403': { $ref: '#/components/responses/ErrorResponse' }
+    put:
+      tags: [AdminSiteMetadata]
+      operationId: updateAdminLoginPageSetting
+      summary: 更新学校管理员登录页展示内容
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginPageContentUpdateRequest'
+      responses:
+        '200':
+          description: 更新后的登录页配置
+          content:
+            application/json:
+              schema:
+                $ref: '../common-response/openapi-common-response.yaml#/components/schemas/ObjectSuccessResponse'
+        '400': { $ref: '#/components/responses/ErrorResponse' }
+        '401': { $ref: '#/components/responses/ErrorResponse' }
+        '403': { $ref: '#/components/responses/ErrorResponse' }
+  /api/v1/platform/site-metadata:
+    get:
+      tags: [PlatformSiteMetadata]
+      operationId: getPlatformSiteMetadata
+      summary: 获取系统管理员站点元数据配置
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: 当前站点元数据配置
+          content:
+            application/json:
+              schema:
+                $ref: '../common-response/openapi-common-response.yaml#/components/schemas/ObjectSuccessResponse'
+        '401': { $ref: '#/components/responses/ErrorResponse' }
+        '403': { $ref: '#/components/responses/ErrorResponse' }
+    put:
+      tags: [PlatformSiteMetadata]
+      operationId: updatePlatformSiteMetadata
+      summary: 更新系统管理员站点元数据配置
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PlatformSiteMetadataUpdateRequest'
+      responses:
+        '200':
+          description: 更新后的站点元数据配置
+          content:
+            application/json:
+              schema:
+                $ref: '../common-response/openapi-common-response.yaml#/components/schemas/ObjectSuccessResponse'
+        '400': { $ref: '#/components/responses/ErrorResponse' }
+        '401': { $ref: '#/components/responses/ErrorResponse' }
+        '403': { $ref: '#/components/responses/ErrorResponse' }
+components:
+  responses:
+    ErrorResponse:
+      description: 业务错误
+      content:
+        application/json:
+          schema:
+            $ref: '../common-response/openapi-common-response.yaml#/components/schemas/ErrorResponse'
+  schemas:
+    LoginPageContentUpdateRequest:
+      type: object
+      required: [html]
+      properties:
+        html:
+          type: string
+          minLength: 1
+          maxLength: 8000
+        imageUrl:
+          type: string
+          maxLength: 500
+    SiteBrandingUpdateRequest:
+      type: object
+      required: [schoolName]
+      properties:
+        schoolName:
+          type: string
+          minLength: 1
+          maxLength: 128
+        squareLogoUrl:
+          type: string
+          maxLength: 500
+        horizontalLogoUrl:
+          type: string
+          maxLength: 500
+    PlatformSiteMetadataUpdateRequest:
+      type: object
+      required: [branding, login, schoolAdminEditable]
+      properties:
+        branding:
+          $ref: '#/components/schemas/SiteBrandingUpdateRequest'
+        login:
+          $ref: '#/components/schemas/LoginPageContentUpdateRequest'
+        schoolAdminEditable:
+          type: boolean
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: Token
