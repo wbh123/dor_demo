@@ -63,7 +63,7 @@ export_service = read("backend-java/server/src/main/java/com/wust/dormitory/expo
 require(export_service, "claimNext", "导出任务服务必须支持领取下一个排队任务")
 require(export_service, "file_reference", "成功任务必须保留安全文件引用")
 
-controller = read("backend-java/server/src/main/java/com/wust/dormitory/admin/AdminGovernanceController.java")
+controller = read("backend-java/server/src/main/java/com/wust/dormitory/admin/AdminGovernanceAuditController.java")
 require(controller, '/exports/{taskId}/download', "治理接口必须提供已完成导出下载入口")
 
 export_panel = read("frontend/src/components/admin/ExportTaskPanel.vue")

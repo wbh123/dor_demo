@@ -120,7 +120,10 @@ require("governanceEnabled" in shell and "'/admin/governance'" in shell,
 require("<AppModal" in shell and "welcome-overlay" not in shell and "welcome-dialog" not in shell,
         "student welcome still duplicates a complete custom modal overlay")
 
-controller = read("backend-java/server/src/main/java/com/wust/dormitory/admin/AdminGovernanceController.java")
+controller = (
+    read("backend-java/server/src/main/java/com/wust/dormitory/admin/AdminGovernanceAuditController.java")
+    + read("backend-java/server/src/main/java/com/wust/dormitory/admin/AdminGovernanceAnalyticsController.java")
+)
 require("FeatureAccessService" in controller and "requireAny" in controller,
         "direct governance controller endpoints do not enforce effective feature access")
 
