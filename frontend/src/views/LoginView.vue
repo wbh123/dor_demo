@@ -13,7 +13,7 @@ const heroBrandSubtitle = String(import.meta.env.VITE_LOGIN_BRAND_SUBTITLE || '�
 const loginServiceName = String(import.meta.env.VITE_LOGIN_SERVICE_NAME || '学生宿舍服务')
 const showOperatorInfo = String(import.meta.env.VITE_SHOW_OPERATOR_INFO || 'false').toLowerCase() === 'true' && Boolean(operatorName.trim())
 const showIcpRecord = String(import.meta.env.VITE_SHOW_ICP_RECORD || 'false').toLowerCase() === 'true' && Boolean(icpRecord.trim())
-const logoOnly = `${import.meta.env.BASE_URL}assert/logo-only.png`
+const brandLogo = `${import.meta.env.BASE_URL}assert/logo-only.png`
 const auth = useAuthStore()
 const router = useRouter()
 const mode = ref<'login' | 'activate'>('login')
@@ -63,7 +63,10 @@ async function submitActivate() {
   <div class="login-page">
     <section class="login-hero">
       <div class="hero-copy">
-        <div class="madrid-brand"><img class="login-school-logo" :src="logoOnly" :alt="`${institutionName}校徽`" /><div><strong>{{ institutionName }}</strong><span>{{ heroBrandSubtitle }}</span></div></div>
+        <div class="madrid-brand">
+          <div class="brand-image-surface hero-brand-surface"><img class="login-school-logo" :src="brandLogo" :alt="`${institutionName}校徽与校名`" /></div>
+          <span>{{ heroBrandSubtitle }}</span>
+        </div>
         <h1 class="login-hero-title">{{ heroTitle }}</h1>
         <p>{{ heroDescription }}</p>
       </div>
@@ -71,7 +74,10 @@ async function submitActivate() {
 
     <section class="login-panel">
       <div class="login-card auth-card-fixed">
-        <div class="brand login-brand school-login-brand"><img :src="logoOnly" :alt="`${institutionName}校徽`" /><div><strong>{{ institutionName }}</strong><span>{{ loginServiceName }}</span></div></div>
+        <div class="school-login-brand">
+          <div class="brand-image-surface card-brand-surface"><img :src="brandLogo" :alt="`${institutionName}校徽与校名`" /></div>
+          <span>{{ loginServiceName }}</span>
+        </div>
         <div class="segment auth-mode-switch"><button :class="{ active: mode === 'login' }" type="button" @click="setMode('login')">登录</button><button :class="{ active: mode === 'activate' }" type="button" @click="setMode('activate')">学生激活</button></div>
 
         <div class="auth-form-frame">
@@ -102,5 +108,5 @@ async function submitActivate() {
 </template>
 
 <style scoped>
-.login-hero{display:flex;align-items:center}.hero-copy{max-width:680px}.madrid-brand{display:flex;align-items:center;gap:18px;margin-bottom:30px}.madrid-brand div{display:grid;gap:2px}.madrid-brand strong{font-size:27px}.madrid-brand span{font-size:18px;letter-spacing:.2em}.login-school-logo{width:112px;height:112px;object-fit:contain;filter:drop-shadow(0 12px 30px rgba(0,0,0,.16))}.school-login-brand{display:flex;align-items:center;gap:13px;min-height:84px}.school-login-brand img{width:72px;height:72px;object-fit:contain}.school-login-brand div{display:grid;gap:3px}.school-login-brand strong{font-size:18px}.school-login-brand span{color:var(--muted);font-size:13px}.login-panel{display:flex;flex-direction:column;justify-content:center}.auth-card-fixed{width:min(470px,100%);min-height:596px;margin:auto;display:flex;flex-direction:column}.auth-mode-switch{flex:0 0 auto}.auth-form-frame{flex:1;display:flex;min-height:390px}.auth-form{display:grid;grid-template-rows:1fr auto 52px;width:100%;min-height:390px}.auth-fields{display:grid;grid-template-rows:repeat(3,minmax(78px,auto));align-content:start;gap:12px}.auth-field-spacer{min-height:78px}.auth-submit{align-self:end}.auth-inline-hint{min-height:44px;margin:8px 0 0;padding:8px 10px;border-radius:10px;background:var(--soft);color:var(--muted);font-size:13px;line-height:1.45}.auth-inline-hint.error{background:#fff1f2;color:#b42318}.auth-inline-hint.success{background:#ecfdf3;color:#027a48}.login-compliance{display:flex;justify-content:center;gap:12px;flex-wrap:wrap;width:100%;margin-top:auto;padding-top:18px;color:var(--muted);text-align:center;font-size:.7rem}.login-compliance span+span::before{content:"·";margin-right:12px}@media(max-width:760px){.auth-card-fixed{min-height:570px}.madrid-brand strong{font-size:22px}.login-school-logo{width:78px;height:78px}}
+.login-hero{display:flex;align-items:center}.hero-copy{max-width:680px}.madrid-brand{display:grid;justify-items:start;gap:10px;margin-bottom:30px}.madrid-brand>span{font-size:16px;letter-spacing:.18em}.brand-image-surface{display:flex;align-items:center;justify-content:center;background:#fff;border:1px solid rgba(15,23,42,.08);box-shadow:0 12px 32px rgba(15,23,42,.12)}.hero-brand-surface{width:min(470px,92vw);min-height:76px;padding:9px 15px;border-radius:16px}.login-school-logo{display:block;width:100%;height:auto;max-height:64px;object-fit:contain}.school-login-brand{display:grid;justify-items:start;gap:8px;min-height:86px;margin-bottom:4px}.card-brand-surface{width:min(330px,100%);min-height:58px;padding:7px 11px;border-radius:13px}.card-brand-surface img{display:block;width:100%;height:auto;max-height:48px;object-fit:contain}.school-login-brand>span{color:var(--muted);font-size:13px}.login-panel{display:flex;flex-direction:column;justify-content:center}.auth-card-fixed{width:min(470px,100%);min-height:596px;margin:auto;display:flex;flex-direction:column}.auth-mode-switch{flex:0 0 auto}.auth-form-frame{flex:1;display:flex;min-height:390px}.auth-form{display:grid;grid-template-rows:1fr auto 52px;width:100%;min-height:390px}.auth-fields{display:grid;grid-template-rows:repeat(3,minmax(78px,auto));align-content:start;gap:12px}.auth-field-spacer{min-height:78px}.auth-submit{align-self:end}.auth-inline-hint{min-height:44px;margin:8px 0 0;padding:8px 10px;border-radius:10px;background:var(--soft);color:var(--muted);font-size:13px;line-height:1.45}.auth-inline-hint.error{background:#fff1f2;color:#b42318}.auth-inline-hint.success{background:#ecfdf3;color:#027a48}.login-compliance{display:flex;justify-content:center;gap:12px;flex-wrap:wrap;width:100%;margin-top:auto;padding-top:18px;color:var(--muted);text-align:center;font-size:.7rem}.login-compliance span+span::before{content:"·";margin-right:12px}@media(max-width:760px){.auth-card-fixed{min-height:570px}.hero-brand-surface{min-height:62px}.login-school-logo{max-height:50px}}
 </style>
