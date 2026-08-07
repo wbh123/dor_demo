@@ -19,15 +19,14 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-
 @Service
 public class NotificationDispatchService {
     private static final int DEFAULT_MAX_NOTIFICATION_RECIPIENTS = 1000;
     private static final int CHUNK_SIZE = 200;
-
     private final NamedParameterJdbcTemplate jdbc;
     private final FeatureAccessService featureAccessService;
     private final SubscriptionService subscriptionService;
@@ -58,16 +57,17 @@ public class NotificationDispatchService {
         List<Long> recipients = recipientResolver.resolve(criteria);
         enforceRecipientLimit(recipients.size());
         Map<String, Object> template = templateRevision(templateRevisionId);
-        return Map.of(
-                "recipientCount", recipients.size(),
-                "templateRevisionId", templateRevisionId,
-                "titleZhCn", template.get("title_zh_cn"),
-                "contentZhCn", template.get("content_zh_cn"),
-                "titleEnUs", template.get("title_en_us"),
-                "contentEnUs", template.get("content_en_us"),
-                "variables", variables == null ? Map.of() : variables,
-                "channel", NotificationChannel.IN_APP.name(),
-                "externalChannelsImplemented", false);
+        Map<String, Object> preview = new LinkedHashMap<>();
+        preview.put("recipientCount", recipients.size());
+        preview.put("templateRevisionId", templateRevisionId);
+        preview.put("titleZhCn", template.get("title_zh_cn"));
+        preview.put("contentZhCn", template.get("content_zh_cn"));
+        preview.put("titleEnUs", template.get("title_en_us"));
+        preview.put("contentEnUs", template.get("content_en_us"));
+        preview.put("variables", variables == null ? Map.of() : variables);
+        preview.put("channel", NotificationChannel.IN_APP.name());
+        preview.put("externalChannelsImplemented", false);
+        return preview;
     }
 
     @Transactional

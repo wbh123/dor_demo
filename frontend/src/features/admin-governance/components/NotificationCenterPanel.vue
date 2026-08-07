@@ -38,6 +38,24 @@ const emit = defineEmits<{
 
 function selectTemplate(item: DataObject) {
   emit('update:selected-template-revision-id', String(item.revision_id ?? ''))
+  emit('update:template-draft', {
+    templateId: Number(item.id),
+    templateCode: String(item.template_code ?? ''),
+    templateName: String(item.template_name ?? ''),
+    titleZhCn: String(item.title_zh_cn ?? ''),
+    contentZhCn: String(item.content_zh_cn ?? ''),
+    titleEnUs: String(item.title_en_us ?? ''),
+    contentEnUs: String(item.content_en_us ?? ''),
+    enabled: Boolean(item.enabled),
+    creationReason: '',
+  })
+}
+function newContent() {
+  emit('update:selected-template-revision-id', '')
+  emit('update:template-draft', {
+    templateCode: '', templateName: '', titleZhCn: '', contentZhCn: '',
+    titleEnUs: '', contentEnUs: '', enabled: true, creationReason: '',
+  })
 }
 </script>
 
@@ -47,7 +65,7 @@ function selectTemplate(item: DataObject) {
       <div>
         <span class="eyebrow">NOTIFICATION</span>
         <h3>统一通知中心</h3>
-        <p>模板修订、双语内容、变量、接收范围和预览集中在同一工作台。当前仅发送站内通知。</p>
+        <p>先确定通知内容，再设置接收范围并发送；模板只是可复用的内容来源，不再是发送通知的前置条件。</p>
       </div>
     </header>
 
@@ -55,41 +73,39 @@ function selectTemplate(item: DataObject) {
     <p v-if="message" class="alert success">{{ message }}</p>
 
     <div class="notification-workbench">
-      <aside class="notification-template-list">
-        <div class="workspace-title"><strong>模板与历史修订</strong><span>{{ templates.length }}项</span></div>
-        <button
-          v-for="item in templates"
-          :key="String(item.revision_id)"
-          class="template-revision-card"
-          :class="{active:selectedTemplateRevisionId===String(item.revision_id)}"
-          type="button"
-          @click="selectTemplate(item)"
-        >
-          <strong>{{ item.template_name }}</strong>
-          <span>{{ item.template_code }} · 修订{{ item.revision }}</span>
-          <small>{{ item.enabled ? '当前可用' : '已停用' }}</small>
-        </button>
-        <p v-if="!templates.length" class="empty-state compact">暂无通知模板。</p>
-      </aside>
+      <section class="notification-template-list workspace-block">
+        <div class="workspace-title"><div><strong>1. 选择内容来源</strong><span>可从模板开始，也可新建</span></div><button class="button ghost small" type="button" @click="newContent">新建空白通知</button></div>
+        <div class="template-strip">
+          <button
+            v-for="item in templates"
+            :key="String(item.revision_id)"
+            class="template-revision-card"
+            :class="{active:selectedTemplateRevisionId===String(item.revision_id)}"
+            type="button"
+            @click="selectTemplate(item)"
+          >
+            <strong>{{ item.template_name }}</strong>
+            <span>{{ item.template_code }} · 修订{{ item.revision }}</span>
+            <small>{{ item.enabled ? '点击后载入当前编辑器' : '已停用，仅可查看内容' }}</small>
+          </button>
+          <p v-if="!templates.length" class="empty-state compact">暂无通知模板，可直接新建通知内容。</p>
+        </div>
+      </section>
 
-      <main class="notification-editor-column">
-        <div class="workspace-title"><strong>通知内容</strong><span>旧修订不会被覆盖</span></div>
+      <section class="notification-editor-column workspace-block">
+        <div class="workspace-title"><div><strong>2. 编辑通知内容</strong><span>当前编辑内容将用于立即发送</span></div><span v-if="selectedTemplateRevisionId" class="source-chip">来源：修订 {{ selectedTemplateRevisionId }}</span></div>
         <NotificationTemplateEditor
-          v-if="canTemplateManage"
+          v-if="canTemplateManage || canNotificationSend"
           :model-value="templateDraft"
           :busy="busy"
           @update:model-value="emit('update:template-draft', $event)"
           @save="emit('save-template')"
         />
-        <div v-else-if="selectedTemplateRevisionId" class="preview-card">
-          <strong>已选择模板修订</strong>
-          <span>修订编号 {{ selectedTemplateRevisionId }}</span>
-        </div>
-        <p v-else class="empty-state">请选择一个模板修订。</p>
-      </main>
+        <p v-else class="empty-state">当前账号没有通知编辑权限。</p>
+      </section>
 
-      <aside v-if="canNotificationSend" class="notification-recipient-column">
-        <div class="workspace-title"><strong>接收范围与预览</strong><span>先预检再发送</span></div>
+      <section v-if="canNotificationSend" class="notification-recipient-column workspace-block">
+        <div class="workspace-title"><div><strong>3. 设置接收范围并发送</strong><span>固定字段为无搜索下拉多选</span></div><span>{{ recipientCount === undefined ? '尚未预检' : `预计 ${recipientCount} 人` }}</span></div>
         <RecipientSelector
           :model-value="recipientCriteria"
           :recipient-count="recipientCount"
@@ -99,23 +115,24 @@ function selectTemplate(item: DataObject) {
         />
 
         <div v-if="preview" class="preview-card">
-          <strong>内容预览</strong>
-          <span>接收人 {{ preview.recipientCount }} 人</span>
+          <div class="preview-heading"><strong>当前内容预览</strong><span>接收人 {{ preview.recipientCount }} 人</span></div>
           <h4>{{ preview.titleZhCn }}</h4>
           <p>{{ preview.contentZhCn }}</p>
+          <details v-if="preview.titleEnUs || preview.contentEnUs"><summary>查看英文内容</summary><h4>{{ preview.titleEnUs }}</h4><p>{{ preview.contentEnUs }}</p></details>
         </div>
 
         <label v-if="canNotificationSchedule" class="schedule-field">
-          <span>定时发送时间（留空立即执行）</span>
+          <span>定时发送时间（可选）</span>
           <input class="input" type="datetime-local" :value="scheduledAt" @input="emit('update:scheduled-at', ($event.target as HTMLInputElement).value)" />
+          <small>立即发送使用当前编辑内容；定时发送需先把当前内容保存为模板修订。</small>
         </label>
 
-        <button class="button primary" type="button" :disabled="!preview || busy" @click="emit('confirm-send')">确认发送范围与内容</button>
-      </aside>
+        <button class="button primary send-button" type="button" :disabled="recipientCount===undefined || !templateDraft.titleZhCn.trim() || !templateDraft.contentZhCn.trim() || busy" @click="emit('confirm-send')">{{ scheduledAt ? '确认创建定时发送任务' : '确认直接发送当前内容' }}</button>
+      </section>
     </div>
 
     <div v-if="canNotificationStatus" class="notification-task-section">
-      <div class="workspace-title"><strong>发送任务</strong><span>最近状态</span></div>
+      <div class="workspace-title"><div><strong>发送任务</strong><span>仅定时/异步模板任务会出现在这里</span></div></div>
       <div class="task-list">
         <article v-for="task in tasks" :key="String(task.id)">
           <strong>{{ task.task_status }}</strong>
@@ -129,5 +146,5 @@ function selectTemplate(item: DataObject) {
 </template>
 
 <style scoped>
-.governance-section{display:grid;gap:18px}.notification-workbench{display:grid;grid-template-columns:minmax(190px,.65fr) minmax(360px,1.35fr) minmax(320px,1fr);gap:14px;align-items:start}.notification-template-list,.notification-editor-column,.notification-recipient-column{display:grid;align-content:start;gap:12px;min-width:0;padding:14px;border:1px solid var(--border);border-radius:15px;background:var(--surface)}.workspace-title{display:flex;align-items:center;justify-content:space-between;gap:10px}.workspace-title span{color:var(--text-muted);font-size:11px}.template-revision-card{display:grid;gap:3px;width:100%;border:1px solid var(--border);border-radius:11px;padding:10px;background:var(--surface-soft);color:inherit;text-align:left;cursor:pointer}.template-revision-card.active{border-color:var(--primary);box-shadow:0 0 0 2px color-mix(in srgb,var(--primary) 12%,transparent)}.template-revision-card span,.template-revision-card small{color:var(--text-muted);font-size:11px}.preview-card{display:grid;gap:7px;padding:14px;border:1px solid var(--border);border-radius:13px;background:var(--surface-soft)}.preview-card h4,.preview-card p{margin:0}.schedule-field{display:grid;gap:6px}.notification-task-section{display:grid;gap:10px;padding-top:16px;border-top:1px solid var(--border)}.task-list{display:grid;gap:8px}.task-list article{display:flex;align-items:center;gap:12px;padding:11px;border:1px solid var(--border);border-radius:11px}.task-list article span{color:var(--text-muted);font-size:12px;flex:1}@media(max-width:1180px){.notification-workbench{grid-template-columns:220px 1fr}.notification-recipient-column{grid-column:1/-1}}@media(max-width:760px){.notification-workbench{grid-template-columns:1fr}.notification-recipient-column{grid-column:auto}.task-list article{align-items:flex-start;flex-direction:column}}
+.governance-section{display:grid;gap:18px}.notification-workbench{display:grid;grid-template-columns:1fr;gap:16px}.workspace-block{display:grid;align-content:start;gap:14px;min-width:0;padding:18px;border:1px solid var(--border);border-radius:16px;background:var(--surface)}.workspace-title{display:flex;align-items:center;justify-content:space-between;gap:12px}.workspace-title>div{display:grid;gap:3px}.workspace-title span{color:var(--text-muted);font-size:11px}.source-chip{padding:5px 9px;border-radius:999px;background:var(--surface-soft)}.template-strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:9px}.template-revision-card{display:grid;gap:3px;width:100%;border:1px solid var(--border);border-radius:11px;padding:11px;background:var(--surface-soft);color:inherit;text-align:left;cursor:pointer}.template-revision-card.active{border-color:var(--primary);box-shadow:0 0 0 2px color-mix(in srgb,var(--primary) 12%,transparent)}.template-revision-card span,.template-revision-card small{color:var(--text-muted);font-size:11px}.preview-card{display:grid;gap:8px;padding:15px;border:1px solid var(--border);border-radius:13px;background:var(--surface-soft)}.preview-heading{display:flex;align-items:center;justify-content:space-between;gap:10px}.preview-card h4,.preview-card p{margin:0}.preview-card p{white-space:pre-wrap;line-height:1.7}.preview-card details{display:grid;gap:7px;padding-top:8px;border-top:1px solid var(--border)}.schedule-field{display:grid;gap:6px}.schedule-field small{color:var(--text-muted)}.send-button{justify-self:start;min-width:220px}.notification-task-section{display:grid;gap:10px;padding-top:16px;border-top:1px solid var(--border)}.task-list{display:grid;gap:8px}.task-list article{display:flex;align-items:center;gap:12px;padding:11px;border:1px solid var(--border);border-radius:11px}.task-list article span{color:var(--text-muted);font-size:12px;flex:1}@media(max-width:760px){.workspace-title,.preview-heading{align-items:flex-start;flex-direction:column}.template-strip{grid-template-columns:1fr}.send-button{width:100%}.task-list article{align-items:flex-start;flex-direction:column}}
 </style>

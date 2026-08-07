@@ -19,7 +19,16 @@ checks = {
         'ROOM_ROWS_PER_PAGE = 4', 'roomColumnCount', 'roomPageSize', 'pagedRooms', 'totalRoomPages',
     )),
     'room filters reset pagination before slicing': all(token in compact_room_list for token in (
-        'watch([keyword,floorFilter,minimumAvailableBeds]', 'roomPage.value=1', 'sortedFilteredRooms',
+        'watch([buildingFilter,floorFilter,roomKeyword,minimumAvailableBeds]', 'roomPage.value=1', 'sortedFilteredRooms',
+    )),
+    'room filters use direct building floor and capacity options plus room keyword suggestions': all(token in room_list for token in (
+        'buildingFilter', 'buildingOptions', '全部楼栋', '全部楼层', 'roomKeyword',
+        'roomNumberSuggestions', 'list="room-number-options"', '<datalist id="room-number-options">',
+        '最低剩余床位', 'minimumAvailableBedOptions',
+    )),
+    'room number keyword is independent from building selection': "`${room.building_name} ${room.room_number}`" not in room_list and 'String(room.room_number' in room_list,
+    'room cards remove redundant occupancy and mode explanation text': all(token not in room_list for token in (
+        '在住 {{ room.activeResidentCount', "{{ isRoomMode?'选择寝室':'选择床位' }}", '个人模式显示你的匹配度；组队模式会分别计算每名已确认队友的匹配分。',
     )),
     'room cards are equal height and preference areas are height limited': all(token in compact_room_style for token in (
         '.room-list-page.room-card-grid{', '.room-list-page.room-selection-card{',
@@ -66,4 +75,4 @@ if failed:
     for label in failed:
         print(f'FAIL: {label}')
     raise SystemExit(1)
-print('Room pagination and exact exchange-search contract passed.')
+print('Room pagination, filter and exact exchange-search contract passed.')

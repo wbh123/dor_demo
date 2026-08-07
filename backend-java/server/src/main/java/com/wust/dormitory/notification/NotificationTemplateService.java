@@ -15,6 +15,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -59,6 +60,9 @@ public class NotificationTemplateService {
             CurrentUser operator) {
         featureAccessService.require(FeatureCodes.P3_NOTIFICATION_TEMPLATE_MANAGE);
         TemplateCommand normalized = command.normalized();
+        if (templateId == null && normalized.templateCode().isBlank()) {
+            normalized = normalized.withTemplateCode(nextTemplateCode());
+        }
         validate(normalized);
         long resolvedTemplateId = templateId == null
                 ? createTemplate(normalized, operator)
@@ -109,6 +113,7 @@ public class NotificationTemplateService {
                 .addValue("templateId", resolvedTemplateId));
         return Map.of(
                 "templateId", resolvedTemplateId,
+                "templateCode", normalized.templateCode(),
                 "revisionId", revisionId.longValue(),
                 "revision", revision,
                 "builtIn", false,
@@ -157,9 +162,14 @@ public class NotificationTemplateService {
         return key.longValue();
     }
 
+    private String nextTemplateCode() {
+        return "NTF-" + UUID.randomUUID().toString().replace("-", "")
+                .substring(0, 10).toUpperCase();
+    }
+
     private void validate(TemplateCommand command) {
         if (command.templateCode().isBlank() || command.templateName().isBlank()) {
-            throw new BusinessException("NOTIFICATION_TEMPLATE_REQUIRED", "模板编号和名称不能为空");
+            throw new BusinessException("NOTIFICATION_TEMPLATE_REQUIRED", "模板名称不能为空");
         }
         if (command.creationReason().length() < 2) {
             throw new BusinessException("NOTIFICATION_TEMPLATE_REASON_REQUIRED", "创建修订必须填写原因");
@@ -204,6 +214,12 @@ public class NotificationTemplateService {
             return new TemplateCommand(
                     clean(templateCode), clean(templateName), clean(titleZhCn), clean(contentZhCn),
                     clean(titleEnUs), clean(contentEnUs), enabled, clean(creationReason));
+        }
+
+        TemplateCommand withTemplateCode(String code) {
+            return new TemplateCommand(
+                    code, templateName, titleZhCn, contentZhCn,
+                    titleEnUs, contentEnUs, enabled, creationReason);
         }
 
         private static String clean(String value) {

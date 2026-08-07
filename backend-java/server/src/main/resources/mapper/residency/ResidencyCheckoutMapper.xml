@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.wust.dormitory.residency.ResidencyCheckoutMapper">
+    <insert id="appendAssignmentCancellation">
+        INSERT INTO assignment_history
+        (assignment_id, batch_id, student_id, bed_id, event_type,
+         assignment_method, operator_user_id, reason,
+         previous_data, current_data, occurred_at)
+        SELECT assignment.id, assignment.batch_id, assignment.student_id,
+               assignment.bed_id, 'CANCELLED', assignment.assignment_method,
+               #{operatorId}, #{reason},
+               JSON_OBJECT(
+                   'assignmentId', assignment.id,
+                   'batchId', assignment.batch_id,
+                   'studentId', assignment.student_id,
+                   'bedId', assignment.bed_id,
+                   'assignmentMethod', assignment.assignment_method,
+                   'assignmentStatus', assignment.assignment_status
+               ),
+               JSON_OBJECT('assignmentStatus', 'CANCELLED_BY_CHECKOUT'),
+               CURRENT_TIMESTAMP(3)
+        FROM bed_assignment assignment
+        WHERE assignment.batch_id=#{batchId}
+          AND assignment.student_id=#{studentId}
+          AND assignment.assignment_status='ACTIVE'
+    </insert>
+
+    <delete id="deleteActiveAssignment">
+        DELETE FROM bed_assignment
+        WHERE batch_id=#{batchId}
+          AND student_id=#{studentId}
+          AND assignment_status='ACTIVE'
+    </delete>
+</mapper>

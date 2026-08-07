@@ -24,8 +24,8 @@
         SELECT batch.id AS value,
                batch.batch_name AS label,
                CONCAT(batch.batch_status, ' · ',
-                      DATE_FORMAT(batch.open_at, '%Y-%m-%d %H:%i'), ' 至 ',
-                      DATE_FORMAT(batch.close_at, '%Y-%m-%d %H:%i')) AS description
+                      DATE_FORMAT(batch.start_at, '%Y-%m-%d %H:%i'), ' 至 ',
+                      DATE_FORMAT(batch.end_at, '%Y-%m-%d %H:%i')) AS description
         FROM selection_batch batch
         WHERE batch.batch_status NOT IN ('CANCELLED')
         ORDER BY batch.created_at DESC, batch.id DESC
@@ -46,5 +46,43 @@
                CASE WHEN building.enabled=1 THEN '正常开放' ELSE '已停用' END AS description
         FROM dormitory_building building
         ORDER BY building.enabled DESC, building.building_code
+    </select>
+
+    <select id="listGradeYears" resultType="map">
+        SELECT DISTINCT student.grade_year AS value,
+               CONCAT(student.grade_year, '级') AS label,
+               '按学生档案年级筛选' AS description
+        FROM student
+        WHERE student.grade_year IS NOT NULL
+        ORDER BY student.grade_year DESC
+    </select>
+
+    <select id="listDegreeLevels" resultType="map">
+        SELECT DISTINCT student.degree_level AS value,
+               CASE student.degree_level
+                 WHEN 'UNDERGRADUATE' THEN '本科生'
+                 WHEN 'MASTER' THEN '硕士研究生'
+                 WHEN 'DOCTOR' THEN '博士研究生'
+                 ELSE student.degree_level
+               END AS label,
+               '培养层次' AS description
+        FROM student
+        WHERE student.degree_level IS NOT NULL
+          AND TRIM(student.degree_level)&lt;&gt;''
+        ORDER BY student.degree_level
+    </select>
+
+    <select id="listStudentCategories" resultType="map">
+        SELECT DISTINCT student.student_category AS value,
+               CASE student.student_category
+                 WHEN 'DOMESTIC' THEN '国内生'
+                 WHEN 'INTERNATIONAL' THEN '国际生'
+                 ELSE student.student_category
+               END AS label,
+               '学生类别' AS description
+        FROM student
+        WHERE student.student_category IS NOT NULL
+          AND TRIM(student.student_category)&lt;&gt;''
+        ORDER BY student.student_category
     </select>
 </mapper>

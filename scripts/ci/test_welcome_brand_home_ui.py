@@ -13,13 +13,25 @@ welcome_logo_large = (
   or 'width:88px;height:88px;object-fit:contain' in shell
  )
 )
+horizontal_login_brand = all(token in login for token in (
+ 'assets/logo-title-right.png',
+ 'legacyBrandLogo',
+ 'fallbackBrandLogo',
+ 'brand-image-surface',
+ 'hero-brand-surface',
+ 'card-brand-surface',
+ 'background:#fff',
+ 'height:64px;object-fit:contain',
+ 'height:48px;object-fit:contain',
+))
 checks={
  'sanitized institution defaults': all('示例大学' in text for text in (shell,login,runner)),
- 'BASE-safe shell logo': "${publicBase}assert/logo-only.png" in shell and "import.meta.env.BASE_URL" in shell,
- 'no root-only logo path': "'/assert/logo-only.png'" not in shell,
+ 'BASE-safe shell logo': "${publicBase}assets/logo-only.png" in shell and "import.meta.env.BASE_URL" in shell,
+ 'public demo emblem fallback': "${publicBase}assert/logo-only.png" in shell and 'fallbackLogo' in shell,
+ 'no root-only logo path': "'/assets/logo-only.png'" not in shell,
  'welcome blocks router': '<RouterView v-if="!auth.welcomeRequired" />' in shell,
  'welcome heading row and content order': welcome_logo_large and all(token in shell for token in ('welcome-modal-heading','welcome-school-logo','welcome-modal-message','welcome-start-button')),
- 'large contain logos': 'width:60px;height:60px;object-fit:contain' in shell and welcome_logo_large and 'width:112px;height:112px;object-fit:contain' in login and 'width:72px;height:72px;object-fit:contain' in login,
+ 'horizontal high-contrast login brand': horizontal_login_brand,
  'assignment emphasis': all(token in home for token in ('assignment-building','assignment-room','assignment-bed','font-size:clamp(2.1rem')),
  'phone common modal': '<AppModal :open="showPhoneDialog"' in home,
  'real admin render': 'test_admin_data_render.mjs' in runner,
