@@ -31,7 +31,7 @@ function applyTheme() {
     <span>主题</span>
     <div class="theme-segment">
       <button type="button" :class="{active:theme==='blue'}" @click="setTheme('blue')">经典蓝</button>
-      <button type="button" :class="{active:theme==='green'}" @click="setTheme('green')">武科大绿</button>
+      <button type="button" :class="{active:theme==='green'}" @click="setTheme('green')">校园绿</button>
     </div>
   </div>
 </template>
