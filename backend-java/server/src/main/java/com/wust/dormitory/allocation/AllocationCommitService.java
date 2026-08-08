@@ -12,7 +12,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -22,18 +21,20 @@ import java.util.UUID;
 public class AllocationCommitService {
     private final AllocationCommitMapper mapper;
     private final AllocationSnapshotReader snapshotReader;
-    private final BaselineAllocationPlanner planner;
+    private final AssignmentWriteService assignmentWriteService;
+    private final BaselineAllocationPlanner planner = new BaselineAllocationPlanner();
     private final ObjectMapper objectMapper;
     private final AuditService auditService;
 
     public AllocationCommitService(
             AllocationCommitMapper mapper,
             AllocationSnapshotReader snapshotReader,
+            AssignmentWriteService assignmentWriteService,
             ObjectMapper objectMapper,
             AuditService auditService) {
         this.mapper = mapper;
         this.snapshotReader = snapshotReader;
-        this.planner = new BaselineAllocationPlanner();
+        this.assignmentWriteService = assignmentWriteService;
         this.objectMapper = objectMapper;
         this.auditService = auditService;
     }
@@ -81,40 +82,19 @@ public class AllocationCommitService {
         mapper.insertRun(run);
         long runId = generatedId(run, "统一分配运行");
 
-        Set<Long> completedTeams = new LinkedHashSet<>();
-        for (AllocationModels.AssignmentItem item : plan.assignments()) {
-            Map<String, Object> assignment = new HashMap<>();
-            assignment.put("batchId", batchId);
-            assignment.put("studentId", item.studentId());
-            assignment.put("bedId", item.bedId());
-            assignment.put("teamId", item.teamId());
-            assignment.put("runId", runId);
-            assignment.put("operatorId", operator.userId());
-            mapper.insertAssignment(assignment);
-            long assignmentId = generatedId(assignment, "床位分配");
-
-            mapper.insertAssignmentHistory(Map.of(
-                    "assignmentId", assignmentId,
-                    "batchId", batchId,
-                    "studentId", item.studentId(),
-                    "bedId", item.bedId(),
-                    "operatorId", operator.userId(),
-                    "reason", item.teamId() == null ? "统一分配学生" : "统一分配锁定队伍",
-                    "currentData", json(item.toMap())));
-            mapper.insertAssignedResult(Map.of(
-                    "runId", runId,
-                    "studentId", item.studentId(),
-                    "bedId", item.bedId(),
-                    "score", item.score(),
-                    "explanation", json(Map.of(
-                            "algorithm", BaselineAllocationPlanner.ALGORITHM_VERSION,
-                            "teamPreserved", item.teamId() != null,
-                            "genderMatched", true))));
-            if (item.teamId() != null) completedTeams.add(item.teamId());
-        }
-        if (!completedTeams.isEmpty()) mapper.completeTeams(List.copyOf(completedTeams));
+        List<AssignmentWriteService.WriteItem> writes = plan.assignments().stream()
+                .map(item -> new AssignmentWriteService.WriteItem(
+                        item.studentId(), item.bedId(), item.teamId(), item.toMap()))
+                .toList();
+        assignmentWriteService.write(
+                batchId,
+                writes,
+                "ADMIN_RANDOM",
+                runId,
+                operator.userId(),
+                "统一分配运行 " + runId);
+        insertAssignedResults(runId, plan.assignments());
         insertUnassigned(runId, plan.unassigned());
-        mapper.finishBatch(batchId);
 
         auditService.success(
                 operator,
@@ -131,6 +111,20 @@ public class AllocationCommitService {
         result.put("summary", plan.summary());
         result.put("unassigned", plan.unassigned().stream().map(AllocationModels.UnassignedItem::toMap).toList());
         return result;
+    }
+
+    private void insertAssignedResults(long runId, List<AllocationModels.AssignmentItem> assignments) {
+        for (AllocationModels.AssignmentItem item : assignments) {
+            mapper.insertAssignedResult(Map.of(
+                    "runId", runId,
+                    "studentId", item.studentId(),
+                    "bedId", item.bedId(),
+                    "score", item.score(),
+                    "explanation", json(Map.of(
+                            "algorithm", BaselineAllocationPlanner.ALGORITHM_VERSION,
+                            "teamPreserved", item.teamId() != null,
+                            "genderMatched", true))));
+        }
     }
 
     private void insertUnassigned(long runId, List<AllocationModels.UnassignedItem> unassigned) {
