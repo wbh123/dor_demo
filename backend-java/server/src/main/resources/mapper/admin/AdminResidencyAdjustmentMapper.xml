@@ -11,6 +11,9 @@
                    room.room_number, room.capacity, room.resident_scope,
                    floor.floor_number, building.id AS building_id,
                    building.building_code, building.building_name,
+                   CASE WHEN #{currentBedId,jdbcType=BIGINT} IS NULL THEN 0 ELSE 1 END AS current_bed_present,
+                   (SELECT COUNT(*) FROM room_assignment resident
+                    WHERE resident.room_id=room.id AND resident.assignment_status='ACTIVE') AS active_resident_count,
                    EXISTS(SELECT 1 FROM active_batch_room_lock room_lock WHERE room_lock.room_id=room.id) AS room_locked,
                    CASE
                      WHEN EXISTS (SELECT 1 FROM room_exchange_participant_lock exchange_lock JOIN room_assignment exchange_residency ON exchange_residency.student_id=exchange_lock.student_id AND exchange_residency.assignment_status='ACTIVE' AND exchange_residency.bed_id=bed.id) THEN 'ROOM_EXCHANGE'
@@ -37,7 +40,6 @@
               AND room.gender_restriction=student.gender
               AND ((student.student_category='DOMESTIC' AND room.resident_scope IN ('DOMESTIC_ONLY','MIXED')) OR (student.student_category='INTERNATIONAL' AND room.resident_scope IN ('INTERNATIONAL_ONLY','MIXED')))
               AND (#{currentBedId,jdbcType=BIGINT} IS NULL OR bed.id&lt;&gt;#{currentBedId,jdbcType=BIGINT})
-              AND (room.id=#{currentRoomId} OR (SELECT COUNT(*) FROM room_assignment resident WHERE resident.room_id=room.id AND resident.assignment_status='ACTIVE') &lt; room.capacity)
         )
         SELECT compatible_beds.*,
                CASE WHEN compatible_beds.occupancy_source='AVAILABLE' THEN 0 ELSE 1 END AS occupied,
@@ -52,10 +54,18 @@
                  WHEN compatible_beds.occupancy_source='PENDING_CONFIRMATION' THEN CONCAT('该床位正在等待',COALESCE(occupant.student_name,'学生'),'核查，暂不能调整')
                  ELSE NULL
                END AS blocking_reason,
-               CASE WHEN compatible_beds.room_locked=0 AND compatible_beds.occupancy_source IN ('AVAILABLE','RESIDENCY','ALLOCATION') THEN 1 ELSE 0 END AS selectable,
-               CASE WHEN compatible_beds.occupancy_source IN ('RESIDENCY','ALLOCATION') THEN 1 ELSE 0 END AS swap_required
+               CASE
+                 WHEN compatible_beds.room_locked=0
+                      AND (compatible_beds.occupancy_source='AVAILABLE'
+                           OR (compatible_beds.current_bed_present=1 AND compatible_beds.occupancy_source IN ('RESIDENCY','ALLOCATION')))
+                 THEN 1 ELSE 0
+               END AS selectable,
+               CASE WHEN compatible_beds.current_bed_present=1 AND compatible_beds.occupancy_source IN ('RESIDENCY','ALLOCATION') THEN 1 ELSE 0 END AS swap_required
         FROM compatible_beds
         LEFT JOIN student occupant ON occupant.id=compatible_beds.occupant_student_id
+        WHERE (#{currentRoomId,jdbcType=BIGINT} IS NOT NULL AND compatible_beds.room_id=#{currentRoomId,jdbcType=BIGINT})
+           OR compatible_beds.active_resident_count &lt; compatible_beds.capacity
+           OR (compatible_beds.current_bed_present=1 AND compatible_beds.occupancy_source IN ('RESIDENCY','ALLOCATION'))
         ORDER BY compatible_beds.building_code,compatible_beds.floor_number,compatible_beds.room_number,compatible_beds.bed_code
     </select>
 </mapper>
