@@ -1,0 +1,2 @@
+Private compatibility trigger for fix/student-immutable-random-reselect-20260808.
+Do not merge this branch; it only asks the public workflow to checkout and verify the private integration ref.
