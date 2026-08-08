@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.wust.dormitory.importworkflow.mapper.ImportRollbackMapper">
+    <delete id="deleteStudentUser">
+        DELETE FROM app_user
+        WHERE student_id = #{studentId}
+    </delete>
+
+    <delete id="deleteStudent">
+        DELETE FROM student
+        WHERE id = #{studentId}
+    </delete>
+
+    <update id="restoreStudent" parameterType="map">
+        UPDATE student
+        SET student_number = #{studentNumber},
+            student_name = #{studentName},
+            gender = #{gender},
+            major_id = #{majorId},
+            nationality_code = #{nationalityCode},
+            student_category = #{studentCategory},
+            enrollment_source = #{enrollmentSource},
+            phone_number = #{phoneNumber},
+            degree_level = #{degreeLevel},
+            grade_year = #{gradeYear}
+        WHERE id = #{studentId}
+    </update>
+
+    <update id="restoreUser" parameterType="map">
+        UPDATE app_user
+        SET username = #{username},
+            display_name = #{displayName},
+            account_status = #{accountStatus},
+            password_hash = #{passwordHash},
+            user_type = #{userType}
+        WHERE student_id = #{studentId}
+    </update>
+
+    <delete id="deleteRoomBeds">
+        DELETE FROM bed
+        WHERE room_id = #{roomId}
+    </delete>
+
+    <delete id="deleteRoom">
+        DELETE FROM room
+        WHERE id = #{roomId}
+    </delete>
+
+    <delete id="deleteFloorIfEmpty">
+        DELETE floor
+        FROM dormitory_floor floor
+        LEFT JOIN room current_room ON current_room.floor_id = floor.id
+        WHERE floor.id = #{floorId}
+          AND current_room.id IS NULL
+    </delete>
+
+    <delete id="deleteBuildingIfEmpty">
+        DELETE building
+        FROM dormitory_building building
+        LEFT JOIN dormitory_floor floor ON floor.building_id = building.id
+        WHERE building.id = #{buildingId}
+          AND floor.id IS NULL
+    </delete>
+
+    <update id="restoreRoom" parameterType="map">
+        UPDATE room
+        SET room_type = #{roomType},
+            capacity = #{capacity},
+            gender_restriction = #{genderRestriction},
+            resident_scope = #{residentScope},
+            operational_status = #{operationalStatus},
+            remark = #{remark},
+            state_version = state_version + 1
+        WHERE id = #{roomId}
+    </update>
+</mapper>

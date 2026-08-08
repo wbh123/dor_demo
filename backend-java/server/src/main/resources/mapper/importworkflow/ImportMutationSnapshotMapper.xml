@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.wust.dormitory.importworkflow.mapper.ImportMutationSnapshotMapper">
+    <sql id="studentSnapshotColumns">
+        SELECT s.id AS studentId,
+               s.student_number AS studentNumber,
+               s.student_name AS studentName,
+               s.gender AS gender,
+               s.major_id AS majorId,
+               s.nationality_code AS nationalityCode,
+               s.student_category AS studentCategory,
+               s.enrollment_source AS enrollmentSource,
+               s.phone_number AS phoneNumber,
+               s.degree_level AS degreeLevel,
+               s.grade_year AS gradeYear,
+               u.id AS userId,
+               u.username AS username,
+               u.display_name AS displayName,
+               u.account_status AS accountStatus,
+               u.password_hash AS passwordHash,
+               u.user_type AS userType
+        FROM student s
+        LEFT JOIN app_user u ON u.student_id = s.id
+    </sql>
+
+    <select id="findStudentSnapshotByNumber" resultType="map">
+        <include refid="studentSnapshotColumns"/>
+        WHERE s.student_number = #{studentNumber}
+    </select>
+
+    <select id="findStudentSnapshot" resultType="map">
+        <include refid="studentSnapshotColumns"/>
+        WHERE s.id = #{studentId}
+    </select>
+
+    <select id="findRoomSnapshot" resultType="map">
+        SELECT id AS roomId,
+               floor_id AS floorId,
+               room_number AS roomNumber,
+               room_type AS roomType,
+               capacity AS capacity,
+               gender_restriction AS genderRestriction,
+               resident_scope AS residentScope,
+               operational_status AS operationalStatus,
+               remark AS remark,
+               state_version AS stateVersion
+        FROM room
+        WHERE id = #{roomId}
+    </select>
+
+    <select id="countActiveResidents" resultType="int">
+        SELECT COUNT(*)
+        FROM room_assignment
+        WHERE room_id = #{roomId}
+          AND assignment_status = 'ACTIVE'
+    </select>
+</mapper>

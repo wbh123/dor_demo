@@ -1,10 +1,10 @@
 package com.wust.dormitory.admin;
 
 import com.wust.dormitory.admin.mapper.RoomCatalogMapper;
+import com.wust.dormitory.admin.mapper.RoomManagementMapper;
 import com.wust.dormitory.admin.model.persistence.RoomCatalogRow;
 import com.wust.dormitory.audit.AuditService;
 import org.junit.jupiter.api.Test;
-import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 
 import java.util.List;
 import java.util.Map;
@@ -18,7 +18,7 @@ import static org.mockito.Mockito.when;
 class RoomManagementQueryServiceTest {
     @Test
     void roomListUsesTypedMapperAndPreservesExistingResponseKeys() {
-        NamedParameterJdbcTemplate jdbc = mock(NamedParameterJdbcTemplate.class);
+        RoomManagementMapper managementMapper = mock(RoomManagementMapper.class);
         AuditService auditService = mock(AuditService.class);
         RoomCatalogMapper mapper = mock(RoomCatalogMapper.class);
         RoomCatalogRow row = new RoomCatalogRow(
@@ -49,7 +49,7 @@ class RoomManagementQueryServiceTest {
         when(mapper.findRooms(2L, "F")).thenReturn(List.of(row));
 
         RoomManagementService service =
-                new RoomManagementService(jdbc, auditService, mapper);
+                new RoomManagementService(managementMapper, auditService, mapper);
         List<Map<String, Object>> result = service.rooms(2L, "F");
 
         verify(mapper).findRooms(2L, "F");
