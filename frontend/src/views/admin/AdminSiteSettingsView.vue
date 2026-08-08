@@ -4,9 +4,11 @@ import AdminThemeToggle from '../../components/admin/AdminThemeToggle.vue'
 import { api } from '../../api/client'
 import type { DataObject, ObjectSuccessResponse } from '../../api/types'
 import { useI18n } from '../../i18n'
+import { normalizeSiteTheme, type SiteTheme } from '../../site/theme'
 
 const state = reactive({ html: '', imageUrl: '' })
 const editable = ref(false)
+const theme = ref<SiteTheme>('blue')
 const loading = ref(true)
 const saving = ref(false)
 const error = ref('')
@@ -25,6 +27,7 @@ async function load() {
     state.html = String(login.html ?? '')
     state.imageUrl = String(login.imageUrl ?? '')
     editable.value = Boolean(data.editable)
+    theme.value = normalizeSiteTheme(data.theme)
   } catch (reason) { error.value = translateError(reason) }
   finally { loading.value = false }
 }
@@ -46,7 +49,7 @@ function escapeAttribute(value: string) {
   <div class="content-column">
     <header class="page-title"><span class="eyebrow">界面与登录页</span><h2>站点展示设置</h2><p>主题设置统一作用于管理端、学生端与登录页；登录页内容需系统管理员授权后才能修改。</p></header>
     <p v-if="error" class="alert error">{{ error }}</p><p v-if="message" class="alert success">{{ message }}</p>
-    <section class="panel"><div class="section-head"><div><span class="eyebrow">界面主题</span><h3>全系统主题</h3></div></div><AdminThemeToggle /></section>
+    <section class="panel"><div class="section-head"><div><span class="eyebrow">界面主题</span><h3>全系统主题</h3></div></div><AdminThemeToggle v-model="theme" /></section>
     <section class="panel">
       <div class="section-head split-title"><div><span class="eyebrow">登录页左侧</span><h3>内置 HTML 展示区域</h3><p>内容在隔离的内置框架中展示，不显示外部边框和滚动条。</p></div><span class="status-chip" :class="{success:editable}">{{ editable ? '已授权修改' : '等待系统管理员授权' }}</span></div>
       <p v-if="loading" class="empty-state">正在读取登录页设置…</p>

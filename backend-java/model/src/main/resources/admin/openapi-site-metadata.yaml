@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: Wust Dormitory Select 站点元数据接口
-  version: 1.0.0
+  version: 1.1.0
 paths:
   /api/v1/public/site-config:
     get:
@@ -24,7 +24,7 @@ paths:
         - bearerAuth: []
       responses:
         '200':
-          description: 当前登录页配置及是否可编辑
+          description: 当前登录页配置、学校主题及是否可编辑
           content:
             application/json:
               schema:
@@ -46,6 +46,29 @@ paths:
       responses:
         '200':
           description: 更新后的登录页配置
+          content:
+            application/json:
+              schema:
+                $ref: '../common-response/openapi-common-response.yaml#/components/schemas/ObjectSuccessResponse'
+        '400': { $ref: '#/components/responses/ErrorResponse' }
+        '401': { $ref: '#/components/responses/ErrorResponse' }
+        '403': { $ref: '#/components/responses/ErrorResponse' }
+  /api/v1/admin/settings/theme:
+    put:
+      tags: [AdminSiteMetadata]
+      operationId: updateAdminThemeSetting
+      summary: 更新学校级界面主题
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SchoolThemeUpdateRequest'
+      responses:
+        '200':
+          description: 更新后的学校主题
           content:
             application/json:
               schema:
@@ -111,6 +134,13 @@ components:
         imageUrl:
           type: string
           maxLength: 500
+    SchoolThemeUpdateRequest:
+      type: object
+      required: [theme]
+      properties:
+        theme:
+          type: string
+          enum: [blue, green]
     SiteBrandingUpdateRequest:
       type: object
       required: [schoolName]

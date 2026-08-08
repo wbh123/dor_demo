@@ -12,13 +12,25 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.LinkedHashMap;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Service
 public class SiteMetadataService {
     private static final String BRANDING_KEY = "SITE_BRANDING";
     private static final String LOGIN_CONTENT_KEY = "LOGIN_LEFT_CONTENT";
     private static final String LOGIN_ADMIN_EDITABLE_KEY = "LOGIN_LEFT_ADMIN_EDITABLE";
+    private static final String SITE_THEME = "SITE_THEME";
+    private static final Set<String> LOGIN_HTML_ALLOWED_TAGS = Set.of(
+            "h1", "h2", "h3", "h4",
+            "p", "ul", "ol", "li",
+            "strong", "em", "b", "i",
+            "br", "span", "div", "small", "blockquote", "hr");
+    private static final Pattern LOGIN_HTML_TAG_PATTERN = Pattern.compile(
+            "(?is)<\\s*(/?)\\s*([a-z][a-z0-9]*)\\s*([^>]*)>");
 
     private final SiteMetadataMapper mapper;
     private final ObjectMapper objectMapper;
@@ -40,6 +52,7 @@ public class SiteMetadataService {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("branding", branding());
         result.put("login", loginContent());
+        result.put("theme", theme());
         return result;
     }
 
@@ -53,6 +66,7 @@ public class SiteMetadataService {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("login", loginContent());
         result.put("editable", schoolAdminEditable());
+        result.put("theme", theme());
         return result;
     }
 
@@ -102,6 +116,24 @@ public class SiteMetadataService {
         return after;
     }
 
+    @Transactional
+    public Map<String, Object> updateThemeForSchoolAdmin(
+            String requestedTheme,
+            CurrentUser operator) {
+        String before = theme();
+        String after = validateTheme(requestedTheme);
+        mapper.upsert(SITE_THEME, after, operator.userId());
+        auditService.success(
+                operator,
+                "SITE_THEME_UPDATE",
+                "SYSTEM_SETTING",
+                null,
+                "学校管理员修改学校主题",
+                Map.of("theme", before),
+                Map.of("theme", after));
+        return Map.of("theme", after);
+    }
+
     private Map<String, Object> branding() {
         Map<String, String> defaults = new LinkedHashMap<>();
         defaults.put("schoolName", defaultSchoolName);
@@ -114,11 +146,22 @@ public class SiteMetadataService {
         Map<String, String> defaults = new LinkedHashMap<>();
         defaults.put("html", "<h1>宿舍智能选择系统</h1><p>查看开放批次、完善个人偏好，并在开放时段完成寝室选择。</p>");
         defaults.put("imageUrl", "");
-        return readObject(LOGIN_CONTENT_KEY, defaults);
+        Map<String, Object> configured = readObject(LOGIN_CONTENT_KEY, defaults);
+        Object htmlValue = configured.get("html");
+        try {
+            validateSafeLoginHtml(htmlValue instanceof String ? (String) htmlValue : "");
+            return configured;
+        } catch (BusinessException ignored) {
+            return new LinkedHashMap<>(defaults);
+        }
     }
 
     private boolean schoolAdminEditable() {
         return Boolean.parseBoolean(String.valueOf(mapper.findValue(LOGIN_ADMIN_EDITABLE_KEY)));
+    }
+
+    private String theme() {
+        return "green".equals(clean(mapper.findValue(SITE_THEME))) ? "green" : "blue";
     }
 
     private Map<String, Object> readObject(String key, Map<String, String> defaults) {
@@ -151,10 +194,48 @@ public class SiteMetadataService {
         if (command == null) throw new BusinessException("LOGIN_CONTENT_REQUIRED", "请填写登录页展示内容");
         String html = bounded(command.html(), 8000, "登录页HTML内容最多8000个字符");
         if (html.isEmpty()) throw new BusinessException("LOGIN_CONTENT_REQUIRED", "登录页HTML内容不能为空");
+        validateSafeLoginHtml(html);
         Map<String, String> result = new LinkedHashMap<>();
         result.put("html", html);
         result.put("imageUrl", bounded(command.imageUrl(), 500, "登录页图片地址最多500个字符"));
         return result;
+    }
+
+    private void validateSafeLoginHtml(String html) {
+        Matcher matcher = LOGIN_HTML_TAG_PATTERN.matcher(html);
+        int cursor = 0;
+        while (matcher.find()) {
+            if (html.substring(cursor, matcher.start()).indexOf('<') >= 0) {
+                throw unsafeLoginHtml();
+            }
+            boolean closing = !matcher.group(1).isEmpty();
+            String tag = matcher.group(2).toLowerCase(Locale.ROOT);
+            String suffix = matcher.group(3).trim();
+            if (!LOGIN_HTML_ALLOWED_TAGS.contains(tag)) {
+                throw unsafeLoginHtml();
+            }
+            if (closing ? !suffix.isEmpty() : (!suffix.isEmpty() && !"/".equals(suffix))) {
+                throw unsafeLoginHtml();
+            }
+            cursor = matcher.end();
+        }
+        if (html.substring(cursor).indexOf('<') >= 0) {
+            throw unsafeLoginHtml();
+        }
+    }
+
+    private BusinessException unsafeLoginHtml() {
+        return new BusinessException(
+                "LOGIN_CONTENT_UNSAFE",
+                "登录页HTML仅支持标题、段落、列表和基础文本格式，不允许脚本、事件属性或可执行嵌入内容");
+    }
+
+    private String validateTheme(String value) {
+        String normalized = clean(value).toLowerCase(Locale.ROOT);
+        if (!"blue".equals(normalized) && !"green".equals(normalized)) {
+            throw new BusinessException("SITE_THEME_INVALID", "界面主题仅支持经典蓝或校园绿");
+        }
+        return normalized;
     }
 
     private String bounded(String value, int maximum, String message) {

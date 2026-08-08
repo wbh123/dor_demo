@@ -4,6 +4,7 @@ import com.wust.dormitory.common.response.ResponseFactory;
 import com.wust.dormitory.model.api.AdminSiteMetadataApi;
 import com.wust.dormitory.model.dto.LoginPageContentUpdateRequest;
 import com.wust.dormitory.model.dto.ObjectSuccessResponse;
+import com.wust.dormitory.model.dto.SchoolThemeUpdateRequest;
 import com.wust.dormitory.security.SecurityUsers;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
@@ -30,5 +31,14 @@ public class AdminLoginPageSettingController implements AdminSiteMetadataApi {
                 request.getImageUrl());
         return ResponseEntity.ok(ResponseFactory.object(
                 service.updateLoginForSchoolAdmin(command, SecurityUsers.requireAdmin())));
+    }
+
+    @Override
+    public ResponseEntity<ObjectSuccessResponse> updateAdminThemeSetting(
+            SchoolThemeUpdateRequest request) {
+        return ResponseEntity.ok(ResponseFactory.object(
+                service.updateThemeForSchoolAdmin(
+                        request.getTheme().getValue(),
+                        SecurityUsers.requireAdmin())));
     }
 }

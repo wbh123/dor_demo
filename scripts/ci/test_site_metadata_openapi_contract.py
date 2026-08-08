@@ -5,6 +5,8 @@ ROOT = Path(__file__).resolve().parents[2]
 INTERFACE = ROOT / "backend-java/model/src/main/resources/openapi-interface.yaml"
 SITE_SPEC = ROOT / "backend-java/model/src/main/resources/admin/openapi-site-metadata.yaml"
 STUDENT_CATALOG_SPEC = ROOT / "backend-java/model/src/main/resources/admin/openapi-student-catalog.yaml"
+SITE_SERVICE = ROOT / "backend-java/server/src/main/java/com/wust/dormitory/admin/SiteMetadataService.java"
+ADMIN_SITE_CONTROLLER = ROOT / "backend-java/server/src/main/java/com/wust/dormitory/admin/AdminLoginPageSettingController.java"
 
 interface = INTERFACE.read_text(encoding="utf-8")
 
@@ -13,6 +15,8 @@ required_refs = (
     "admin/openapi-site-metadata.yaml#/paths/~1api~1v1~1public~1site-config",
     "/api/v1/admin/settings/login-page:",
     "admin/openapi-site-metadata.yaml#/paths/~1api~1v1~1admin~1settings~1login-page",
+    "/api/v1/admin/settings/theme:",
+    "admin/openapi-site-metadata.yaml#/paths/~1api~1v1~1admin~1settings~1theme",
     "/api/v1/platform/site-metadata:",
     "admin/openapi-site-metadata.yaml#/paths/~1api~1v1~1platform~1site-metadata",
     "/api/v1/admin/student-catalog:",
@@ -32,10 +36,13 @@ for token in (
     "operationId: getPublicSiteConfig",
     "operationId: getAdminLoginPageSetting",
     "operationId: updateAdminLoginPageSetting",
+    "operationId: updateAdminThemeSetting",
     "operationId: getPlatformSiteMetadata",
     "operationId: updatePlatformSiteMetadata",
     "PlatformSiteMetadataUpdateRequest:",
     "LoginPageContentUpdateRequest:",
+    "SchoolThemeUpdateRequest:",
+    "enum: [blue, green]",
 ):
     if token not in site_spec:
         raise AssertionError(f"站点元数据 OpenAPI 缺少：{token}")
@@ -76,4 +83,16 @@ for relative, tokens in controllers.items():
     if "@RequestMapping(" in text or "@GetMapping" in text or "@PutMapping" in text:
         raise AssertionError(f"{relative} 仍在绕过 OpenAPI 手写路由注解")
 
-print("Site metadata and admin student catalog OpenAPI contract passed")
+service = SITE_SERVICE.read_text(encoding="utf-8")
+admin_controller = ADMIN_SITE_CONTROLLER.read_text(encoding="utf-8")
+for token in (
+    'SITE_THEME',
+    'result.put("theme", theme())',
+    'updateThemeForSchoolAdmin',
+):
+    if token not in service:
+        raise AssertionError(f"站点元数据服务缺少学校级主题能力：{token}")
+if "updateAdminThemeSetting" not in admin_controller:
+    raise AssertionError("学校管理员站点 Controller 尚未实现生成式主题更新端点")
+
+print("Site metadata, school theme and admin student catalog OpenAPI contract passed")
