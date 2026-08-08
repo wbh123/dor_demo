@@ -1,4 +1,4 @@
 private-ref: fix/student-immutable-random-reselect-20260808
 private-base: 5fa97d3fa1788ad7459d4d7b981f349bb7246ecb
-private-head: 4d3e8d22da90ab8472a497ae7a457d3c4e3a1e76
-purpose: validate immutable student identity, integrated random-selection button, exchange building dropdown, cancellation reselection, extra-compact building cards, and system-admin theme authorization entry against latest private main
+private-head: 1b7a70734d12b8747bbb813495f560c8a56ae349
+purpose: validate immutable student identity, integrated random-selection button, exchange building dropdown, cancellation reselection via MyBatis, extra-compact building cards, and system-admin theme authorization entry against latest private main
