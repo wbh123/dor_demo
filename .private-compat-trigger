@@ -1,2 +1,2 @@
 private_ref=feat/redis-selection-runtime-20260808
-run=green-reservation-state-machine
+run=red-room-reservation
