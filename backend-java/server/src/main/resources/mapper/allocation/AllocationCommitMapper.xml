@@ -51,7 +51,7 @@
          allocation_run_id, assigned_by, assigned_at)
         VALUES
         (#{batchId}, #{studentId}, #{bedId}, #{teamId},
-         'ADMIN_RANDOM', 'ACTIVE', #{runId}, #{operatorId}, CURRENT_TIMESTAMP(3))
+         #{assignmentMethod}, 'ACTIVE', #{allocationRunId}, #{operatorId}, CURRENT_TIMESTAMP(3))
     </insert>
 
     <insert id="insertAssignmentHistory" parameterType="map">
@@ -61,7 +61,7 @@
          reason, current_data, occurred_at)
         VALUES
         (#{assignmentId}, #{batchId}, #{studentId}, #{bedId},
-         'CREATED', 'ADMIN_RANDOM', #{operatorId}, #{reason},
+         'CREATED', #{assignmentMethod}, #{operatorId}, #{reason},
          CAST(#{currentData} AS JSON), CURRENT_TIMESTAMP(3))
     </insert>
 
