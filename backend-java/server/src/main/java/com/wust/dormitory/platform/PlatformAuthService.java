@@ -62,11 +62,8 @@ public class PlatformAuthService {
         validateNewPassword(newPassword);
         String hash = jdbc.queryForObject("SELECT password_hash FROM app_user WHERE id=:id",
                 Map.of("id", user.userId()), String.class);
-        if (hash == null || !passwordEncoder.matches(currentPassword, hash)) {
+        if (hash == null || currentPassword == null || !passwordEncoder.matches(currentPassword, hash)) {
             throw new BusinessException("CURRENT_PASSWORD_INVALID", "当前密码不正确", HttpStatus.BAD_REQUEST);
-        }
-        if (passwordEncoder.matches(newPassword, hash)) {
-            throw new BusinessException("PASSWORD_NOT_CHANGED", "新密码不能与当前密码相同");
         }
         jdbc.update("""
                 UPDATE app_user
@@ -80,12 +77,8 @@ public class PlatformAuthService {
     }
 
     private void validateNewPassword(String password) {
-        if (password == null || password.length() < 12
-                || !password.matches(".*[A-Z].*")
-                || !password.matches(".*[a-z].*")
-                || !password.matches(".*\\d.*")
-                || !password.matches(".*[^A-Za-z0-9].*")) {
-            throw new BusinessException("PASSWORD_WEAK", "密码至少12位，并包含大小写字母、数字和特殊字符");
+        if (password == null || password.isBlank()) {
+            throw new BusinessException("PASSWORD_REQUIRED", "请输入新密码");
         }
     }
 

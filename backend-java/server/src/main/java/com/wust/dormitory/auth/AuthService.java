@@ -73,6 +73,9 @@ public class AuthService {
         if (rows.isEmpty() || !studentName.equals(String.valueOf(rows.getFirst().get("student_name")))) {
             throw new BusinessException("ACTIVATION_INVALID", "学号或姓名不匹配");
         }
+        if (password == null || password.isBlank()) {
+            throw new BusinessException("PASSWORD_REQUIRED", "请输入密码");
+        }
         Map<String, Object> row = rows.getFirst();
         if (row.get("password_hash") != null && "ACTIVE".equals(String.valueOf(row.get("account_status")))) {
             throw new BusinessException("ACCOUNT_ALREADY_ACTIVE", "该学生账号已经激活");
@@ -93,13 +96,8 @@ public class AuthService {
         if (user == null || !"ADMIN".equals(user.userType())) {
             throw new BusinessException("ADMIN_PASSWORD_FORBIDDEN", "只有学校管理员可以在此修改密码", HttpStatus.FORBIDDEN);
         }
-        if (newPassword == null || newPassword.length() < 12 || newPassword.length() > 72
-                || !newPassword.matches(".*[A-Z].*")
-                || !newPassword.matches(".*[a-z].*")
-                || !newPassword.matches(".*[0-9].*")
-                || !newPassword.matches(".*[^A-Za-z0-9].*")) {
-            throw new BusinessException("PASSWORD_POLICY_INVALID",
-                    "新密码需为12至72位，并同时包含大写字母、小写字母、数字和特殊字符");
+        if (newPassword == null || newPassword.isBlank()) {
+            throw new BusinessException("PASSWORD_REQUIRED", "请输入新密码");
         }
         String hash = jdbc.queryForObject("SELECT password_hash FROM app_user WHERE id=:id",
                 Map.of("id", user.userId()), String.class);
