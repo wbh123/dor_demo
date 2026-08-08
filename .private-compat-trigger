@@ -1,0 +1,3 @@
+private-ref: integration/site-theme-login-second-batch-20260808
+private-base: 16bcbc47ea7b5c62576621bbf12d64ac1ca6596c
+purpose: validate latest private second-batch red contract against current private main baseline
