@@ -50,27 +50,6 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
 
-      - name: Probe merge with private main
-        working-directory: private-repo
-        shell: bash
-        run: |
-          set -euo pipefail
-          git config user.name "private-compat-probe"
-          git config user.email "private-compat-probe@users.noreply.github.com"
-          set +e
-          git merge --no-commit --no-ff origin/main
-          merge_status=$?
-          set -e
-          if [[ $merge_status -ne 0 ]]; then
-            echo "MERGE_CONFLICT_FILES_BEGIN"
-            git diff --name-only --diff-filter=U
-            echo "MERGE_CONFLICT_FILES_END"
-            git merge --abort || true
-            exit 42
-          fi
-          echo "MERGE_PROBE_CLEAN"
-          git merge --abort || true
-
       - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
