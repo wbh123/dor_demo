@@ -13,9 +13,11 @@ for field in ['batchIds', 'majorIds', 'buildingIds', 'gradeYears', 'degreeLevels
 
 assert '/api/v1/admin/governance/notifications/recipients/count:' in openapi, 'recipient-count endpoint must be part of OpenAPI'
 assert '/api/v1/admin/governance/notifications/direct:' in openapi, 'direct notification endpoint must be part of OpenAPI'
+assert 'NotificationPreflightRequest:' in openapi, 'preview must use a request schema that does not require a send reason'
+preflight_path = openapi[openapi.index('/api/v1/admin/governance/notifications/preflight:'):]
+preflight_path = preflight_path[:preflight_path.index('/api/v1/admin/governance/notifications/schedule:')]
+assert 'NotificationPreflightRequest' in preflight_path
 
 preflight_marker = "'/api/v1/admin/governance/notifications/preflight'"
-assert preflight_marker in dialog
-preflight = dialog[dialog.index(preflight_marker):dialog.index(preflight_marker) + 900]
-assert 'reason:' in preflight, 'single-student template preview must send the required reason'
+assert preflight_marker in dialog, 'student private-message template mode must support preview'
 print('Notification recipient contract synchronization passed')
