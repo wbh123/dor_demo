@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.wust.dormitory.admin.mapper.BatchLifecycleMapper">
+    <select id="lockBatch" resultType="map">
+        SELECT id,
+               batch_status,
+               selection_mode,
+               separate_student_categories
+        FROM selection_batch
+        WHERE id = #{batchId}
+        FOR UPDATE
+    </select>
+
+    <update id="updateStatus">
+        UPDATE selection_batch
+        SET batch_status = #{status},
+            published_at = CASE
+                WHEN #{status} = 'PUBLISHED' THEN COALESCE(published_at, CURRENT_TIMESTAMP(3))
+                ELSE published_at
+            END,
+            finished_at = CASE
+                WHEN #{status} = 'FINISHED' THEN COALESCE(finished_at, CURRENT_TIMESTAMP(3))
+                ELSE finished_at
+            END
+        WHERE id = #{batchId}
+    </update>
+
+    <insert id="insertStudentLocks">
+        INSERT INTO active_batch_student_lock (student_id, batch_id)
+        SELECT student_id, batch_id
+        FROM batch_student_eligibility
+        WHERE batch_id = #{batchId}
+          AND eligibility_status = 'ELIGIBLE'
+    </insert>
+
+    <delete id="deleteStudentLocks">
+        DELETE FROM active_batch_student_lock
+        WHERE batch_id = #{batchId}
+    </delete>
+</mapper>
