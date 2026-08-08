@@ -10,6 +10,6 @@ import java.util.Map;
 public interface AdminResidencyAdjustmentMapper {
     List<Map<String, Object>> findCompatibleBeds(
             @Param("studentId") long studentId,
-            @Param("currentRoomId") long currentRoomId,
+            @Param("currentRoomId") Long currentRoomId,
             @Param("currentBedId") Long currentBedId);
 }
