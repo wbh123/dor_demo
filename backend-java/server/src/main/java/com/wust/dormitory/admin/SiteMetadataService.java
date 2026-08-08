@@ -19,6 +19,7 @@ public class SiteMetadataService {
     private static final String BRANDING_KEY = "SITE_BRANDING";
     private static final String LOGIN_CONTENT_KEY = "LOGIN_LEFT_CONTENT";
     private static final String LOGIN_ADMIN_EDITABLE_KEY = "LOGIN_LEFT_ADMIN_EDITABLE";
+    private static final String SITE_THEME = "SITE_THEME";
 
     private final SiteMetadataMapper mapper;
     private final ObjectMapper objectMapper;
@@ -40,6 +41,7 @@ public class SiteMetadataService {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("branding", branding());
         result.put("login", loginContent());
+        result.put("theme", theme());
         return result;
     }
 
@@ -53,6 +55,7 @@ public class SiteMetadataService {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("login", loginContent());
         result.put("editable", schoolAdminEditable());
+        result.put("theme", theme());
         return result;
     }
 
@@ -102,6 +105,24 @@ public class SiteMetadataService {
         return after;
     }
 
+    @Transactional
+    public Map<String, Object> updateThemeForSchoolAdmin(
+            String requestedTheme,
+            CurrentUser operator) {
+        String before = theme();
+        String after = validateTheme(requestedTheme);
+        mapper.upsert(SITE_THEME, after, operator.userId());
+        auditService.success(
+                operator,
+                "SITE_THEME_UPDATE",
+                "SYSTEM_SETTING",
+                null,
+                "学校管理员修改学校主题",
+                Map.of("theme", before),
+                Map.of("theme", after));
+        return Map.of("theme", after);
+    }
+
     private Map<String, Object> branding() {
         Map<String, String> defaults = new LinkedHashMap<>();
         defaults.put("schoolName", defaultSchoolName);
@@ -119,6 +140,10 @@ public class SiteMetadataService {
 
     private boolean schoolAdminEditable() {
         return Boolean.parseBoolean(String.valueOf(mapper.findValue(LOGIN_ADMIN_EDITABLE_KEY)));
+    }
+
+    private String theme() {
+        return "green".equals(clean(mapper.findValue(SITE_THEME))) ? "green" : "blue";
     }
 
     private Map<String, Object> readObject(String key, Map<String, String> defaults) {
@@ -155,6 +180,14 @@ public class SiteMetadataService {
         result.put("html", html);
         result.put("imageUrl", bounded(command.imageUrl(), 500, "登录页图片地址最多500个字符"));
         return result;
+    }
+
+    private String validateTheme(String value) {
+        String normalized = clean(value).toLowerCase();
+        if (!"blue".equals(normalized) && !"green".equals(normalized)) {
+            throw new BusinessException("SITE_THEME_INVALID", "界面主题仅支持经典蓝或校园绿");
+        }
+        return normalized;
     }
 
     private String bounded(String value, int maximum, String message) {
