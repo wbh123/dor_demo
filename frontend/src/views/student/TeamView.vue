@@ -59,7 +59,7 @@ async function invite() {
   if (!/^\d{12}$/.test(studentNumber) || !studentName || submitting.value) return
   submitting.value = true; error.value = ''
   try {
-    const response = await api.post<ObjectSuccessResponse>('/api/v1/student/team-invitations/verified', { studentNumber, studentName })
+    const response = await api.post<ObjectSuccessResponse>('/api/v1/student/team-invitations', { studentNumber, studentName })
     const invited = (response.data.data ?? {}) as DataObject
     inviteStudentNumber.value = ''; inviteStudentName.value = ''
     showNotice(`已向 ${String(invited.studentName)} 发送邀请。`); await load()
@@ -75,7 +75,7 @@ async function cancelInvitation() {
   if (!cancelCandidate.value || submitting.value) return
   const { team, member } = cancelCandidate.value
   submitting.value = true; error.value = ''
-  try { await api.delete(`/api/v1/student/teams/${Number(team.id)}/invitations/${Number(member.student_id)}`); cancelCandidate.value = null; showNotice(`已取消对 ${String(member.student_name)} 的邀请。`); await load() }
+  try { await api.delete(`/api/v1/student/teams/${Number(team.id)}/members/${Number(member.student_id)}`); cancelCandidate.value = null; showNotice(`已取消对 ${String(member.student_name)} 的邀请。`); await load() }
   catch (reason) { error.value = translateError(reason) }
   finally { submitting.value = false }
 }
@@ -117,7 +117,6 @@ function teamStatusText(status: unknown) { return ({ FORMING:'邀请成员中', 
     <TransientNotice :message="notice" @close="notice = ''" />
     <div class="page-title"><span class="eyebrow">{{ subtitle('组队选寝','TEAM SELECTION') }}</span><h2>直接邀请队友一起选寝</h2><p>邀请时必须同时填写学号和姓名，系统匹配成功后才会发送，避免误邀和骚扰。</p></div>
     <p v-if="error" class="alert error">{{ error }}</p>
-
     <section v-if="!assigned && invitations.length" class="panel"><div class="section-head"><div><span class="eyebrow">待处理邀请</span><h3>同学邀请</h3></div></div><article v-for="invitation in invitations" :key="String(invitation.invitation_token)" class="invitation-item"><div><strong>{{ invitation.inviter_name }} 邀请你一起选寝</strong><p>邀请人学号：{{ invitation.inviter_student_number }}</p></div><div class="button-row"><button class="button ghost" @click="respond(invitation.invitation_token,false)">{{ t('common.reject') }}</button><button class="button primary" @click="respond(invitation.invitation_token,true)">{{ t('common.accept') }}</button></div></article></section>
 
     <section v-if="canInvite" class="panel compact-team-invite-panel"><div class="section-head"><div><span class="eyebrow">邀请队友</span><h3>{{ currentTeam ? '继续邀请队友' : '邀请第一名队友' }}</h3><p>学号和姓名必须同时匹配当前选寝批次中的同学。首次邀请会自动建立队伍。</p></div></div><form class="team-invite-panel verified-invite-form" @submit.prevent="invite"><label><span>队友学号</span><input v-model.trim="inviteStudentNumber" class="input" required inputmode="numeric" pattern="\d{12}" maxlength="12" placeholder="请输入12位学号" /></label><label><span>队友姓名</span><input v-model.trim="inviteStudentName" class="input" required maxlength="128" placeholder="请输入与学号对应的姓名" /></label><button class="button primary" :disabled="submitting">{{ submitting ? '正在发送…' : '发送邀请' }}</button></form></section>

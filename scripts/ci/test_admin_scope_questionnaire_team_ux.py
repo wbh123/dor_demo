@@ -164,8 +164,9 @@ require(team_view, (
     "studentName }",
     "cancelInvitation",
     "TransientNotice",
-    "/team-invitations/verified",
-), "team page must validate identity, cancel invitations and use popup notices")
+    "'/api/v1/student/team-invitations'",
+    "/members/${Number(member.student_id)}",
+), "team page must validate identity, cancel invitations and use generated StudentApi routes")
 
 spreadsheet = read("backend-java/server/src/main/java/com/wust/dormitory/admin/SpreadsheetSupport.java")
 require(spreadsheet, (
