@@ -1,0 +1,87 @@
+name: Private Compatibility CI
+
+on:
+  push:
+    branches:
+      - 'private-compat/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: private-compat-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify-private-ref:
+    name: Verify private integration ref
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Resolve private branch name
+        id: target
+        shell: bash
+        run: |
+          set -euo pipefail
+          private_ref="${GITHUB_REF_NAME#private-compat/}"
+          if [[ -z "$private_ref" || "$private_ref" == "$GITHUB_REF_NAME" ]]; then
+            echo "Invalid compatibility branch name" >&2
+            exit 1
+          fi
+          if [[ ! "$private_ref" =~ ^[A-Za-z0-9._/-]+$ ]]; then
+            echo "Unsupported private ref characters" >&2
+            exit 1
+          fi
+          echo "private_ref=$private_ref" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout private integration branch
+        uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: ${{ steps.target.outputs.private_ref }}
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: false
+          fetch-depth: 1
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: private-repo/backend-java/pom.xml
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: private-repo/frontend/package-lock.json
+
+      - name: Verify private contracts
+        working-directory: private-repo
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/ci/test_runtime_error_data_correctness_batch.py
+          bash scripts/ci/run_contracts.sh
+
+      - name: Verify private Java modules
+        working-directory: private-repo/backend-java
+        shell: bash
+        run: |
+          set -euo pipefail
+          mvn -B -ntp clean verify
+
+      - name: Verify private frontend
+        working-directory: private-repo
+        shell: bash
+        env:
+          VITE_INSTITUTION_NAME: Example University
+          VITE_CAMPUS_NAME: Example Campus
+        run: |
+          set -euo pipefail
+          bash scripts/ci/run_frontend.sh
