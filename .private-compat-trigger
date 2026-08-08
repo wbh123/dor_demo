@@ -1,4 +1,4 @@
 private-ref: integration/site-theme-login-second-batch-20260808
 private-base: 16bcbc47ea7b5c62576621bbf12d64ac1ca6596c
-private-head: 958ba487c85a1e314e157c4f44aba3a15c0fe90b
-purpose: validate latest private second-batch after extracting login HTML policy below modularization limit
+private-head: a3df0ec0cc99f6df9b5529c95f8781f593f850a4
+purpose: validate latest private second-batch after aligning debug password contract with natural login layout
