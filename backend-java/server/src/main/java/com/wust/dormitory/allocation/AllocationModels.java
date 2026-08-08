@@ -34,13 +34,18 @@ public final class AllocationModels {
             String studentName,
             String gender,
             String memberRole,
-            long memberOrder) {
+            long memberOrder,
+            boolean assigned) {
         StudentCandidate student() {
             return new StudentCandidate(studentId, studentNumber, studentName, gender, null, null);
         }
     }
 
-    public record TeamCandidate(long teamId, String gender, List<StudentCandidate> members) {
+    public record TeamCandidate(
+            long teamId,
+            String gender,
+            int expectedUnassignedCount,
+            List<StudentCandidate> members) {
     }
 
     public record BedCandidate(
@@ -109,8 +114,7 @@ public final class AllocationModels {
             String failureCode,
             String failureReason) {
         static UnassignedItem of(StudentCandidate student, String code, String reason) {
-            return new UnassignedItem(
-                    student.studentId(), student.studentNumber(), student.studentName(), code, reason);
+            return new UnassignedItem(student.studentId(), student.studentNumber(), student.studentName(), code, reason);
         }
 
         public Map<String, Object> toMap() {
