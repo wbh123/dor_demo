@@ -1,34 +1,28 @@
 package com.wust.dormitory.admin;
 
+import com.wust.dormitory.admin.mapper.RoomLayoutMapper;
 import com.wust.dormitory.audit.AuditService;
+import com.wust.dormitory.security.CurrentUser;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
-import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
-import com.wust.dormitory.security.CurrentUser;
 
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.anyMap;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.argThat;
+import static org.mockito.Mockito.when;
 
 class RoomLayoutServiceTest {
-    private NamedParameterJdbcTemplate jdbc;
+    private RoomLayoutMapper mapper;
     private RoomLayoutService service;
 
     @BeforeEach
     void setUp() {
-        jdbc = mock(NamedParameterJdbcTemplate.class);
-        service = new RoomLayoutService(jdbc, mock(AuditService.class));
+        mapper = mock(RoomLayoutMapper.class);
+        service = new RoomLayoutService(mapper, new RoomLayoutPlanner(), mock(AuditService.class));
     }
 
     @Test
@@ -49,9 +43,8 @@ class RoomLayoutServiceTest {
                 bed(3L, "C", "LOFT_BED_DESK", 3, null),
                 bed(4L, "D-UP", "BUNK_UPPER", 4, 9L),
                 bed(5L, "D-LOW", "BUNK_LOWER", 5, 9L));
-        when(jdbc.queryForList(anyString(), anyMap()))
-                .thenReturn(List.of(room))
-                .thenReturn(bedRows);
+        when(mapper.findRoomLayout(1L)).thenReturn(room);
+        when(mapper.findBeds(1L)).thenReturn(bedRows);
 
         Map<String, Object> result = service.getLayout(1L);
         List<Map<String, Object>> beds = (List<Map<String, Object>>) result.get("beds");
@@ -64,7 +57,6 @@ class RoomLayoutServiceTest {
         assertPlacement(beds.get(4), 2.35, 1.65, 0);
         assertThat(result).containsEntry("layout_source", RoomLayoutService.DEFAULT_LAYOUT);
     }
-
 
     @Test
     @SuppressWarnings("unchecked")
@@ -88,15 +80,12 @@ class RoomLayoutServiceTest {
         List<Map<String, Object>> afterBeds = List.of(
                 layoutBed(1L, "A-UP", "SINGLE_BED", 1, null, 0));
 
-        when(jdbc.queryForList(anyString(), anyMap()))
-                .thenReturn(List.of(lockedRoom))
-                .thenReturn(lockedBeds)
-                .thenReturn(List.of(roomBefore))
-                .thenReturn(beforeBeds)
-                .thenReturn(List.of(roomAfter))
-                .thenReturn(afterBeds);
-        when(jdbc.update(anyString(), anyMap())).thenReturn(1);
-        when(jdbc.update(anyString(), any(MapSqlParameterSource.class))).thenReturn(1);
+        when(mapper.lockRoom(1L)).thenReturn(lockedRoom);
+        when(mapper.lockRoomBeds(1L)).thenReturn(lockedBeds);
+        when(mapper.findRoomLayout(1L)).thenReturn(roomBefore, roomAfter);
+        when(mapper.findBeds(1L)).thenReturn(beforeBeds, afterBeds);
+        when(mapper.retireBed(2L, 1L)).thenReturn(1);
+        when(mapper.updateRoomVersioned(1L, "OTHER", 1, 4L)).thenReturn(1);
 
         Map<String, Object> result = service.updateLayout(
                 1L,
@@ -107,16 +96,14 @@ class RoomLayoutServiceTest {
                 new CurrentUser(10L, null, "admin", "管理员", "ADMIN"));
 
         assertThat(((Map<String, Object>) result.get("room")).get("capacity")).isEqualTo(1);
-        verify(jdbc).update(argThat(sql -> sql.contains("operational_status='RETIRED'")), anyMap());
-        verify(jdbc).update(argThat(sql -> sql.contains("SET bed_frame_id=NULL, bed_type=:bedType")), any(MapSqlParameterSource.class));
+        verify(mapper).deleteBedScope(2L);
+        verify(mapper).deletePlacement(2L);
+        verify(mapper).retireBed(2L, 1L);
+        verify(mapper).updateRepresentativeAfterCollapse(1L, 1L, "SINGLE_BED");
+        verify(mapper).deleteFrame(9L, 1L);
     }
 
-    private Map<String, Object> bed(
-            long id,
-            String code,
-            String type,
-            int position,
-            Long frameId) {
+    private Map<String, Object> bed(long id, String code, String type, int position, Long frameId) {
         Map<String, Object> row = new LinkedHashMap<>();
         row.put("id", id);
         row.put("bed_code", code);
@@ -132,26 +119,28 @@ class RoomLayoutServiceTest {
         return row;
     }
 
-
     private Map<String, Object> lockedBed(long id, String code, String type, int position, Long frameId, int occupied) {
         Map<String, Object> row = new LinkedHashMap<>();
-        row.put("id", id); row.put("bed_code", code); row.put("bed_type", type);
-        row.put("position_index", position); row.put("bed_frame_id", frameId); row.put("occupied", occupied);
+        row.put("id", id);
+        row.put("bed_code", code);
+        row.put("bed_type", type);
+        row.put("position_index", position);
+        row.put("bed_frame_id", frameId);
+        row.put("occupied", occupied);
         return row;
     }
 
     private Map<String, Object> layoutBed(long id, String code, String type, int position, Long frameId, int occupied) {
         Map<String, Object> row = lockedBed(id, code, type, position, frameId, occupied);
-        row.put("operational_status", "ENABLED"); row.put("layout_x", 1.5); row.put("layout_z", 1.0);
-        row.put("rotation_degrees", 90); row.put("custom_layout", 1);
+        row.put("operational_status", "ENABLED");
+        row.put("layout_x", 1.5);
+        row.put("layout_z", 1.0);
+        row.put("rotation_degrees", 90);
+        row.put("custom_layout", 1);
         return row;
     }
 
-    private void assertPlacement(
-            Map<String, Object> bed,
-            double x,
-            double z,
-            int rotation) {
+    private void assertPlacement(Map<String, Object> bed, double x, double z, int rotation) {
         assertThat(((Number) bed.get("layout_x")).doubleValue()).isEqualTo(x);
         assertThat(((Number) bed.get("layout_z")).doubleValue()).isEqualTo(z);
         assertThat(((Number) bed.get("rotation_degrees")).intValue()).isEqualTo(rotation);
