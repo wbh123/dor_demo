@@ -1,14 +1,14 @@
 package com.wust.dormitory.admin;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wust.dormitory.admin.mapper.AdminCatalogMapper;
 import com.wust.dormitory.admin.mapper.AdminDashboardMapper;
 import com.wust.dormitory.admin.mapper.BatchCatalogMapper;
+import com.wust.dormitory.admin.mapper.BatchPreparationMapper;
+import com.wust.dormitory.admin.mapper.MajorManagementMapper;
 import com.wust.dormitory.admin.mapper.StudentAdminMapper;
 import com.wust.dormitory.admin.model.persistence.BatchCatalogRow;
 import com.wust.dormitory.audit.AuditService;
 import org.junit.jupiter.api.Test;
-import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -22,14 +22,14 @@ import static org.mockito.Mockito.when;
 class BatchCatalogQueryServiceTest {
     @Test
     void batchListDelegatesToTypedMapperAndPreservesResponseValues() {
-        NamedParameterJdbcTemplate jdbc = mock(NamedParameterJdbcTemplate.class);
-        ObjectMapper objectMapper = mock(ObjectMapper.class);
         AuditService auditService = mock(AuditService.class);
         AdminCatalogMapper adminCatalogMapper = mock(AdminCatalogMapper.class);
         StudentAdminMapper studentAdminMapper = mock(StudentAdminMapper.class);
         AdminDashboardMapper adminDashboardMapper = mock(AdminDashboardMapper.class);
         BatchCatalogMapper batchCatalogMapper = mock(BatchCatalogMapper.class);
         ReferenceDataCacheService referenceDataCacheService = mock(ReferenceDataCacheService.class);
+        MajorManagementMapper majorManagementMapper = mock(MajorManagementMapper.class);
+        BatchPreparationMapper batchPreparationMapper = mock(BatchPreparationMapper.class);
         BatchCatalogRow row = mock(BatchCatalogRow.class);
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("id", 8L);
@@ -48,14 +48,14 @@ class BatchCatalogQueryServiceTest {
         when(batchCatalogMapper.findBatches()).thenReturn(List.of(row));
 
         AdminService service = new AdminService(
-                jdbc,
-                objectMapper,
                 auditService,
                 adminCatalogMapper,
                 studentAdminMapper,
                 adminDashboardMapper,
                 batchCatalogMapper,
-                referenceDataCacheService);
+                referenceDataCacheService,
+                majorManagementMapper,
+                batchPreparationMapper);
 
         List<Map<String, Object>> result = service.batches();
 
