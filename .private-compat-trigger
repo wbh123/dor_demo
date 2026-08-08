@@ -1,4 +1,4 @@
 private-ref: fix/student-immutable-random-reselect-20260808
 private-base: 5fa97d3fa1788ad7459d4d7b981f349bb7246ecb
-private-head: 359c36acf71c36846a1bed5a1eb33e9d0f81a444
-purpose: validate immutable student identity, random selection combo button, exchange building dropdown, cancellation reselection, and extra-compact building cards against latest private main
+private-head: f94e4b36ff65e2fdc93e37020c699b4c594dff14
+purpose: validate immutable student identity, integrated random-selection button, exchange building dropdown, cancellation reselection, extra-compact building cards, and system-admin theme authorization entry against latest private main
