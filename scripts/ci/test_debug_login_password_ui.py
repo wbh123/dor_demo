@@ -39,17 +39,19 @@ assert "PASSWORD_WEAK" not in platform_auth_service
 assert "PASSWORD_NOT_CHANGED" not in platform_auth_service
 assert "password.matches(" not in platform_auth_service
 
-# 登录/学生激活共用同高表单骨架：登录补第三行占位，激活行距更紧凑。
+# 第二批恢复登录/激活的自然内容高度，不使用不可见第三行或固定表单最小高度强行补齐。
 assert 'class="auth-fields login-fields"' in login_view
-assert 'class="auth-field-spacer"' in login_view
 assert 'class="auth-fields activate-fields"' in login_view
-assert ".auth-form-frame{min-height:" in login_view
-assert ".activate-fields{gap:" in login_view
+assert 'auth-field-spacer' not in login_view
+assert ".auth-form-frame{display:flex}" in login_view
+assert ".auth-form{display:grid;gap:8px;width:100%}" in login_view
+assert ".auth-fields{display:grid;align-content:start;gap:8px}" in login_view
+assert ".activate-fields{gap:5px}" in login_view
 
-# 左右两个校徽承载区域取消边框和阴影，图片左对齐、不拉伸。
+# 左右两个校徽承载区域取消边框和阴影；图片使用自然高度、左对齐且不拉伸。
 assert ".brand-image-surface{display:flex;align-items:center;justify-content:flex-start;background:transparent;border:0;box-shadow:none;overflow:hidden}" in login_view
 for class_name in (".hero-school-logo", ".form-school-logo"):
-    assert f"{class_name}{{display:block;width:auto;max-width:100%;" in login_view
-    assert "object-fit:contain;object-position:left center" in login_view
+    assert f"{class_name}{{display:block;width:auto;max-width:100%;height:auto;" in login_view
+assert login_view.count("object-fit:contain;object-position:left center") >= 2
 
-print("Debug login layout and password policy contract passed")
+print("Debug natural login layout and password policy contract passed")
