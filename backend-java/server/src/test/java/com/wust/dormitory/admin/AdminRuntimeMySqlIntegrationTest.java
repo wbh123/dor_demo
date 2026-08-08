@@ -3,12 +3,21 @@ package com.wust.dormitory.admin;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wust.dormitory.audit.AuditService;
 import com.wust.dormitory.residency.AdminBedSwapService;
+import com.wust.dormitory.residency.ResidencyHistoryWriter;
 import com.wust.dormitory.residency.ResidencyPolicyService;
 import com.wust.dormitory.residency.ResidencyService;
+import com.wust.dormitory.residency.mapper.ResidencyMapper;
 import com.wust.dormitory.roomchange.RoomChangeService;
 import com.wust.dormitory.security.AuthTokenService;
 import com.wust.dormitory.security.CurrentUser;
 import com.wust.dormitory.selection.BedHoldResetService;
+import org.apache.ibatis.builder.xml.XMLMapperBuilder;
+import org.apache.ibatis.io.Resources;
+import org.apache.ibatis.mapping.Environment;
+import org.apache.ibatis.session.Configuration;
+import org.apache.ibatis.session.SqlSession;
+import org.apache.ibatis.session.SqlSessionFactoryBuilder;
+import org.apache.ibatis.transaction.jdbc.JdbcTransactionFactory;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
@@ -21,6 +30,7 @@ import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.utility.DockerImageName;
 
+import java.io.InputStream;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
@@ -36,6 +46,7 @@ import static org.mockito.Mockito.when;
 
 class AdminRuntimeMySqlIntegrationTest {
     private static GenericContainer<?> mysql;
+    private DriverManagerDataSource dataSource;
     private NamedParameterJdbcTemplate jdbc;
     private CurrentUser operator;
 
@@ -64,7 +75,7 @@ class AdminRuntimeMySqlIntegrationTest {
     @BeforeEach
     void setUp() throws Exception {
         awaitDatabase();
-        DriverManagerDataSource dataSource = new DriverManagerDataSource();
+        dataSource = new DriverManagerDataSource();
         dataSource.setDriverClassName("com.mysql.cj.jdbc.Driver");
         dataSource.setUrl(jdbcUrl());
         dataSource.setUsername("root");
@@ -97,16 +108,20 @@ class AdminRuntimeMySqlIntegrationTest {
     }
 
     @Test
-    void confirmBedAndEndResidencyPersistHistoryAgainstMySql84() {
+    void confirmBedAndEndResidencyPersistHistoryAgainstMySql84() throws Exception {
         AuditService audit = mock(AuditService.class);
         ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
-        ResidencyService service = new ResidencyService(
-                jdbc, mock(ResidencyPolicyService.class), audit, objectMapper);
+        try (SqlSession sqlSession = residencySqlSession()) {
+            ResidencyMapper residencyMapper = sqlSession.getMapper(ResidencyMapper.class);
+            ResidencyHistoryWriter historyWriter = new ResidencyHistoryWriter(residencyMapper, objectMapper);
+            ResidencyService service = new ResidencyService(
+                    residencyMapper, mock(ResidencyPolicyService.class), audit, historyWriter);
 
-        Map<String, Object> confirmed = service.confirmBed(900L, 22L, "现场核查", operator);
-        assertThat(((Number) confirmed.get("bed_id")).longValue()).isEqualTo(22L);
-        Map<String, Object> ended = service.end(900L, "办理退宿", operator);
-        assertThat(ended.get("assignment_status")).isEqualTo("ENDED");
+            Map<String, Object> confirmed = service.confirmBed(900L, 22L, "现场核查", operator);
+            assertThat(((Number) confirmed.get("bed_id")).longValue()).isEqualTo(22L);
+            Map<String, Object> ended = service.end(900L, "办理退宿", operator);
+            assertThat(ended.get("assignment_status")).isEqualTo("ENDED");
+        }
         Integer historyCount = jdbc.getJdbcTemplate().queryForObject(
                 "SELECT COUNT(*) FROM room_assignment_history WHERE room_assignment_id=900",
                 Integer.class);
@@ -130,6 +145,17 @@ class AdminRuntimeMySqlIntegrationTest {
                 100L, "202600000001", "重新初始化测试账号", operator);
 
         assertThat(result.get("accountStatus")).isEqualTo("PENDING");
+    }
+
+    private SqlSession residencySqlSession() throws Exception {
+        Environment environment = new Environment(
+                "runtime-test", new JdbcTransactionFactory(), dataSource);
+        Configuration configuration = new Configuration(environment);
+        String resource = "mapper/residency/ResidencyMapper.xml";
+        try (InputStream input = Resources.getResourceAsStream(resource)) {
+            new XMLMapperBuilder(input, configuration, resource, configuration.getSqlFragments()).parse();
+        }
+        return new SqlSessionFactoryBuilder().build(configuration).openSession(true);
     }
 
     private void resetSchema() throws SQLException {
