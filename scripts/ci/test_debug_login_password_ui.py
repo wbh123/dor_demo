@@ -12,18 +12,30 @@ def read(path: str) -> str:
 def password_inputs(source: str) -> list[str]:
     return re.findall(r'<input\b[^>]*\btype="password"[^>]*>', source, flags=re.IGNORECASE)
 
+
+def password_property_lines(source: str) -> list[str]:
+    names = ("password:", "currentPassword:", "newPassword:")
+    return [line.strip() for line in source.splitlines() if line.strip().startswith(names)]
+
 login_view = read("frontend/src/views/LoginView.vue")
 admin_password_view = read("frontend/src/views/admin/AdminPasswordView.vue")
 platform_password_view = read("frontend/src/views/platform/PlatformPasswordView.vue")
 auth_service = read("backend-java/server/src/main/java/com/wust/dormitory/auth/AuthService.java")
 platform_auth_service = read("backend-java/server/src/main/java/com/wust/dormitory/platform/PlatformAuthService.java")
+auth_openapi = read("backend-java/model/src/main/resources/auth/openapi-auth.yaml")
+platform_openapi = read("backend-java/model/src/main/resources/platform/openapi-platform.yaml")
 
-# 调试阶段：所有前端密码字段只保留 required，不做长度/字符复杂度限制。
+# 调试阶段：所有前端密码字段和 OpenAPI 密码字段只要求非空，不做长度/字符复杂度限制。
 for input_tag in password_inputs(login_view + admin_password_view + platform_password_view):
     lower = input_tag.lower()
     assert "minlength=" not in lower
     assert "maxlength=" not in lower
     assert "pattern=" not in lower
+
+for line in password_property_lines(auth_openapi) + password_property_lines(platform_openapi):
+    assert "minLength" not in line
+    assert "maxLength" not in line
+    assert "pattern" not in line
 
 for obsolete in (
     "至少8位", "至少12位", "12至72位", "包含大写字母", "包含小写字母", "包含数字", "包含特殊字符"
