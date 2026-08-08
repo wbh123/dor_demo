@@ -1,4 +1,4 @@
 private-ref: integration/site-theme-login-second-batch-20260808
 private-base: 16bcbc47ea7b5c62576621bbf12d64ac1ca6596c
-private-head: 2232b99c16b9cea9548208f9825eed0790673c5d
-purpose: validate latest private second-batch implementation against current private main baseline
+private-head: 21b72e274f2569d6d375e3a68150c07ca6c376d9
+purpose: validate latest private second-batch implementation after school-theme contract convergence
