@@ -1,3 +1,4 @@
 private-ref: integration/navicat-dynamic-migration-governance-20260808
 private-base: d463da68b17a9ab072d4195493ae4fffadc73bcd
-purpose: validate dynamic Navicat latest-migration governance RED against latest private main
+private-head: 4f77d2e97c9343cccaee1d4d7f81a27a3aac6c99
+purpose: validate dynamic Navicat latest-migration governance and full generator suite against latest private main
