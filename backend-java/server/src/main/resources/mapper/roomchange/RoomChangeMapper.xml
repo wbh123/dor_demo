@@ -1,0 +1,236 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.wust.dormitory.roomchange.mapper.RoomChangeMapper">
+
+    <sql id="RequestColumns">
+        request.id, request.student_id, request.source_residency_id,
+        request.source_room_id, request.target_room_id, request.target_bed_id,
+        request.policy_mode, request.request_status, request.reason,
+        request.reviewed_by, request.review_reason, request.created_at,
+        request.updated_at, request.reviewed_at, request.executed_residency_id,
+        request.executed_at
+    </sql>
+
+    <select id="findCandidateRooms" resultType="map">
+        SELECT r.id, r.room_number, r.room_type, r.capacity,
+               r.gender_restriction, r.resident_scope,
+               f.floor_number, db.id AS building_id,
+               db.building_code, db.building_name,
+               COUNT(active_ra.id) AS active_residents,
+               GREATEST(r.capacity-COUNT(active_ra.id),0) AS available_count
+        FROM room r
+        JOIN dormitory_floor f ON f.id=r.floor_id
+        JOIN dormitory_building db ON db.id=f.building_id
+        LEFT JOIN room_assignment active_ra
+          ON active_ra.room_id=r.id AND active_ra.assignment_status='ACTIVE'
+        WHERE r.id&lt;&gt;#{currentRoomId}
+          AND r.operational_status='ENABLED'
+          AND r.gender_restriction=#{gender}
+          AND (
+            r.resident_scope='MIXED'
+            OR (#{category}='DOMESTIC' AND r.resident_scope='DOMESTIC_ONLY')
+            OR (#{category}='INTERNATIONAL' AND r.resident_scope='INTERNATIONAL_ONLY')
+          )
+        GROUP BY r.id, r.room_number, r.room_type, r.capacity,
+                 r.gender_restriction, r.resident_scope,
+                 f.floor_number, db.id, db.building_code, db.building_name
+        HAVING COUNT(active_ra.id)&lt;r.capacity
+        ORDER BY db.building_code, f.floor_number, r.room_number
+    </select>
+
+    <select id="findStudentRequests" resultType="map">
+        SELECT request.id, request.request_status, request.policy_mode,
+               request.reason, request.review_reason,
+               request.created_at, request.reviewed_at, request.executed_at,
+               source_room.room_number AS source_room_number,
+               source_building.building_name AS source_building_name,
+               target_room.room_number AS target_room_number,
+               target_building.building_name AS target_building_name,
+               target_bed.bed_code AS target_bed_code
+        FROM room_change_request request
+        JOIN room source_room ON source_room.id=request.source_room_id
+        JOIN dormitory_floor source_floor ON source_floor.id=source_room.floor_id
+        JOIN dormitory_building source_building ON source_building.id=source_floor.building_id
+        JOIN room target_room ON target_room.id=request.target_room_id
+        JOIN dormitory_floor target_floor ON target_floor.id=target_room.floor_id
+        JOIN dormitory_building target_building ON target_building.id=target_floor.building_id
+        LEFT JOIN bed target_bed ON target_bed.id=request.target_bed_id
+        WHERE request.student_id=#{studentId}
+        ORDER BY request.created_at DESC
+    </select>
+
+    <select id="findAdminRequests" resultType="map">
+        SELECT request.id, request.request_status, request.policy_mode,
+               request.reason, request.review_reason,
+               request.created_at, request.reviewed_at, request.executed_at,
+               student.id AS student_id, student.student_number, student.student_name,
+               source_room.room_number AS source_room_number,
+               source_building.building_name AS source_building_name,
+               target_room.room_number AS target_room_number,
+               target_building.building_name AS target_building_name,
+               target_bed.bed_code AS target_bed_code,
+               reviewer.display_name AS reviewed_by_name
+        FROM room_change_request request
+        JOIN student ON student.id=request.student_id
+        JOIN room source_room ON source_room.id=request.source_room_id
+        JOIN dormitory_floor source_floor ON source_floor.id=source_room.floor_id
+        JOIN dormitory_building source_building ON source_building.id=source_floor.building_id
+        JOIN room target_room ON target_room.id=request.target_room_id
+        JOIN dormitory_floor target_floor ON target_floor.id=target_room.floor_id
+        JOIN dormitory_building target_building ON target_building.id=target_floor.building_id
+        LEFT JOIN bed target_bed ON target_bed.id=request.target_bed_id
+        LEFT JOIN app_user reviewer ON reviewer.id=request.reviewed_by
+        <where>
+            <if test="status != null and status != '' and status != 'ALL'">
+                request.request_status=#{status}
+            </if>
+            <if test="keyword != null and keyword != ''">
+                <if test="status != null and status != '' and status != 'ALL'">AND</if>
+                (student.student_number LIKE CONCAT('%',#{keyword},'%')
+                 OR student.student_name LIKE CONCAT('%',#{keyword},'%')
+                 OR source_room.room_number LIKE CONCAT('%',#{keyword},'%')
+                 OR target_room.room_number LIKE CONCAT('%',#{keyword},'%'))
+            </if>
+        </where>
+        ORDER BY request.created_at DESC
+    </select>
+
+    <select id="findPolicyMode" resultType="string">
+        SELECT setting_value
+        FROM system_setting
+        WHERE setting_key='ROOM_CHANGE_POLICY'
+        LIMIT 1
+    </select>
+
+    <select id="findRequest" resultType="map">
+        SELECT <include refid="RequestColumns"/>
+        FROM room_change_request request
+        WHERE request.id=#{requestId}
+    </select>
+
+    <select id="lockRequest" resultType="map">
+        SELECT <include refid="RequestColumns"/>
+        FROM room_change_request request
+        WHERE request.id=#{requestId}
+        FOR UPDATE
+    </select>
+
+    <select id="findActiveResidency" resultType="map">
+        SELECT id, batch_id, student_id, room_id, bed_id, team_id,
+               source_selection_mode, assignment_method, assignment_status,
+               assigned_by, assigned_at, bed_confirmed_at, ended_at, end_reason,
+               created_at, updated_at
+        FROM room_assignment
+        WHERE student_id=#{studentId} AND assignment_status='ACTIVE'
+        ORDER BY id
+        LIMIT 1
+    </select>
+
+    <select id="lockActiveResidency" resultType="map">
+        SELECT id, batch_id, student_id, room_id, bed_id, team_id,
+               source_selection_mode, assignment_method, assignment_status,
+               assigned_by, assigned_at, bed_confirmed_at, ended_at, end_reason,
+               created_at, updated_at
+        FROM room_assignment
+        WHERE student_id=#{studentId} AND assignment_status='ACTIVE'
+        ORDER BY id
+        LIMIT 1
+        FOR UPDATE
+    </select>
+
+    <select id="countActiveRequests" resultType="int">
+        SELECT COUNT(*)
+        FROM room_change_request
+        WHERE student_id=#{studentId}
+          AND request_status IN ('PENDING','APPROVED')
+    </select>
+
+    <select id="lockActiveRequestIds" resultType="long">
+        SELECT id
+        FROM room_change_request
+        WHERE student_id=#{studentId}
+          AND request_status IN ('PENDING','APPROVED')
+        ORDER BY id
+        FOR UPDATE
+    </select>
+
+    <insert id="insertRequest" parameterType="map" useGeneratedKeys="true" keyProperty="id" keyColumn="id">
+        INSERT INTO room_change_request
+        (student_id, source_residency_id, source_room_id,
+         target_room_id, target_bed_id, policy_mode,
+         request_status, reason, created_at, updated_at)
+        VALUES
+        (#{studentId}, #{sourceResidencyId}, #{sourceRoomId},
+         #{targetRoomId}, #{targetBedId}, #{policyMode},
+         'PENDING', #{reason}, CURRENT_TIMESTAMP(3), CURRENT_TIMESTAMP(3))
+    </insert>
+
+    <update id="approveRequest">
+        UPDATE room_change_request
+        SET request_status='APPROVED', reviewed_by=#{reviewedBy},
+            reviewed_at=CURRENT_TIMESTAMP(3), review_reason=#{reason},
+            updated_at=CURRENT_TIMESTAMP(3)
+        WHERE id=#{requestId}
+    </update>
+
+    <update id="rejectRequest">
+        UPDATE room_change_request
+        SET request_status='REJECTED', reviewed_by=#{reviewedBy},
+            reviewed_at=CURRENT_TIMESTAMP(3), review_reason=#{reason},
+            updated_at=CURRENT_TIMESTAMP(3)
+        WHERE id=#{requestId}
+    </update>
+
+    <update id="cancelRequest">
+        UPDATE room_change_request
+        SET request_status='CANCELLED', review_reason=#{reason},
+            updated_at=CURRENT_TIMESTAMP(3)
+        WHERE id=#{requestId}
+    </update>
+
+    <update id="cancelActiveRequests">
+        UPDATE room_change_request
+        SET request_status='CANCELLED', review_reason=#{reason},
+            reviewed_by=#{reviewedBy}, reviewed_at=CURRENT_TIMESTAMP(3),
+            updated_at=CURRENT_TIMESTAMP(3)
+        WHERE student_id=#{studentId}
+          AND request_status IN ('PENDING','APPROVED')
+    </update>
+
+    <update id="markExecuted">
+        UPDATE room_change_request
+        SET request_status='EXECUTED', executed_residency_id=#{residencyId},
+            executed_at=CURRENT_TIMESTAMP(3), updated_at=CURRENT_TIMESTAMP(3)
+        WHERE id=#{requestId}
+    </update>
+
+    <update id="markFailed">
+        UPDATE room_change_request
+        SET request_status='FAILED', review_reason=#{reason},
+            updated_at=CURRENT_TIMESTAMP(3)
+        WHERE id=#{requestId}
+    </update>
+
+    <insert id="upsertPolicy">
+        INSERT INTO system_setting
+        (setting_key, setting_value, version, updated_by)
+        VALUES ('ROOM_CHANGE_POLICY', #{mode}, 0, #{updatedBy})
+        ON DUPLICATE KEY UPDATE
+            setting_value=VALUES(setting_value),
+            version=version+1,
+            updated_by=VALUES(updated_by),
+            updated_at=CURRENT_TIMESTAMP(3)
+    </insert>
+
+    <insert id="insertStudentNotification">
+        INSERT INTO student_notification
+        (student_id, notification_type, title_key, message_key, parameters_json, read_at)
+        VALUES
+        (#{studentId}, #{type},
+         CONCAT('notification.', LOWER(#{type}), '.title'),
+         CONCAT('notification.', LOWER(#{type}), '.message'),
+         JSON_OBJECT('requestId', #{requestId}), NULL)
+    </insert>
+</mapper>
