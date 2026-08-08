@@ -1,0 +1,345 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.wust.dormitory.bedconfirmation.mapper.BedConfirmationMapper">
+    <sql id="currentResidencyColumns">
+        SELECT ra.id AS residency_id,
+               ra.student_id,
+               ra.room_id,
+               ra.bed_id,
+               ra.assignment_method,
+               ra.source_selection_mode,
+               ra.assigned_at,
+               db.building_name,
+               floor.floor_number,
+               room.room_number,
+               bed.bed_code,
+               bed.bed_type
+        FROM room_assignment ra
+        JOIN room ON room.id = ra.room_id
+        JOIN dormitory_floor floor ON floor.id = room.floor_id
+        JOIN dormitory_building db ON db.id = floor.building_id
+        LEFT JOIN bed ON bed.id = ra.bed_id
+        WHERE ra.student_id = #{studentId}
+          AND ra.assignment_status = 'ACTIVE'
+        ORDER BY ra.assigned_at DESC, ra.id DESC
+        LIMIT 1
+    </sql>
+
+    <select id="findCurrentResidency" resultType="map">
+        <include refid="currentResidencyColumns"/>
+    </select>
+
+    <select id="lockCurrentResidency" resultType="map">
+        <include refid="currentResidencyColumns"/>
+        FOR UPDATE
+    </select>
+
+    <sql id="roomInfoColumns">
+        SELECT room.id AS room_id,
+               db.building_name,
+               floor.floor_number,
+               room.room_number,
+               room.capacity
+        FROM room
+        JOIN dormitory_floor floor ON floor.id = room.floor_id
+        JOIN dormitory_building db ON db.id = floor.building_id
+        WHERE room.id = #{roomId}
+    </sql>
+
+    <select id="findRoomInfo" resultType="map">
+        <include refid="roomInfoColumns"/>
+    </select>
+
+    <select id="lockRoomInfo" resultType="map">
+        <include refid="roomInfoColumns"/>
+        FOR UPDATE
+    </select>
+
+    <select id="findRoomBeds" resultType="map">
+        SELECT bed.id AS bed_id,
+               bed.bed_code,
+               bed.bed_type,
+               bed.operational_status,
+               CASE WHEN MAX(current.id) IS NULL THEN 0 ELSE 1 END AS occupied
+        FROM bed
+        LEFT JOIN room_assignment current
+               ON current.bed_id = bed.id
+              AND current.assignment_status = 'ACTIVE'
+        WHERE bed.room_id = #{roomId}
+        GROUP BY bed.id, bed.bed_code, bed.bed_type, bed.operational_status, bed.position_index
+        ORDER BY bed.position_index, bed.id
+    </select>
+
+    <select id="lockBed" resultType="map">
+        SELECT id AS bed_id, bed_code, bed_type, operational_status
+        FROM bed
+        WHERE id = #{bedId}
+          AND room_id = #{roomId}
+        FOR UPDATE
+    </select>
+
+    <select id="findPendingForResidency" resultType="map">
+        SELECT request.id,
+               request.residency_id,
+               request.student_id,
+               request.room_id,
+               request.declared_bed_id,
+               request.request_status,
+               request.reason,
+               request.reviewed_by,
+               request.review_reason,
+               request.submitted_at,
+               request.reviewed_at,
+               request.created_at,
+               request.updated_at,
+               bed.bed_code,
+               bed.bed_type
+        FROM bed_confirmation_request request
+        JOIN bed ON bed.id = request.declared_bed_id
+        WHERE request.residency_id = #{residencyId}
+          AND request.request_status = 'PENDING'
+        ORDER BY request.id DESC
+        LIMIT 1
+    </select>
+
+    <select id="lockRequest" resultType="map">
+        SELECT id,
+               residency_id,
+               student_id,
+               room_id,
+               declared_bed_id,
+               request_status,
+               reason,
+               reviewed_by,
+               review_reason,
+               submitted_at,
+               reviewed_at,
+               created_at,
+               updated_at
+        FROM bed_confirmation_request
+        WHERE id = #{requestId}
+        FOR UPDATE
+    </select>
+
+    <select id="findRequest" resultType="map">
+        SELECT request.id,
+               request.residency_id,
+               request.student_id,
+               request.room_id,
+               request.declared_bed_id,
+               request.request_status,
+               request.reason,
+               request.reviewed_by,
+               request.review_reason,
+               request.submitted_at,
+               request.reviewed_at,
+               request.created_at,
+               request.updated_at,
+               bed.bed_code,
+               bed.bed_type,
+               student.student_number,
+               student.student_name
+        FROM bed_confirmation_request request
+        JOIN bed ON bed.id = request.declared_bed_id
+        JOIN student ON student.id = request.student_id
+        WHERE request.id = #{requestId}
+    </select>
+
+    <select id="findRooms" resultType="map">
+        SELECT r.id AS room_id,
+               db.building_name,
+               f.floor_number,
+               r.room_number,
+               r.capacity,
+               COUNT(DISTINCT ra.id) AS resident_count,
+               COUNT(DISTINCT request.id) AS pending_count,
+               COUNT(DISTINCT CASE
+                   WHEN occupied.id IS NOT NULL OR duplicate_request.id IS NOT NULL
+                   THEN request.id END) AS conflict_count
+        FROM room r
+        JOIN dormitory_floor f ON f.id = r.floor_id
+        JOIN dormitory_building db ON db.id = f.building_id
+        LEFT JOIN room_assignment ra
+               ON ra.room_id = r.id
+              AND ra.assignment_status = 'ACTIVE'
+        LEFT JOIN bed_confirmation_request request
+               ON request.residency_id = ra.id
+              AND request.request_status = 'PENDING'
+        LEFT JOIN room_assignment occupied
+               ON occupied.bed_id = request.declared_bed_id
+              AND occupied.assignment_status = 'ACTIVE'
+              AND occupied.id &lt;&gt; request.residency_id
+        LEFT JOIN bed_confirmation_request duplicate_request
+               ON duplicate_request.room_id = request.room_id
+              AND duplicate_request.declared_bed_id = request.declared_bed_id
+              AND duplicate_request.request_status = 'PENDING'
+              AND duplicate_request.id &lt; request.id
+        WHERE (#{keyword} = ''
+           OR db.building_name LIKE CONCAT('%', #{keyword}, '%')
+           OR r.room_number LIKE CONCAT('%', #{keyword}, '%'))
+        GROUP BY r.id, db.building_name, f.floor_number, r.room_number, r.capacity
+        HAVING pending_count &gt; 0
+        ORDER BY db.building_name, f.floor_number, r.room_number
+    </select>
+
+    <select id="findRoomStudents" resultType="map">
+        SELECT ra.id AS residency_id,
+               ra.student_id,
+               student.student_number,
+               student.student_name,
+               ra.bed_id AS current_bed_id,
+               current_bed.bed_code AS current_bed_code,
+               request.id AS request_id,
+               request.declared_bed_id,
+               declared_bed.bed_code AS declared_bed_code,
+               request.reason,
+               request.submitted_at,
+               CASE
+                 WHEN request.id IS NULL THEN 'NONE'
+                 WHEN occupied.id IS NOT NULL THEN 'OCCUPIED'
+                 WHEN duplicate_request.id IS NOT NULL THEN 'DUPLICATE'
+                 ELSE 'READY'
+               END AS review_state
+        FROM room_assignment ra
+        JOIN student ON student.id = ra.student_id
+        LEFT JOIN bed current_bed ON current_bed.id = ra.bed_id
+        LEFT JOIN bed_confirmation_request request
+               ON request.residency_id = ra.id
+              AND request.request_status = 'PENDING'
+        LEFT JOIN bed declared_bed ON declared_bed.id = request.declared_bed_id
+        LEFT JOIN room_assignment occupied
+               ON occupied.bed_id = request.declared_bed_id
+              AND occupied.assignment_status = 'ACTIVE'
+              AND occupied.id &lt;&gt; ra.id
+        LEFT JOIN bed_confirmation_request duplicate_request
+               ON duplicate_request.room_id = request.room_id
+              AND duplicate_request.declared_bed_id = request.declared_bed_id
+              AND duplicate_request.request_status = 'PENDING'
+              AND duplicate_request.id &lt; request.id
+        WHERE ra.room_id = #{roomId}
+          AND ra.assignment_status = 'ACTIVE'
+        ORDER BY student.student_number
+    </select>
+
+    <select id="lockPendingRequests" resultType="long">
+        SELECT id
+        FROM bed_confirmation_request
+        WHERE room_id = #{roomId}
+          AND request_status = 'PENDING'
+        ORDER BY submitted_at, id
+        FOR UPDATE
+    </select>
+
+    <select id="lockActiveAssignments" resultType="long">
+        SELECT id
+        FROM room_assignment
+        WHERE room_id = #{roomId}
+          AND assignment_status = 'ACTIVE'
+        ORDER BY id
+        FOR UPDATE
+    </select>
+
+    <select id="lockRoomBeds" resultType="long">
+        SELECT id
+        FROM bed
+        WHERE room_id = #{roomId}
+        ORDER BY id
+        FOR UPDATE
+    </select>
+
+    <select id="findRoomApprovalCandidates" resultType="map">
+        WITH pending AS (
+            SELECT request.id,
+                   request.residency_id,
+                   request.student_id,
+                   request.declared_bed_id,
+                   request.submitted_at,
+                   bed.bed_code,
+                   bed.operational_status,
+                   COUNT(*) OVER (PARTITION BY request.declared_bed_id) AS declaration_count
+            FROM bed_confirmation_request request
+            JOIN bed ON bed.id = request.declared_bed_id
+            WHERE request.room_id = #{roomId}
+              AND request.request_status = 'PENDING'
+        )
+        SELECT pending.id,
+               pending.residency_id,
+               pending.student_id,
+               pending.declared_bed_id,
+               pending.bed_code,
+               pending.operational_status,
+               pending.declaration_count,
+               CASE WHEN self_assignment.id IS NULL THEN 0 ELSE 1 END AS occupied_by_self,
+               CASE WHEN other_assignment.id IS NULL THEN 0 ELSE 1 END AS occupied_by_other
+        FROM pending
+        LEFT JOIN room_assignment self_assignment
+               ON self_assignment.id = pending.residency_id
+              AND self_assignment.bed_id = pending.declared_bed_id
+              AND self_assignment.assignment_status = 'ACTIVE'
+        LEFT JOIN room_assignment other_assignment
+               ON other_assignment.bed_id = pending.declared_bed_id
+              AND other_assignment.assignment_status = 'ACTIVE'
+              AND other_assignment.id &lt;&gt; pending.residency_id
+        ORDER BY pending.submitted_at, pending.id
+    </select>
+
+    <insert id="insertRequest" parameterType="map" useGeneratedKeys="true" keyProperty="id" keyColumn="id">
+        INSERT INTO bed_confirmation_request
+        (residency_id, student_id, room_id, declared_bed_id,
+         request_status, reason, submitted_at)
+        VALUES
+        (#{residencyId}, #{studentId}, #{roomId}, #{bedId},
+         'PENDING', #{reason}, CURRENT_TIMESTAMP(3))
+    </insert>
+
+    <update id="cancelRequest">
+        UPDATE bed_confirmation_request
+        SET request_status = 'CANCELLED',
+            review_reason = #{reason},
+            reviewed_at = CURRENT_TIMESTAMP(3),
+            updated_at = CURRENT_TIMESTAMP(3)
+        WHERE id = #{requestId}
+          AND request_status = 'PENDING'
+    </update>
+
+    <update id="assignBed">
+        UPDATE room_assignment
+        SET bed_id = #{bedId},
+            source_selection_mode = 'BED',
+            bed_confirmed_at = CURRENT_TIMESTAMP(3),
+            updated_at = CURRENT_TIMESTAMP(3)
+        WHERE id = #{residencyId}
+          AND assignment_status = 'ACTIVE'
+    </update>
+
+    <update id="approveRequest">
+        UPDATE bed_confirmation_request
+        SET request_status = 'APPROVED',
+            reviewed_by = #{reviewedBy},
+            review_reason = #{reason},
+            reviewed_at = CURRENT_TIMESTAMP(3),
+            updated_at = CURRENT_TIMESTAMP(3)
+        WHERE id = #{requestId}
+          AND request_status = 'PENDING'
+    </update>
+
+    <update id="rejectRequest">
+        UPDATE bed_confirmation_request
+        SET request_status = 'REJECTED',
+            reviewed_by = #{reviewedBy},
+            review_reason = #{reason},
+            reviewed_at = CURRENT_TIMESTAMP(3),
+            updated_at = CURRENT_TIMESTAMP(3)
+        WHERE id = #{requestId}
+          AND request_status = 'PENDING'
+    </update>
+
+    <insert id="insertStudentNotification" parameterType="map">
+        INSERT INTO student_notification
+        (student_id, notification_type, title_key, message_key, parameters_json)
+        VALUES
+        (#{studentId}, #{type}, #{title}, #{message}, CAST(#{parameters} AS JSON))
+    </insert>
+</mapper>
