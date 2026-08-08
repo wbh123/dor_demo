@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.wust.dormitory.admin.mapper.RoomManagementMapper">
+    <select id="findBuildings" resultType="map">
+        SELECT b.id,
+               b.building_code,
+               b.building_name,
+               b.gender_restriction,
+               b.education_level_scope,
+               b.resident_scope,
+               b.enabled,
+               c.campus_name,
+               COUNT(DISTINCT r.id) AS room_count,
+               COUNT(DISTINCT CASE WHEN bed.operational_status &lt;&gt; 'RETIRED' THEN bed.id END) AS bed_count
+        FROM dormitory_building b
+        JOIN campus c ON c.id = b.campus_id
+        LEFT JOIN dormitory_floor f ON f.building_id = b.id
+        LEFT JOIN room r ON r.floor_id = f.id
+        LEFT JOIN bed ON bed.room_id = r.id
+        GROUP BY b.id, b.building_code, b.building_name, b.gender_restriction,
+                 b.education_level_scope, b.resident_scope, b.enabled, c.campus_name
+        ORDER BY b.building_code
+    </select>
+
+    <select id="findDefaultCampusId" resultType="long">
+        SELECT id
+        FROM campus
+        WHERE enabled = 1
+        ORDER BY id
+        LIMIT 1
+    </select>
+
+    <select id="countBuildingByCode" resultType="int">
+        SELECT COUNT(*)
+        FROM dormitory_building
+        WHERE building_code = #{code}
+    </select>
+
+    <insert id="insertBuilding" parameterType="map" useGeneratedKeys="true" keyProperty="id" keyColumn="id">
+        INSERT INTO dormitory_building
+        (campus_id, building_code, building_name, gender_restriction,
+         education_level_scope, resident_scope, enabled)
+        VALUES
+        (#{campusId}, #{code}, #{name}, #{gender}, #{educationScope}, #{residentScope}, 1)
+    </insert>
+
+    <insert id="batchInsertFloors">
+        INSERT INTO dormitory_floor (building_id, floor_number, floor_name, enabled)
+        VALUES
+        <foreach collection="floorNumbers" item="floor" separator=",">
+            (#{buildingId}, #{floor}, CONCAT(#{floor}, '层'), 1)
+        </foreach>
+    </insert>
+
+    <select id="findBuildingForValidation" resultType="map">
+        SELECT id,
+               gender_restriction AS building_gender_restriction,
+               education_level_scope AS building_education_level_scope,
+               resident_scope AS building_resident_scope
+        FROM dormitory_building
+        WHERE id = #{buildingId}
+          AND enabled = 1
+    </select>
+
+    <select id="findFloorId" resultType="long">
+        SELECT id
+        FROM dormitory_floor
+        WHERE building_id = #{buildingId}
+          AND floor_number = #{floorNumber}
+          AND enabled = 1
+    </select>
+
+    <select id="countRoomNumber" resultType="int">
+        SELECT COUNT(*)
+        FROM room
+        WHERE floor_id = #{floorId}
+          AND room_number = #{roomNumber}
+    </select>
+
+    <insert id="insertRoom" parameterType="map" useGeneratedKeys="true" keyProperty="id" keyColumn="id">
+        INSERT INTO room
+        (floor_id, room_number, room_type, capacity, gender_restriction,
+         education_level_scope, resident_scope, operational_status, remark)
+        VALUES
+        (#{floorId}, #{roomNumber}, #{roomType}, #{capacity}, #{gender},
+         #{educationScope}, #{residentScope}, #{status}, #{remark})
+    </insert>
+
+    <insert id="batchInsertBeds">
+        INSERT INTO bed
+        (room_id, bed_code, bed_type, position_index, operational_status)
+        VALUES
+        <foreach collection="positions" item="position" separator=",">
+            (#{roomId}, CONCAT('B', #{position}), 'LOFT_BED_DESK', #{position}, 'ENABLED')
+        </foreach>
+    </insert>
+
+    <select id="lockRoomForUpdate" resultType="map">
+        SELECT r.id,
+               r.floor_id,
+               r.room_number,
+               r.room_type,
+               r.capacity,
+               r.gender_restriction,
+               r.education_level_scope,
+               r.resident_scope,
+               r.operational_status,
+               r.remark,
+               r.state_version,
+               r.version,
+               b.gender_restriction AS building_gender_restriction,
+               b.education_level_scope AS building_education_level_scope,
+               b.resident_scope AS building_resident_scope
+        FROM room r
+        JOIN dormitory_floor f ON f.id = r.floor_id
+        JOIN dormitory_building b ON b.id = f.building_id
+        WHERE r.id = #{roomId}
+        FOR UPDATE
+    </select>
+
+    <select id="countPhysicalBeds" resultType="int">
+        SELECT COUNT(*)
+        FROM bed
+        WHERE room_id = #{roomId}
+          AND operational_status &lt;&gt; 'RETIRED'
+    </select>
+
+    <select id="countIncompatibleResidents" resultType="int">
+        SELECT COUNT(*)
+        FROM room_assignment ra
+        JOIN student s ON s.id = ra.student_id
+        WHERE ra.room_id = #{roomId}
+          AND ra.assignment_status = 'ACTIVE'
+          AND (
+            s.gender &lt;&gt; #{gender}
+            OR (#{residentScope} = 'DOMESTIC_ONLY' AND s.student_category &lt;&gt; 'DOMESTIC')
+            OR (#{residentScope} = 'INTERNATIONAL_ONLY' AND s.student_category &lt;&gt; 'INTERNATIONAL')
+            OR (#{educationScope} = 'UNDERGRADUATE_ONLY' AND COALESCE(s.degree_level, '') &lt;&gt; 'UNDERGRADUATE')
+            OR (#{educationScope} = 'GRADUATE_ONLY' AND COALESCE(s.degree_level, '') NOT IN ('MASTER','DOCTOR','MASTER_DOCTOR'))
+          )
+    </select>
+
+    <update id="updateRoom" parameterType="map">
+        UPDATE room
+        SET capacity = #{capacity},
+            gender_restriction = #{gender},
+            education_level_scope = #{educationScope},
+            resident_scope = #{residentScope},
+            operational_status = #{status},
+            remark = #{remark},
+            state_version = state_version + 1,
+            version = version + 1
+        WHERE id = #{id}
+    </update>
+</mapper>
