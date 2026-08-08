@@ -18,6 +18,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 class ResidencyMutationServiceTest {
@@ -103,8 +104,7 @@ class ResidencyMutationServiceTest {
         assertThat(service.confirmBed(100L, 2L, "重复核查", operator)).isEqualTo(before);
         verify(mapper, never()).lockBed(2L);
         verify(mapper, never()).countOtherActiveBedOccupants(2L, 100L);
-        verify(historyWriter, never()).append(any(), any(Long.class), any(Long.class), any(),
-                anyString(), any(), anyString(), any(), any());
+        verifyNoInteractions(historyWriter);
         verify(audit, never()).success(any(), anyString(), anyString(), any(), anyString(), any(), any());
     }
 
