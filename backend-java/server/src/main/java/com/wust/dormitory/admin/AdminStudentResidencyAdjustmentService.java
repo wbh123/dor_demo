@@ -146,10 +146,7 @@ public class AdminStudentResidencyAdjustmentService {
             long studentId,
             Long currentRoomId,
             Long currentBedId) {
-        return adjustmentMapper.findCompatibleBeds(
-                studentId,
-                currentRoomId == null ? -1L : currentRoomId,
-                currentBedId);
+        return adjustmentMapper.findCompatibleBeds(studentId, currentRoomId, currentBedId);
     }
 
     private boolean swapRequired(Map<String, Object> target) {
