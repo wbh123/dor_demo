@@ -1,0 +1,144 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.wust.dormitory.allocation.OptimizedAllocationMapper">
+    <select id="findBatchMetadata" resultType="map">
+        SELECT id,
+               batch_status,
+               matching_weight_scheme_id,
+               rule_template_id,
+               rule_version
+        FROM selection_batch
+        WHERE id = #{batchId}
+    </select>
+
+    <select id="lockBatchMetadata" resultType="map">
+        SELECT id,
+               batch_status,
+               matching_weight_scheme_id,
+               rule_template_id,
+               rule_version
+        FROM selection_batch
+        WHERE id = #{batchId}
+        FOR UPDATE
+    </select>
+
+    <insert id="insertRun" parameterType="map" useGeneratedKeys="true" keyProperty="id" keyColumn="id">
+        INSERT INTO allocation_optimization_run
+        (batch_id, algorithm_version, input_digest,
+         matching_scheme_revision_id, batch_rule_revision_id,
+         random_seed, metrics_json, run_status, version,
+         created_by, created_at, expires_at)
+        VALUES
+        (#{batchId}, #{algorithmVersion}, #{inputDigest},
+         #{matchingSchemeRevisionId}, #{batchRuleRevisionId},
+         #{randomSeed}, CAST(#{metrics} AS JSON), 'READY', 1,
+         #{createdBy}, CURRENT_TIMESTAMP(3), #{expiresAt})
+    </insert>
+
+    <insert id="insertCandidates">
+        INSERT INTO allocation_optimization_candidate
+        (run_id, student_id, bed_id, room_id, team_id,
+         score, candidate_version, explanation_json, created_at)
+        VALUES
+        <foreach collection="items" item="item" separator=",">
+            (#{runId}, #{item.studentId}, #{item.bedId}, #{item.roomId}, #{item.teamId},
+             #{item.score}, 1, CAST(#{item.explanation} AS JSON), CURRENT_TIMESTAMP(3))
+        </foreach>
+    </insert>
+
+    <select id="findRunView" resultType="map">
+        SELECT run.id,
+               run.batch_id,
+               run.algorithm_version,
+               run.input_digest,
+               run.matching_scheme_revision_id,
+               run.batch_rule_revision_id,
+               run.random_seed,
+               run.metrics_json,
+               run.run_status,
+               run.version,
+               run.created_at,
+               run.expires_at,
+               run.submitted_at,
+               creator.display_name AS created_by_name,
+               submitter.display_name AS submitted_by_name
+        FROM allocation_optimization_run run
+        JOIN app_user creator ON creator.id = run.created_by
+        LEFT JOIN app_user submitter ON submitter.id = run.submitted_by
+        WHERE run.id = #{runId}
+    </select>
+
+    <select id="lockRun" resultType="map">
+        SELECT id,
+               batch_id,
+               input_digest,
+               random_seed,
+               run_status,
+               version,
+               expires_at,
+               submitted_at
+        FROM allocation_optimization_run
+        WHERE id = #{runId}
+        FOR UPDATE
+    </select>
+
+    <select id="findCandidates" resultType="map">
+        SELECT student_id,
+               bed_id,
+               room_id,
+               team_id,
+               score
+        FROM allocation_optimization_candidate
+        WHERE run_id = #{runId}
+        ORDER BY student_id
+    </select>
+
+    <select id="lockCandidates" resultType="map">
+        SELECT student_id,
+               bed_id,
+               room_id,
+               team_id,
+               score
+        FROM allocation_optimization_candidate
+        WHERE run_id = #{runId}
+          AND student_id IN
+        <foreach collection="studentIds" item="studentId" open="(" separator="," close=")">
+            #{studentId}
+        </foreach>
+        ORDER BY student_id
+        FOR UPDATE
+    </select>
+
+    <update id="updateCandidate" parameterType="map">
+        UPDATE allocation_optimization_candidate
+        SET bed_id = #{bedId},
+            room_id = #{roomId},
+            candidate_version = candidate_version + 1,
+            explanation_json = CAST(#{explanation} AS JSON),
+            updated_at = CURRENT_TIMESTAMP(3)
+        WHERE run_id = #{runId}
+          AND student_id = #{studentId}
+    </update>
+
+    <update id="bumpRunVersion">
+        UPDATE allocation_optimization_run
+        SET version = version + 1,
+            updated_at = CURRENT_TIMESTAMP(3)
+        WHERE id = #{runId}
+          AND version = #{expectedVersion}
+    </update>
+
+    <update id="markSubmitted">
+        UPDATE allocation_optimization_run
+        SET run_status = 'SUBMITTED',
+            submitted_by = #{operatorId},
+            submitted_at = CURRENT_TIMESTAMP(3),
+            version = version + 1,
+            updated_at = CURRENT_TIMESTAMP(3)
+        WHERE id = #{runId}
+          AND run_status = 'READY'
+          AND submitted_at IS NULL
+    </update>
+</mapper>
