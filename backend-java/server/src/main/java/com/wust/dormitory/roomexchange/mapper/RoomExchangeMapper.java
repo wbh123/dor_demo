@@ -33,9 +33,9 @@ public interface RoomExchangeMapper {
             @Param("firstStudentId") long firstStudentId,
             @Param("secondStudentId") long secondStudentId);
 
-    Map<String, Object> findActiveResidency(@Param("studentId") long studentId);
+    List<Map<String, Object>> findActiveResidency(@Param("studentId") long studentId);
 
-    Map<String, Object> lockActiveResidency(@Param("studentId") long studentId);
+    List<Map<String, Object>> lockActiveResidency(@Param("studentId") long studentId);
 
     int insertRequest(Map<String, Object> request);
 
