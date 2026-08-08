@@ -157,7 +157,6 @@
         FROM room_assignment
         WHERE student_id=#{studentId} AND assignment_status='ACTIVE'
         ORDER BY id
-        LIMIT 1
     </select>
 
     <select id="lockActiveResidency" resultType="map">
@@ -168,7 +167,6 @@
         FROM room_assignment
         WHERE student_id=#{studentId} AND assignment_status='ACTIVE'
         ORDER BY id
-        LIMIT 1
         FOR UPDATE
     </select>
 
