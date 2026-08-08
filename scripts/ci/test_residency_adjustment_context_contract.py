@@ -11,13 +11,16 @@ assert '@Param("currentRoomId") Long currentRoomId' in mapper_java, 'mapper must
 
 # Capacity is based only on ACTIVE residency facts.
 assert "resident.assignment_status='ACTIVE'" in mapper_xml
+assert 'active_resident_count' in mapper_xml
 
-# A currently placed student can swap into an occupied bed even when the target room is full.
-assert '#{currentBedId,jdbcType=BIGINT} IS NOT NULL' in mapper_xml
+# Swap eligibility is derived from whether the source student really has a current bed.
+assert 'CASE WHEN #{currentBedId,jdbcType=BIGINT} IS NULL THEN 0 ELSE 1 END AS current_bed_present' in mapper_xml
+assert "current_bed_present=1" in mapper_xml
 assert "occupancy_source IN ('RESIDENCY','ALLOCATION')" in mapper_xml
 
-# A student without a current bed must not be offered an occupied target as selectable/swap-required.
-assert 'current_bed_present' in mapper_xml, 'selectability must distinguish first assignment from a real bed swap'
-assert "current_bed_present=1" in mapper_xml
+# Full target rooms remain reachable for real swaps, while first assignment cannot select occupied beds.
+assert 'active_resident_count &lt; compatible_beds.capacity' in mapper_xml
+assert "compatible_beds.current_bed_present=1 AND compatible_beds.occupancy_source IN ('RESIDENCY','ALLOCATION')" in mapper_xml
+assert "compatible_beds.occupancy_source='AVAILABLE'" in mapper_xml
 
 print('Residency adjustment context contract passed')
