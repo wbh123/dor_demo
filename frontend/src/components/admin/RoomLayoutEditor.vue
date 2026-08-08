@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { api } from '../../api/client'
+import { ApiRequestError, api } from '../../api/client'
 import type { DataObject, ListSuccessResponse, ObjectSuccessResponse } from '../../api/types'
 import { useFeatureAccess } from '../../composables/useFeatureAccess'
 import { useI18n } from '../../i18n'
@@ -151,7 +151,47 @@ function unitStyle(unit:Unit){return{left:`${((unit.x-MIN_X)/(MAX_X-MIN_X))*100}
 function typeLabel(type:UnitType){return{LOFT_BED_DESK:'上床下桌',BUNK:'上下铺',SINGLE_BED:'单人床'}[type]}
 function typeActionDisabled(unit:Unit,type:UnitType){if(!canEdit.value)return true;if(unit.occupied&&type!==unit.originalType)return true;return false}
 function occupancyLabel(source:string){return({RESIDENCY:'正式在住',ALLOCATION:'有效分配',PENDING_CONFIRMATION:'待核查申报',ROOM_EXCHANGE:'寝室交换锁定'} as Record<string,string>)[source]??source}
-async function save(){if(!canEdit.value)return;if(!reason.value.trim()){error.value='请填写布局修改原因。';return}if(projectedCapacity.value>MAX_CAPACITY){error.value='房间最多只能配置8个床位。';return}saving.value=true;try{await api.put(`/api/v1/admin/rooms/${props.roomId}/bed-layout`,{expectedRoomVersion:roomVersion.value,reason:reason.value.trim(),beds:units.value.map(unit=>({bedId:unit.representativeBedId,bedType:unit.unitType,layoutX:unit.x,layoutZ:unit.z,rotationDegrees:unit.rotation}))});message.value='床位类型与布局已保存。';reason.value='';await load();emit('saved')}catch(cause){error.value=translateError(cause)}finally{saving.value=false}}
+async function save(){
+  if(!canEdit.value)return
+  const savedReason=reason.value.trim()
+  if(!savedReason){error.value='请填写布局修改原因。';return}
+  if(projectedCapacity.value>MAX_CAPACITY){error.value='房间最多只能配置8个床位。';return}
+  saving.value=true
+  try{
+    await api.put(`/api/v1/admin/rooms/${props.roomId}/bed-layout`,{
+      expectedRoomVersion:roomVersion.value,
+      reason:savedReason,
+      beds:units.value.map(unit=>({
+        bedId:unit.representativeBedId,
+        bedType:unit.unitType,
+        layoutX:unit.x,
+        layoutZ:unit.z,
+        rotationDegrees:unit.rotation,
+      })),
+    })
+    message.value='床位类型与布局已保存。'
+    reason.value=''
+    await load()
+    emit('saved')
+  }catch(cause){
+    if(cause instanceof ApiRequestError&&cause.code==='ROOM_LAYOUT_VERSION_CONFLICT'){
+      await load()
+      const reloadError=error.value
+      reason.value=savedReason
+      if(reloadError){
+        message.value=''
+        error.value=`房间信息已发生变化，但重新加载失败：${reloadError}`
+      }else{
+        error.value=''
+        message.value='房间信息已发生变化，已加载最新布局，请确认后重新保存'
+      }
+    }else{
+      error.value=translateError(cause)
+    }
+  }finally{
+    saving.value=false
+  }
+}
 </script>
 
 <template>

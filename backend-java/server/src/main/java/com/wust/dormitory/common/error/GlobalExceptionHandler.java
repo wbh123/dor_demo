@@ -1,7 +1,9 @@
 package com.wust.dormitory.common.error;
 
+import com.wust.dormitory.common.request.RequestIdFilter;
 import com.wust.dormitory.common.response.ResponseFactory;
 import com.wust.dormitory.model.dto.ErrorResponse;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
@@ -10,10 +12,17 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+    private final RuntimeErrorRecorder runtimeErrorRecorder;
+
+    public GlobalExceptionHandler(RuntimeErrorRecorder runtimeErrorRecorder) {
+        this.runtimeErrorRecorder = runtimeErrorRecorder;
+    }
+
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<ErrorResponse> handleBusiness(BusinessException exception) {
         return ResponseEntity.status(exception.getStatus())
@@ -41,8 +50,18 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<ErrorResponse> handleUnknown(Exception exception) {
+    public ResponseEntity<ErrorResponse> handleUnknown(Exception exception, HttpServletRequest request) {
+        Object attribute = request.getAttribute(RequestIdFilter.ATTRIBUTE_NAME);
+        String requestId = attribute == null ? UUID.randomUUID().toString() : String.valueOf(attribute);
+        runtimeErrorRecorder.record(
+                request,
+                requestId,
+                HttpStatus.INTERNAL_SERVER_ERROR.value(),
+                "INTERNAL_ERROR",
+                exception);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(ResponseFactory.error("INTERNAL_ERROR", "系统内部错误，请通过请求编号联系管理员"));
+                .body(ResponseFactory.error(
+                        "INTERNAL_ERROR",
+                        "系统内部错误，请通过请求编号联系管理员（请求编号：" + requestId + "）"));
     }
 }

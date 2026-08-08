@@ -27,7 +27,7 @@ api.interceptors.request.use((config) => {
   if (token) config.headers.Authorization = `Bearer ${token}`
   const selectionLeaseToken = sessionStorage.getItem(SELECTION_LEASE_TOKEN_KEY)
   if (selectionLeaseToken) config.headers['X-Selection-Lease-Token'] = selectionLeaseToken
-  config.headers['X-Request-Id'] = crypto.randomUUID()
+  if (!config.headers['X-Request-Id']) config.headers['X-Request-Id'] = crypto.randomUUID()
   return config
 })
 
