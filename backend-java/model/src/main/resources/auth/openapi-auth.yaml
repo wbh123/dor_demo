@@ -110,7 +110,7 @@ components:
       required: [username, password]
       properties:
         username: { type: string, minLength: 1, maxLength: 64 }
-        password: { type: string, minLength: 8, maxLength: 72 }
+        password: { type: string }
 
     ActivateRequest:
       type: object
@@ -118,14 +118,14 @@ components:
       properties:
         studentNumber: { type: string, pattern: '^\d{12}$' }
         studentName: { type: string, minLength: 1, maxLength: 128 }
-        password: { type: string, minLength: 8, maxLength: 72 }
+        password: { type: string }
 
     ChangePasswordRequest:
       type: object
       required: [currentPassword, newPassword]
       properties:
-        currentPassword: { type: string, minLength: 1, maxLength: 72 }
-        newPassword: { type: string, minLength: 12, maxLength: 72 }
+        currentPassword: { type: string }
+        newPassword: { type: string }
 
     WelcomeData:
       type: object
