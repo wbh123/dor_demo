@@ -6,6 +6,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
+import org.springframework.web.servlet.HandlerMapping;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -25,6 +26,9 @@ import java.util.regex.Pattern;
 public class RuntimeErrorRecorder {
     private static final Logger log = LoggerFactory.getLogger(RuntimeErrorRecorder.class);
     private static final Pattern NUMERIC_RESOURCE = Pattern.compile("/(\\d+)(?=/|$)");
+    private static final Pattern UUID_SEGMENT = Pattern.compile(
+            "/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}(?=/|$)");
+    private static final Pattern LONG_NUMERIC_SEGMENT = Pattern.compile("/\\d{8,}(?=/|$)");
     private static final Set<String> SENSITIVE_NAMES = Set.of(
             "Authorization", "Cookie", "password", "Secret", "token", "phoneNumber", "studentName");
 
@@ -33,7 +37,7 @@ public class RuntimeErrorRecorder {
 
     public RuntimeErrorRecorder(
             ObjectMapper objectMapper,
-            @Value("${wust.debug.runtime-error-log-enabled:true}") boolean enabled) {
+            @Value("${wust.debug.runtime-error-log-enabled:false}") boolean enabled) {
         this.objectMapper = objectMapper;
         this.enabled = enabled;
     }
@@ -49,7 +53,7 @@ public class RuntimeErrorRecorder {
         record.put("timestamp", OffsetDateTime.now().toString());
         record.put("requestId", requestId);
         record.put("method", request.getMethod());
-        record.put("path", request.getRequestURI());
+        record.put("path", safePath(request));
         record.put("status", status);
         record.put("errorCode", errorCode);
         record.put("exceptionType", exception.getClass().getName());
@@ -70,6 +74,17 @@ public class RuntimeErrorRecorder {
         } catch (IOException ioException) {
             log.warn("Unable to append runtime error record for requestId={}", requestId, ioException);
         }
+    }
+
+    private String safePath(HttpServletRequest request) {
+        Object routePattern = request.getAttribute(HandlerMapping.BEST_MATCHING_PATTERN_ATTRIBUTE);
+        if (routePattern != null) {
+            return String.valueOf(routePattern);
+        }
+        String raw = request.getRequestURI();
+        if (raw == null || raw.isBlank()) return "";
+        String withoutUuid = UUID_SEGMENT.matcher(raw).replaceAll("/{token}");
+        return LONG_NUMERIC_SEGMENT.matcher(withoutUuid).replaceAll("/{id}");
     }
 
     private List<Long> numericResourceIds(String path) {
