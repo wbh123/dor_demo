@@ -27,6 +27,8 @@ paths:
     $ref: 'admin/openapi-system-setting.yaml#/paths/~1api~1v1~1admin~1settings~1student-welcome'
   /api/v1/admin/settings/login-page:
     $ref: 'admin/openapi-site-metadata.yaml#/paths/~1api~1v1~1admin~1settings~1login-page'
+  /api/v1/admin/settings/theme:
+    $ref: 'admin/openapi-site-metadata.yaml#/paths/~1api~1v1~1admin~1settings~1theme'
   /api/v1/admin/settings/features:
     $ref: 'admin/openapi-school-feature-setting.yaml#/paths/~1api~1v1~1admin~1settings~1features'
   /api/v1/admin/settings/features/{featureCode}:
