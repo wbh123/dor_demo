@@ -1,3 +1,3 @@
 private-ref: integration/runtime-errors-data-correctness-verified-20260808
-private-head: c1dc08c08c46d06905c8093f4380e2dc4ac51ad6
+private-head: 01d47ec38a9f3b2068d769449497bae3e30e2bbc
 purpose: validate private batch-1 integration on public runner without publishing private source
