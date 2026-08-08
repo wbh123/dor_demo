@@ -1,14 +1,14 @@
 package com.wust.dormitory.admin;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wust.dormitory.admin.mapper.AdminCatalogMapper;
 import com.wust.dormitory.admin.mapper.AdminDashboardMapper;
 import com.wust.dormitory.admin.mapper.BatchCatalogMapper;
+import com.wust.dormitory.admin.mapper.BatchPreparationMapper;
+import com.wust.dormitory.admin.mapper.MajorManagementMapper;
 import com.wust.dormitory.admin.mapper.StudentAdminMapper;
 import com.wust.dormitory.admin.model.persistence.BuildingCatalogRow;
 import com.wust.dormitory.audit.AuditService;
 import org.junit.jupiter.api.Test;
-import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -22,14 +22,14 @@ import static org.mockito.Mockito.when;
 class AdminCatalogQueryServiceTest {
     @Test
     void majorAndBuildingListsDelegateToCacheAndTypedMapperAndPreserveResponseKeys() {
-        NamedParameterJdbcTemplate jdbc = mock(NamedParameterJdbcTemplate.class);
-        ObjectMapper objectMapper = mock(ObjectMapper.class);
         AuditService auditService = mock(AuditService.class);
         AdminCatalogMapper mapper = mock(AdminCatalogMapper.class);
         StudentAdminMapper studentAdminMapper = mock(StudentAdminMapper.class);
         AdminDashboardMapper dashboardMapper = mock(AdminDashboardMapper.class);
         BatchCatalogMapper batchCatalogMapper = mock(BatchCatalogMapper.class);
         ReferenceDataCacheService referenceDataCacheService = mock(ReferenceDataCacheService.class);
+        MajorManagementMapper majorManagementMapper = mock(MajorManagementMapper.class);
+        BatchPreparationMapper batchPreparationMapper = mock(BatchPreparationMapper.class);
         LocalDateTime now = LocalDateTime.of(2026, 8, 6, 10, 0);
 
         when(referenceDataCacheService.majors(true)).thenReturn(List.of(Map.of(
@@ -44,14 +44,14 @@ class AdminCatalogQueryServiceTest {
                 true, "示例校区", 12L, 47L)));
 
         AdminService service = new AdminService(
-                jdbc,
-                objectMapper,
                 auditService,
                 mapper,
                 studentAdminMapper,
                 dashboardMapper,
                 batchCatalogMapper,
-                referenceDataCacheService);
+                referenceDataCacheService,
+                majorManagementMapper,
+                batchPreparationMapper);
 
         List<Map<String, Object>> majors = service.majors(true);
         List<Map<String, Object>> buildings = service.buildings();

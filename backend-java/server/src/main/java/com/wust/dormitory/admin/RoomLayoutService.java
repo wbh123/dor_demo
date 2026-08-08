@@ -1,19 +1,16 @@
 package com.wust.dormitory.admin;
 
+import com.wust.dormitory.admin.RoomLayoutPlanner.DefaultPlacement;
+import com.wust.dormitory.admin.mapper.RoomLayoutMapper;
 import com.wust.dormitory.audit.AuditService;
 import com.wust.dormitory.common.error.BusinessException;
 import com.wust.dormitory.security.CurrentUser;
 import org.springframework.http.HttpStatus;
-import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
-import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
-import org.springframework.jdbc.support.GeneratedKeyHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -23,56 +20,28 @@ import java.util.Set;
 public class RoomLayoutService {
     public static final String DEFAULT_LAYOUT = "DEFAULT_LAYOUT";
     public static final String CUSTOM_LAYOUT = "CUSTOM_LAYOUT";
+    private static final DefaultPlacement STANDARD_TOP_LEFT = new DefaultPlacement(-2.35, -1.65, 0);
 
-    private static final int MAX_ROOM_CAPACITY = 8;
-    private static final double MIN_X = -5.2;
-    private static final double MAX_X = 5.2;
-    private static final double MIN_Z = -3.5;
-    private static final double MAX_Z = 3.5;
-    private static final Set<Integer> ROTATIONS = Set.of(0, 90, 180, 270);
-    private static final Set<String> UNIT_TYPES = Set.of("LOFT_BED_DESK", "BUNK", "SINGLE_BED");
-
-    private final NamedParameterJdbcTemplate jdbc;
+    private final RoomLayoutMapper roomLayoutMapper;
+    private final RoomLayoutPlanner planner;
     private final AuditService auditService;
 
-    public RoomLayoutService(NamedParameterJdbcTemplate jdbc, AuditService auditService) {
-        this.jdbc = jdbc;
+    public RoomLayoutService(
+            RoomLayoutMapper roomLayoutMapper,
+            RoomLayoutPlanner planner,
+            AuditService auditService) {
+        this.roomLayoutMapper = roomLayoutMapper;
+        this.planner = planner;
         this.auditService = auditService;
     }
 
     public Map<String, Object> getLayout(long roomId) {
-        Map<String, Object> room = one("""
-                SELECT r.id, r.room_number, r.room_type, r.capacity,
-                       r.version AS room_version, r.state_version,
-                       f.floor_number, b.building_name
-                FROM room r
-                JOIN dormitory_floor f ON f.id=r.floor_id
-                JOIN dormitory_building b ON b.id=f.building_id
-                WHERE r.id=:roomId
-                """, Map.of("roomId", roomId), "ROOM_NOT_FOUND", "房间不存在");
-
-        List<Map<String, Object>> rows = jdbc.queryForList("""
-                SELECT bed.id, bed.bed_code, bed.bed_type, bed.position_index,
-                       bed.bed_frame_id, bed.operational_status,
-                       CASE WHEN EXISTS (
-                           SELECT 1 FROM bed_assignment assignment
-                           WHERE assignment.bed_id=bed.id
-                             AND assignment.assignment_status='ACTIVE'
-                       ) OR EXISTS (
-                           SELECT 1 FROM room_assignment residency
-                           WHERE residency.bed_id=bed.id
-                             AND residency.assignment_status='ACTIVE'
-                       ) THEN 1 ELSE 0 END AS occupied,
-                       layout.layout_x, layout.layout_z, layout.rotation_degrees,
-                       CASE WHEN layout.bed_id IS NULL THEN 0 ELSE 1 END AS custom_layout
-                FROM bed
-                LEFT JOIN room_bed_layout layout ON layout.bed_id=bed.id
-                WHERE bed.room_id=:roomId
-                  AND bed.operational_status<>'RETIRED'
-                ORDER BY bed.position_index, bed.id
-                """, Map.of("roomId", roomId));
-
-        Set<Long> genuineBunkFrames = genuineBunkFrameIds(rows);
+        Map<String, Object> room = roomLayoutMapper.findRoomLayout(roomId);
+        if (room == null) {
+            throw new BusinessException("ROOM_NOT_FOUND", "房间不存在", HttpStatus.NOT_FOUND);
+        }
+        List<Map<String, Object>> rows = roomLayoutMapper.findBeds(roomId);
+        Set<Long> genuineBunkFrames = planner.genuineBunkFrameIds(rows);
         boolean hasCustom = false;
         List<Map<String, Object>> beds = new ArrayList<>(rows.size());
         for (Map<String, Object> row : rows) {
@@ -80,506 +49,165 @@ public class RoomLayoutService {
             boolean custom = ((Number) row.get("custom_layout")).intValue() == 1;
             hasCustom |= custom;
             if (!custom) {
-                DefaultPlacement placement = defaultPlacement(
-                        String.valueOf(row.get("bed_type")),
-                        ((Number) row.get("position_index")).intValue());
+                String bedType = String.valueOf(row.get("bed_type"));
+                int position = ((Number) row.get("position_index")).intValue();
+                DefaultPlacement placement = planner.defaultPlacement(bedType, position);
+                if (position == 1 && "LOFT_BED_DESK".equals(bedType)
+                        && !STANDARD_TOP_LEFT.equals(placement)) {
+                    throw new IllegalStateException("标准2×2布局左上床具坐标发生漂移");
+                }
                 bed.put("layout_x", placement.x());
                 bed.put("layout_z", placement.z());
                 bed.put("rotation_degrees", placement.rotationDegrees());
             }
-            Object frameValue = row.get("bed_frame_id");
-            boolean genuineBunk = frameValue != null
-                    && genuineBunkFrames.contains(number(frameValue));
-            bed.put("layout_unit_type", genuineBunk
-                    ? "BUNK"
-                    : "SINGLE_BED".equals(String.valueOf(row.get("bed_type")))
-                    ? "SINGLE_BED"
-                    : "LOFT_BED_DESK");
+            bed.put("layout_unit_type", planner.layoutUnitType(row, genuineBunkFrames));
             beds.add(bed);
         }
-
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("room", room);
         result.put("beds", beds);
         result.put("layout_source", hasCustom ? CUSTOM_LAYOUT : DEFAULT_LAYOUT);
-        result.put("maximum_capacity", MAX_ROOM_CAPACITY);
+        result.put("maximum_capacity", RoomLayoutPlanner.MAX_ROOM_CAPACITY);
         return result;
     }
 
     @Transactional
-    public Map<String, Object> updateLayout(
-            long roomId,
-            LayoutCommand command,
-            CurrentUser operator) {
-        Map<String, Object> room = one("""
-                SELECT id, version, state_version, capacity
-                FROM room
-                WHERE id=:roomId
-                FOR UPDATE
-                """, Map.of("roomId", roomId), "ROOM_NOT_FOUND", "房间不存在");
-
-        long currentVersion = ((Number) room.get("version")).longValue();
-        if (currentVersion != command.expectedRoomVersion()) {
-            throw new BusinessException(
-                    "ROOM_LAYOUT_VERSION_CONFLICT",
-                    "房间布局已被其他管理员修改，请重新加载后再保存",
-                    HttpStatus.CONFLICT);
+    public Map<String, Object> updateLayout(long roomId, LayoutCommand command, CurrentUser operator) {
+        Map<String, Object> room = roomLayoutMapper.lockRoom(roomId);
+        if (room == null) {
+            throw new BusinessException("ROOM_NOT_FOUND", "房间不存在", HttpStatus.NOT_FOUND);
         }
+        long currentVersion = ((Number) room.get("version")).longValue();
+        if (currentVersion != command.expectedRoomVersion()) throw versionConflict();
         if (command.reason() == null || command.reason().isBlank()) {
             throw new BusinessException("ROOM_LAYOUT_REASON_REQUIRED", "请填写布局修改原因");
         }
 
-        List<Map<String, Object>> roomBeds = lockRoomBeds(roomId);
-        List<BedUnit> units = buildUnits(roomBeds);
-        validateUnitSet(units, command.beds());
-        validateItems(command.beds());
-
+        List<Map<String, Object>> roomBeds = roomLayoutMapper.lockRoomBeds(roomId);
+        List<RoomLayoutPlanner.BedUnit> units = planner.buildUnits(roomBeds);
+        planner.validateUnitSet(units, command.beds());
+        planner.validateItems(command.beds());
         Map<String, Object> before = getLayout(roomId);
         Map<Long, LayoutItem> itemById = new HashMap<>();
-        for (LayoutItem item : command.beds()) {
-            itemById.put(item.bedId(), item);
-        }
+        command.beds().forEach(item -> itemById.put(item.bedId(), item));
 
         int capacity = roomBeds.size();
-        for (BedUnit unit : units) {
+        for (RoomLayoutPlanner.BedUnit unit : units) {
             LayoutItem item = itemById.get(unit.representativeBedId());
             if (unit.occupied() && !unit.unitType().equals(item.bedType())) {
-                throw new BusinessException(
-                        "BED_TYPE_OCCUPIED",
-                        "非空床位不能修改床位类型",
-                        HttpStatus.CONFLICT);
+                throw new BusinessException("BED_TYPE_OCCUPIED", "非空床位不能修改床位类型", HttpStatus.CONFLICT);
             }
             if ("BUNK".equals(unit.unitType()) && !"BUNK".equals(item.bedType())) {
                 collapseBunkUnit(roomId, unit, item, operator.userId());
                 capacity--;
-                continue;
-            }
-            if (!"BUNK".equals(unit.unitType()) && "BUNK".equals(item.bedType())) {
-                if (capacity >= MAX_ROOM_CAPACITY) {
-                    throw new BusinessException(
-                            "ROOM_CAPACITY_LIMIT",
-                            "房间最多只能配置8个床位",
-                            HttpStatus.CONFLICT);
+            } else if (!"BUNK".equals(unit.unitType()) && "BUNK".equals(item.bedType())) {
+                if (capacity >= RoomLayoutPlanner.MAX_ROOM_CAPACITY) {
+                    throw new BusinessException("ROOM_CAPACITY_LIMIT", "房间最多只能配置8个床位", HttpStatus.CONFLICT);
                 }
-                splitLoftIntoBunk(roomId, unit, item, operator.userId());
+                splitIntoBunk(roomId, unit, item, operator.userId());
                 capacity++;
             } else {
-                updateIndependentBedType(unit, item);
+                updateIndependentType(unit, item);
                 savePlacement(unit.beds(), item, operator.userId());
             }
         }
 
-        String roomType = roomTypeForBedCount(capacity);
-        int updated = jdbc.update("""
-                UPDATE room
-                SET room_type=:roomType, capacity=:capacity,
-                    version=version+1, state_version=state_version+1
-                WHERE id=:roomId AND version=:expectedVersion
-                """, new MapSqlParameterSource()
-                .addValue("roomId", roomId)
-                .addValue("roomType", roomType)
-                .addValue("capacity", capacity)
-                .addValue("expectedVersion", command.expectedRoomVersion()));
-        if (updated != 1) {
-            throw new BusinessException(
-                    "ROOM_LAYOUT_VERSION_CONFLICT",
-                    "房间布局已被其他管理员修改，请重新加载后再保存",
-                    HttpStatus.CONFLICT);
-        }
-
+        int updated = roomLayoutMapper.updateRoomVersioned(
+                roomId, planner.roomTypeForBedCount(capacity), capacity, command.expectedRoomVersion());
+        if (updated != 1) throw versionConflict();
         Map<String, Object> after = getLayout(roomId);
-        auditService.success(
-                operator,
-                "ROOM_LAYOUT_UPDATE",
-                "ROOM",
-                roomId,
-                command.reason().trim(),
-                before,
-                after);
+        auditService.success(operator, "ROOM_LAYOUT_UPDATE", "ROOM", roomId,
+                command.reason().trim(), before, after);
         return after;
     }
 
-    private List<Map<String, Object>> lockRoomBeds(long roomId) {
-        return jdbc.queryForList("""
-                SELECT bed.id, bed.bed_code, bed.bed_type, bed.position_index,
-                       bed.bed_frame_id,
-                       CASE WHEN EXISTS (
-                           SELECT 1 FROM bed_assignment assignment
-                           WHERE assignment.bed_id=bed.id
-                             AND assignment.assignment_status='ACTIVE'
-                       ) OR EXISTS (
-                           SELECT 1 FROM room_assignment residency
-                           WHERE residency.bed_id=bed.id
-                             AND residency.assignment_status='ACTIVE'
-                       ) THEN 1 ELSE 0 END AS occupied
-                FROM bed
-                WHERE bed.room_id=:roomId
-                  AND bed.operational_status<>'RETIRED'
-                ORDER BY bed.position_index, bed.id
-                FOR UPDATE
-                """, Map.of("roomId", roomId));
-    }
-
-    private List<BedUnit> buildUnits(List<Map<String, Object>> roomBeds) {
-        Map<Long, List<Map<String, Object>>> frameBeds = new LinkedHashMap<>();
-        List<BedUnit> units = new ArrayList<>();
-        for (Map<String, Object> bed : roomBeds) {
-            Object frameValue = bed.get("bed_frame_id");
-            if (frameValue == null) {
-                units.add(independentUnit(bed));
-                continue;
-            }
-            frameBeds.computeIfAbsent(number(frameValue), ignored -> new ArrayList<>()).add(bed);
+    private void updateIndependentType(RoomLayoutPlanner.BedUnit unit, LayoutItem item) {
+        if (!"BUNK".equals(unit.unitType()) && !unit.unitType().equals(item.bedType())) {
+            roomLayoutMapper.updateIndependentBedType(unit.representativeBedId(), item.bedType());
         }
-        for (List<Map<String, Object>> beds : frameBeds.values()) {
-            beds.sort(Comparator.comparingInt(
-                    bed -> ((Number) bed.get("position_index")).intValue()));
-            if (!isGenuineBunkPair(beds)) {
-                beds.stream().map(this::independentUnit).forEach(units::add);
-                continue;
-            }
-            Map<String, Object> representative = beds.stream()
-                    .filter(bed -> "BUNK_UPPER".equals(bed.get("bed_type")))
-                    .findFirst()
-                    .orElseThrow();
-            units.add(new BedUnit(
-                    number(representative.get("id")),
-                    "BUNK",
-                    List.copyOf(beds),
-                    beds.stream().anyMatch(this::occupied)));
-        }
-        units.sort(Comparator.comparingLong(BedUnit::representativeBedId));
-        return units;
-    }
-
-    private Set<Long> genuineBunkFrameIds(List<Map<String, Object>> roomBeds) {
-        Map<Long, List<Map<String, Object>>> frameBeds = new LinkedHashMap<>();
-        for (Map<String, Object> bed : roomBeds) {
-            Object frameValue = bed.get("bed_frame_id");
-            if (frameValue != null) {
-                frameBeds.computeIfAbsent(number(frameValue), ignored -> new ArrayList<>())
-                        .add(bed);
-            }
-        }
-        Set<Long> result = new HashSet<>();
-        frameBeds.forEach((frameId, beds) -> {
-            if (isGenuineBunkPair(beds)) {
-                result.add(frameId);
-            }
-        });
-        return result;
-    }
-
-    private boolean isGenuineBunkPair(List<Map<String, Object>> beds) {
-        if (beds.size() != 2) {
-            return false;
-        }
-        Set<String> types = new HashSet<>();
-        for (Map<String, Object> bed : beds) {
-            types.add(String.valueOf(bed.get("bed_type")));
-        }
-        return types.equals(Set.of("BUNK_UPPER", "BUNK_LOWER"));
-    }
-
-    private BedUnit independentUnit(Map<String, Object> bed) {
-        String unitType = "SINGLE_BED".equals(String.valueOf(bed.get("bed_type")))
-                ? "SINGLE_BED"
-                : "LOFT_BED_DESK";
-        return new BedUnit(
-                number(bed.get("id")),
-                unitType,
-                List.of(bed),
-                occupied(bed));
-    }
-
-    private void validateUnitSet(List<BedUnit> units, List<LayoutItem> items) {
-        if (items == null || items.size() != units.size()) {
-            throw new BusinessException(
-                    "ROOM_LAYOUT_BED_MISMATCH",
-                    "必须一次提交房间内全部床具单元的布局");
-        }
-        Set<Long> expected = new HashSet<>();
-        for (BedUnit unit : units) {
-            expected.add(unit.representativeBedId());
-        }
-        Set<Long> actual = new HashSet<>();
-        for (LayoutItem item : items) {
-            if (!actual.add(item.bedId())) {
-                throw new BusinessException("ROOM_LAYOUT_BED_MISMATCH", "床具布局中存在重复项目");
-            }
-        }
-        if (!expected.equals(actual)) {
-            throw new BusinessException(
-                    "ROOM_LAYOUT_BED_MISMATCH",
-                    "布局包含缺失床具或其他房间的床具");
-        }
-    }
-
-    private void validateItems(List<LayoutItem> items) {
-        for (LayoutItem item : items) {
-            if (!UNIT_TYPES.contains(item.bedType())) {
-                throw new BusinessException(
-                        "BED_TYPE_INVALID",
-                        "床具类型只能为上床下桌、上下铺或单人床");
-            }
-            if (!Double.isFinite(item.layoutX()) || !Double.isFinite(item.layoutZ())
-                    || item.layoutX() < MIN_X || item.layoutX() > MAX_X
-                    || item.layoutZ() < MIN_Z || item.layoutZ() > MAX_Z) {
-                throw new BusinessException(
-                        "ROOM_LAYOUT_OUT_OF_BOUNDS",
-                        "床具坐标超出房间可视区域");
-            }
-            if (!ROTATIONS.contains(item.rotationDegrees())) {
-                throw new BusinessException(
-                        "ROOM_LAYOUT_ROTATION_INVALID",
-                        "床具朝向只能为0、90、180或270度");
-            }
-        }
-    }
-
-    private void updateIndependentBedType(BedUnit unit, LayoutItem item) {
-        if ("BUNK".equals(unit.unitType()) || unit.unitType().equals(item.bedType())) {
-            return;
-        }
-        jdbc.update("""
-                UPDATE bed
-                SET bed_type=:bedType, bed_frame_id=NULL, version=version+1
-                WHERE id=:bedId
-                """, new MapSqlParameterSource()
-                .addValue("bedId", unit.representativeBedId())
-                .addValue("bedType", item.bedType()));
     }
 
     private void collapseBunkUnit(
-            long roomId,
-            BedUnit unit,
-            LayoutItem item,
-            long operatorUserId) {
+            long roomId, RoomLayoutPlanner.BedUnit unit, LayoutItem item, long operatorUserId) {
         if (unit.occupied()) {
-            throw new BusinessException(
-                    "BED_TYPE_OCCUPIED",
-                    "上下铺有人在住或已分配时不能合并床型",
-                    HttpStatus.CONFLICT);
+            throw new BusinessException("BED_TYPE_OCCUPIED", "上下铺有人在住或已分配时不能合并床型", HttpStatus.CONFLICT);
         }
         Map<String, Object> representative = unit.beds().stream()
-                .filter(bed -> number(bed.get("id")) == unit.representativeBedId())
-                .findFirst()
-                .orElseThrow();
+                .filter(bed -> planner.number(bed.get("id")) == unit.representativeBedId())
+                .findFirst().orElseThrow();
         Map<String, Object> removed = unit.beds().stream()
-                .filter(bed -> number(bed.get("id")) != unit.representativeBedId())
-                .findFirst()
-                .orElseThrow();
-        long removedBedId = number(removed.get("id"));
+                .filter(bed -> planner.number(bed.get("id")) != unit.representativeBedId())
+                .findFirst().orElseThrow();
+        long removedBedId = planner.number(removed.get("id"));
         Object frameValue = representative.get("bed_frame_id");
-
-        jdbc.update("DELETE FROM batch_bed_scope WHERE bed_id=:bedId", Map.of("bedId", removedBedId));
-        jdbc.update("DELETE FROM room_bed_layout WHERE bed_id=:bedId", Map.of("bedId", removedBedId));
-        int retired = jdbc.update("""
-                UPDATE bed
-                SET bed_frame_id=NULL, operational_status='RETIRED', version=version+1
-                WHERE id=:bedId AND room_id=:roomId AND operational_status<>'RETIRED'
-                """, Map.of("bedId", removedBedId, "roomId", roomId));
-        if (retired != 1) {
-            throw new BusinessException(
-                    "BUNK_COLLAPSE_CONFLICT",
-                    "上下铺床位状态已变化，请重新加载后再试",
-                    HttpStatus.CONFLICT);
+        roomLayoutMapper.deleteBedScope(removedBedId);
+        roomLayoutMapper.deletePlacement(removedBedId);
+        if (roomLayoutMapper.retireBed(removedBedId, roomId) != 1) {
+            throw new BusinessException("BUNK_COLLAPSE_CONFLICT", "上下铺床位状态已变化，请重新加载后再试", HttpStatus.CONFLICT);
         }
-        jdbc.update("""
-                UPDATE bed
-                SET bed_frame_id=NULL, bed_type=:bedType, operational_status='ENABLED', version=version+1
-                WHERE id=:bedId AND room_id=:roomId
-                """, new MapSqlParameterSource()
-                .addValue("bedId", unit.representativeBedId())
-                .addValue("roomId", roomId)
-                .addValue("bedType", item.bedType()));
-        if (frameValue != null) {
-            jdbc.update("DELETE FROM bed_frame WHERE id=:frameId AND room_id=:roomId",
-                    Map.of("frameId", number(frameValue), "roomId", roomId));
-        }
+        roomLayoutMapper.updateRepresentativeAfterCollapse(unit.representativeBedId(), roomId, item.bedType());
+        if (frameValue != null) roomLayoutMapper.deleteFrame(planner.number(frameValue), roomId);
         savePlacement(List.of(Map.of("id", unit.representativeBedId())), item, operatorUserId);
     }
 
-    private void splitLoftIntoBunk(
-            long roomId,
-            BedUnit unit,
-            LayoutItem item,
-            long operatorUserId) {
-        Map<String, Object> source = unit.beds().getFirst();
-        long sourceBedId = number(source.get("id"));
-        int nextPosition = nextPosition(roomId);
-        String frameCode = uniqueFrameCode(roomId, sourceBedId);
+    private void splitIntoBunk(
+            long roomId, RoomLayoutPlanner.BedUnit unit, LayoutItem item, long operatorUserId) {
+        long sourceBedId = planner.number(unit.beds().getFirst().get("id"));
+        int nextPosition = roomLayoutMapper.nextPosition(roomId);
+        Map<String, Object> frame = new HashMap<>();
+        frame.put("roomId", roomId);
+        frame.put("frameCode", uniqueFrameCode(roomId, sourceBedId));
+        roomLayoutMapper.insertFrame(frame);
+        long frameId = generatedId(frame, "床架");
+        roomLayoutMapper.updateSourceToUpper(sourceBedId, frameId);
 
-        GeneratedKeyHolder frameKey = new GeneratedKeyHolder();
-        jdbc.update("""
-                INSERT INTO bed_frame (room_id, frame_code, frame_type, enabled)
-                VALUES (:roomId, :frameCode, 'BUNK_FRAME', 1)
-                """, new MapSqlParameterSource()
-                .addValue("roomId", roomId)
-                .addValue("frameCode", frameCode),
-                frameKey,
-                new String[]{"id"});
-        long frameId = frameKey.getKey().longValue();
-
-        jdbc.update("""
-                UPDATE bed
-                SET bed_frame_id=:frameId, bed_type='BUNK_UPPER', version=version+1
-                WHERE id=:bedId
-                """, new MapSqlParameterSource()
-                .addValue("frameId", frameId)
-                .addValue("bedId", sourceBedId));
-
-        GeneratedKeyHolder lowerKey = new GeneratedKeyHolder();
-        jdbc.update("""
-                INSERT INTO bed
-                (room_id, bed_frame_id, bed_code, bed_type, position_index, operational_status)
-                VALUES (:roomId, :frameId, :bedCode, 'BUNK_LOWER', :positionIndex, 'ENABLED')
-                """, new MapSqlParameterSource()
-                .addValue("roomId", roomId)
-                .addValue("frameId", frameId)
-                .addValue("bedCode", uniqueBedCode(roomId, nextPosition))
-                .addValue("positionIndex", nextPosition),
-                lowerKey,
-                new String[]{"id"});
-        long lowerBedId = lowerKey.getKey().longValue();
-
-        jdbc.update("""
-                INSERT IGNORE INTO batch_bed_scope (batch_id, bed_id)
-                SELECT batch_id, :newBedId
-                FROM batch_bed_scope
-                WHERE bed_id=:sourceBedId
-                """, new MapSqlParameterSource()
-                .addValue("newBedId", lowerBedId)
-                .addValue("sourceBedId", sourceBedId));
-
-        savePlacement(
-                List.of(Map.of("id", sourceBedId), Map.of("id", lowerBedId)),
-                item,
-                operatorUserId);
+        Map<String, Object> lower = new HashMap<>();
+        lower.put("roomId", roomId);
+        lower.put("frameId", frameId);
+        lower.put("bedCode", uniqueBedCode(roomId, nextPosition));
+        lower.put("positionIndex", nextPosition);
+        roomLayoutMapper.insertLowerBed(lower);
+        long lowerBedId = generatedId(lower, "下铺床位");
+        roomLayoutMapper.copyBedScope(lowerBedId, sourceBedId);
+        savePlacement(List.of(Map.of("id", sourceBedId), Map.of("id", lowerBedId)), item, operatorUserId);
     }
 
-    private void savePlacement(
-            List<Map<String, Object>> beds,
-            LayoutItem item,
-            long operatorUserId) {
-        for (Map<String, Object> bed : beds) {
-            jdbc.update("""
-                    INSERT INTO room_bed_layout
-                    (bed_id, layout_x, layout_z, rotation_degrees, updated_by)
-                    VALUES (:bedId, :layoutX, :layoutZ, :rotation, :updatedBy)
-                    ON DUPLICATE KEY UPDATE
-                        layout_x=VALUES(layout_x),
-                        layout_z=VALUES(layout_z),
-                        rotation_degrees=VALUES(rotation_degrees),
-                        updated_by=VALUES(updated_by),
-                        version=version+1
-                    """, new MapSqlParameterSource()
-                    .addValue("bedId", number(bed.get("id")))
-                    .addValue("layoutX", item.layoutX())
-                    .addValue("layoutZ", item.layoutZ())
-                    .addValue("rotation", item.rotationDegrees())
-                    .addValue("updatedBy", operatorUserId));
-        }
+    private void savePlacement(List<Map<String, Object>> beds, LayoutItem item, long operatorUserId) {
+        List<Map<String, Object>> values = beds.stream().map(bed -> Map.<String, Object>of(
+                "bedId", planner.number(bed.get("id")),
+                "layoutX", item.layoutX(),
+                "layoutZ", item.layoutZ(),
+                "rotation", item.rotationDegrees(),
+                "updatedBy", operatorUserId)).toList();
+        roomLayoutMapper.batchUpsertPlacements(values);
     }
 
-    private int nextPosition(long roomId) {
-        Integer value = jdbc.queryForObject("""
-                SELECT COALESCE(MAX(position_index), 0) + 1
-                FROM bed WHERE room_id=:roomId
-                """, Map.of("roomId", roomId), Integer.class);
-        return value == null ? 1 : value;
+    private String uniqueBedCode(long roomId, int positionIndex) {
+        int suffix = positionIndex;
+        String candidate = "B" + suffix;
+        while (roomLayoutMapper.countBedCode(roomId, candidate) > 0) candidate = "B" + (++suffix);
+        return candidate;
     }
 
     private String uniqueFrameCode(long roomId, long bedId) {
         String base = "BF-" + roomId + "-" + bedId;
-        if (base.length() <= 32) {
-            return base;
-        }
-        return "BF-" + bedId;
+        return base.length() <= 32 ? base : "BF-" + bedId;
     }
 
-    private String uniqueBedCode(long roomId, int positionIndex) {
-        String candidate = "B" + positionIndex;
-        int suffix = positionIndex;
-        while (count("""
-                SELECT COUNT(*) FROM bed
-                WHERE room_id=:roomId AND bed_code=:bedCode
-                """, new MapSqlParameterSource()
-                .addValue("roomId", roomId)
-                .addValue("bedCode", candidate)) > 0) {
-            suffix++;
-            candidate = "B" + suffix;
-        }
-        return candidate;
+    private long generatedId(Map<String, Object> values, String entity) {
+        Object key = values.get("id");
+        if (key instanceof Number number) return number.longValue();
+        throw new IllegalStateException(entity + "创建成功但未返回编号");
     }
 
-    private boolean occupied(Map<String, Object> bed) {
-        return ((Number) bed.get("occupied")).intValue() == 1;
+    private BusinessException versionConflict() {
+        return new BusinessException("ROOM_LAYOUT_VERSION_CONFLICT",
+                "房间布局已被其他管理员修改，请重新加载后再保存", HttpStatus.CONFLICT);
     }
 
-    private long number(Object value) {
-        return ((Number) value).longValue();
+    public record LayoutCommand(long expectedRoomVersion, String reason, List<LayoutItem> beds) {
     }
 
-    private int count(String sql, MapSqlParameterSource parameters) {
-        Integer value = jdbc.queryForObject(sql, parameters, Integer.class);
-        return value == null ? 0 : value;
-    }
-
-    private String roomTypeForBedCount(int bedCount) {
-        return switch (bedCount) {
-            case 4 -> "FOUR_PERSON";
-            case 5 -> "FIVE_PERSON";
-            case 6 -> "SIX_PERSON";
-            default -> "OTHER";
-        };
-    }
-
-    private DefaultPlacement defaultPlacement(String bedType, int positionIndex) {
-        if ("BUNK_UPPER".equals(bedType) || "BUNK_LOWER".equals(bedType)) {
-            return new DefaultPlacement(2.35, 1.65, 0);
-        }
-        return switch (positionIndex) {
-            case 1 -> new DefaultPlacement(-2.35, -1.65, 0);
-            case 2 -> new DefaultPlacement(2.35, -1.65, 0);
-            case 3 -> new DefaultPlacement(-2.35, 1.65, 0);
-            default -> new DefaultPlacement(2.35, 1.65, 0);
-        };
-    }
-
-    private Map<String, Object> one(
-            String sql,
-            Map<String, ?> parameters,
-            String code,
-            String message) {
-        List<Map<String, Object>> rows = jdbc.queryForList(sql, parameters);
-        if (rows.isEmpty()) {
-            throw new BusinessException(code, message, HttpStatus.NOT_FOUND);
-        }
-        return rows.getFirst();
-    }
-
-    public record LayoutCommand(
-            long expectedRoomVersion,
-            String reason,
-            List<LayoutItem> beds) {
-    }
-
-    public record LayoutItem(
-            long bedId,
-            String bedType,
-            double layoutX,
-            double layoutZ,
-            int rotationDegrees) {
-    }
-
-    private record BedUnit(
-            long representativeBedId,
-            String unitType,
-            List<Map<String, Object>> beds,
-            boolean occupied) {
-    }
-
-    private record DefaultPlacement(double x, double z, int rotationDegrees) {
+    public record LayoutItem(long bedId, String bedType, double layoutX, double layoutZ, int rotationDegrees) {
     }
 }

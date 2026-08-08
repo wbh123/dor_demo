@@ -8,6 +8,8 @@ def read(path: str) -> str:
 
 layout = read('frontend/src/components/admin/RoomLayoutEditor.vue')
 layout_service = read('backend-java/server/src/main/java/com/wust/dormitory/admin/RoomLayoutService.java')
+layout_planner = read('backend-java/server/src/main/java/com/wust/dormitory/admin/RoomLayoutPlanner.java')
+layout_mapper = read('backend-java/server/src/main/resources/mapper/admin/RoomLayoutMapper.xml')
 single_service = read('backend-java/server/src/main/java/com/wust/dormitory/admin/SingleBedRoomLayoutService.java')
 dormitory = read('frontend/src/views/admin/AdminDormitoryView.vue')
 room_service = read('backend-java/server/src/main/java/com/wust/dormitory/admin/RoomManagementService.java')
@@ -22,8 +24,8 @@ en = read('frontend/src/i18n/locales/en-US.ts')
 assert "BUNK_COLLAPSE_NOT_SUPPORTED" not in layout_service
 assert "BUNK_TO_SINGLE_NOT_SUPPORTED" not in single_service
 assert 'collapseBunkUnit' in layout_service
-assert "operational_status='RETIRED'" in layout_service
-assert 'SINGLE_BED' in layout_service
+assert "operational_status = 'RETIRED'" in layout_mapper
+assert 'SINGLE_BED' in (layout_service + layout_planner + single_service)
 assert "unit.originalType==='BUNK'&&type!=='BUNK'" not in layout
 assert 'collapsedBunks' in layout
 assert 'width:220px' in layout

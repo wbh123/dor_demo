@@ -1,8 +1,8 @@
 package com.wust.dormitory.admin;
 
+import com.wust.dormitory.admin.mapper.RoomLayoutMapper;
 import com.wust.dormitory.audit.AuditService;
 import org.springframework.context.annotation.Primary;
-import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Service;
 
 /**
@@ -12,9 +12,11 @@ import org.springframework.stereotype.Service;
 @Primary
 public class SingleBedRoomLayoutService extends RoomLayoutService {
     public static final String SINGLE_BED = "SINGLE_BED";
+
     public SingleBedRoomLayoutService(
-            NamedParameterJdbcTemplate jdbc,
+            RoomLayoutMapper roomLayoutMapper,
+            RoomLayoutPlanner planner,
             AuditService auditService) {
-        super(jdbc, auditService);
+        super(roomLayoutMapper, planner, auditService);
     }
 }

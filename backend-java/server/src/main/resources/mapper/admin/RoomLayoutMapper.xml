@@ -1,0 +1,188 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.wust.dormitory.admin.mapper.RoomLayoutMapper">
+    <select id="findRoomLayout" resultType="map">
+        SELECT r.id,
+               r.room_number,
+               r.room_type,
+               r.capacity,
+               r.version AS room_version,
+               r.state_version,
+               f.floor_number,
+               b.building_name
+        FROM room r
+        JOIN dormitory_floor f ON f.id = r.floor_id
+        JOIN dormitory_building b ON b.id = f.building_id
+        WHERE r.id = #{roomId}
+    </select>
+
+    <select id="findBeds" resultType="map">
+        SELECT bed.id,
+               bed.bed_code,
+               bed.bed_type,
+               bed.position_index,
+               bed.bed_frame_id,
+               bed.operational_status,
+               CASE WHEN EXISTS (
+                   SELECT 1
+                   FROM bed_assignment assignment
+                   WHERE assignment.bed_id = bed.id
+                     AND assignment.assignment_status = 'ACTIVE'
+               ) OR EXISTS (
+                   SELECT 1
+                   FROM room_assignment residency
+                   WHERE residency.bed_id = bed.id
+                     AND residency.assignment_status = 'ACTIVE'
+               ) THEN 1 ELSE 0 END AS occupied,
+               layout.layout_x,
+               layout.layout_z,
+               layout.rotation_degrees,
+               CASE WHEN layout.bed_id IS NULL THEN 0 ELSE 1 END AS custom_layout
+        FROM bed
+        LEFT JOIN room_bed_layout layout ON layout.bed_id = bed.id
+        WHERE bed.room_id = #{roomId}
+          AND bed.operational_status &lt;&gt; 'RETIRED'
+        ORDER BY bed.position_index, bed.id
+    </select>
+
+    <select id="lockRoom" resultType="map">
+        SELECT id, version, state_version, capacity
+        FROM room
+        WHERE id = #{roomId}
+        FOR UPDATE
+    </select>
+
+    <select id="lockRoomBeds" resultType="map">
+        SELECT bed.id,
+               bed.bed_code,
+               bed.bed_type,
+               bed.position_index,
+               bed.bed_frame_id,
+               CASE WHEN EXISTS (
+                   SELECT 1
+                   FROM bed_assignment assignment
+                   WHERE assignment.bed_id = bed.id
+                     AND assignment.assignment_status = 'ACTIVE'
+               ) OR EXISTS (
+                   SELECT 1
+                   FROM room_assignment residency
+                   WHERE residency.bed_id = bed.id
+                     AND residency.assignment_status = 'ACTIVE'
+               ) THEN 1 ELSE 0 END AS occupied
+        FROM bed
+        WHERE bed.room_id = #{roomId}
+          AND bed.operational_status &lt;&gt; 'RETIRED'
+        ORDER BY bed.position_index, bed.id
+        FOR UPDATE
+    </select>
+
+    <update id="updateRoomVersioned">
+        UPDATE room
+        SET room_type = #{roomType},
+            capacity = #{capacity},
+            version = version + 1,
+            state_version = state_version + 1
+        WHERE id = #{roomId}
+          AND version = #{expectedVersion}
+    </update>
+
+    <update id="updateIndependentBedType">
+        UPDATE bed
+        SET bed_type = #{bedType},
+            bed_frame_id = NULL,
+            version = version + 1
+        WHERE id = #{bedId}
+    </update>
+
+    <delete id="deleteBedScope">
+        DELETE FROM batch_bed_scope
+        WHERE bed_id = #{bedId}
+    </delete>
+
+    <delete id="deletePlacement">
+        DELETE FROM room_bed_layout
+        WHERE bed_id = #{bedId}
+    </delete>
+
+    <update id="retireBed">
+        UPDATE bed
+        SET bed_frame_id = NULL,
+            operational_status = 'RETIRED',
+            version = version + 1
+        WHERE id = #{bedId}
+          AND room_id = #{roomId}
+          AND operational_status &lt;&gt; 'RETIRED'
+    </update>
+
+    <update id="updateRepresentativeAfterCollapse">
+        UPDATE bed
+        SET bed_frame_id = NULL,
+            bed_type = #{bedType},
+            operational_status = 'ENABLED',
+            version = version + 1
+        WHERE id = #{bedId}
+          AND room_id = #{roomId}
+    </update>
+
+    <delete id="deleteFrame">
+        DELETE FROM bed_frame
+        WHERE id = #{frameId}
+          AND room_id = #{roomId}
+    </delete>
+
+    <insert id="insertFrame" parameterType="map" useGeneratedKeys="true" keyProperty="id" keyColumn="id">
+        INSERT INTO bed_frame (room_id, frame_code, frame_type, enabled)
+        VALUES (#{roomId}, #{frameCode}, 'BUNK_FRAME', 1)
+    </insert>
+
+    <update id="updateSourceToUpper">
+        UPDATE bed
+        SET bed_frame_id = #{frameId},
+            bed_type = 'BUNK_UPPER',
+            version = version + 1
+        WHERE id = #{bedId}
+    </update>
+
+    <insert id="insertLowerBed" parameterType="map" useGeneratedKeys="true" keyProperty="id" keyColumn="id">
+        INSERT INTO bed
+        (room_id, bed_frame_id, bed_code, bed_type, position_index, operational_status)
+        VALUES (#{roomId}, #{frameId}, #{bedCode}, 'BUNK_LOWER', #{positionIndex}, 'ENABLED')
+    </insert>
+
+    <insert id="copyBedScope">
+        INSERT IGNORE INTO batch_bed_scope (batch_id, bed_id)
+        SELECT batch_id, #{newBedId}
+        FROM batch_bed_scope
+        WHERE bed_id = #{sourceBedId}
+    </insert>
+
+    <insert id="batchUpsertPlacements">
+        INSERT INTO room_bed_layout
+        (bed_id, layout_x, layout_z, rotation_degrees, updated_by)
+        VALUES
+        <foreach collection="items" item="item" separator=",">
+            (#{item.bedId}, #{item.layoutX}, #{item.layoutZ}, #{item.rotation}, #{item.updatedBy})
+        </foreach>
+        ON DUPLICATE KEY UPDATE
+            layout_x = VALUES(layout_x),
+            layout_z = VALUES(layout_z),
+            rotation_degrees = VALUES(rotation_degrees),
+            updated_by = VALUES(updated_by),
+            version = version + 1
+    </insert>
+
+    <select id="nextPosition" resultType="int">
+        SELECT COALESCE(MAX(position_index), 0) + 1
+        FROM bed
+        WHERE room_id = #{roomId}
+    </select>
+
+    <select id="countBedCode" resultType="int">
+        SELECT COUNT(*)
+        FROM bed
+        WHERE room_id = #{roomId}
+          AND bed_code = #{bedCode}
+    </select>
+</mapper>

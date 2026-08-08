@@ -27,16 +27,16 @@ snapshot = (
     + read("backend-java/server/src/main/resources/mapper/analytics/BatchAnalyticsSnapshotMapper.xml")
 )
 historical = read("backend-java/server/src/main/java/com/wust/dormitory/analytics/HistoricalAnalyticsService.java")
-lifecycle = read("backend-java/server/src/main/java/com/wust/dormitory/admin/BatchLifecycleService.java")
+lifecycle = (
+    read("backend-java/server/src/main/java/com/wust/dormitory/admin/BatchLifecycleService.java")
+    + read("backend-java/server/src/main/resources/mapper/admin/BatchLifecycleMapper.xml")
+)
 audit = read("backend-java/server/src/main/java/com/wust/dormitory/audit/AuditQueryService.java")
 retention = read("backend-java/server/src/main/java/com/wust/dormitory/retention/DataRetentionQueryService.java")
 
 for forbidden in ("recommendation_log", "assignment_source"):
     require(forbidden not in snapshot, f"snapshot service still references nonexistent schema object: {forbidden}")
 
-# V27 student_recommendation_request only exposes created_at and response_json for this
-# analytics flow. Restrict nonexistent-column checks to the recommendation CTE so aliases
-# used by room-change/exchange requests cannot cause false positives.
 recommendation_match = re.search(
     r"recommendation_fact\s+AS\s*\((?P<body>.*?)\)\s*,\s*room_change_fact",
     snapshot,
@@ -79,7 +79,9 @@ require("assignment.room_id" not in historical,
         "historical analytics still joins the nonexistent bed_assignment.room_id")
 require("PRIVACY_THRESHOLD" in historical and "sample_size" in historical,
         "small-sample privacy suppression is not based on immutable facts")
-require("selection_batch SET finished_at" in lifecycle,
+require("selection_batch" in lifecycle
+        and "finished_at" in lifecycle
+        and "COALESCE(finished_at" in lifecycle,
         "finished batch timestamp is not captured for immutable completion duration")
 require("audit.ip_address=:networkAddress" in audit and "audit.ip_address AS network_address" in audit,
         "advanced audit does not map the existing ip_address column")
