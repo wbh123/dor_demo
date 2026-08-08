@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.wust.dormitory.admin.mapper.BatchPreparationMapper">
+    <select id="findBatchStatus" resultType="string">
+        SELECT batch_status
+        FROM selection_batch
+        WHERE id = #{batchId}
+    </select>
+
+    <insert id="insertEligibleStudents">
+        INSERT IGNORE INTO batch_student_eligibility
+        (batch_id, student_id, eligibility_status)
+        SELECT #{batchId}, s.id, 'ELIGIBLE'
+        FROM student s
+        JOIN major m ON m.id = s.major_id
+        WHERE m.enabled = 1
+          AND EXISTS (
+              SELECT 1
+              FROM selection_batch batch
+              WHERE batch.id = #{batchId}
+                AND batch.batch_status = 'DRAFT'
+          )
+    </insert>
+
+    <insert id="insertEnabledBuildings">
+        INSERT IGNORE INTO batch_building_scope (batch_id, building_id)
+        SELECT #{batchId}, building.id
+        FROM dormitory_building building
+        WHERE building.enabled = 1
+          AND EXISTS (
+              SELECT 1
+              FROM selection_batch batch
+              WHERE batch.id = #{batchId}
+                AND batch.batch_status = 'DRAFT'
+          )
+    </insert>
+</mapper>
