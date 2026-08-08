@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.wust.dormitory.allocation.AllocationCommitMapper">
+    <select id="lockBatch" resultType="map">
+        SELECT id, batch_status
+        FROM selection_batch
+        WHERE id = #{batchId}
+        FOR UPDATE
+    </select>
+
+    <select id="findExistingRun" resultType="map">
+        SELECT id, execution_code, summary_json
+        FROM allocation_run
+        WHERE batch_id = #{batchId}
+          AND idempotency_key = #{idempotencyKey}
+        LIMIT 1
+    </select>
+
+    <select id="findUnassignedFailures" resultType="map">
+        SELECT result.student_id,
+               student.student_number,
+               student.student_name,
+               result.failure_code,
+               JSON_UNQUOTE(JSON_EXTRACT(result.explanation_json, '$.failureReason')) AS failure_reason
+        FROM allocation_run_result result
+        JOIN student ON student.id = result.student_id
+        WHERE result.allocation_run_id = #{runId}
+          AND result.result_status = 'UNASSIGNED'
+        ORDER BY student.student_number
+    </select>
+
+    <insert id="insertRun" parameterType="map" useGeneratedKeys="true" keyProperty="id" keyColumn="id">
+        INSERT INTO allocation_run
+        (batch_id, execution_code, idempotency_key, run_mode, run_status,
+         algorithm_version, rule_version, random_seed,
+         student_snapshot_json, bed_snapshot_json, summary_json,
+         operator_user_id, started_at, finished_at)
+        VALUES
+        (#{batchId}, #{executionCode}, #{idempotencyKey}, 'COMMIT', #{runStatus},
+         #{algorithmVersion}, 'phase1-rule-v1', #{randomSeed},
+         CAST(#{studentSnapshot} AS JSON), CAST(#{bedSnapshot} AS JSON), CAST(#{summary} AS JSON),
+         #{operatorId}, CURRENT_TIMESTAMP(3), CURRENT_TIMESTAMP(3))
+    </insert>
+
+    <insert id="insertAssignment" parameterType="map" useGeneratedKeys="true" keyProperty="id" keyColumn="id">
+        INSERT INTO bed_assignment
+        (batch_id, student_id, bed_id, team_id,
+         assignment_method, assignment_status,
+         allocation_run_id, assigned_by, assigned_at)
+        VALUES
+        (#{batchId}, #{studentId}, #{bedId}, #{teamId},
+         'ADMIN_RANDOM', 'ACTIVE', #{runId}, #{operatorId}, CURRENT_TIMESTAMP(3))
+    </insert>
+
+    <insert id="insertAssignmentHistory" parameterType="map">
+        INSERT INTO assignment_history
+        (assignment_id, batch_id, student_id, bed_id,
+         event_type, assignment_method, operator_user_id,
+         reason, current_data, occurred_at)
+        VALUES
+        (#{assignmentId}, #{batchId}, #{studentId}, #{bedId},
+         'CREATED', 'ADMIN_RANDOM', #{operatorId}, #{reason},
+         CAST(#{currentData} AS JSON), CURRENT_TIMESTAMP(3))
+    </insert>
+
+    <insert id="insertAssignedResult" parameterType="map">
+        INSERT INTO allocation_run_result
+        (allocation_run_id, student_id, bed_id,
+         result_status, score, explanation_json)
+        VALUES
+        (#{runId}, #{studentId}, #{bedId}, 'ASSIGNED', #{score}, CAST(#{explanation} AS JSON))
+    </insert>
+
+    <insert id="insertUnassignedResults">
+        INSERT INTO allocation_run_result
+        (allocation_run_id, student_id, result_status, failure_code, explanation_json)
+        VALUES
+        <foreach collection="items" item="item" separator=",">
+            (#{runId}, #{item.studentId}, 'UNASSIGNED', #{item.failureCode}, CAST(#{item.explanation} AS JSON))
+        </foreach>
+    </insert>
+
+    <update id="completeTeams">
+        UPDATE selection_team
+        SET team_status = 'COMPLETED'
+        WHERE team_status = 'LOCKED'
+          AND id IN
+        <foreach collection="teamIds" item="teamId" open="(" separator="," close=")">
+            #{teamId}
+        </foreach>
+    </update>
+
+    <update id="finishBatch">
+        UPDATE selection_batch
+        SET batch_status = 'FINISHED'
+        WHERE id = #{batchId}
+    </update>
+</mapper>
