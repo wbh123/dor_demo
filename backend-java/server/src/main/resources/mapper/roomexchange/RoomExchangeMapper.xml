@@ -1,0 +1,254 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.wust.dormitory.roomexchange.mapper.RoomExchangeMapper">
+
+    <sql id="RequestColumns">
+        exchange_row.id, exchange_row.initiator_student_id, exchange_row.target_student_id,
+        exchange_row.initiator_residency_id, exchange_row.target_residency_id,
+        exchange_row.policy_mode, exchange_row.request_status, exchange_row.reason,
+        exchange_row.target_response_reason, exchange_row.responded_at,
+        exchange_row.reviewed_by, exchange_row.review_reason, exchange_row.reviewed_at,
+        exchange_row.initiator_executed_residency_id,
+        exchange_row.target_executed_residency_id, exchange_row.executed_at,
+        exchange_row.created_at, exchange_row.updated_at
+    </sql>
+
+    <sql id="ViewColumns">
+        <include refid="RequestColumns"/>,
+        initiator.student_number AS initiator_student_number,
+        initiator.student_name AS initiator_student_name,
+        target.student_number AS target_student_number,
+        target.student_name AS target_student_name,
+        initiator_room.room_number AS initiator_room_number,
+        initiator_building.building_name AS initiator_building_name,
+        initiator_bed.bed_code AS initiator_bed_code,
+        target_room.room_number AS target_room_number,
+        target_building.building_name AS target_building_name,
+        target_bed.bed_code AS target_bed_code
+    </sql>
+
+    <sql id="ViewJoins">
+        FROM room_exchange_request exchange_row
+        JOIN student initiator ON initiator.id=exchange_row.initiator_student_id
+        JOIN student target ON target.id=exchange_row.target_student_id
+        JOIN room_assignment initiator_residency
+          ON initiator_residency.id=exchange_row.initiator_residency_id
+        JOIN room initiator_room ON initiator_room.id=initiator_residency.room_id
+        JOIN dormitory_floor initiator_floor ON initiator_floor.id=initiator_room.floor_id
+        JOIN dormitory_building initiator_building
+          ON initiator_building.id=initiator_floor.building_id
+        LEFT JOIN bed initiator_bed ON initiator_bed.id=initiator_residency.bed_id
+        JOIN room_assignment target_residency
+          ON target_residency.id=exchange_row.target_residency_id
+        JOIN room target_room ON target_room.id=target_residency.room_id
+        JOIN dormitory_floor target_floor ON target_floor.id=target_room.floor_id
+        JOIN dormitory_building target_building
+          ON target_building.id=target_floor.building_id
+        LEFT JOIN bed target_bed ON target_bed.id=target_residency.bed_id
+    </sql>
+
+    <select id="findCompatibleCandidates" resultType="map">
+        SELECT target.id AS target_student_id,
+               target.student_number, target.student_name,
+               target.gender, target.student_category,
+               assignment.id AS target_residency_id,
+               assignment.room_id, assignment.bed_id,
+               building.building_name, floor.floor_number,
+               room.room_number, room.room_type,
+               bed.bed_code, bed.bed_type
+        FROM student target
+        JOIN room_assignment assignment
+          ON assignment.student_id=target.id
+         AND assignment.assignment_status='ACTIVE'
+        JOIN room ON room.id=assignment.room_id
+        JOIN dormitory_floor floor ON floor.id=room.floor_id
+        JOIN dormitory_building building ON building.id=floor.building_id
+        LEFT JOIN bed ON bed.id=assignment.bed_id
+        LEFT JOIN room_exchange_participant_lock participant_lock
+          ON participant_lock.student_id=target.id
+        WHERE target.id&lt;&gt;#{studentId}
+          AND target.gender=#{sourceGender}
+          AND target.gender=#{sourceRoomGender}
+          AND target.student_number LIKE #{studentNumberPattern} ESCAPE '\\'
+          AND participant_lock.student_id IS NULL
+          AND #{sourceRoomStatus}='ENABLED'
+          AND room.operational_status='ENABLED'
+          AND room.gender_restriction=#{sourceGender}
+          AND (
+            room.resident_scope='MIXED'
+            OR (#{sourceCategory}='DOMESTIC' AND room.resident_scope='DOMESTIC_ONLY')
+            OR (#{sourceCategory}='INTERNATIONAL' AND room.resident_scope='INTERNATIONAL_ONLY')
+          )
+          AND (
+            #{sourceRoomScope}='MIXED'
+            OR (target.student_category='DOMESTIC' AND #{sourceRoomScope}='DOMESTIC_ONLY')
+            OR (target.student_category='INTERNATIONAL' AND #{sourceRoomScope}='INTERNATIONAL_ONLY')
+          )
+        ORDER BY building.building_code, floor.floor_number,
+                 room.room_number, target.student_number
+        LIMIT 20
+    </select>
+
+    <select id="findStudentRequests" resultType="map">
+        SELECT <include refid="ViewColumns"/>
+        <include refid="ViewJoins"/>
+        WHERE exchange_row.initiator_student_id=#{studentId}
+           OR exchange_row.target_student_id=#{studentId}
+        ORDER BY exchange_row.created_at DESC
+    </select>
+
+    <select id="findAdminRequests" resultType="map">
+        SELECT <include refid="ViewColumns"/>
+        <include refid="ViewJoins"/>
+        <where>
+            <if test="status != null and status != '' and status != 'ALL'">
+                exchange_row.request_status=#{status}
+            </if>
+            <if test="keyword != null and keyword != ''">
+                <if test="status != null and status != '' and status != 'ALL'">AND</if>
+                (initiator.student_number LIKE CONCAT('%',#{keyword},'%')
+                 OR initiator.student_name LIKE CONCAT('%',#{keyword},'%')
+                 OR target.student_number LIKE CONCAT('%',#{keyword},'%')
+                 OR target.student_name LIKE CONCAT('%',#{keyword},'%'))
+            </if>
+        </where>
+        ORDER BY exchange_row.created_at DESC
+    </select>
+
+    <select id="findRequestView" resultType="map">
+        SELECT <include refid="ViewColumns"/>
+        <include refid="ViewJoins"/>
+        WHERE exchange_row.id=#{exchangeId}
+    </select>
+
+    <select id="findPolicyMode" resultType="string">
+        SELECT setting_value
+        FROM system_setting
+        WHERE setting_key='ROOM_EXCHANGE_POLICY'
+        LIMIT 1
+    </select>
+
+    <select id="lockRequest" resultType="map">
+        SELECT <include refid="RequestColumns"/>
+        FROM room_exchange_request exchange_row
+        WHERE exchange_row.id=#{exchangeId}
+        FOR UPDATE
+    </select>
+
+    <select id="lockActiveResidencies" resultType="map">
+        SELECT id, batch_id, student_id, room_id, bed_id, team_id,
+               source_selection_mode, assignment_method, assignment_status,
+               assigned_by, assigned_at, bed_confirmed_at,
+               ended_at, end_reason, created_at, updated_at
+        FROM room_assignment
+        WHERE student_id IN (#{firstStudentId},#{secondStudentId})
+          AND assignment_status='ACTIVE'
+        ORDER BY student_id
+        FOR UPDATE
+    </select>
+
+    <select id="findActiveResidency" resultType="map">
+        SELECT id, batch_id, student_id, room_id, bed_id, team_id,
+               source_selection_mode, assignment_method, assignment_status,
+               assigned_by, assigned_at, bed_confirmed_at,
+               ended_at, end_reason, created_at, updated_at
+        FROM room_assignment
+        WHERE student_id=#{studentId} AND assignment_status='ACTIVE'
+        ORDER BY id
+    </select>
+
+    <select id="lockActiveResidency" resultType="map">
+        SELECT id, batch_id, student_id, room_id, bed_id, team_id,
+               source_selection_mode, assignment_method, assignment_status,
+               assigned_by, assigned_at, bed_confirmed_at,
+               ended_at, end_reason, created_at, updated_at
+        FROM room_assignment
+        WHERE student_id=#{studentId} AND assignment_status='ACTIVE'
+        ORDER BY id
+        FOR UPDATE
+    </select>
+
+    <insert id="insertRequest" parameterType="map" useGeneratedKeys="true" keyProperty="id" keyColumn="id">
+        INSERT INTO room_exchange_request
+        (initiator_student_id, target_student_id,
+         initiator_residency_id, target_residency_id,
+         policy_mode, request_status, reason,
+         created_at, updated_at)
+        VALUES
+        (#{initiatorStudentId}, #{targetStudentId},
+         #{initiatorResidencyId}, #{targetResidencyId},
+         #{policyMode}, 'WAITING_TARGET', #{reason},
+         CURRENT_TIMESTAMP(3), CURRENT_TIMESTAMP(3))
+    </insert>
+
+    <insert id="insertParticipantLock">
+        INSERT INTO room_exchange_participant_lock
+        (student_id, exchange_id, participant_role, created_at)
+        VALUES (#{studentId},#{exchangeId},#{role},CURRENT_TIMESTAMP(3))
+    </insert>
+
+    <delete id="deleteParticipantLocks">
+        DELETE FROM room_exchange_participant_lock
+        WHERE exchange_id=#{exchangeId}
+    </delete>
+
+    <update id="rejectByTarget">
+        UPDATE room_exchange_request
+        SET request_status='REJECTED', target_response_reason=#{reason},
+            responded_at=CURRENT_TIMESTAMP(3), updated_at=CURRENT_TIMESTAMP(3)
+        WHERE id=#{exchangeId}
+    </update>
+
+    <update id="acceptByTarget">
+        UPDATE room_exchange_request
+        SET request_status=#{status}, target_response_reason=#{reason},
+            responded_at=CURRENT_TIMESTAMP(3), updated_at=CURRENT_TIMESTAMP(3)
+        WHERE id=#{exchangeId}
+    </update>
+
+    <update id="approveRequest">
+        UPDATE room_exchange_request
+        SET request_status='APPROVED', reviewed_by=#{reviewedBy},
+            review_reason=#{reason}, reviewed_at=CURRENT_TIMESTAMP(3),
+            updated_at=CURRENT_TIMESTAMP(3)
+        WHERE id=#{exchangeId}
+    </update>
+
+    <update id="rejectByAdmin">
+        UPDATE room_exchange_request
+        SET request_status='REJECTED', reviewed_by=#{reviewedBy},
+            review_reason=#{reason}, reviewed_at=CURRENT_TIMESTAMP(3),
+            updated_at=CURRENT_TIMESTAMP(3)
+        WHERE id=#{exchangeId}
+    </update>
+
+    <update id="cancelRequest">
+        UPDATE room_exchange_request
+        SET request_status='CANCELLED', review_reason=#{reason},
+            updated_at=CURRENT_TIMESTAMP(3)
+        WHERE id=#{exchangeId}
+    </update>
+
+    <update id="markExecuted">
+        UPDATE room_exchange_request
+        SET request_status='EXECUTED',
+            initiator_executed_residency_id=#{initiatorResidencyId},
+            target_executed_residency_id=#{targetResidencyId},
+            executed_at=CURRENT_TIMESTAMP(3),
+            updated_at=CURRENT_TIMESTAMP(3)
+        WHERE id=#{exchangeId}
+    </update>
+
+    <insert id="upsertPolicy">
+        INSERT INTO system_setting
+        (setting_key, setting_value, version, updated_by)
+        VALUES ('ROOM_EXCHANGE_POLICY', #{mode}, 0, #{updatedBy})
+        ON DUPLICATE KEY UPDATE
+            setting_value=VALUES(setting_value),
+            version=version+1,
+            updated_by=VALUES(updated_by),
+            updated_at=CURRENT_TIMESTAMP(3)
+    </insert>
+</mapper>

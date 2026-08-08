@@ -1,0 +1,187 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.wust.dormitory.residency.mapper.ResidencyMapper">
+
+    <select id="findCurrentResidency" resultType="map">
+        SELECT ra.id AS residency_id, ra.batch_id, ra.student_id,
+               ra.room_id, ra.bed_id, ra.team_id,
+               ra.source_selection_mode, ra.assignment_method,
+               ra.assigned_at, ra.bed_confirmed_at,
+               r.room_number, r.capacity, r.gender_restriction,
+               r.resident_scope, r.operational_status,
+               f.floor_number, db.id AS building_id, db.building_code,
+               db.building_name,
+               b.bed_code, b.bed_type,
+               (ra.bed_id IS NOT NULL) AS bed_confirmed
+        FROM room_assignment ra
+        JOIN room r ON r.id=ra.room_id
+        JOIN dormitory_floor f ON f.id=r.floor_id
+        JOIN dormitory_building db ON db.id=f.building_id
+        LEFT JOIN bed b ON b.id=ra.bed_id
+        WHERE ra.student_id=#{studentId}
+          AND ra.assignment_status='ACTIVE'
+        ORDER BY ra.assigned_at DESC, ra.id DESC
+        LIMIT 1
+    </select>
+
+    <select id="findResidencies" resultType="map">
+        SELECT ra.id AS residency_id, ra.batch_id, ra.student_id,
+               s.student_number, s.student_name, s.gender,
+               s.student_category, s.enrollment_source,
+               ra.room_id, r.room_number, r.resident_scope,
+               f.floor_number, db.id AS building_id, db.building_name,
+               ra.bed_id, b.bed_code, b.bed_type,
+               ra.source_selection_mode, ra.assignment_method,
+               ra.assigned_at, ra.bed_confirmed_at,
+               (ra.bed_id IS NOT NULL) AS bed_confirmed
+        FROM room_assignment ra
+        JOIN student s ON s.id=ra.student_id
+        JOIN room r ON r.id=ra.room_id
+        JOIN dormitory_floor f ON f.id=r.floor_id
+        JOIN dormitory_building db ON db.id=f.building_id
+        LEFT JOIN bed b ON b.id=ra.bed_id
+        WHERE ra.assignment_status='ACTIVE'
+        <if test="roomId != null">
+            AND ra.room_id=#{roomId}
+        </if>
+        <if test="keyword != null and keyword != ''">
+            AND (s.student_number LIKE CONCAT('%',#{keyword},'%')
+                 OR s.student_name LIKE CONCAT('%',#{keyword},'%')
+                 OR r.room_number LIKE CONCAT('%',#{keyword},'%')
+                 OR db.building_name LIKE CONCAT('%',#{keyword},'%'))
+        </if>
+        <if test="bedMappingStatus == 'CONFIRMED'">
+            AND ra.bed_id IS NOT NULL
+        </if>
+        <if test="bedMappingStatus == 'UNCONFIRMED'">
+            AND ra.bed_id IS NULL
+        </if>
+        ORDER BY db.building_code, f.floor_number, r.room_number, s.student_number
+    </select>
+
+    <select id="findRoomSummaries" resultType="map">
+        SELECT r.id AS room_id, db.building_name, f.floor_number,
+               r.room_number, r.capacity, r.gender_restriction,
+               r.resident_scope, r.operational_status,
+               COUNT(ra.id) AS active_residents,
+               SUM(ra.bed_id IS NOT NULL) AS confirmed_beds,
+               SUM(ra.bed_id IS NULL) AS unconfirmed_beds,
+               GREATEST(r.capacity-COUNT(ra.id),0) AS remaining_capacity
+        FROM room r
+        JOIN dormitory_floor f ON f.id=r.floor_id
+        JOIN dormitory_building db ON db.id=f.building_id
+        LEFT JOIN room_assignment ra
+          ON ra.room_id=r.id AND ra.assignment_status='ACTIVE'
+        GROUP BY r.id, db.building_name, f.floor_number,
+                 r.room_number, r.capacity, r.gender_restriction,
+                 r.resident_scope, r.operational_status
+        ORDER BY db.building_code, f.floor_number, r.room_number
+    </select>
+
+    <select id="findBedRoom" resultType="map">
+        SELECT b.id, b.room_id
+        FROM bed b
+        WHERE b.id=#{bedId}
+    </select>
+
+    <select id="lockActiveResidency" resultType="map">
+        SELECT id, student_id, room_id, bed_id, batch_id, team_id,
+               source_selection_mode, assignment_method, assignment_status,
+               assigned_by, assigned_at, bed_confirmed_at, ended_at, end_reason,
+               created_at, updated_at
+        FROM room_assignment
+        WHERE student_id=#{studentId}
+          AND assignment_status='ACTIVE'
+        ORDER BY id
+        LIMIT 1
+        FOR UPDATE
+    </select>
+
+    <insert id="insertAssignment" parameterType="map" useGeneratedKeys="true" keyProperty="id" keyColumn="id">
+        INSERT INTO room_assignment
+        (batch_id, student_id, room_id, bed_id, team_id,
+         source_selection_mode, assignment_method, assignment_status,
+         assigned_by, assigned_at, bed_confirmed_at)
+        VALUES (#{batchId}, #{studentId}, #{roomId}, #{bedId}, #{teamId},
+                #{sourceMode}, #{method}, 'ACTIVE', #{operatorId},
+                CURRENT_TIMESTAMP(3),
+                CASE WHEN #{bedId} IS NULL THEN NULL ELSE CURRENT_TIMESTAMP(3) END)
+    </insert>
+
+    <update id="updateBedAssignment">
+        UPDATE room_assignment
+        SET bed_id=#{bedId}, bed_confirmed_at=CURRENT_TIMESTAMP(3),
+            source_selection_mode='BED', assignment_method=#{method},
+            updated_at=CURRENT_TIMESTAMP(3)
+        WHERE id=#{id}
+    </update>
+
+    <select id="lockResidency" resultType="map">
+        SELECT id, batch_id, student_id, room_id, bed_id, team_id,
+               source_selection_mode, assignment_method, assignment_status,
+               assigned_by, assigned_at, bed_confirmed_at, ended_at, end_reason,
+               created_at, updated_at
+        FROM room_assignment
+        WHERE id=#{residencyId}
+        FOR UPDATE
+    </select>
+
+    <select id="lockBed" resultType="map">
+        SELECT id, room_id, operational_status
+        FROM bed
+        WHERE id=#{bedId}
+        FOR UPDATE
+    </select>
+
+    <select id="countOtherActiveBedOccupants" resultType="int">
+        SELECT COUNT(*)
+        FROM room_assignment
+        WHERE bed_id=#{bedId}
+          AND assignment_status='ACTIVE'
+          AND id&lt;&gt;#{residencyId}
+    </select>
+
+    <update id="confirmBed">
+        UPDATE room_assignment
+        SET bed_id=#{bedId},
+            bed_confirmed_at=CURRENT_TIMESTAMP(3),
+            updated_at=CURRENT_TIMESTAMP(3)
+        WHERE id=#{residencyId}
+    </update>
+
+    <update id="endResidency">
+        UPDATE room_assignment
+        SET assignment_status='ENDED', ended_at=CURRENT_TIMESTAMP(3),
+            end_reason=#{reason}, updated_at=CURRENT_TIMESTAMP(3)
+        WHERE id=#{residencyId}
+    </update>
+
+    <select id="findResidency" resultType="map">
+        SELECT ra.id, ra.batch_id, ra.student_id, ra.room_id, ra.bed_id, ra.team_id,
+               ra.source_selection_mode, ra.assignment_method, ra.assignment_status,
+               ra.assigned_by, ra.assigned_at, ra.bed_confirmed_at,
+               ra.ended_at, ra.end_reason, ra.created_at, ra.updated_at,
+               s.student_number, s.student_name, s.gender,
+               s.student_category, r.room_number, r.resident_scope,
+               f.floor_number, db.building_name,
+               b.bed_code, b.bed_type
+        FROM room_assignment ra
+        JOIN student s ON s.id=ra.student_id
+        JOIN room r ON r.id=ra.room_id
+        JOIN dormitory_floor f ON f.id=r.floor_id
+        JOIN dormitory_building db ON db.id=f.building_id
+        LEFT JOIN bed b ON b.id=ra.bed_id
+        WHERE ra.id=#{residencyId}
+    </select>
+
+    <insert id="insertHistory" parameterType="map">
+        INSERT INTO room_assignment_history
+        (room_assignment_id, student_id, room_id, bed_id, event_type,
+         operator_user_id, reason, previous_data, current_data, occurred_at)
+        VALUES (#{assignmentId}, #{studentId}, #{roomId}, #{bedId}, #{eventType},
+                #{operatorId}, #{reason}, CAST(#{previous} AS JSON),
+                CAST(#{current} AS JSON), CURRENT_TIMESTAMP(3))
+    </insert>
+</mapper>

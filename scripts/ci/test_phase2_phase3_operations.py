@@ -59,9 +59,15 @@ for token in (
 room_change_service = read("backend-java/server/src/main/java/com/wust/dormitory/roomchange/RoomChangeService.java")
 for token in (
     "DISABLED", "FREE", "APPROVAL_REQUIRED", "PENDING", "APPROVED",
-    "REJECTED", "EXECUTED", "executeRoomChange", "FOR UPDATE", "auditService.success",
+    "REJECTED", "EXECUTED", "executeRoomChange", "auditService.success",
 ):
     require(room_change_service, token, f"room-change service missing behavior: {token}")
+room_change_xml = read("backend-java/server/src/main/resources/mapper/roomchange/RoomChangeMapper.xml")
+for lock_id in ("lockRequest", "lockActiveResidency", "lockActiveRequestIds"):
+    start = room_change_xml.find(f'id="{lock_id}"')
+    end = room_change_xml.find("</select>", start)
+    if start < 0 or end < 0 or "FOR UPDATE" not in room_change_xml[start:end].upper():
+        raise AssertionError(f"room-change lock missing FOR UPDATE: {lock_id}")
 
 room_change_controller = read("backend-java/server/src/main/java/com/wust/dormitory/roomchange/RoomChangeController.java")
 require(room_change_controller, "implements RoomChangeApi", "room-change controller must implement generated API")

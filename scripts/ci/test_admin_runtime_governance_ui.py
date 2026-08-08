@@ -81,7 +81,7 @@ require(dashboard, "auditResourceText", "业务操作目标类型应统一中文
 
 normalizer = read("backend-java/server/src/main/java/com/wust/dormitory/common/json/JdbcJsonNormalizer.java")
 require(normalizer, "TemporalAccessor", "JDBC/Java 时间值必须在写入历史和审计前规范化")
-require(read("backend-java/server/src/main/java/com/wust/dormitory/residency/ResidencyService.java"), "JdbcJsonNormalizer.normalize", "在住历史必须规范化数据库时间值")
+require(read("backend-java/server/src/main/java/com/wust/dormitory/residency/ResidencyHistoryWriter.java"), "JdbcJsonNormalizer.normalize", "在住历史必须规范化数据库时间值")
 require(read("backend-java/server/src/main/java/com/wust/dormitory/audit/AuditService.java"), "JdbcJsonNormalizer.normalize", "通用审计必须规范化数据库时间值")
 
 print("admin runtime and governance UI contract: OK")
