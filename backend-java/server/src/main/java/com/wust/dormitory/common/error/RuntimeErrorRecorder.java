@@ -14,23 +14,20 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.time.OffsetDateTime;
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 @Component
 public class RuntimeErrorRecorder {
     private static final Logger log = LoggerFactory.getLogger(RuntimeErrorRecorder.class);
-    private static final Pattern NUMERIC_RESOURCE = Pattern.compile("/(\\d+)(?=/|$)");
     private static final Pattern UUID_SEGMENT = Pattern.compile(
             "/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}(?=/|$)");
     private static final Pattern LONG_NUMERIC_SEGMENT = Pattern.compile("/\\d{8,}(?=/|$)");
     private static final Set<String> SENSITIVE_NAMES = Set.of(
-            "Authorization", "Cookie", "password", "Secret", "token", "phoneNumber", "studentName");
+            "Authorization", "Cookie", "password", "Secret", "token", "phoneNumber", "studentName", "studentNumber");
 
     private final ObjectMapper objectMapper;
     private final boolean enabled;
@@ -58,7 +55,7 @@ public class RuntimeErrorRecorder {
         record.put("errorCode", errorCode);
         record.put("exceptionType", exception.getClass().getName());
         record.put("message", exception.getClass().getSimpleName());
-        record.put("resourceIds", numericResourceIds(request.getRequestURI()));
+        record.put("resourceIds", safeResourceIds(request));
         record.put("queryKeys", safeQueryKeys(request));
         record.put("actorType", request.getUserPrincipal() == null ? "ANONYMOUS" : "AUTHENTICATED");
         record.put("stackTrace", stackFrames(exception));
@@ -78,33 +75,40 @@ public class RuntimeErrorRecorder {
 
     private String safePath(HttpServletRequest request) {
         Object routePattern = request.getAttribute(HandlerMapping.BEST_MATCHING_PATTERN_ATTRIBUTE);
-        if (routePattern != null) {
-            return String.valueOf(routePattern);
-        }
+        if (routePattern != null) return String.valueOf(routePattern);
         String raw = request.getRequestURI();
         if (raw == null || raw.isBlank()) return "";
         String withoutUuid = UUID_SEGMENT.matcher(raw).replaceAll("/{token}");
         return LONG_NUMERIC_SEGMENT.matcher(withoutUuid).replaceAll("/{id}");
     }
 
-    private List<Long> numericResourceIds(String path) {
-        List<Long> result = new ArrayList<>();
-        Matcher matcher = NUMERIC_RESOURCE.matcher(path == null ? "" : path);
-        while (matcher.find()) {
+    private Map<String, Long> safeResourceIds(HttpServletRequest request) {
+        Object attribute = request.getAttribute(HandlerMapping.URI_TEMPLATE_VARIABLES_ATTRIBUTE);
+        if (!(attribute instanceof Map<?, ?> variables)) return Map.of();
+        Map<String, Long> result = new LinkedHashMap<>();
+        variables.forEach((rawName, rawValue) -> {
+            String name = String.valueOf(rawName);
+            if (!name.endsWith("Id") || isSensitiveName(name) || rawValue == null) return;
+            String value = String.valueOf(rawValue).trim();
+            if (!value.matches("\\d{1,18}")) return;
             try {
-                result.add(Long.parseLong(matcher.group(1)));
+                result.put(name, Long.parseLong(value));
             } catch (NumberFormatException ignored) {
-                // Path segment is outside long range; skip it rather than logging the raw value.
+                // Ignore values outside the signed long range.
             }
-        }
+        });
         return result;
     }
 
     private List<String> safeQueryKeys(HttpServletRequest request) {
         return request.getParameterMap().keySet().stream()
-                .filter(name -> SENSITIVE_NAMES.stream().noneMatch(sensitive -> sensitive.equalsIgnoreCase(name)))
+                .filter(name -> !isSensitiveName(name))
                 .sorted()
                 .toList();
+    }
+
+    private boolean isSensitiveName(String name) {
+        return SENSITIVE_NAMES.stream().anyMatch(sensitive -> sensitive.equalsIgnoreCase(name));
     }
 
     private List<String> stackFrames(Exception exception) {
