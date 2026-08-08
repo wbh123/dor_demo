@@ -7,7 +7,6 @@
     "backend-java/server/src/main/java/com/wust/dormitory/admin/BatchRuleTemplateService.java": 468,
     "backend-java/server/src/main/java/com/wust/dormitory/admin/RoomImportService.java": 382,
     "backend-java/server/src/main/java/com/wust/dormitory/admin/RoomLayoutService.java": 585,
-    "backend-java/server/src/main/java/com/wust/dormitory/admin/RoomManagementService.java": 384,
     "backend-java/server/src/main/java/com/wust/dormitory/allocation/AdminAllocationService.java": 638,
     "backend-java/server/src/main/java/com/wust/dormitory/allocation/OptimizedAllocationRunService.java": 728,
     "backend-java/server/src/main/java/com/wust/dormitory/importworkflow/ImportMutationService.java": 416,
