@@ -3,6 +3,7 @@ import { computed, nextTick, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { api } from '../api/client'
 import type { ActivateRequest, DataObject, LoginRequest, ObjectSuccessResponse } from '../api/types'
+import { applySiteTheme } from '../site/theme'
 import { useAuthStore } from '../stores/auth'
 
 const fallbackInstitutionName = String(import.meta.env.VITE_INSTITUTION_NAME || '示例大学')
@@ -15,7 +16,7 @@ const showOperatorInfo = String(import.meta.env.VITE_SHOW_OPERATOR_INFO || 'fals
 const showIcpRecord = String(import.meta.env.VITE_SHOW_ICP_RECORD || 'false').toLowerCase() === 'true' && Boolean(icpRecord.trim())
 const publicBase = String(import.meta.env.BASE_URL || '/').replace(/\/?$/, '/')
 const fallbackBrandLogo = `${publicBase}assets/logo-title-right.png`
-const legacyBrandLogo = `${publicBase}assert/logo-only.png`
+const legacyBrandLogo = `${publicBase}assets/logo-only.png`
 const auth = useAuthStore()
 const router = useRouter()
 const mode = ref<'login' | 'activate'>('login')
@@ -46,8 +47,10 @@ async function loadSiteConfig() {
   try {
     const response = await api.get<ObjectSuccessResponse>('/api/v1/public/site-config')
     siteConfig.value = (response.data.data ?? {}) as DataObject
+    applySiteTheme(siteConfig.value.theme)
   } catch {
     siteConfig.value = {}
+    applySiteTheme('blue')
   }
 }
 function setMode(nextMode: 'login' | 'activate') {
@@ -106,7 +109,6 @@ function escapeAttribute(value: string) {
             <div class="auth-fields login-fields">
               <label><span>用户名或学号</span><input ref="loginUsernameInput" v-model.trim="loginForm.username" required maxlength="64" autocomplete="username" placeholder="管理员用户名或12位学号" /></label>
               <label><span>密码</span><input v-model="loginForm.password" required type="password" autocomplete="current-password" placeholder="请输入密码" /></label>
-              <div class="auth-field-spacer" aria-hidden="true"></div>
             </div>
             <button class="button primary full auth-submit" :disabled="auth.loading">{{ auth.loading ? '正在登录…' : '进入系统' }}</button>
             <p class="auth-inline-hint" :class="{ error: error, success: message }" role="status">{{ loginFormHint }}</p>
@@ -128,5 +130,5 @@ function escapeAttribute(value: string) {
 </template>
 
 <style scoped>
-.login-hero{display:flex;align-items:center}.hero-content-frame{display:grid;grid-template-rows:auto minmax(300px,1fr);gap:20px;width:min(760px,100%);max-height:76vh}.brand-image-surface{display:flex;align-items:center;justify-content:flex-start;background:transparent;border:0;box-shadow:none;overflow:hidden}.hero-brand-surface{width:min(500px,92vw);min-height:72px;padding:0}.hero-school-logo{display:block;width:auto;max-width:100%;height:64px;object-fit:contain;object-position:left center}.card-brand-surface{width:min(350px,100%);min-height:52px;padding:0}.form-school-logo{display:block;width:auto;max-width:100%;height:48px;object-fit:contain;object-position:left center}.login-left-frame{display:block;width:100%;height:100%;min-height:300px;border:0;background:transparent;overflow:hidden}.school-login-brand{display:grid;justify-items:start;gap:5px;margin-bottom:8px}.school-login-brand>span{color:var(--muted);font-size:12px}.login-panel{display:flex;flex-direction:column;justify-content:center}.auth-card-fixed{width:min(450px,100%);min-height:500px;margin:auto;display:flex;flex-direction:column}.auth-mode-switch{margin-bottom:10px}.auth-form-frame{min-height:292px;display:flex;flex:1}.auth-form{display:grid;grid-template-rows:1fr auto 36px;gap:8px;width:100%;min-height:292px}.auth-fields{display:grid;grid-template-rows:repeat(3,minmax(56px,auto));align-content:start;gap:8px}.activate-fields{gap:5px}.auth-fields label{gap:4px}.auth-fields input{width:100%;height:40px;padding:8px 10px;border:1px solid var(--line);border-radius:10px;outline:none;background:#fff}.auth-fields input:focus{border-color:#6e91df;box-shadow:0 0 0 3px rgba(60,111,217,.1)}.auth-field-spacer{min-height:56px}.auth-submit{margin-top:2px}.auth-inline-hint{min-height:36px;margin:0;padding:7px 9px;border-radius:9px;background:var(--soft);color:var(--muted);font-size:12px;line-height:1.4}.auth-inline-hint.error{background:#fff1f2;color:#b42318}.auth-inline-hint.success{background:#ecfdf3;color:#027a48}.login-compliance{display:flex;justify-content:center;gap:12px;flex-wrap:wrap;width:100%;margin-top:auto;padding-top:14px;color:var(--muted);text-align:center;font-size:.7rem}.login-compliance span+span::before{content:"·";margin-right:12px}@media(max-width:760px){.hero-content-frame{grid-template-rows:auto minmax(220px,1fr);gap:12px}.hero-brand-surface{min-height:58px}.hero-school-logo{height:50px}.card-brand-surface{min-height:48px}.form-school-logo{height:44px}.login-left-frame{min-height:220px}.auth-card-fixed{min-height:480px}}
+.login-hero{display:flex;align-items:center}.hero-content-frame{display:grid;grid-template-rows:auto minmax(300px,1fr);gap:20px;width:min(760px,100%);max-height:76vh}.brand-image-surface{display:flex;align-items:center;justify-content:flex-start;background:transparent;border:0;box-shadow:none;overflow:hidden}.hero-brand-surface{width:min(500px,92vw);min-height:72px;padding:0}.hero-school-logo{display:block;width:auto;max-width:100%;height:auto;max-height:64px;object-fit:contain;object-position:left center}.card-brand-surface{width:min(350px,100%);min-height:52px;padding:0}.form-school-logo{display:block;width:auto;max-width:100%;height:auto;max-height:48px;object-fit:contain;object-position:left center}.login-left-frame{display:block;width:100%;height:100%;min-height:300px;border:0;background:transparent;overflow:hidden}.school-login-brand{display:grid;justify-items:start;gap:5px;margin-bottom:8px}.school-login-brand>span{color:var(--muted);font-size:12px}.login-panel{display:flex;flex-direction:column;justify-content:center}.auth-card-fixed{width:min(450px,100%);margin:auto;display:flex;flex-direction:column}.auth-mode-switch{margin-bottom:10px}.auth-form-frame{display:flex}.auth-form{display:grid;gap:8px;width:100%}.auth-fields{display:grid;align-content:start;gap:8px}.activate-fields{gap:5px}.auth-fields label{gap:4px}.auth-fields input{width:100%;height:40px;padding:8px 10px;border:1px solid var(--line);border-radius:10px;outline:none;background:#fff}.auth-fields input:focus{border-color:#6e91df;box-shadow:0 0 0 3px rgba(60,111,217,.1)}.auth-submit{margin-top:2px}.auth-inline-hint{min-height:36px;margin:0;padding:7px 9px;border-radius:9px;background:var(--soft);color:var(--muted);font-size:12px;line-height:1.4}.auth-inline-hint.error{background:#fff1f2;color:#b42318}.auth-inline-hint.success{background:#ecfdf3;color:#027a48}.login-compliance{display:flex;justify-content:center;gap:12px;flex-wrap:wrap;width:100%;margin-top:auto;padding-top:14px;color:var(--muted);text-align:center;font-size:.7rem}.login-compliance span+span::before{content:"·";margin-right:12px}@media(max-width:760px){.hero-content-frame{grid-template-rows:auto minmax(220px,1fr);gap:12px}.hero-brand-surface{min-height:58px}.hero-school-logo{max-height:50px}.card-brand-surface{min-height:48px}.form-school-logo{max-height:44px}.login-left-frame{min-height:220px}}
 </style>
