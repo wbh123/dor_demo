@@ -90,7 +90,7 @@ class AdminRuntimeMySqlIntegrationTest {
         ResidencyService residencyService = mock(ResidencyService.class);
         when(residencyService.current(100L)).thenReturn(Map.of("resident", false));
         AdminResidencyAdjustmentMapper adjustmentMapper = mock(AdminResidencyAdjustmentMapper.class);
-        when(adjustmentMapper.findCompatibleBeds(100L, -1L, null)).thenReturn(List.of(Map.of(
+        when(adjustmentMapper.findCompatibleBeds(100L, null, null)).thenReturn(List.of(Map.of(
                 "bed_id", 22L,
                 "room_id", 12L,
                 "swap_required", 0)));
