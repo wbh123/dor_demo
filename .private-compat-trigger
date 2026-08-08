@@ -1,3 +1,4 @@
 private-ref: integration/high-density-room-ui-third-batch-20260808
 private-base: 1f55fccd150f97b6199828a7c7534545137ebaa5
-purpose: validate remaining third-batch high-density dormitory and room-selection RED contract against latest private main
+private-head: 94abe83281a1b8286c68edb434397c59b133215e
+purpose: validate remaining third-batch high-density dormitory and room-selection implementation against latest private baseline
