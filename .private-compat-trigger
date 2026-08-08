@@ -1,0 +1,4 @@
+private-ref: fix/reselection-realtime-release-20260808
+private-base: 4b7e4abaf9f97f9b74130f93d4ff40693d51051f
+private-head: d2601ba31b32344443590aadef47569ac2964735
+purpose: RED validation for reselection cancellation realtime BED_RELEASED broadcast after transaction commit
