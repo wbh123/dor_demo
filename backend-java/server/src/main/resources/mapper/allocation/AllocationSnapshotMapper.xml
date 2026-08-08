@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.wust.dormitory.allocation.AllocationSnapshotMapper">
+    <select id="findBatchId" resultType="long">
+        SELECT id
+        FROM selection_batch
+        WHERE id = #{batchId}
+    </select>
+
+    <select id="findEligibleStudents" resultType="map">
+        SELECT s.id AS student_id,
+               s.student_number,
+               s.student_name,
+               s.gender,
+               s.major_id,
+               u.account_status
+        FROM batch_student_eligibility eligibility
+        JOIN student s ON s.id = eligibility.student_id
+        LEFT JOIN app_user u ON u.student_id = s.id
+        LEFT JOIN bed_assignment assignment
+          ON assignment.batch_id = eligibility.batch_id
+         AND assignment.student_id = s.id
+         AND assignment.assignment_status = 'ACTIVE'
+        WHERE eligibility.batch_id = #{batchId}
+          AND eligibility.eligibility_status = 'ELIGIBLE'
+          AND assignment.id IS NULL
+        ORDER BY s.student_number, s.id
+    </select>
+
+    <select id="findAvailableBeds" resultType="map">
+        WITH scoped_rooms AS (
+            SELECT scope.room_id
+            FROM batch_room_scope scope
+            WHERE scope.batch_id = #{batchId}
+            UNION
+            SELECT room.id
+            FROM batch_building_scope scope
+            JOIN dormitory_floor floor ON floor.building_id = scope.building_id
+            JOIN room ON room.floor_id = floor.id
+            WHERE scope.batch_id = #{batchId}
+        ),
+        bed_scope_config AS (
+            SELECT COUNT(*) AS configured_count
+            FROM batch_bed_scope
+            WHERE batch_id = #{batchId}
+        )
+        SELECT bed.id AS bed_id,
+               room.id AS room_id,
+               room.gender_restriction AS gender,
+               building.building_name,
+               room.room_number,
+               bed.bed_code,
+               bed.position_index
+        FROM scoped_rooms scoped
+        JOIN room ON room.id = scoped.room_id
+        JOIN dormitory_floor floor ON floor.id = room.floor_id
+        JOIN dormitory_building building ON building.id = floor.building_id
+        JOIN bed ON bed.room_id = room.id
+        CROSS JOIN bed_scope_config config
+        LEFT JOIN batch_bed_scope allowed
+          ON allowed.batch_id = #{batchId}
+         AND allowed.bed_id = bed.id
+        LEFT JOIN bed_assignment assignment
+          ON assignment.batch_id = #{batchId}
+         AND assignment.bed_id = bed.id
+         AND assignment.assignment_status = 'ACTIVE'
+        WHERE bed.operational_status = 'ENABLED'
+          AND room.operational_status = 'ENABLED'
+          AND assignment.id IS NULL
+          AND (config.configured_count = 0 OR allowed.bed_id IS NOT NULL)
+        ORDER BY room.id, bed.position_index, bed.id
+    </select>
+
+    <select id="findLockedTeamMembers" resultType="map">
+        SELECT team.id AS team_id,
+               student.id AS student_id,
+               student.student_number,
+               student.student_name,
+               student.gender,
+               member.member_role,
+               member.id AS member_order,
+               CASE WHEN assignment.id IS NULL THEN 0 ELSE 1 END AS assigned
+        FROM selection_team team
+        JOIN selection_team_member member ON member.team_id = team.id
+        JOIN student ON student.id = member.student_id
+        LEFT JOIN bed_assignment assignment
+          ON assignment.batch_id = team.batch_id
+         AND assignment.student_id = student.id
+         AND assignment.assignment_status = 'ACTIVE'
+        WHERE team.batch_id = #{batchId}
+          AND team.team_status = 'LOCKED'
+          AND member.member_status = 'LOCKED'
+        ORDER BY team.id,
+                 member.member_role = 'LEADER' DESC,
+                 member.id
+    </select>
+</mapper>
