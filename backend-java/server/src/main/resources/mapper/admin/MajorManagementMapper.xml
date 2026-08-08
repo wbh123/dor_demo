@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.wust.dormitory.admin.mapper.MajorManagementMapper">
+    <select id="findMajor" resultType="map">
+        SELECT id,
+               major_code,
+               major_name,
+               enabled,
+               created_at,
+               updated_at
+        FROM major
+        WHERE id = #{id}
+    </select>
+
+    <insert id="insertMajor" parameterType="map" useGeneratedKeys="true" keyProperty="id" keyColumn="id">
+        INSERT INTO major (major_code, major_name, enabled)
+        VALUES (#{code}, #{name}, #{enabled})
+    </insert>
+
+    <update id="updateMajor" parameterType="map">
+        UPDATE major
+        SET major_code = #{code},
+            major_name = #{name},
+            enabled = #{enabled}
+        WHERE id = #{id}
+    </update>
+</mapper>
