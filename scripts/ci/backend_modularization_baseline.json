@@ -3,7 +3,6 @@
   "controller_operation_limit": 12,
   "large_java_files": {
     "backend-java/server/src/main/java/com/wust/dormitory/admin/AdminController.java": 505,
-    "backend-java/server/src/main/java/com/wust/dormitory/admin/AdminService.java": 497,
     "backend-java/server/src/main/java/com/wust/dormitory/admin/BatchRuleTemplateService.java": 468,
     "backend-java/server/src/main/java/com/wust/dormitory/admin/RoomImportService.java": 382,
     "backend-java/server/src/main/java/com/wust/dormitory/admin/RoomLayoutService.java": 585,
