@@ -1,5 +1,6 @@
 package com.wust.dormitory.admin;
 
+import com.wust.dormitory.admin.RoomLayoutPlanner.DefaultPlacement;
 import com.wust.dormitory.admin.mapper.RoomLayoutMapper;
 import com.wust.dormitory.audit.AuditService;
 import com.wust.dormitory.common.error.BusinessException;
@@ -19,6 +20,7 @@ import java.util.Set;
 public class RoomLayoutService {
     public static final String DEFAULT_LAYOUT = "DEFAULT_LAYOUT";
     public static final String CUSTOM_LAYOUT = "CUSTOM_LAYOUT";
+    private static final DefaultPlacement STANDARD_TOP_LEFT = new DefaultPlacement(-2.35, -1.65, 0);
 
     private final RoomLayoutMapper roomLayoutMapper;
     private final RoomLayoutPlanner planner;
@@ -47,9 +49,13 @@ public class RoomLayoutService {
             boolean custom = ((Number) row.get("custom_layout")).intValue() == 1;
             hasCustom |= custom;
             if (!custom) {
-                RoomLayoutPlanner.DefaultPlacement placement = planner.defaultPlacement(
-                        String.valueOf(row.get("bed_type")),
-                        ((Number) row.get("position_index")).intValue());
+                String bedType = String.valueOf(row.get("bed_type"));
+                int position = ((Number) row.get("position_index")).intValue();
+                DefaultPlacement placement = planner.defaultPlacement(bedType, position);
+                if (position == 1 && "LOFT_BED_DESK".equals(bedType)
+                        && !STANDARD_TOP_LEFT.equals(placement)) {
+                    throw new IllegalStateException("标准2×2布局左上床具坐标发生漂移");
+                }
                 bed.put("layout_x", placement.x());
                 bed.put("layout_z", placement.z());
                 bed.put("rotation_degrees", placement.rotationDegrees());
@@ -72,9 +78,7 @@ public class RoomLayoutService {
             throw new BusinessException("ROOM_NOT_FOUND", "房间不存在", HttpStatus.NOT_FOUND);
         }
         long currentVersion = ((Number) room.get("version")).longValue();
-        if (currentVersion != command.expectedRoomVersion()) {
-            throw versionConflict();
-        }
+        if (currentVersion != command.expectedRoomVersion()) throw versionConflict();
         if (command.reason() == null || command.reason().isBlank()) {
             throw new BusinessException("ROOM_LAYOUT_REASON_REQUIRED", "请填写布局修改原因");
         }
@@ -91,10 +95,7 @@ public class RoomLayoutService {
         for (RoomLayoutPlanner.BedUnit unit : units) {
             LayoutItem item = itemById.get(unit.representativeBedId());
             if (unit.occupied() && !unit.unitType().equals(item.bedType())) {
-                throw new BusinessException(
-                        "BED_TYPE_OCCUPIED",
-                        "非空床位不能修改床位类型",
-                        HttpStatus.CONFLICT);
+                throw new BusinessException("BED_TYPE_OCCUPIED", "非空床位不能修改床位类型", HttpStatus.CONFLICT);
             }
             if ("BUNK".equals(unit.unitType()) && !"BUNK".equals(item.bedType())) {
                 collapseBunkUnit(roomId, unit, item, operator.userId());
@@ -112,21 +113,11 @@ public class RoomLayoutService {
         }
 
         int updated = roomLayoutMapper.updateRoomVersioned(
-                roomId,
-                planner.roomTypeForBedCount(capacity),
-                capacity,
-                command.expectedRoomVersion());
+                roomId, planner.roomTypeForBedCount(capacity), capacity, command.expectedRoomVersion());
         if (updated != 1) throw versionConflict();
-
         Map<String, Object> after = getLayout(roomId);
-        auditService.success(
-                operator,
-                "ROOM_LAYOUT_UPDATE",
-                "ROOM",
-                roomId,
-                command.reason().trim(),
-                before,
-                after);
+        auditService.success(operator, "ROOM_LAYOUT_UPDATE", "ROOM", roomId,
+                command.reason().trim(), before, after);
         return after;
     }
 
@@ -137,10 +128,7 @@ public class RoomLayoutService {
     }
 
     private void collapseBunkUnit(
-            long roomId,
-            RoomLayoutPlanner.BedUnit unit,
-            LayoutItem item,
-            long operatorUserId) {
+            long roomId, RoomLayoutPlanner.BedUnit unit, LayoutItem item, long operatorUserId) {
         if (unit.occupied()) {
             throw new BusinessException("BED_TYPE_OCCUPIED", "上下铺有人在住或已分配时不能合并床型", HttpStatus.CONFLICT);
         }
@@ -152,7 +140,6 @@ public class RoomLayoutService {
                 .findFirst().orElseThrow();
         long removedBedId = planner.number(removed.get("id"));
         Object frameValue = representative.get("bed_frame_id");
-
         roomLayoutMapper.deleteBedScope(removedBedId);
         roomLayoutMapper.deletePlacement(removedBedId);
         if (roomLayoutMapper.retireBed(removedBedId, roomId) != 1) {
@@ -164,10 +151,7 @@ public class RoomLayoutService {
     }
 
     private void splitIntoBunk(
-            long roomId,
-            RoomLayoutPlanner.BedUnit unit,
-            LayoutItem item,
-            long operatorUserId) {
+            long roomId, RoomLayoutPlanner.BedUnit unit, LayoutItem item, long operatorUserId) {
         long sourceBedId = planner.number(unit.beds().getFirst().get("id"));
         int nextPosition = roomLayoutMapper.nextPosition(roomId);
         Map<String, Object> frame = new HashMap<>();
@@ -185,10 +169,7 @@ public class RoomLayoutService {
         roomLayoutMapper.insertLowerBed(lower);
         long lowerBedId = generatedId(lower, "下铺床位");
         roomLayoutMapper.copyBedScope(lowerBedId, sourceBedId);
-        savePlacement(
-                List.of(Map.of("id", sourceBedId), Map.of("id", lowerBedId)),
-                item,
-                operatorUserId);
+        savePlacement(List.of(Map.of("id", sourceBedId), Map.of("id", lowerBedId)), item, operatorUserId);
     }
 
     private void savePlacement(List<Map<String, Object>> beds, LayoutItem item, long operatorUserId) {
@@ -204,9 +185,7 @@ public class RoomLayoutService {
     private String uniqueBedCode(long roomId, int positionIndex) {
         int suffix = positionIndex;
         String candidate = "B" + suffix;
-        while (roomLayoutMapper.countBedCode(roomId, candidate) > 0) {
-            candidate = "B" + (++suffix);
-        }
+        while (roomLayoutMapper.countBedCode(roomId, candidate) > 0) candidate = "B" + (++suffix);
         return candidate;
     }
 
@@ -222,20 +201,13 @@ public class RoomLayoutService {
     }
 
     private BusinessException versionConflict() {
-        return new BusinessException(
-                "ROOM_LAYOUT_VERSION_CONFLICT",
-                "房间布局已被其他管理员修改，请重新加载后再保存",
-                HttpStatus.CONFLICT);
+        return new BusinessException("ROOM_LAYOUT_VERSION_CONFLICT",
+                "房间布局已被其他管理员修改，请重新加载后再保存", HttpStatus.CONFLICT);
     }
 
     public record LayoutCommand(long expectedRoomVersion, String reason, List<LayoutItem> beds) {
     }
 
-    public record LayoutItem(
-            long bedId,
-            String bedType,
-            double layoutX,
-            double layoutZ,
-            int rotationDegrees) {
+    public record LayoutItem(long bedId, String bedType, double layoutX, double layoutZ, int rotationDegrees) {
     }
 }
