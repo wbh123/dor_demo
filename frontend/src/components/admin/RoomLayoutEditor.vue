@@ -176,9 +176,15 @@ async function save(){
   }catch(cause){
     if(cause instanceof ApiRequestError&&cause.code==='ROOM_LAYOUT_VERSION_CONFLICT'){
       await load()
+      const reloadError=error.value
       reason.value=savedReason
-      error.value=''
-      message.value='房间信息已发生变化，已加载最新布局，请确认后重新保存'
+      if(reloadError){
+        message.value=''
+        error.value=`房间信息已发生变化，但重新加载失败：${reloadError}`
+      }else{
+        error.value=''
+        message.value='房间信息已发生变化，已加载最新布局，请确认后重新保存'
+      }
     }else{
       error.value=translateError(cause)
     }
