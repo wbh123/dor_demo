@@ -2,6 +2,9 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+python3 "$ROOT_DIR/scripts/ci/test_runtime_error_trace_contract.py"
+python3 "$ROOT_DIR/scripts/ci/test_dashboard_active_residency_contract.py"
+python3 "$ROOT_DIR/scripts/ci/test_student_server_sort_contract.py"
 python3 "$ROOT_DIR/scripts/ci/test_backend_layering.py"
 python3 "$ROOT_DIR/scripts/ci/test_site_metadata_openapi_contract.py"
 python3 "$ROOT_DIR/scripts/ci/test_debug_login_password_ui.py"
