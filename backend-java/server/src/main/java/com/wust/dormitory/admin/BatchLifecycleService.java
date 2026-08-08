@@ -1,5 +1,6 @@
 package com.wust.dormitory.admin;
 
+import com.wust.dormitory.audit.AuditService;
 import com.wust.dormitory.common.error.BusinessException;
 import com.wust.dormitory.residency.BatchRoomLockService;
 import com.wust.dormitory.security.CurrentUser;
@@ -19,27 +20,34 @@ import java.util.Set;
 @Service
 public class BatchLifecycleService {
     private static final Set<String> ACTIVE_STATUSES = Set.of("PUBLISHED", "OPEN", "PAUSED");
+    private static final Map<String, Set<String>> TRANSITIONS = Map.of(
+            "DRAFT", Set.of("PUBLISHED", "CANCELLED"),
+            "PUBLISHED", Set.of("OPEN", "CANCELLED"),
+            "OPEN", Set.of("PAUSED", "CLOSED"),
+            "PAUSED", Set.of("OPEN", "CLOSED"),
+            "CLOSED", Set.of("ALLOCATING", "FINISHED"),
+            "ALLOCATING", Set.of("FINISHED", "CLOSED"));
 
     private final NamedParameterJdbcTemplate jdbc;
-    private final AdminService adminService;
     private final BatchScopeService batchScopeService;
     private final BatchRoomLockService roomLockService;
     private final FeatureAccessService featureAccessService;
     private final EntitlementSnapshotService entitlementSnapshotService;
+    private final AuditService auditService;
 
     public BatchLifecycleService(
             NamedParameterJdbcTemplate jdbc,
-            AdminService adminService,
             BatchScopeService batchScopeService,
             BatchRoomLockService roomLockService,
             FeatureAccessService featureAccessService,
-            EntitlementSnapshotService entitlementSnapshotService) {
+            EntitlementSnapshotService entitlementSnapshotService,
+            AuditService auditService) {
         this.jdbc = jdbc;
-        this.adminService = adminService;
         this.batchScopeService = batchScopeService;
         this.roomLockService = roomLockService;
         this.featureAccessService = featureAccessService;
         this.entitlementSnapshotService = entitlementSnapshotService;
+        this.auditService = auditService;
     }
 
     @Transactional
@@ -47,6 +55,11 @@ public class BatchLifecycleService {
         Map<String, Object> current = currentBatch(batchId);
         String currentStatus = String.valueOf(current.get("batch_status"));
         if (currentStatus.equals(targetStatus)) return;
+        if (!TRANSITIONS.getOrDefault(currentStatus, Set.of()).contains(targetStatus)) {
+            throw new BusinessException(
+                    "BATCH_STATUS_INVALID",
+                    "不允许从" + currentStatus + "切换到" + targetStatus);
+        }
 
         boolean enteringActiveState = !ACTIVE_STATUSES.contains(currentStatus)
                 && ACTIVE_STATUSES.contains(targetStatus);
@@ -64,13 +77,19 @@ public class BatchLifecycleService {
             entitlementSnapshotService.captureForBatch(batchId);
         }
 
-        adminService.changeBatchStatus(batchId, targetStatus, operator);
-        if ("FINISHED".equals(targetStatus)) {
-            jdbc.update("""
-                    UPDATE selection_batch SET finished_at=COALESCE(finished_at,CURRENT_TIMESTAMP(3))
-                    WHERE id=:batchId
-                    """, Map.of("batchId", batchId));
-        }
+        jdbc.update("""
+                UPDATE selection_batch
+                SET batch_status=:status,
+                    published_at=CASE
+                        WHEN :status='PUBLISHED' THEN COALESCE(published_at,CURRENT_TIMESTAMP(3))
+                        ELSE published_at
+                    END,
+                    finished_at=CASE
+                        WHEN :status='FINISHED' THEN COALESCE(finished_at,CURRENT_TIMESTAMP(3))
+                        ELSE finished_at
+                    END
+                WHERE id=:batchId
+                """, Map.of("batchId", batchId, "status", targetStatus));
 
         if (leavingActiveState) {
             jdbc.update(
@@ -78,6 +97,14 @@ public class BatchLifecycleService {
                     Map.of("batchId", batchId));
             roomLockService.release(batchId);
         }
+        auditService.success(
+                operator,
+                "BATCH_STATUS_CHANGE",
+                "SELECTION_BATCH",
+                batchId,
+                currentStatus + " -> " + targetStatus,
+                current,
+                Map.of("batchStatus", targetStatus));
     }
 
     private Map<String, Object> currentBatch(long batchId) {
