@@ -105,17 +105,22 @@ for token in (
 
 exchange_service = read("backend-java/server/src/main/java/com/wust/dormitory/roomexchange/RoomExchangeService.java")
 for token in (
-    "room_exchange_participant_lock",
     "WAITING_TARGET",
     "PENDING_ADMIN",
     "executeExchange",
-    "FOR UPDATE",
     "residencyService.end",
     "residencyService.assign",
     "MUTUAL_CONFIRMATION",
     "APPROVAL_REQUIRED",
 ):
     require(exchange_service, token, f"room-exchange service missing transactional behavior: {token}")
+exchange_xml = read("backend-java/server/src/main/resources/mapper/roomexchange/RoomExchangeMapper.xml")
+require(exchange_xml, "room_exchange_participant_lock", "room-exchange participant locking must remain in persistence layer")
+for lock_id in ("lockRequest", "lockActiveResidencies", "lockActiveResidency"):
+    start = exchange_xml.find(f'id="{lock_id}"')
+    end = exchange_xml.find("</select>", start)
+    if start < 0 or end < 0 or "FOR UPDATE" not in exchange_xml[start:end].upper():
+        raise AssertionError(f"room-exchange lock missing FOR UPDATE: {lock_id}")
 
 exchange_controller = read("backend-java/server/src/main/java/com/wust/dormitory/roomexchange/RoomExchangeController.java")
 require(exchange_controller, "implements RoomExchangeApi", "room-exchange controller must implement the generated OpenAPI interface")
