@@ -111,6 +111,10 @@ paths:
     $ref: 'admin/openapi-governance.yaml#/paths/~1api~1v1~1admin~1governance~1notifications~1templates'
   /api/v1/admin/governance/notifications/templates/revisions:
     $ref: 'admin/openapi-governance.yaml#/paths/~1api~1v1~1admin~1governance~1notifications~1templates~1revisions'
+  /api/v1/admin/governance/notifications/recipients/count:
+    $ref: 'admin/openapi-governance.yaml#/paths/~1api~1v1~1admin~1governance~1notifications~1recipients~1count'
+  /api/v1/admin/governance/notifications/direct:
+    $ref: 'admin/openapi-governance.yaml#/paths/~1api~1v1~1admin~1governance~1notifications~1direct'
   /api/v1/admin/governance/notifications/preflight:
     $ref: 'admin/openapi-governance.yaml#/paths/~1api~1v1~1admin~1governance~1notifications~1preflight'
   /api/v1/admin/governance/notifications/schedule:

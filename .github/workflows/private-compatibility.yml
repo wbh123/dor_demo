@@ -4,6 +4,11 @@ on:
   push:
     branches:
       - 'private-compat/**'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - '.private-compat-trigger'
 
 permissions:
   contents: read
@@ -23,8 +28,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          private_ref="${GITHUB_REF_NAME#private-compat/}"
-          if [[ -z "$private_ref" || "$private_ref" == "$GITHUB_REF_NAME" ]]; then
+          candidate="${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}"
+          private_ref="${candidate#private-compat/}"
+          if [[ -z "$private_ref" || "$private_ref" == "$candidate" ]]; then
             echo "Invalid compatibility branch name" >&2
             exit 1
           fi
