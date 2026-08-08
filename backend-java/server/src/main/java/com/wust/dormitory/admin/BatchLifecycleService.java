@@ -1,5 +1,6 @@
 package com.wust.dormitory.admin;
 
+import com.wust.dormitory.admin.mapper.BatchLifecycleMapper;
 import com.wust.dormitory.audit.AuditService;
 import com.wust.dormitory.common.error.BusinessException;
 import com.wust.dormitory.residency.BatchRoomLockService;
@@ -9,11 +10,9 @@ import com.wust.dormitory.subscription.FeatureAccessService;
 import com.wust.dormitory.subscription.FeatureCodes;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpStatus;
-import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -28,7 +27,7 @@ public class BatchLifecycleService {
             "CLOSED", Set.of("ALLOCATING", "FINISHED"),
             "ALLOCATING", Set.of("FINISHED", "CLOSED"));
 
-    private final NamedParameterJdbcTemplate jdbc;
+    private final BatchLifecycleMapper batchLifecycleMapper;
     private final BatchScopeService batchScopeService;
     private final BatchRoomLockService roomLockService;
     private final FeatureAccessService featureAccessService;
@@ -36,13 +35,13 @@ public class BatchLifecycleService {
     private final AuditService auditService;
 
     public BatchLifecycleService(
-            NamedParameterJdbcTemplate jdbc,
+            BatchLifecycleMapper batchLifecycleMapper,
             BatchScopeService batchScopeService,
             BatchRoomLockService roomLockService,
             FeatureAccessService featureAccessService,
             EntitlementSnapshotService entitlementSnapshotService,
             AuditService auditService) {
-        this.jdbc = jdbc;
+        this.batchLifecycleMapper = batchLifecycleMapper;
         this.batchScopeService = batchScopeService;
         this.roomLockService = roomLockService;
         this.featureAccessService = featureAccessService;
@@ -52,20 +51,20 @@ public class BatchLifecycleService {
 
     @Transactional
     public void changeStatus(long batchId, String targetStatus, CurrentUser operator) {
-        Map<String, Object> current = currentBatch(batchId);
+        Map<String, Object> current = batchLifecycleMapper.lockBatch(batchId);
+        if (current == null) {
+            throw new BusinessException("BATCH_NOT_FOUND", "选寝批次不存在", HttpStatus.NOT_FOUND);
+        }
         String currentStatus = String.valueOf(current.get("batch_status"));
         if (currentStatus.equals(targetStatus)) return;
         if (!TRANSITIONS.getOrDefault(currentStatus, Set.of()).contains(targetStatus)) {
-            throw new BusinessException(
-                    "BATCH_STATUS_INVALID",
-                    "不允许从" + currentStatus + "切换到" + targetStatus);
+            throw new BusinessException("BATCH_STATUS_INVALID", "不允许从" + currentStatus + "切换到" + targetStatus);
         }
 
         boolean enteringActiveState = !ACTIVE_STATUSES.contains(currentStatus)
                 && ACTIVE_STATUSES.contains(targetStatus);
         boolean leavingActiveState = ACTIVE_STATUSES.contains(currentStatus)
                 && !ACTIVE_STATUSES.contains(targetStatus);
-
         if (enteringActiveState) {
             if ("BED".equals(String.valueOf(current.get("selection_mode")))) {
                 featureAccessService.require(FeatureCodes.P2_BED_SELECTION_MODE);
@@ -77,24 +76,9 @@ public class BatchLifecycleService {
             entitlementSnapshotService.captureForBatch(batchId);
         }
 
-        jdbc.update("""
-                UPDATE selection_batch
-                SET batch_status=:status,
-                    published_at=CASE
-                        WHEN :status='PUBLISHED' THEN COALESCE(published_at,CURRENT_TIMESTAMP(3))
-                        ELSE published_at
-                    END,
-                    finished_at=CASE
-                        WHEN :status='FINISHED' THEN COALESCE(finished_at,CURRENT_TIMESTAMP(3))
-                        ELSE finished_at
-                    END
-                WHERE id=:batchId
-                """, Map.of("batchId", batchId, "status", targetStatus));
-
+        batchLifecycleMapper.updateStatus(batchId, targetStatus);
         if (leavingActiveState) {
-            jdbc.update(
-                    "DELETE FROM active_batch_student_lock WHERE batch_id=:batchId",
-                    Map.of("batchId", batchId));
+            batchLifecycleMapper.deleteStudentLocks(batchId);
             roomLockService.release(batchId);
         }
         auditService.success(
@@ -107,26 +91,9 @@ public class BatchLifecycleService {
                 Map.of("batchStatus", targetStatus));
     }
 
-    private Map<String, Object> currentBatch(long batchId) {
-        List<Map<String, Object>> rows = jdbc.queryForList("""
-                SELECT id, batch_status, selection_mode,
-                       separate_student_categories
-                FROM selection_batch WHERE id=:batchId FOR UPDATE
-                """, Map.of("batchId", batchId));
-        if (rows.isEmpty()) {
-            throw new BusinessException("BATCH_NOT_FOUND", "选寝批次不存在", HttpStatus.NOT_FOUND);
-        }
-        return rows.getFirst();
-    }
-
     private void acquireStudentLocks(long batchId) {
         try {
-            jdbc.update("""
-                    INSERT INTO active_batch_student_lock (student_id, batch_id)
-                    SELECT student_id, batch_id
-                    FROM batch_student_eligibility
-                    WHERE batch_id=:batchId AND eligibility_status='ELIGIBLE'
-                    """, Map.of("batchId", batchId));
+            batchLifecycleMapper.insertStudentLocks(batchId);
         } catch (DuplicateKeyException exception) {
             throw new BusinessException(
                     "BATCH_STUDENT_ACTIVE_CONFLICT",
