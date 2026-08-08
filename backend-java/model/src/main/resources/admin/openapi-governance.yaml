@@ -81,7 +81,33 @@ paths:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/NotificationSendRequest' }
+            schema: { $ref: '#/components/schemas/NotificationPreflightRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/ObjectSuccess' }
+  /api/v1/admin/governance/notifications/recipients/count:
+    post:
+      tags: [AdminNotificationRecipientPreview]
+      operationId: countNotificationRecipients
+      summary: 按当前多选接收范围计算接收人数
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RecipientPreviewRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/ObjectSuccess' }
+  /api/v1/admin/governance/notifications/direct:
+    post:
+      tags: [AdminDirectNotification]
+      operationId: sendDirectNotification
+      summary: 直接发送当前编辑的站内通知内容
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DirectNotificationRequest' }
       responses:
         '200': { $ref: '#/components/responses/ObjectSuccess' }
   /api/v1/admin/governance/notifications/schedule:
@@ -292,14 +318,47 @@ components:
       additionalProperties: false
       properties:
         studentIds: { type: array, items: { type: integer, format: int64 } }
-        batchId: { type: integer, format: int64, nullable: true }
-        majorId: { type: integer, format: int64, nullable: true }
-        gradeYear: { type: integer, nullable: true }
-        degreeLevel: { type: string }
-        studentCategory: { type: string }
-        buildingId: { type: integer, format: int64, nullable: true }
+        batchId: { type: integer, format: int64, nullable: true, deprecated: true }
+        majorId: { type: integer, format: int64, nullable: true, deprecated: true }
+        gradeYear: { type: integer, nullable: true, deprecated: true }
+        degreeLevel: { type: string, deprecated: true }
+        studentCategory: { type: string, deprecated: true }
+        buildingId: { type: integer, format: int64, nullable: true, deprecated: true }
+        batchIds: { type: array, items: { type: integer, format: int64 } }
+        majorIds: { type: array, items: { type: integer, format: int64 } }
+        gradeYears: { type: array, items: { type: integer } }
+        degreeLevels: { type: array, items: { type: string } }
+        studentCategories: { type: array, items: { type: string } }
+        buildingIds: { type: array, items: { type: integer, format: int64 } }
         unselectedOnly: { type: boolean, default: false }
         pendingReviewOnly: { type: boolean, default: false }
+    RecipientPreviewRequest:
+      type: object
+      additionalProperties: false
+      required: [criteria]
+      properties:
+        criteria: { $ref: '#/components/schemas/RecipientCriteria' }
+    DirectNotificationRequest:
+      type: object
+      additionalProperties: false
+      required: [criteria, titleZhCn, contentZhCn, reason]
+      properties:
+        criteria: { $ref: '#/components/schemas/RecipientCriteria' }
+        titleZhCn: { type: string, minLength: 1, maxLength: 200 }
+        contentZhCn: { type: string, minLength: 1, maxLength: 5000 }
+        titleEnUs: { type: string, maxLength: 200 }
+        contentEnUs: { type: string, maxLength: 5000 }
+        reason: { type: string, minLength: 2, maxLength: 500 }
+    NotificationPreflightRequest:
+      type: object
+      additionalProperties: false
+      required: [criteria, templateRevisionId, variables]
+      properties:
+        criteria: { $ref: '#/components/schemas/RecipientCriteria' }
+        templateRevisionId: { type: integer, format: int64, minimum: 1 }
+        variables:
+          type: object
+          additionalProperties: { type: string }
     NotificationSendRequest:
       type: object
       additionalProperties: false
