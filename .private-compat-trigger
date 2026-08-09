@@ -1,0 +1,5 @@
+Private compatibility trigger
+
+Validated private branch: perf/selection-static-snapshot-cache-confirm-fixture-20260809
+Purpose: TDD red for free contention target bed and shared parsed runtime snapshot cache.
+Nonce: 2026-08-09-selection-static-cache-red
