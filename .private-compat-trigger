@@ -1,5 +1,5 @@
 Private compatibility trigger
 
 Validated private branch: perf/selection-entitlement-cache-loadfix-20260809
-Purpose: validate final entitlement/quota runtime cache, transaction-safe invalidation, preauthenticated HTTP/SSE token reuse, exact 1900+100=2000 user isolation, and existing Redis selection hot paths.
-Nonce: 2026-08-09-entitlement-cache-loadfix-2
+Purpose: validate final branch after syncing latest main: entitlement/quota runtime cache, transaction-safe invalidation, preauthenticated HTTP/SSE token reuse, exact 1900+100=2000 user isolation, and current MyBatis refactors.
+Nonce: 2026-08-09-entitlement-cache-loadfix-3
