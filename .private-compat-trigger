@@ -1,5 +1,5 @@
 Private compatibility trigger
 
 Validated private branch: fix/loadtest-restart-backend-502-20260809
-Purpose: TDD red for forced local backend port cleanup, self-start and proxy bypass in 2000-user load test.
-Nonce: 2026-08-09-loadtest-backend-restart-502-red
+Purpose: verify forced local backend port cleanup, starter self-start, NO_PROXY bypass and 502 recovery.
+Nonce: 2026-08-09-loadtest-backend-restart-502-green
