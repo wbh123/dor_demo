@@ -1,5 +1,5 @@
 Private compatibility trigger
 
 Validated private branch: fix/selection-health-timeout-20260809
-Purpose: verify configurable 8-second backend health timeout after production script update.
-Nonce: 2026-08-09-selection-health-timeout-green
+Purpose: verify clean final head after removing accidental temporary file; configurable 8-second backend health timeout remains the only production change.
+Nonce: 2026-08-09-selection-health-timeout-green-clean
