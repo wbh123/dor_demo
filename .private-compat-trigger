@@ -1,0 +1,5 @@
+Private compatibility trigger
+
+Validated private branch: fix/selection-load-hold-diagnostics-20260809
+Purpose: TDD red for hold outcome diagnostics and target bed state capture.
+Nonce: 2026-08-09-hold-diagnostics-red
