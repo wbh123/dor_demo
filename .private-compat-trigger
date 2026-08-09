@@ -1,5 +1,5 @@
 Private compatibility trigger
 
 Validated private branch: fix/selection-load-health-probe-20260809
-Purpose: verify diagnosable backend health probing, localhost/127.0.0.1 fallback, default 8080 fallback, and existing selection load contracts.
-Nonce: 2026-08-09-selection-health-probe-green
+Purpose: verify final diagnosable backend health probing, localhost/127.0.0.1 fallback, default 8080 fallback, bash syntax, and existing selection load contracts.
+Nonce: 2026-08-09-selection-health-probe-green-2
