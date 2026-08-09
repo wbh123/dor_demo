@@ -1,0 +1,5 @@
+Private compatibility trigger
+
+Validated private branch: perf/selection-entitlement-cache-loadfix-20260809
+Purpose: validate entitlement/quota runtime cache, transaction-safe invalidation, exact 2000-user account isolation, and existing Redis selection hot paths.
+Nonce: 2026-08-09-entitlement-cache-loadfix-1
