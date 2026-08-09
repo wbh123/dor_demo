@@ -1,0 +1,5 @@
+Private compatibility trigger
+
+Validated private branch: fix/selection-load-health-probe-20260809
+Purpose: verify the new selection load health-probe contract fails before production-script changes.
+Nonce: 2026-08-09-selection-health-probe-red
