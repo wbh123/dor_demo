@@ -1,5 +1,5 @@
 Private compatibility trigger
 
 Validated private branch: integration/selection-hotpath-batching-verified-20260809
-Purpose: validate current private integration head after modular snapshot-writer contract alignment, Redis hotpath batching, race-safe hold reads, SSE runtime authorization, ROOM-mode bed-read elimination, and single-read room bootstrap.
-Nonce: 2026-08-09-compat-rerun-4
+Purpose: validate current private integration head after preserving remaining-bed warning contract markers, modular Redis hotpath batching, race-safe hold reads, SSE runtime authorization, ROOM-mode bed-read elimination, and single-read room bootstrap.
+Nonce: 2026-08-09-compat-rerun-5
