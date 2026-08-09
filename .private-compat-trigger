@@ -1,0 +1,5 @@
+Private compatibility trigger
+
+Validated private branch: integration/selection-hotpath-batching-verified-20260809
+Validated private head: 06565d86c68c7a3c1e3c1bb7d0a84590a869005d
+Purpose: verify modular Redis selection hotpath batching, SSE runtime authorization, bootstrap single-read path, and race-safe bulk hold reads.
