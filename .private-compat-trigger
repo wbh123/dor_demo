@@ -1,5 +1,5 @@
 Private compatibility trigger
 
 Validated private branch: fix/selection-health-timeout-20260809
-Purpose: verify health probe timeout contract fails before production script update.
-Nonce: 2026-08-09-selection-health-timeout-red
+Purpose: verify configurable 8-second backend health timeout after production script update.
+Nonce: 2026-08-09-selection-health-timeout-green
