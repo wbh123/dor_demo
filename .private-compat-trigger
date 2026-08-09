@@ -1,2 +1,3 @@
 private_ref=refactor/plan-service-mybatis-main-20260809
-phase=red
+phase=contract-red
+private_head=8060863ab27841ded48de60c2666f925639ac272
