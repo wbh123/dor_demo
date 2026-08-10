@@ -1,5 +1,5 @@
 Private compatibility trigger
 
 Validated private branch: verify/selection-room-profile-latest-main-20260810
-Purpose: run all non-size contracts plus Java 21 Maven/frontend for latest-main selection performance integration.
-Nonce: 2026-08-10-selection-room-profile-verify-latest-main-3
+Purpose: run remaining contracts plus Java 21 Maven/frontend after excluding only independent latest-main governance/system-contract reds.
+Nonce: 2026-08-10-selection-room-profile-verify-latest-main-4
