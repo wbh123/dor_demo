@@ -1,5 +1,5 @@
 Private compatibility trigger
 
 Validated private branch: diag/selection-load-runtime-20260810
-Purpose: GREEN validation for round-9 selection load runtime diagnostics and A/B toggle.
-Nonce: 2026-08-10-selection-runtime-diag-green-1
+Purpose: runtime exercise for round-9 selection load diagnostics; unrelated notification baseline may remain red.
+Nonce: 2026-08-10-selection-runtime-diag-green-2
