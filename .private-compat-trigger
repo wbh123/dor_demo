@@ -1,5 +1,5 @@
 Private compatibility trigger
 
 Validated private branch: perf/candidate-summary-vector-20260810
-Purpose: final rerun after system-contract adaptation for split detail warnings and bounded candidate conflict hints.
-Nonce: 2026-08-10-candidate-summary-vector-final-4
+Purpose: final validation after fixing ROOM capacity test fixture while preserving vectorized summaries and roommate tags.
+Nonce: 2026-08-10-candidate-summary-vector-final-5
