@@ -1,5 +1,5 @@
 Private compatibility trigger
 
 Validated private branch: perf/selection-room-profile-bootstrap-lease-20260810
-Purpose: TDD RED after wiring low-disturbance load contract before unrelated notification baseline.
-Nonce: 2026-08-10-selection-room-profile-red-2
+Purpose: GREEN verification for prepared room profiles, lock-light snapshots, Tomcat concurrency and low-disturbance 1000-user load diagnostics.
+Nonce: 2026-08-10-selection-room-profile-green-1
