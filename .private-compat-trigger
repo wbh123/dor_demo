@@ -1,0 +1,5 @@
+Private compatibility trigger
+
+Validated private branch: perf/candidate-summary-vector-20260810
+Purpose: TDD RED for prepared preference score-only and lightweight candidate summaries.
+Nonce: 2026-08-10-candidate-summary-vector-red-1
