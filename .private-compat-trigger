@@ -1,0 +1,5 @@
+Private compatibility trigger
+
+Validated private branch: diag/selection-load-runtime-20260810
+Purpose: TDD RED for round-9 selection load runtime diagnostics.
+Nonce: 2026-08-10-selection-runtime-diag-red-1
