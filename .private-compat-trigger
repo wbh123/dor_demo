@@ -1,5 +1,5 @@
 Private compatibility trigger
 
 Validated private branch: perf/candidate-summary-vector-20260810
-Purpose: verify current prepared preference vector scoring, lightweight summaries, roommate tag preservation, raw preference separation, and final-room-only detailed analysis.
-Nonce: 2026-08-10-candidate-summary-vector-current-2
+Purpose: full validation for prepared preference vector scoring, compiled preference reuse, lightweight room summaries with roommate tags, raw preference separation, final-room-only detailed analysis, and candidate response byte metrics.
+Nonce: 2026-08-10-candidate-summary-vector-final-3
