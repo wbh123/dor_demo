@@ -1,0 +1,5 @@
+Private compatibility trigger
+
+Validated private branch: fix/loadtest-idempotent-confirm-20260810
+Purpose: TDD RED for idempotent duplicate confirmation semantics after round-7 pressure test.
+Nonce: 2026-08-10-loadtest-idempotent-confirm-red
