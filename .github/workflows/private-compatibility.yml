@@ -79,8 +79,17 @@ jobs:
         working-directory: private-repo/backend-java
         shell: bash
         run: |
-          set -euo pipefail
-          mvn -B -ntp clean verify
+          set -o pipefail
+          mvn -B -ntp clean verify 2>&1 | tee ../../maven-verify.log
+
+      - name: Upload Maven verify log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: candidate-summary-vector-maven-log
+          path: maven-verify.log
+          if-no-files-found: warn
+          retention-days: 1
 
       - name: Verify private frontend
         working-directory: private-repo
