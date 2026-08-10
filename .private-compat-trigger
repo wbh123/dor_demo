@@ -1,5 +1,5 @@
 Private compatibility trigger
 
 Validated private branch: perf/selection-room-profile-bootstrap-lease-20260810
-Purpose: GREEN verification for prepared room profiles, lock-light snapshots, Tomcat concurrency and low-disturbance 1000-user load diagnostics.
-Nonce: 2026-08-10-selection-room-profile-green-1
+Purpose: GREEN verification after lease timing modularization.
+Nonce: 2026-08-10-selection-room-profile-green-2
