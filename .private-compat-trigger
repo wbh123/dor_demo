@@ -1,5 +1,5 @@
 Private compatibility trigger
 
 Validated private branch: verify/selection-room-profile-latest-main-20260810
-Purpose: run full CI with a temporary modularization baseline entry for the unrelated 306-line notification service already present on main.
-Nonce: 2026-08-10-selection-room-profile-verify-latest-main-1
+Purpose: continue full CI past the latest main's unrelated notification 306-line governance baseline.
+Nonce: 2026-08-10-selection-room-profile-verify-latest-main-2
