@@ -1,0 +1,5 @@
+Private compatibility trigger
+
+Validated private branch: fix/loadtest-preference-fixture-20260810
+Purpose: TDD RED for realistic selection preference fixtures after round-6 PREFERENCE_REQUIRED diagnosis.
+Nonce: 2026-08-10-loadtest-preference-red
