@@ -1,5 +1,5 @@
 Private compatibility trigger
 
 Validated private branch: perf/selection-room-profile-bootstrap-lease-20260810
-Purpose: trigger targeted Java/frontend validation after temporary workflow was added.
-Nonce: 2026-08-10-selection-room-profile-targeted-1
+Purpose: full contracts + Java 21 Maven + frontend after stale notification test repair.
+Nonce: 2026-08-10-selection-room-profile-full-green-1
