@@ -1,5 +1,5 @@
 Private compatibility trigger
 
 Validated private branch: perf/selection-room-profile-bootstrap-lease-20260810
-Purpose: GREEN verification after lock-light runtime snapshot contract update.
-Nonce: 2026-08-10-selection-room-profile-green-3
+Purpose: trigger targeted Java/frontend validation after temporary workflow was added.
+Nonce: 2026-08-10-selection-room-profile-targeted-1
