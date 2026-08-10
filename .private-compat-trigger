@@ -1,5 +1,5 @@
 Private compatibility trigger
 
 Validated private branch: verify/selection-room-profile-latest-main-20260810
-Purpose: validate latest-main room-layout constructor compatibility plus selection performance integration.
-Nonce: 2026-08-10-selection-room-profile-verify-latest-main-5
+Purpose: validate latest-main constructor/test drift fixes plus selection performance integration.
+Nonce: 2026-08-10-selection-room-profile-verify-latest-main-6
