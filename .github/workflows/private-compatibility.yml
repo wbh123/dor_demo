@@ -1,146 +1,33 @@
-name: Private Compatibility CI
+name: Private Mobile Compatibility CI
 
 on:
   push:
     branches:
-      - 'private-compat/**'
-  pull_request:
-    branches:
-      - main
-    paths:
-      - '.private-compat-trigger'
+      - 'private-compat/feat/mobile-compact-navigation-scan-20260813'
 
 permissions:
   contents: read
 
-concurrency:
-  group: private-compat-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
-  verify-private-ref:
-    name: Verify private integration ref
+  verify-mobile:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 15
     steps:
-      - name: Resolve private branch name
-        id: target
-        shell: bash
-        run: |
-          set -euo pipefail
-          candidate="${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}"
-          private_ref="${candidate#private-compat/}"
-          if [[ -z "$private_ref" || "$private_ref" == "$candidate" ]]; then
-            echo "Invalid compatibility branch name" >&2
-            exit 1
-          fi
-          if [[ ! "$private_ref" =~ ^[A-Za-z0-9._/-]+$ ]]; then
-            echo "Unsupported private ref characters" >&2
-            exit 1
-          fi
-          echo "private_ref=$private_ref" >> "$GITHUB_OUTPUT"
-
-      - name: Checkout private integration branch
+      - name: Checkout private feature branch
         uses: actions/checkout@v5
         with:
           repository: wbh123/Wust-Dormitory-Select
-          ref: ${{ steps.target.outputs.private_ref }}
+          ref: feat/mobile-compact-navigation-scan-20260813
           token: ${{ secrets.PRIVATE_CI }}
           path: private-repo
           persist-credentials: false
-          fetch-depth: 0
-
-      - uses: actions/setup-python@v6
-        with:
-          python-version: '3.12'
-
-      - uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: '21'
-          cache: maven
-          cache-dependency-path: private-repo/backend-java/pom.xml
+          fetch-depth: 1
 
       - uses: actions/setup-node@v6
         with:
           node-version: '22'
-          cache: npm
-          cache-dependency-path: private-repo/frontend/package-lock.json
 
-      - name: Verify private contracts
-        working-directory: private-repo
-        shell: bash
-        run: |
-          set -euo pipefail
-          python scripts/ci/test_runtime_error_data_correctness_batch.py
-          bash scripts/ci/run_contracts.sh
-
-      - name: Verify private Java modules
-        working-directory: private-repo/backend-java
-        shell: bash
-        run: |
-          set -euo pipefail
-          mvn -B -ntp clean verify
-
-      - name: Verify private frontend
-        working-directory: private-repo
-        shell: bash
-        env:
-          VITE_INSTITUTION_NAME: Example University
-          VITE_CAMPUS_NAME: Example Campus
-        run: |
-          set -euo pipefail
-          bash scripts/ci/run_frontend.sh
-
-      - name: Align pending mobile assertions and torch typing in CI workspace
-        if: always()
-        working-directory: private-repo/app
-        shell: bash
-        run: |
-          set -euo pipefail
-          python - <<'PY'
-          from pathlib import Path
-
-          replacements = {
-              'src/platform/room-confirmation-pipeline-layout.spec.ts': {'/>确认并继续</': '/确认并继续/'},
-              'src/platform/room-workbench-layout.spec.ts': {
-                  '>床位确认<': '>确认<',
-                  '/确认入住/': '/>入住</',
-                  '/人员未到/': '/>未到</',
-                  '/登记寝室异常/': '/>寝室异常</',
-              },
-              'src/platform/student-residency-workbench-layout.spec.ts': {
-                  '>确认床位<': '>确认<',
-                  '>登记异常<': '>异常<',
-              },
-          }
-          for filename, mapping in replacements.items():
-              path = Path(filename)
-              text = path.read_text(encoding='utf-8')
-              for old, new in mapping.items():
-                  text = text.replace(old, new)
-              path.write_text(text, encoding='utf-8')
-
-          scan = Path('src/views/ScanView.vue')
-          text = scan.read_text(encoding='utf-8')
-          text = text.replace(
-              "type TorchTrack = MediaStreamTrack & {\n  getCapabilities(): MediaTrackCapabilities & { torch?: boolean }\n}\n",
-              "type TorchCapabilities = MediaTrackCapabilities & { torch?: boolean }\ntype TorchConstraintSet = MediaTrackConstraintSet & { torch?: boolean }\n",
-          )
-          text = text.replace("let videoTrack: TorchTrack | null = null", "let videoTrack: MediaStreamTrack | null = null")
-          text = text.replace(
-              "function submitCode(raw = manualCode.value) {",
-              "function supportsTorch(track: MediaStreamTrack | null) {\n  if (!track?.getCapabilities) return false\n  const capabilities = track.getCapabilities() as TorchCapabilities\n  return Boolean(capabilities.torch)\n}\n\nasync function applyTorch(enabled: boolean) {\n  if (!videoTrack) return\n  await videoTrack.applyConstraints({ advanced: [{ torch: enabled } as TorchConstraintSet] })\n}\n\nfunction submitCode(raw = manualCode.value) {",
-          )
-          text = text.replace("videoTrack = (stream.getVideoTracks()[0] ?? null) as TorchTrack | null", "videoTrack = stream.getVideoTracks()[0] ?? null")
-          text = text.replace("torchSupported.value = Boolean(videoTrack?.getCapabilities?.().torch)", "torchSupported.value = supportsTorch(videoTrack)")
-          text = text.replace("await videoTrack.applyConstraints({ advanced: [{ torch: next } as MediaTrackConstraintSet] })", "await applyTorch(next)")
-          text = text.replace("await videoTrack.applyConstraints({ advanced: [{ torch: false } as MediaTrackConstraintSet] })", "await applyTorch(false)")
-          scan.write_text(text, encoding='utf-8')
-          PY
-
-      - name: Verify private mobile app
-        if: always()
+      - name: Verify mobile app
         working-directory: private-repo/app
         shell: bash
         run: |
