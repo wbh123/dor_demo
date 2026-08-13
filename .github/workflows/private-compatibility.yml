@@ -93,6 +93,7 @@ jobs:
           bash scripts/ci/run_frontend.sh
 
       - name: Verify private mobile app
+        if: always()
         working-directory: private-repo/app
         shell: bash
         run: |
