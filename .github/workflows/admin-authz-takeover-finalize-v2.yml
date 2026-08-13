@@ -1,0 +1,135 @@
+name: Admin Authz Takeover Finalize V2
+
+on:
+  push:
+    branches:
+      - 'private-compat/feat/admin-authz-v2-20260813'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: admin-authz-takeover-finalize-v2
+  cancel-in-progress: true
+
+jobs:
+  finalize-private-branch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout validation harness
+        uses: actions/checkout@v5
+
+      - name: Checkout private feature branch
+        uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: feat/admin-authz-v2-20260813
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: true
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: private-repo/backend-java/pom.xml
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            private-repo/frontend/package-lock.json
+            private-repo/app/package-lock.json
+
+      - name: Apply deterministic convergence patch
+        working-directory: private-repo
+        run: python ../.github/scripts/finalize_admin_authz.py
+
+      - name: Generate and verify production deployment SQL
+        working-directory: private-repo
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/db/generate_school_deployment_sql.py --check
+          python scripts/db/generate_school_deployment_sql.py
+          python scripts/db/test_generate_school_deployment.py
+          test -s 'backend-java/docs/sql/deployment/generated/00_学校全新部署.sql'
+          test -s 'backend-java/docs/sql/deployment/generated/01_清空运营数据.sql'
+
+      - name: Verify focused source contracts
+        working-directory: private-repo
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/frontend/test_building_lifecycle_campus_selectors.py
+          python scripts/ci/test_admin_password_lifecycle.py
+          python scripts/ci/test_admin_authorization_v44.py
+          python scripts/ci/test_admin_high_risk_authorization.py
+          python scripts/ci/test_account_admin_openapi.py
+
+      - name: Verify authorization focused Java tests
+        working-directory: private-repo/backend-java
+        run: mvn -B -ntp -Dtest=AdminAuthorizationServiceTest,AuthServiceTest,MobileAuthServiceTest,BuildingManagementServiceTest -Dsurefire.failIfNoSpecifiedTests=false test
+
+      - name: Verify database generator contracts
+        working-directory: private-repo
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/db/test_generate_navicat_latest_database.py
+          python scripts/db/generate_navicat_sql.py --check --skip-redis
+
+      - name: Verify full Java build
+        working-directory: private-repo/backend-java
+        run: mvn -B -ntp clean verify
+
+      - name: Verify Web frontend
+        working-directory: private-repo
+        env:
+          VITE_INSTITUTION_NAME: Example University
+          VITE_CAMPUS_NAME: Example Campus
+        run: bash scripts/ci/run_frontend.sh
+
+      - name: Verify mobile admin app
+        working-directory: private-repo/app
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --no-audit --no-fund
+          npm test
+          npm run build
+
+      - name: Upload generated deployment SQL
+        uses: actions/upload-artifact@v4
+        with:
+          name: school-deployment-sql
+          path: private-repo/backend-java/docs/sql/deployment/generated/*.sql
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Commit verified convergence back to private feature branch
+        working-directory: private-repo
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'Wust Dormitory CI'
+          git config user.email 'ci@wust-dormitory.local'
+          git add frontend/src/views/admin/AdminDormitoryView.vue \
+                  frontend/src/components/admin/BuildingResourceCard.vue \
+                  scripts/frontend/test_building_lifecycle_campus_selectors.py
+          git add -f backend-java/docs/sql/deployment/generated/*.sql
+          if git diff --cached --quiet; then
+            echo 'No convergence changes to commit.'
+          else
+            git commit -m 'feat: finalize admin bootstrap and building lifecycle UX'
+            git push origin HEAD:feat/admin-authz-v2-20260813
+          fi
+          echo "PRIVATE_HEAD=$(git rev-parse HEAD)"
