@@ -1,5 +1,6 @@
 name: Private Mobile Compatibility CI
 
+# private head refresh: legacy residency route retired
 on:
   push:
     branches:
