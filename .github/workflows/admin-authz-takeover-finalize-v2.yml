@@ -51,7 +51,11 @@ jobs:
 
       - name: Apply deterministic convergence patch
         working-directory: private-repo
-        run: python ../.github/scripts/finalize_admin_authz.py
+        shell: bash
+        run: |
+          set -euo pipefail
+          python ../.github/scripts/finalize_admin_authz.py
+          python ../.github/scripts/normalize_school_deployment_test.py
 
       - name: Generate and verify production deployment SQL
         working-directory: private-repo
@@ -124,7 +128,8 @@ jobs:
           git config user.email 'ci@wust-dormitory.local'
           git add frontend/src/views/admin/AdminDormitoryView.vue \
                   frontend/src/components/admin/BuildingResourceCard.vue \
-                  scripts/frontend/test_building_lifecycle_campus_selectors.py
+                  scripts/frontend/test_building_lifecycle_campus_selectors.py \
+                  scripts/db/test_generate_school_deployment.py
           git add -f backend-java/docs/sql/deployment/generated/*.sql
           if git diff --cached --quiet; then
             echo 'No convergence changes to commit.'
