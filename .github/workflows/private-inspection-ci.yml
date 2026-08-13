@@ -1,6 +1,6 @@
 name: Private Inspection Compatibility CI
 
-# private inspection refresh 6
+# private inspection refresh 8
 on:
   push:
     branches:
