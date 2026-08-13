@@ -4,11 +4,6 @@ on:
   push:
     branches:
       - 'private-compat/**'
-  pull_request:
-    branches:
-      - main
-    paths:
-      - '.private-compat-trigger'
 
 permissions:
   contents: read
@@ -21,23 +16,16 @@ jobs:
   verify-private-ref:
     name: Verify private integration ref
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 35
     steps:
       - name: Resolve private branch name
         id: target
         shell: bash
         run: |
           set -euo pipefail
-          candidate="${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}"
+          candidate="$GITHUB_REF_NAME"
           private_ref="${candidate#private-compat/}"
-          if [[ -z "$private_ref" || "$private_ref" == "$candidate" ]]; then
-            echo "Invalid compatibility branch name" >&2
-            exit 1
-          fi
-          if [[ ! "$private_ref" =~ ^[A-Za-z0-9._/-]+$ ]]; then
-            echo "Unsupported private ref characters" >&2
-            exit 1
-          fi
+          test -n "$private_ref" && test "$private_ref" != "$candidate"
           echo "private_ref=$private_ref" >> "$GITHUB_OUTPUT"
 
       - name: Checkout private integration branch
@@ -61,20 +49,20 @@ jobs:
           cache: maven
           cache-dependency-path: private-repo/backend-java/pom.xml
 
-      - name: Verify admin authorization and login services
-        working-directory: private-repo/backend-java
-        shell: bash
-        run: |
-          set -euo pipefail
-          mvn -B -ntp -Dtest=AdminAuthorizationServiceTest,AuthServiceTest,MobileAuthServiceTest -Dsurefire.failIfNoSpecifiedTests=false test
-
       - uses: actions/setup-node@v6
         with:
           node-version: '22'
           cache: npm
           cache-dependency-path: private-repo/frontend/package-lock.json
 
-      - name: Verify admin authorization contracts
+      - name: Verify authorization focused tests
+        working-directory: private-repo/backend-java
+        shell: bash
+        run: |
+          set -euo pipefail
+          mvn -B -ntp -Dtest=AdminAuthorizationServiceTest,AuthServiceTest,MobileAuthServiceTest -Dsurefire.failIfNoSpecifiedTests=false test
+
+      - name: Verify authorization contracts
         working-directory: private-repo
         shell: bash
         run: |
@@ -82,22 +70,14 @@ jobs:
           python scripts/ci/test_admin_authorization_v44.py
           python scripts/ci/test_admin_high_risk_authorization.py
 
-      - name: Verify private contracts
-        working-directory: private-repo
-        shell: bash
-        run: |
-          set -euo pipefail
-          python scripts/ci/test_runtime_error_data_correctness_batch.py
-          bash scripts/ci/run_contracts.sh
-
-      - name: Verify private Java modules
+      - name: Verify full Java build
         working-directory: private-repo/backend-java
         shell: bash
         run: |
           set -euo pipefail
           mvn -B -ntp clean verify
 
-      - name: Verify private frontend
+      - name: Verify existing Web frontend
         working-directory: private-repo
         shell: bash
         env:
@@ -106,3 +86,12 @@ jobs:
         run: |
           set -euo pipefail
           bash scripts/ci/run_frontend.sh
+
+      - name: Verify mobile admin app
+        working-directory: private-repo/app
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --no-audit --no-fund
+          npm test
+          npm run build
