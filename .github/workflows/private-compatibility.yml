@@ -67,6 +67,13 @@ jobs:
           cache: npm
           cache-dependency-path: private-repo/frontend/package-lock.json
 
+      - name: Verify admin authorization contract
+        working-directory: private-repo
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/ci/test_admin_authorization_v44.py
+
       - name: Verify private contracts
         working-directory: private-repo
         shell: bash
