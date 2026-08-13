@@ -1,0 +1,80 @@
+name: Mobile Admin P1 Database Sync
+
+on:
+  push:
+    branches:
+      - 'private-compat/agent/mobile-admin-p1-20260813'
+    paths:
+      - '.github/workflows/mobile-admin-p1-db-sync.yml'
+      - '.mobile-p1-db-sync-trigger'
+
+permissions:
+  contents: read
+
+jobs:
+  sync-private-database-artifacts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout private P1 branch
+        uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: agent/mobile-admin-p1-20260813
+          token: ${{ secrets.PRIVATE_CI }}
+          persist-credentials: true
+          fetch-depth: 0
+
+      - name: Update V38 human-readable database dictionary
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('backend-java/docs/database-dictionary.md')
+          text = path.read_text(encoding='utf-8')
+          text = text.replace('当前正式迁移版本：**V37**', '当前正式迁移版本：**V38**')
+          text = text.replace('当前业务表数量：**77 张**', '当前业务表数量：**79 张**')
+          text = text.replace('# 2. 当前 77 张业务表', '# 2. 当前 79 张业务表')
+          text = text.replace('最后校准：2026-08-10', '最后校准：2026-08-13')
+          anchor = '| 实际床位 | `bed_confirmation_request` | 学生实际床位申报和管理员核查 |\n'
+          rows = (
+              '| 移动现场 | `residency_checkin` | 管理员对正式在住学生的现场入住办理状态；每条正式在住最多一条当前记录 |\n'
+              '| 移动现场 | `residency_issue` | 人员未到、床位不符、寝室或设施等现场异常及其处理状态 |\n'
+          )
+          if '`residency_checkin`' not in text:
+              if anchor not in text:
+                  raise SystemExit('dictionary insertion anchor missing')
+              text = text.replace(anchor, anchor + rows, 1)
+          appendix = '''\n\n---\n\n# 15. V38 移动现场管理\n\n## `residency_checkin`\n\n移动管理员现场办理入住的当前事实。`residency_id` 唯一关联 `room_assignment`，状态只允许 `CONFIRMED`、`NOT_ARRIVED`、`EXCEPTION`。该表不改写学生原选寝结果；重复提交同一正式在住记录执行更新/幂等返回。\n\n关键字段：`residency_id`、`student_id`、`room_id`、`bed_id`、`checkin_status`、`note`、`confirmed_by`、`confirmed_at`。\n\n## `residency_issue`\n\n宿舍现场异常的轻量工作记录。`client_request_id` 为移动写入幂等键；状态只允许 `OPEN`、`IN_PROGRESS`、`RESOLVED`、`CLOSED`。异常可关联学生、寝室和床位，但不会直接修改正式住宿或选寝结果。\n\n关键字段：`client_request_id`、`issue_type`、`issue_status`、`student_id`、`room_id`、`bed_id`、`description`、`evidence_url`、`created_by`、`resolved_by`、`resolution_note`。\n'''
+          if '# 15. V38 移动现场管理' not in text:
+              text = text.rstrip() + appendix + '\n'
+          path.write_text(text, encoding='utf-8')
+          PY
+
+      - name: Regenerate Navicat realistic SQL and validate database contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/db/generate_navicat_sql.py --scenario realistic --skip-redis
+          python scripts/db/generate_navicat_sql.py --scenario realistic --check
+          python scripts/db/test_database_dictionary_current.py
+          python -m unittest \
+            scripts/db/test_generate_navicat_scenarios.py \
+            scripts/db/test_generate_navicat_latest_database.py \
+            scripts/db/test_navicat_database_integrity.py -v
+
+      - name: Commit generated database artifacts back to private P1 branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'WangBinghao'
+          git config user.email '2495680763@qq.com'
+          git add backend-java/docs/database-dictionary.md \
+                  backend-java/docs/sql/navicat/generated/00_一键重置数据库.sql
+          if git diff --cached --quiet; then
+            echo 'Database artifacts already synchronized'
+            exit 0
+          fi
+          git commit -m 'docs(db): sync V38 mobile field operations artifacts'
+          git push origin HEAD:agent/mobile-admin-p1-20260813
