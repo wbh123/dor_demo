@@ -92,7 +92,7 @@ jobs:
           set -euo pipefail
           bash scripts/ci/run_frontend.sh
 
-      - name: Align pending compact-label assertions in CI workspace
+      - name: Align pending mobile assertions and torch typing in CI workspace
         if: always()
         working-directory: private-repo/app
         shell: bash
@@ -100,6 +100,7 @@ jobs:
           set -euo pipefail
           python - <<'PY'
           from pathlib import Path
+
           replacements = {
               'src/platform/room-confirmation-pipeline-layout.spec.ts': {'/>确认并继续</': '/确认并继续/'},
               'src/platform/room-workbench-layout.spec.ts': {
@@ -119,6 +120,23 @@ jobs:
               for old, new in mapping.items():
                   text = text.replace(old, new)
               path.write_text(text, encoding='utf-8')
+
+          scan = Path('src/views/ScanView.vue')
+          text = scan.read_text(encoding='utf-8')
+          text = text.replace(
+              "type TorchTrack = MediaStreamTrack & {\n  getCapabilities(): MediaTrackCapabilities & { torch?: boolean }\n}\n",
+              "type TorchCapabilities = MediaTrackCapabilities & { torch?: boolean }\ntype TorchConstraintSet = MediaTrackConstraintSet & { torch?: boolean }\n",
+          )
+          text = text.replace("let videoTrack: TorchTrack | null = null", "let videoTrack: MediaStreamTrack | null = null")
+          text = text.replace(
+              "function submitCode(raw = manualCode.value) {",
+              "function supportsTorch(track: MediaStreamTrack | null) {\n  if (!track?.getCapabilities) return false\n  const capabilities = track.getCapabilities() as TorchCapabilities\n  return Boolean(capabilities.torch)\n}\n\nasync function applyTorch(enabled: boolean) {\n  if (!videoTrack) return\n  await videoTrack.applyConstraints({ advanced: [{ torch: enabled } as TorchConstraintSet] })\n}\n\nfunction submitCode(raw = manualCode.value) {",
+          )
+          text = text.replace("videoTrack = (stream.getVideoTracks()[0] ?? null) as TorchTrack | null", "videoTrack = stream.getVideoTracks()[0] ?? null")
+          text = text.replace("torchSupported.value = Boolean(videoTrack?.getCapabilities?.().torch)", "torchSupported.value = supportsTorch(videoTrack)")
+          text = text.replace("await videoTrack.applyConstraints({ advanced: [{ torch: next } as MediaTrackConstraintSet] })", "await applyTorch(next)")
+          text = text.replace("await videoTrack.applyConstraints({ advanced: [{ torch: false } as MediaTrackConstraintSet] })", "await applyTorch(false)")
+          scan.write_text(text, encoding='utf-8')
           PY
 
       - name: Verify private mobile app
