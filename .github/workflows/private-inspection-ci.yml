@@ -37,8 +37,23 @@ jobs:
         working-directory: private-repo/frontend
         run: npm install --no-audit --no-fund
       - name: Typecheck school admin frontend
+        id: admin_typecheck
+        continue-on-error: true
         working-directory: private-repo/frontend
-        run: npm run typecheck
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run typecheck 2>&1 | tee ../../admin-typecheck.log
+      - name: Upload admin typecheck diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: admin-typecheck-log
+          path: admin-typecheck.log
+          if-no-files-found: error
+      - name: Fail when admin typecheck failed
+        if: steps.admin_typecheck.outcome == 'failure'
+        run: exit 1
       - name: Build school admin frontend
         working-directory: private-repo/frontend
         run: npm run build
