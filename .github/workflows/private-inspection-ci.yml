@@ -1,0 +1,27 @@
+name: Private Inspection Compatibility CI
+
+on:
+  push:
+    branches:
+      - 'private-compat/feat/inspection-workflow-skeleton-20260814'
+
+permissions:
+  contents: read
+
+jobs:
+  inspection-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout private feature branch
+        uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: feat/inspection-workflow-skeleton-20260814
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Verify inspection contract gate
+        working-directory: private-repo
+        run: python scripts/ci/test_inspection_openapi_contract.py
