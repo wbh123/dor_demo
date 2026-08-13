@@ -101,6 +101,7 @@ jobs:
           python - <<'PY'
           from pathlib import Path
           replacements = {
+              'src/platform/room-confirmation-pipeline-layout.spec.ts': {'/>确认并继续</': '/确认并继续/'},
               'src/platform/room-workbench-layout.spec.ts': {
                   '>床位确认<': '>确认<',
                   '/确认入住/': '/>入住</',
