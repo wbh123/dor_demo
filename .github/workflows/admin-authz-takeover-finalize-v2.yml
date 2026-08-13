@@ -56,6 +56,7 @@ jobs:
           set -euo pipefail
           python ../.github/scripts/finalize_admin_authz.py
           python ../.github/scripts/normalize_school_deployment_test.py
+          python ../.github/scripts/fix_admin_residency_test_fixture.py
 
       - name: Generate and verify production deployment SQL
         working-directory: private-repo
@@ -129,7 +130,8 @@ jobs:
           git add frontend/src/views/admin/AdminDormitoryView.vue \
                   frontend/src/components/admin/BuildingResourceCard.vue \
                   scripts/frontend/test_building_lifecycle_campus_selectors.py \
-                  scripts/db/test_generate_school_deployment.py
+                  scripts/db/test_generate_school_deployment.py \
+                  backend-java/server/src/test/java/com/wust/dormitory/mapper/AdminResidencyAdjustmentMapperMySqlIntegrationTest.java
           git add -f backend-java/docs/sql/deployment/generated/*.sql
           if git diff --cached --quiet; then
             echo 'No convergence changes to commit.'
