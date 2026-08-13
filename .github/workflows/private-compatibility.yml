@@ -72,6 +72,7 @@ jobs:
           python scripts/ci/test_account_admin_openapi.py
 
       - name: Verify Navicat database contract
+        if: ${{ always() }}
         working-directory: private-repo
         shell: bash
         run: |
@@ -80,6 +81,7 @@ jobs:
           python scripts/db/generate_navicat_sql.py --check --skip-redis
 
       - name: Verify full Java build
+        if: ${{ always() }}
         working-directory: private-repo/backend-java
         shell: bash
         run: |
@@ -87,6 +89,7 @@ jobs:
           mvn -B -ntp clean verify
 
       - name: Verify existing Web frontend
+        if: ${{ always() }}
         working-directory: private-repo
         shell: bash
         env:
@@ -97,6 +100,7 @@ jobs:
           bash scripts/ci/run_frontend.sh
 
       - name: Verify mobile admin app
+        if: ${{ always() }}
         working-directory: private-repo/app
         shell: bash
         run: |
