@@ -1,0 +1,124 @@
+name: Admin Authz Reverse Sync Main
+
+on:
+  push:
+    branches:
+      - 'private-sync/admin-authz-v2-20260814'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: admin-authz-reverse-sync-main
+  cancel-in-progress: true
+
+jobs:
+  reverse-sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout validation harness
+        uses: actions/checkout@v5
+
+      - name: Checkout private feature branch
+        uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: feat/admin-authz-v2-20260813
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: true
+          fetch-depth: 0
+
+      - name: Merge latest main with guarded router resolution
+        working-directory: private-repo
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'Wust Dormitory CI'
+          git config user.email 'ci@wust-dormitory.local'
+          git fetch origin main
+          feature_before="$(git rev-parse HEAD)"
+          main_head="$(git rev-parse origin/main)"
+          echo "FEATURE_BEFORE=$feature_before"
+          echo "MAIN_HEAD=$main_head"
+
+          if git merge-base --is-ancestor "$main_head" HEAD; then
+            echo 'Latest main is already contained in the feature branch.'
+            exit 0
+          fi
+
+          set +e
+          git merge --no-ff --no-commit origin/main
+          merge_status=$?
+          set -e
+
+          if [ "$merge_status" -ne 0 ]; then
+            conflicts="$(git diff --name-only --diff-filter=U)"
+            if [ "$conflicts" != 'app/src/router/index.ts' ]; then
+              echo "Unexpected merge conflicts; refusing automatic resolution:"
+              printf '%s\n' "$conflicts"
+              git merge --abort
+              exit 1
+            fi
+          fi
+
+          cat > app/src/router/index.ts <<'EOF'
+          import { createRouter, createWebHistory } from 'vue-router'
+          import { useAuthStore } from '../stores/auth'
+          import { resolveMobileEntry } from '../platform/navigation'
+
+          const router = createRouter({
+            history: createWebHistory(import.meta.env.BASE_URL),
+            routes: [
+              { path: '/login', component: () => import('../views/LoginView.vue') },
+              { path: '/', component: () => import('../views/HomeView.vue') },
+              { path: '/tasks', component: () => import('../views/TaskView.vue') },
+              { path: '/scan', component: () => import('../views/ScanView.vue') },
+              { path: '/search', redirect: '/' },
+              { path: '/issues', component: () => import('../views/IssueView.vue') },
+              { path: '/workbench/rooms', component: () => import('../views/RoomWorkbenchEntryView.vue') },
+              { path: '/workbench/students', component: () => import('../views/StudentWorkbenchEntryView.vue') },
+              { path: '/residency', redirect: '/' },
+              { path: '/students/:studentId', component: () => import('../views/StudentPlacementView.vue'), meta: { businessAdminOnly: true } },
+              { path: '/staff/students/:studentId', component: () => import('../views/DormStaffStudentView.vue'), meta: { dormStaffOnly: true } },
+              { path: '/rooms/:roomId', component: () => import('../views/RoomDetailView.vue') },
+              { path: '/confirmations', component: () => import('../views/ConfirmationView.vue'), meta: { businessAdminOnly: true } },
+              { path: '/confirmations/rooms/:roomId', component: () => import('../views/RoomConfirmationView.vue'), meta: { businessAdminOnly: true } },
+              { path: '/confirmations/declarations/:roomId', component: () => import('../views/DeclarationReviewView.vue'), meta: { businessAdminOnly: true } },
+              { path: '/profile', component: () => import('../views/ProfileView.vue') },
+              { path: '/:pathMatch(.*)*', component: () => import('../views/NotFoundView.vue') },
+            ],
+          })
+
+          router.beforeEach(async (to) => {
+            const auth = useAuthStore()
+            if (!auth.initialized) await auth.restore()
+            const resolved = resolveMobileEntry(auth.authenticated, to.path)
+            if (resolved !== to.path) return resolved
+            if (!auth.authenticated) return true
+            if (auth.isDormStaff && to.path.startsWith('/students/')) {
+              return to.path.replace('/students/', '/staff/students/')
+            }
+            if (to.meta.businessAdminOnly && !auth.isBusinessAdmin) return '/'
+            if (to.meta.dormStaffOnly && !auth.isDormStaff) return '/'
+            return true
+          })
+
+          export default router
+          EOF
+
+          sed -i 's/^          //' app/src/router/index.ts
+          git add app/src/router/index.ts
+
+          unresolved="$(git diff --name-only --diff-filter=U)"
+          if [ -n "$unresolved" ]; then
+            echo "Unresolved paths remain:"
+            printf '%s\n' "$unresolved"
+            git merge --abort
+            exit 1
+          fi
+
+          git commit -m 'merge: sync latest main into admin authz v2'
+          git push origin HEAD:feat/admin-authz-v2-20260813
+          echo "FEATURE_AFTER=$(git rev-parse HEAD)"
