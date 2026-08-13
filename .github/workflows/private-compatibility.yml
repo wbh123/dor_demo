@@ -67,7 +67,16 @@ jobs:
           cache: npm
           cache-dependency-path: private-repo/frontend/package-lock.json
 
+      - name: Verify login public-config security regression
+        working-directory: private-repo/backend-java
+        shell: bash
+        run: |
+          set -euo pipefail
+          mvn -B -ntp -Dtest=SecurityConfigTest -Dsurefire.failIfNoSpecifiedTests=false test
+
       - name: Verify private contracts
+        if: always()
+        continue-on-error: true
         working-directory: private-repo
         shell: bash
         run: |
@@ -76,6 +85,7 @@ jobs:
           bash scripts/ci/run_contracts.sh
 
       - name: Verify private Java modules
+        if: always()
         working-directory: private-repo/backend-java
         shell: bash
         run: |
@@ -83,6 +93,7 @@ jobs:
           mvn -B -ntp clean verify
 
       - name: Verify private frontend
+        if: always()
         working-directory: private-repo
         shell: bash
         env:
