@@ -1,6 +1,6 @@
 name: Private Mobile Compatibility CI
 
-# private head refresh: legacy residency route retired
+# private head refresh: legacy views removed
 on:
   push:
     branches:
