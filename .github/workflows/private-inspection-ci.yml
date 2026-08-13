@@ -1,6 +1,6 @@
 name: Private Inspection Compatibility CI
 
-# private inspection refresh 2
+# private inspection refresh 3
 on:
   push:
     branches:
@@ -29,6 +29,6 @@ jobs:
       - name: Verify inspection OpenAPI contract
         working-directory: private-repo
         run: python scripts/ci/test_inspection_openapi_contract.py
-      - name: Verify inspection state contract
+      - name: Verify inspection state and navigation contracts
         working-directory: private-repo/app
-        run: node --experimental-strip-types --test src/inspection/state.spec.ts
+        run: node --experimental-strip-types --test src/inspection/state.spec.ts src/platform/inspection-navigation.spec.ts
