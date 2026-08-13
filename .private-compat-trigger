@@ -1,4 +1,4 @@
 private-ref=main
-validated-head=f1bfac47811018efb5352dfec89b129c91cb3570
-purpose=post-merge selection runtime diagnostics verification
-triggered-at=2026-08-10T14:53:00+08:00
+validated-head=cc3fd17c1a2168ff7f42788c6d8c958f04f1b612
+purpose=mobile admin P0 post-merge validation
+triggered-at=2026-08-13T08:55:00+08:00
