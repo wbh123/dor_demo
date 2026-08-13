@@ -1,10 +1,7 @@
 name: Private Inspection Compatibility CI
-
-# verify clean branch rebased from latest main
 on:
   push:
-    branches:
-      - 'private-compat/feat/inspection-workflow-skeleton-20260814'
+    branches: ['private-compat/feat/inspection-workflow-skeleton-20260814']
 permissions:
   contents: read
 jobs:
@@ -12,8 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
-      - name: Checkout private feature branch
-        uses: actions/checkout@v5
+      - uses: actions/checkout@v5
         with:
           repository: wbh123/Wust-Dormitory-Select
           ref: feat/inspection-workflow-skeleton-mainline-20260814
@@ -37,9 +33,12 @@ jobs:
       - name: Verify admin inspection route contract
         working-directory: private-repo/frontend
         run: node --experimental-strip-types --test src/router/admin-inspection-route.spec.ts
-      - name: Verify school admin frontend
+      - name: Install school admin dependencies
         working-directory: private-repo/frontend
-        run: |
-          npm install --no-audit --no-fund
-          npm run typecheck
-          npm run build
+        run: npm install --no-audit --no-fund
+      - name: Typecheck school admin frontend
+        working-directory: private-repo/frontend
+        run: npm run typecheck
+      - name: Build school admin frontend
+        working-directory: private-repo/frontend
+        run: npm run build
