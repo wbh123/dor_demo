@@ -9,9 +9,9 @@ permissions:
   contents: read
 
 jobs:
-  inspection-contract:
+  verify-inspection:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - name: Checkout private feature branch
         uses: actions/checkout@v5
@@ -22,6 +22,12 @@ jobs:
           path: private-repo
           persist-credentials: false
           fetch-depth: 1
-      - name: Verify inspection contract gate
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+      - name: Verify inspection OpenAPI contract
         working-directory: private-repo
         run: python scripts/ci/test_inspection_openapi_contract.py
+      - name: Verify inspection state contract
+        working-directory: private-repo/app
+        run: node --experimental-strip-types --test src/inspection/state.spec.ts
