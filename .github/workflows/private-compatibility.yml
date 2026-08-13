@@ -70,6 +70,14 @@ jobs:
           python scripts/ci/test_admin_authorization_v44.py
           python scripts/ci/test_admin_high_risk_authorization.py
 
+      - name: Verify Navicat database contract
+        working-directory: private-repo
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/db/test_generate_navicat_latest_database.py
+          python scripts/db/generate_navicat_sql.py --check --skip-redis
+
       - name: Verify full Java build
         working-directory: private-repo/backend-java
         shell: bash
