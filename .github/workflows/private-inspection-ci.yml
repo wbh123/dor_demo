@@ -1,6 +1,6 @@
 name: Private Inspection Compatibility CI
 
-# private inspection refresh 10
+# private inspection refresh 11
 on:
   push:
     branches:
@@ -29,7 +29,7 @@ jobs:
         run: python scripts/ci/test_inspection_openapi_contract.py
       - name: Verify inspection contracts
         working-directory: private-repo/app
-        run: node --experimental-strip-types --test src/inspection/state.spec.ts src/inspection/store.spec.ts src/platform/inspection-navigation.spec.ts src/platform/inspection-workflow-layout.spec.ts
+        run: node --experimental-strip-types --test src/inspection/state.spec.ts src/inspection/store.spec.ts src/platform/inspection-navigation.spec.ts src/platform/inspection-workflow-layout.spec.ts src/platform/inspection-scanner.spec.ts
       - name: Install and typecheck mobile app
         working-directory: private-repo/app
         run: |
