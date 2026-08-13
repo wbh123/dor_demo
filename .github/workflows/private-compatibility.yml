@@ -91,3 +91,13 @@ jobs:
         run: |
           set -euo pipefail
           bash scripts/ci/run_frontend.sh
+
+      - name: Verify private mobile app
+        working-directory: private-repo/app
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --no-audit --no-fund
+          npm test
+          npm run typecheck
+          npm run build
