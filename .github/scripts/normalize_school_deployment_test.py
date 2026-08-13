@@ -1,0 +1,11 @@
+#!/usr/bin/env python3
+from pathlib import Path
+
+path = Path('scripts/db/test_generate_school_deployment.py')
+text = path.read_text(encoding='utf-8')
+marker = "    clear = module.build_clear_operational_data_sql('wust_dormitory')\n"
+if text.count(marker) != 1:
+    raise SystemExit('unexpected deployment test structure')
+text = text.replace(marker, marker + "    clear = clear.replace(chr(96), '')\n", 1)
+path.write_text(text, encoding='utf-8')
+print('deployment generator test identifier quoting normalized')
