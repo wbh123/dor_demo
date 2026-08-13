@@ -15,10 +15,15 @@ print('deployment generator test identifier quoting normalized')
 account_helper = Path(__file__).with_name('finalize_account_admin_openapi.py')
 namespace = runpy.run_path(str(account_helper))
 namespace['main']()
+
+subprocess.run(['python', 'scripts/db/generate_navicat_sql.py', '--skip-redis'], check=True)
+generated_dir = Path('backend-java/docs/sql/navicat/generated')
+
 subprocess.run([
     'git', 'add',
     'backend-java/model/src/main/resources/openapi-interface.yaml',
     'backend-java/model/src/main/resources/account/openapi-account-admin.yaml',
     'scripts/ci/test_account_admin_openapi.py',
 ], check=True)
-print('account-admin OpenAPI sources staged for final verified commit')
+subprocess.run(['git', 'add', '-u', str(generated_dir)], check=True)
+print('account-admin OpenAPI and refreshed tracked database output staged for final verified commit')
