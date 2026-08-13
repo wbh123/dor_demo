@@ -34,6 +34,20 @@ jobs:
           persist-credentials: false
           fetch-depth: 1
 
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Validate P1 security idempotency and database contracts
+        working-directory: private-repo
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/ci/test_mobile_admin_p1_contract.py
+          python scripts/db/generate_navicat_sql.py --scenario realistic --check
+          python scripts/db/test_database_dictionary_current.py
+          python -m unittest scripts/db/test_navicat_database_integrity.py -v
+
       - uses: actions/setup-node@v6
         with:
           node-version: '22'
