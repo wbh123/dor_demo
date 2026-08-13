@@ -69,6 +69,7 @@ jobs:
           set -euo pipefail
           python scripts/ci/test_admin_authorization_v44.py
           python scripts/ci/test_admin_high_risk_authorization.py
+          python scripts/ci/test_account_admin_openapi.py
 
       - name: Verify Navicat database contract
         working-directory: private-repo
