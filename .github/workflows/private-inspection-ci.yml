@@ -1,6 +1,6 @@
 name: Private Inspection Compatibility CI
 
-# private inspection refresh 12
+# private inspection refresh 13
 on:
   push:
     branches:
@@ -10,7 +10,7 @@ permissions:
 jobs:
   verify-inspection:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - name: Checkout private feature branch
         uses: actions/checkout@v5
@@ -27,14 +27,19 @@ jobs:
       - name: Verify inspection OpenAPI contract
         working-directory: private-repo
         run: python scripts/ci/test_inspection_openapi_contract.py
-      - name: Verify inspection mobile contracts
-        working-directory: private-repo/app
-        run: node --experimental-strip-types --test src/inspection/state.spec.ts src/inspection/store.spec.ts src/platform/inspection-navigation.spec.ts src/platform/inspection-workflow-layout.spec.ts src/platform/inspection-scanner.spec.ts
-      - name: Verify admin inspection route contract
-        working-directory: private-repo/frontend
-        run: node --experimental-strip-types --test src/router/admin-inspection-route.spec.ts
-      - name: Install and typecheck mobile app
+      - name: Verify mobile inspection app
         working-directory: private-repo/app
         run: |
           npm install --no-audit --no-fund
+          npm test
           npm run typecheck
+          npm run build
+      - name: Verify admin inspection route contract
+        working-directory: private-repo/frontend
+        run: node --experimental-strip-types --test src/router/admin-inspection-route.spec.ts
+      - name: Verify school admin frontend
+        working-directory: private-repo/frontend
+        run: |
+          npm install --no-audit --no-fund
+          npm run typecheck
+          npm run build
