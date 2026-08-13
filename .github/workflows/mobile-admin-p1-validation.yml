@@ -1,0 +1,72 @@
+name: Mobile Admin P1 Focused Validation
+
+on:
+  push:
+    branches:
+      - 'private-compat/agent/mobile-admin-p1-20260813'
+    paths:
+      - '.mobile-p1-trigger'
+      - '.github/workflows/mobile-admin-p1-validation.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  validate-mobile-p1:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Resolve private branch
+        id: target
+        shell: bash
+        run: |
+          set -euo pipefail
+          ref="${GITHUB_REF_NAME#private-compat/}"
+          echo "private_ref=$ref" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout private P1 branch
+        uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: ${{ steps.target.outputs.private_ref }}
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: false
+          fetch-depth: 1
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+
+      - name: Validate mobile app
+        working-directory: private-repo/app
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci
+          npm test
+          npm run build
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: private-repo/backend-java/pom.xml
+
+      - name: Validate backend
+        working-directory: private-repo/backend-java
+        shell: bash
+        run: |
+          set -euo pipefail
+          mvn -B -ntp clean verify
+
+      - name: Validate existing web frontend
+        working-directory: private-repo
+        shell: bash
+        env:
+          VITE_INSTITUTION_NAME: Example University
+          VITE_CAMPUS_NAME: Example Campus
+        run: |
+          set -euo pipefail
+          bash scripts/ci/run_frontend.sh
