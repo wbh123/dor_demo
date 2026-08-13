@@ -1,6 +1,6 @@
 name: Private Inspection Compatibility CI
 
-# private inspection refresh 15
+# verify clean branch rebased from latest main
 on:
   push:
     branches:
@@ -16,7 +16,7 @@ jobs:
         uses: actions/checkout@v5
         with:
           repository: wbh123/Wust-Dormitory-Select
-          ref: feat/inspection-workflow-skeleton-20260814
+          ref: feat/inspection-workflow-skeleton-mainline-20260814
           token: ${{ secrets.PRIVATE_CI }}
           path: private-repo
           persist-credentials: false
