@@ -107,10 +107,25 @@ jobs:
         working-directory: private-repo/app
         shell: bash
         run: |
-          set -euo pipefail
-          npm install --no-audit --no-fund
-          npm test
-          npm run build
+          set -uo pipefail
+          log_file="$RUNNER_TEMP/mobile-admin-validation.log"
+          : > "$log_file"
+          status=0
+          npm install --no-audit --no-fund 2>&1 | tee -a "$log_file" || status=$?
+          if [ "$status" -eq 0 ]; then
+            npm test 2>&1 | tee -a "$log_file" || status=$?
+          fi
+          if [ "$status" -eq 0 ]; then
+            npm run build 2>&1 | tee -a "$log_file" || status=$?
+          fi
+          if [ "$status" -ne 0 ]; then
+            tail_text="$(tail -n 80 "$log_file")"
+            tail_text="${tail_text//'%'/'%25'}"
+            tail_text="${tail_text//$'\r'/'%0D'}"
+            tail_text="${tail_text//$'\n'/'%0A'}"
+            echo "::error title=Mobile admin validation::${tail_text}"
+            exit "$status"
+          fi
 
       - name: Upload generated deployment SQL
         uses: actions/upload-artifact@v4
