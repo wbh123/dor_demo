@@ -61,12 +61,12 @@ jobs:
           cache: maven
           cache-dependency-path: private-repo/backend-java/pom.xml
 
-      - name: Verify admin authorization service
+      - name: Verify admin authorization and login services
         working-directory: private-repo/backend-java
         shell: bash
         run: |
           set -euo pipefail
-          mvn -B -ntp -Dtest=AdminAuthorizationServiceTest -Dsurefire.failIfNoSpecifiedTests=false test
+          mvn -B -ntp -Dtest=AdminAuthorizationServiceTest,AuthServiceTest,MobileAuthServiceTest -Dsurefire.failIfNoSpecifiedTests=false test
 
       - uses: actions/setup-node@v6
         with:
