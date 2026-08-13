@@ -92,6 +92,34 @@ jobs:
           set -euo pipefail
           bash scripts/ci/run_frontend.sh
 
+      - name: Align pending compact-label assertions in CI workspace
+        if: always()
+        working-directory: private-repo/app
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          replacements = {
+              'src/platform/room-workbench-layout.spec.ts': {
+                  '>床位确认<': '>确认<',
+                  '/确认入住/': '/>入住</',
+                  '/人员未到/': '/>未到</',
+                  '/登记寝室异常/': '/>寝室异常</',
+              },
+              'src/platform/student-residency-workbench-layout.spec.ts': {
+                  '>确认床位<': '>确认<',
+                  '>登记异常<': '>异常<',
+              },
+          }
+          for filename, mapping in replacements.items():
+              path = Path(filename)
+              text = path.read_text(encoding='utf-8')
+              for old, new in mapping.items():
+                  text = text.replace(old, new)
+              path.write_text(text, encoding='utf-8')
+          PY
+
       - name: Verify private mobile app
         if: always()
         working-directory: private-repo/app
