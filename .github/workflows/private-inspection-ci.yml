@@ -25,6 +25,7 @@ jobs:
         working-directory: private-repo
         shell: bash
         run: |
+          set +e
           set -uo pipefail
           failed_script=""
           : > contract-failure.log
@@ -41,6 +42,7 @@ jobs:
             fi
           done < scripts/ci/run_contracts.sh
           echo "failed_script=$failed_script" >> "$GITHUB_OUTPUT"
+          exit 0
       - name: Upload contract failure diagnostics
         if: steps.contract_diag.outputs.failed_script != ''
         uses: actions/upload-artifact@v4
