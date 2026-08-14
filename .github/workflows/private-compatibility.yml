@@ -1,4 +1,4 @@
-name: Android Capacitor Bootstrap CI
+name: Android Capacitor Compatibility CI
 
 on:
   push:
@@ -13,8 +13,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  android-bootstrap:
-    name: Generate and verify Android shell
+  android-debug:
+    name: Verify Android v1 debug build
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -37,7 +37,7 @@ jobs:
           ref: ${{ steps.target.outputs.private_ref }}
           token: ${{ secrets.PRIVATE_CI }}
           path: private-repo
-          persist-credentials: true
+          persist-credentials: false
           fetch-depth: 0
 
       - uses: actions/setup-java@v5
@@ -49,7 +49,7 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Build Vue mobile app
+      - name: Verify Vue mobile app
         working-directory: private-repo/app
         shell: bash
         run: |
@@ -59,18 +59,15 @@ jobs:
           npm run typecheck
           npm run build
 
-      - name: Generate secured Android shell
+      - name: Sync committed Android project
         working-directory: private-repo/app
         shell: bash
         run: |
           set -euo pipefail
-          test ! -d android
-          npx cap add android
-          sed -i 's/minSdkVersion = 24/minSdkVersion = 26/' android/variables.gradle
-          sed -i 's/android:allowBackup="true"/android:allowBackup="false"/' android/app/src/main/AndroidManifest.xml
+          test -d android
           npx cap sync android
 
-      - name: Verify Android contracts and dependencies
+      - name: Verify Android contracts and runtime dependencies
         working-directory: private-repo
         shell: bash
         run: |
@@ -83,20 +80,13 @@ jobs:
             echo 'Forbidden Google/Firebase runtime dependency detected' >&2
             exit 1
           fi
-          ./gradlew lintDebug assembleDebug
-          test -f app/build/outputs/apk/debug/app-debug.apk
+          grep -q 'com.google.zxing:core' ../android-debug-runtime-dependencies.txt
+          grep -q 'com.journeyapps:zxing-android-embedded' ../android-debug-runtime-dependencies.txt
 
-      - name: Commit verified Android source project
-        working-directory: private-repo
+      - name: Test lint and assemble Android Debug APK
+        working-directory: private-repo/app/android
         shell: bash
         run: |
           set -euo pipefail
-          git config user.name "dor-demo-ci"
-          git config user.email "ci@users.noreply.github.com"
-          git add app/android
-          if git diff --cached --quiet; then
-            echo "No Android source changes to commit"
-            exit 1
-          fi
-          git commit -m "feat: bootstrap Capacitor Android project"
-          git push origin "HEAD:${{ steps.target.outputs.private_ref }}"
+          ./gradlew testDebugUnitTest lintDebug assembleDebug
+          test -f app/build/outputs/apk/debug/app-debug.apk
