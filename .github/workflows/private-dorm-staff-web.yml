@@ -49,3 +49,63 @@ jobs:
       - name: Verify dorm staff web controller contract
         working-directory: private-repo/backend-java
         run: mvn -B -ntp -pl server -am -Dtest=DormStaffWebControllerTest -Dsurefire.failIfNoSpecifiedTests=false test
+
+  verify-frontend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout private branch
+        uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: refactor/dorm-staff-web-shell-20260814
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: private-repo/frontend/package-lock.json
+      - name: Install and generate API types
+        working-directory: private-repo
+        run: |
+          npm ci --prefix frontend --no-audit --no-fund
+          npm run --prefix frontend generate:api
+      - name: Typecheck frontend
+        working-directory: private-repo
+        env:
+          VITE_INSTITUTION_NAME: Example University
+          VITE_CAMPUS_NAME: Example Campus
+        run: npm run --prefix frontend typecheck
+      - name: Build frontend
+        working-directory: private-repo
+        env:
+          VITE_INSTITUTION_NAME: Example University
+          VITE_CAMPUS_NAME: Example Campus
+        run: npm run --prefix frontend build
+      - name: Verify focused frontend contract
+        working-directory: private-repo
+        run: node scripts/ci/test_dorm_staff_web_shell.mjs
+
+  verify-server:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout private branch
+        uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: refactor/dorm-staff-web-shell-20260814
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: false
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: private-repo/backend-java/pom.xml
+      - name: Verify Java server module
+        working-directory: private-repo/backend-java
+        run: mvn -B -ntp -pl server -am test
