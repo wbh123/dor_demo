@@ -11,7 +11,7 @@ permissions:
 jobs:
   targeted:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     services:
       mysql:
         image: mysql:8.4
@@ -43,61 +43,111 @@ jobs:
           python -m pip install -r private-repo/scripts/ops/requirements.txt
           sudo apt-get update -qq
           sudo apt-get install -y -qq mysql-client
-      - name: Apply isolated drill implementation in working tree
+      - name: Run backup recovery contracts
         working-directory: private-repo
         run: |
-          python - <<'PY'
-          from pathlib import Path
-
-          path = Path('scripts/ops/backup_recovery.py')
-          source = path.read_text(encoding='utf-8')
-
-          function_anchor = '''def validate_database_name(value: str) -> str:\n    if not DATABASE_PATTERN.fullmatch(value):\n        raise ValueError(f"DATABASE_NAME_INVALID:{value!r}")\n    return value\n\n\n'''
-          function_body = '''def render_integrity_sql_for_database(database_name: str) -> str:\n    """将完整性检查安全绑定到显式目标库，供隔离恢复/演练复用。"""\n    target = validate_database_name(database_name)\n    if not INTEGRITY_SQL.exists():\n        raise ValueError("INTEGRITY_SQL_NOT_FOUND")\n    rendered = INTEGRITY_SQL.read_text(encoding="utf-8")\n    replacements = (\n        ("USE `wust_dormitory`;", f"USE `{target}`;"),\n        ("DATABASE()<>'wust_dormitory'", f"DATABASE()<>'{target}'"),\n        ("当前数据库不是wust_dormitory", f"当前数据库不是{target}"),\n    )\n    for original, replacement in replacements:\n        if original not in rendered:\n            raise ValueError("INTEGRITY_SQL_DATABASE_BINDING_NOT_FOUND")\n        rendered = rendered.replace(original, replacement, 1)\n    return rendered\n\n\n'''
-          if 'def render_integrity_sql_for_database(' not in source:
-              if function_anchor not in source:
-                  raise SystemExit('validate_database_name anchor not found')
-              source = source.replace(function_anchor, function_anchor + function_body, 1)
-
-          old_drill = '''    integrity_status = "WARNING"\n    if INTEGRITY_SQL.exists():\n        command = build_mysql_base_command(settings) + [target]\n        with INTEGRITY_SQL.open("rb") as input_file:\n            completed = subprocess.run(\n                command,\n                stdin=input_file,\n                stdout=subprocess.PIPE,\n                stderr=subprocess.PIPE,\n                check=False,\n                env=mysql_process_environment(settings),\n            )\n        if completed.returncode != 0:\n            integrity_status = "FAILED"\n        else:\n            integrity_status = "PASSED"\n'''
-          new_drill = '''    integrity_status = "WARNING"\n    if INTEGRITY_SQL.exists():\n        command = build_mysql_base_command(settings) + [target]\n        integrity_sql = render_integrity_sql_for_database(target)\n        completed = subprocess.run(\n            command,\n            input=integrity_sql,\n            text=True,\n            stdout=subprocess.PIPE,\n            stderr=subprocess.PIPE,\n            check=False,\n            env=mysql_process_environment(settings),\n        )\n        if completed.returncode != 0:\n            integrity_status = "FAILED"\n        else:\n            integrity_status = "PASSED"\n'''
-          if old_drill in source:
-              source = source.replace(old_drill, new_drill, 1)
-          elif new_drill not in source:
-              raise SystemExit('run_drill integrity block not found')
-
-          path.write_text(source, encoding='utf-8')
-          PY
-      - name: Backup recovery contracts
-        working-directory: private-repo
-        run: python -m unittest scripts/ops/test_backup_recovery.py -v
-      - name: Drill isolation contracts
-        working-directory: private-repo
-        run: python -m unittest scripts/ops/test_backup_recovery_drill_safety.py -v
-      - name: Scenario contracts
-        working-directory: private-repo
-        run: |
-          python -m unittest scripts/db/test_scenario_matrix.py -v
-          python -m unittest scripts/db/test_recovery_scenarios.py -v
-      - name: Execute V47 integrity SQL on MySQL 8.4
+          python -m unittest scripts/ops/test_backup_recovery.py -v
+          python -m unittest scripts/ops/test_backup_recovery_drill_safety.py -v
+          python -m unittest scripts/db/test_scenario_matrix.py scripts/db/test_recovery_scenarios.py -v
+      - name: Prepare realistic V47 source database
         working-directory: private-repo
         env:
           MYSQL_PWD: root
         run: |
           set -euo pipefail
           SQL_FILE='backend-java/docs/sql/navicat/generated/00_一键重置数据库.sql'
-          python scripts/db/generate_navicat_sql.py --scenario realistic --scale standard --skip-redis
+          python scripts/db/generate_navicat_sql.py --scenario realistic --scale standard --students 1000 --seed 20260814 --skip-redis
+          python scripts/db/generate_navicat_sql.py --scenario realistic --scale standard --students 1000 --seed 20260814 --check
           mysql --protocol=TCP -h127.0.0.1 -P3306 -uroot --default-character-set=utf8mb4 --show-warnings < "${SQL_FILE}"
-      - name: Commit verified drill fix to private feature branch
+      - name: Execute encrypted backup verify restore and staging drill
+        working-directory: private-repo
+        env:
+          MYSQL_PWD: root
+          WUST_DORMITORY_DB_HOST: 127.0.0.1
+          WUST_DORMITORY_DB_PORT: '3306'
+          WUST_DORMITORY_DB_USER: root
+          WUST_DORMITORY_DB_PASSWORD: root
+          WUST_DORMITORY_DB_NAME: wust_dormitory
+        run: |
+          set -euo pipefail
+          BACKUP_ROOT="${RUNNER_TEMP}/wust-dormitory-backups"
+          rm -rf "${BACKUP_ROOT}"
+          mkdir -p "${BACKUP_ROOT}"
+          export WUST_DORMITORY_BACKUP_ENCRYPTION_KEY
+          WUST_DORMITORY_BACKUP_ENCRYPTION_KEY="$(python - <<'PY'
+          import base64
+          print(base64.b64encode(bytes(range(32))).decode('ascii'))
+          PY
+          )"
+
+          BACKUP_JSON="$(python scripts/ops/backup_recovery.py backup-full --environment staging --backup-root "${BACKUP_ROOT}" --encrypt)"
+          echo "${BACKUP_JSON}"
+          BACKUP_SET="$(python -c 'import json,sys; print(json.load(sys.stdin)["backupSet"])' <<<"${BACKUP_JSON}")"
+          test -f "${BACKUP_SET}/manifest.json"
+          test -f "${BACKUP_SET}/verify.json"
+          test -f "${BACKUP_SET}/full.sql.gz.enc"
+
+          python scripts/ops/backup_recovery.py verify --environment staging --backup-root "${BACKUP_ROOT}" --backup-set "${BACKUP_SET}"
+          python scripts/ops/backup_recovery.py precheck --environment test --backup-root "${BACKUP_ROOT}" --backup-set "${BACKUP_SET}" --target-database wust_dormitory_restore_ci
+
+          mysql --protocol=TCP -h127.0.0.1 -P3306 -uroot -e 'DROP DATABASE IF EXISTS `wust_dormitory_restore_ci`;'
+          python scripts/ops/backup_recovery.py restore --environment test --backup-root "${BACKUP_ROOT}" --backup-set "${BACKUP_SET}" --target-database wust_dormitory_restore_ci
+
+          SOURCE_COUNTS="$(mysql --protocol=TCP -h127.0.0.1 -P3306 -uroot -N wust_dormitory -e "SELECT CONCAT_WS(',',(SELECT COUNT(*) FROM student),(SELECT COUNT(*) FROM room),(SELECT COUNT(*) FROM bed),(SELECT COUNT(*) FROM room_assignment WHERE assignment_status='ACTIVE'));" )"
+          RESTORE_COUNTS="$(mysql --protocol=TCP -h127.0.0.1 -P3306 -uroot -N wust_dormitory_restore_ci -e "SELECT CONCAT_WS(',',(SELECT COUNT(*) FROM student),(SELECT COUNT(*) FROM room),(SELECT COUNT(*) FROM bed),(SELECT COUNT(*) FROM room_assignment WHERE assignment_status='ACTIVE'));" )"
+          echo "source=${SOURCE_COUNTS} restore=${RESTORE_COUNTS}"
+          test "${SOURCE_COUNTS}" = "${RESTORE_COUNTS}"
+
+          REPORT_PATH="$(python scripts/ops/backup_recovery.py drill --environment staging --backup-root "${BACKUP_ROOT}" --backup-set "${BACKUP_SET}")"
+          test -f "${REPORT_PATH}"
+          python - "${REPORT_PATH}" "${SOURCE_COUNTS}" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          report = json.loads(Path(sys.argv[1]).read_text(encoding='utf-8'))
+          expected = [int(part) for part in sys.argv[2].split(',')]
+          assert report['status'] == 'PASSED', report
+          assert report['integrityStatus'] == 'PASSED', report
+          counts = report['businessCounts']
+          actual = [counts['students'], counts['rooms'], counts['beds'], counts['activeAssignments']]
+          assert actual == expected, (actual, expected)
+          assert report['targetDatabase'].startswith('wust_dormitory_drill_'), report['targetDatabase']
+          assert report['plannedRpoSeconds'] == 300
+          assert report['plannedRtoSeconds'] == 1800
+          print(json.dumps({
+              'status': report['status'],
+              'integrityStatus': report['integrityStatus'],
+              'businessCounts': counts,
+              'targetDatabase': report['targetDatabase'],
+              'actualRpoSeconds': report['actualRpoSeconds'],
+              'actualRtoSeconds': report['actualRtoSeconds'],
+          }, ensure_ascii=False))
+          PY
+
+          mysql --protocol=TCP -h127.0.0.1 -P3306 -uroot -N -e "SELECT COUNT(*) FROM information_schema.schemata WHERE schema_name LIKE 'wust_dormitory_drill_%';" | grep -qx '0'
+      - name: Regenerate and commit canonical V47 Navicat SQL
         working-directory: private-repo
         run: |
           set -euo pipefail
+          SQL_FILE='backend-java/docs/sql/navicat/generated/00_一键重置数据库.sql'
+          python scripts/db/generate_navicat_sql.py --scenario realistic --scale standard --students 1000 --seed 20260814 --skip-redis
+          python scripts/db/generate_navicat_sql.py --scenario realistic --scale standard --students 1000 --seed 20260814 --check
+          grep -q 'Flyway V1-V47' "${SQL_FILE}"
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add scripts/ops/backup_recovery.py
+          git add -f "${SQL_FILE}"
           if ! git diff --cached --quiet; then
-            git commit -m 'fix: bind disaster recovery integrity checks to isolated database'
+            git commit -m 'chore: refresh canonical Navicat reset SQL for V47'
             git push origin HEAD:feat/backup-recovery-scenarios-20260814
           fi
+      - name: Upload validation artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: backup-recovery-v47-validation
+          path: |
+            private-repo/backend-java/docs/sql/navicat/generated/00_一键重置数据库.sql
+          if-no-files-found: error
+          retention-days: 1
 
-# rerun: drill-isolation-green
+# rerun: encrypted-backup-restore-drill-v47
