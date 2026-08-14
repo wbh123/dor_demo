@@ -59,6 +59,13 @@ jobs:
           npm run typecheck
           npm run build
 
+      - name: Verify committed Android shell contract
+        working-directory: private-repo
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/ci/check_android_manifest.py
+
       - name: Generate Android debug project
         working-directory: private-repo/app
         shell: bash
