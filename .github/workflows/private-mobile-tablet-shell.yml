@@ -31,8 +31,6 @@ jobs:
         working-directory: private-repo
         run: npm install --prefix app --no-audit --no-fund
 
-      - name: Verify device form factor and orientation policy
+      - name: Verify device runtime policy
         working-directory: private-repo/app
-        run: node --experimental-strip-types --test src/platform/device-form-factor.spec.ts src/platform/orientation-policy.spec.ts
-
-# rerun: green-device-policy
+        run: node --experimental-strip-types --test src/platform/device-form-factor.spec.ts src/platform/orientation-policy.spec.ts src/platform/device-runtime.spec.ts
