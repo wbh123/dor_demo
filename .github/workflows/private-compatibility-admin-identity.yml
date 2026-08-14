@@ -8,7 +8,7 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 40
     steps:
       - name: Checkout private integration branch
         uses: actions/checkout@v5
@@ -19,9 +19,44 @@ jobs:
           path: private-repo
           persist-credentials: false
           fetch-depth: 0
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: private-repo/backend-java/pom.xml
       - uses: actions/setup-node@v6
         with:
           node-version: '22'
-      - name: Verify identity menu contract
+          cache: npm
+          cache-dependency-path: |
+            private-repo/frontend/package-lock.json
+            private-repo/app/package-lock.json
+      - name: Verify identity and lifecycle contracts
         working-directory: private-repo
-        run: node scripts/ci/test_admin_account_identity_menu.mjs
+        run: |
+          set -euo pipefail
+          node scripts/ci/test_admin_account_identity_menu.mjs
+          python scripts/ci/test_admin_lifecycle_entry.py
+          python scripts/ci/test_runtime_error_data_correctness_batch.py
+      - name: Verify private Java modules
+        working-directory: private-repo/backend-java
+        run: mvn -B -ntp clean verify
+      - name: Verify private Web frontend
+        working-directory: private-repo
+        env:
+          VITE_INSTITUTION_NAME: Example University
+          VITE_CAMPUS_NAME: Example Campus
+        run: bash scripts/ci/run_frontend.sh
+      - name: Verify private mobile admin app
+        working-directory: private-repo
+        run: |
+          set -euo pipefail
+          npm ci --prefix app --no-audit --no-fund
+          npm run --prefix app test
+          npm run --prefix app generate:api
+          npm run --prefix app typecheck
+          npm run --prefix app build
