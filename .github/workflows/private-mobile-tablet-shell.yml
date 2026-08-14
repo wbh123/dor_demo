@@ -31,8 +31,6 @@ jobs:
         working-directory: private-repo
         run: npm install --prefix app --no-audit --no-fund
 
-      - name: Verify device runtime policy
+      - name: Verify device and shell policy
         working-directory: private-repo/app
-        run: node --experimental-strip-types --test src/platform/device-form-factor.spec.ts src/platform/orientation-policy.spec.ts src/platform/device-runtime.spec.ts
-
-# rerun: green-device-runtime
+        run: node --experimental-strip-types --test src/platform/device-form-factor.spec.ts src/platform/orientation-policy.spec.ts src/platform/device-runtime.spec.ts src/platform/tablet-shell-layout.spec.ts
