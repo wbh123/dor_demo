@@ -54,36 +54,27 @@ jobs:
       - name: Verify first-install server provisioning contract
         working-directory: private-repo/app
         shell: bash
-        run: |
-          set -euo pipefail
-          node --experimental-strip-types --test src/platform/initial-server-provisioning.spec.ts
+        run: node --experimental-strip-types --test src/platform/initial-server-provisioning.spec.ts
 
       - name: Verify startup update gate contract first
         working-directory: private-repo/app
         shell: bash
-        run: |
-          set -euo pipefail
-          node --experimental-strip-types --test src/platform/app-update-gate.spec.ts
+        run: node --experimental-strip-types --test src/platform/app-update-gate.spec.ts
 
       - name: Verify recovery restart contract
         working-directory: private-repo/app
         shell: bash
-        run: |
-          set -euo pipefail
-          node --experimental-strip-types --test src/platform/connection-recovery-view.spec.ts
+        run: node --experimental-strip-types --test src/platform/connection-recovery-view.spec.ts
 
       - name: Verify Android adaptive shell contract
         working-directory: private-repo/app
         shell: bash
-        run: |
-          set -euo pipefail
-          node --experimental-strip-types --test src/platform/android-adaptive-shell-contract.spec.ts
+        run: node --experimental-strip-types --test src/platform/android-adaptive-shell-contract.spec.ts
 
       - name: Verify dependency-free adaptive mobile regressions
         working-directory: private-repo/app
         shell: bash
         run: |
-          set -euo pipefail
           node --experimental-strip-types --test \
             src/platform/device-form-factor.spec.ts \
             src/platform/orientation-policy.spec.ts \
@@ -95,25 +86,32 @@ jobs:
       - name: Verify backend Java modules
         working-directory: private-repo/backend-java
         shell: bash
-        run: |
-          set -euo pipefail
-          mvn -B -ntp clean verify
+        run: mvn -B -ntp clean verify
 
-      - name: Verify Vue mobile app
+      - name: Install mobile dependencies
         working-directory: private-repo/app
         shell: bash
-        run: |
-          set -euo pipefail
-          npm install
-          npm test
-          npm run typecheck
-          npm run build
+        run: npm install
+
+      - name: Run mobile app tests
+        working-directory: private-repo/app
+        shell: bash
+        run: npm test
+
+      - name: Run mobile typecheck
+        working-directory: private-repo/app
+        shell: bash
+        run: npm run typecheck
+
+      - name: Build mobile app
+        working-directory: private-repo/app
+        shell: bash
+        run: npm run build
 
       - name: Sync committed Android project
         working-directory: private-repo/app
         shell: bash
         run: |
-          set -euo pipefail
           test -d android
           npx cap sync android
 
@@ -121,7 +119,6 @@ jobs:
         working-directory: private-repo
         shell: bash
         run: |
-          set -euo pipefail
           python scripts/ci/check_android_manifest.py
           bash scripts/ci/check_android_no_google.sh
           cd app/android
@@ -137,6 +134,5 @@ jobs:
         working-directory: private-repo/app/android
         shell: bash
         run: |
-          set -euo pipefail
           ./gradlew testDebugUnitTest lintDebug assembleDebug
           test -f app/build/outputs/apk/debug/app-debug.apk
