@@ -5,6 +5,28 @@ on:
 permissions:
   contents: read
 jobs:
+  verify-mobile-auth-security:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: feat/inspection-workflow-skeleton-mainline-20260814
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: false
+          fetch-depth: 1
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: private-repo/backend-java/pom.xml
+      - name: Verify mobile authentication isolation
+        working-directory: private-repo/backend-java
+        run: mvn -B -ntp -pl server -am -Dtest=MobileSecurityIsolationContractTest,MobileAuthServiceTest -Dsurefire.failIfNoSpecifiedTests=false test
+
   diagnose-contracts:
     runs-on: ubuntu-latest
     timeout-minutes: 20
