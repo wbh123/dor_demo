@@ -16,7 +16,7 @@ jobs:
           token: ${{ secrets.PRIVATE_CI }}
           path: private-repo
           persist-credentials: false
-          fetch-depth: 1
+          fetch-depth: 0
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
@@ -38,7 +38,7 @@ jobs:
           token: ${{ secrets.PRIVATE_CI }}
           path: private-repo
           persist-credentials: false
-          fetch-depth: 1
+          fetch-depth: 0
       - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
@@ -87,7 +87,7 @@ jobs:
           token: ${{ secrets.PRIVATE_CI }}
           path: private-repo
           persist-credentials: false
-          fetch-depth: 1
+          fetch-depth: 0
       - uses: actions/setup-node@v6
         with:
           node-version: '22'
