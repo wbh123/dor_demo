@@ -1,0 +1,32 @@
+name: Private Dorm Staff Bed Verification
+
+on:
+  push:
+    branches:
+      - 'private-compat/fix/dorm-staff-selection-bed-verification-20260815'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout private feature branch
+        uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: fix/dorm-staff-selection-bed-verification-20260815
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: false
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: private-repo/backend-java/pom.xml
+      - name: Run selection bed verification policy test
+        working-directory: private-repo/backend-java
+        run: mvn -B -ntp -pl server -am -Dtest=MobileSelectionBedVerificationPolicyTest -Dsurefire.failIfNoSpecifiedTests=false test
