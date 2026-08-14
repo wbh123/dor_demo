@@ -11,7 +11,7 @@ permissions:
 jobs:
   targeted:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - name: Checkout private branch
         uses: actions/checkout@v5
@@ -25,6 +25,9 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
+      - name: Install ops dependencies
+        working-directory: private-repo
+        run: python -m pip install -r scripts/ops/requirements.txt
       - name: Backup recovery RED/GREEN contracts
         working-directory: private-repo
         run: python -m unittest scripts/ops/test_backup_recovery.py -v
@@ -32,4 +35,4 @@ jobs:
         working-directory: private-repo
         run: python -m unittest scripts/db/test_scenario_matrix.py -v
 
-# rerun: backup-cli-red
+# rerun: backup-cli-highload-green
