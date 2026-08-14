@@ -32,4 +32,4 @@ jobs:
         working-directory: private-repo
         run: python -m unittest scripts/db/test_scenario_matrix.py -v
 
-# rerun: high-load-scenario-red
+# rerun: high-load-scenario-green
