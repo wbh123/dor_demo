@@ -44,4 +44,4 @@ jobs:
           cache-dependency-path: private-repo/backend-java/pom.xml
       - name: Verify inspection backend contracts
         working-directory: private-repo/backend-java
-        run: mvn -B -ntp -pl server -am -Dtest=InspectionMapperContractTest,AdminInspectionServiceTest -Dsurefire.failIfNoSpecifiedTests=false test
+        run: mvn -B -ntp -pl server -am -Dtest=InspectionMapperContractTest,AdminInspectionServiceTest,MobileInspectionServiceTest -Dsurefire.failIfNoSpecifiedTests=false test
