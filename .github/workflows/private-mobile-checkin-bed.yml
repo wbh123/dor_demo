@@ -1,0 +1,29 @@
+name: Private Mobile Checkin Bed Contract
+
+on:
+  push:
+    branches:
+      - 'private-compat/fix/mobile-checkin-bed-required-20260814'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout private fix branch
+        uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: fix/mobile-checkin-bed-required-20260814
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+      - name: Run bed-before-checkin contract
+        working-directory: private-repo/app
+        run: node --experimental-strip-types --test src/platform/checkin-bed-workflow.spec.ts
