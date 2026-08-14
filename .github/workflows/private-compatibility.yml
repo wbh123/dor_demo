@@ -65,6 +65,13 @@ jobs:
           set -euo pipefail
           node --experimental-strip-types --test src/platform/connection-recovery-view.spec.ts
 
+      - name: Verify Android adaptive shell contract
+        working-directory: private-repo/app
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --experimental-strip-types --test src/platform/android-adaptive-shell-contract.spec.ts
+
       - name: Verify backend Java modules
         working-directory: private-repo/backend-java
         shell: bash
