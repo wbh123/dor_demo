@@ -45,3 +45,27 @@ jobs:
       - name: Verify inspection backend contracts
         working-directory: private-repo/backend-java
         run: mvn -B -ntp -pl server -am -Dtest=InspectionMapperContractTest,AdminInspectionServiceTest,MobileInspectionServiceTest,InspectionRoomServiceTest,InspectionIssueServiceTest,InspectionControllerRouteContractTest -Dsurefire.failIfNoSpecifiedTests=false test
+
+  mobile-app:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: refactor/inspection-workflow-p0b-mainline-20260814
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: false
+          fetch-depth: 1
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+      - name: Verify mobile inspection backend adapter
+        working-directory: private-repo/app
+        run: |
+          npm install --no-audit --no-fund
+          npm run generate:api
+          npm test
+          npm run typecheck
+          npm run build
