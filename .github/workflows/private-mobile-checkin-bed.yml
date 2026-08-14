@@ -24,8 +24,6 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: '22'
-          cache: npm
-          cache-dependency-path: private-repo/app/package-lock.json
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
@@ -37,7 +35,7 @@ jobs:
         run: node --experimental-strip-types --test src/platform/checkin-bed-workflow.spec.ts
       - name: Install mobile dependencies
         working-directory: private-repo/app
-        run: npm ci
+        run: npm install
       - name: Run mobile tests
         working-directory: private-repo/app
         run: npm test
