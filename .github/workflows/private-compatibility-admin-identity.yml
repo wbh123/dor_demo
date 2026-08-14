@@ -51,12 +51,18 @@ jobs:
           VITE_INSTITUTION_NAME: Example University
           VITE_CAMPUS_NAME: Example Campus
         run: bash scripts/ci/run_frontend.sh
-      - name: Verify private mobile admin app
+      - name: Install mobile admin dependencies
         working-directory: private-repo
-        run: |
-          set -euo pipefail
-          npm ci --prefix app --no-audit --no-fund
-          npm run --prefix app test
-          npm run --prefix app generate:api
-          npm run --prefix app typecheck
-          npm run --prefix app build
+        run: npm ci --prefix app --no-audit --no-fund
+      - name: Verify mobile admin tests
+        working-directory: private-repo
+        run: npm run --prefix app test
+      - name: Generate mobile admin API
+        working-directory: private-repo
+        run: npm run --prefix app generate:api
+      - name: Verify mobile admin types
+        working-directory: private-repo
+        run: npm run --prefix app typecheck
+      - name: Build mobile admin app
+        working-directory: private-repo
+        run: npm run --prefix app build
