@@ -11,7 +11,19 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: root
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost -proot"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
     steps:
       - name: Checkout private branch
         uses: actions/checkout@v5
@@ -26,8 +38,54 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Verify reset admin relationships
+      - name: Install MySQL client
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq mysql-client
+
+      - name: Verify reset admin relationship contract
         working-directory: private-repo
         run: python scripts/db/test_reset_admin_relationships.py -v
 
-      # Rerun marker: hierarchy fix applied.
+      - name: Execute representative reset scenarios on MySQL 8.4
+        working-directory: private-repo
+        shell: bash
+        run: |
+          set -euo pipefail
+          for scenario in clean realistic authorization_matrix; do
+            echo "=== scenario: ${scenario} ==="
+            python scripts/db/generate_navicat_sql.py \
+              --scenario "${scenario}" \
+              --scale standard \
+              --students 1000 \
+              --seed 20260814 \
+              --skip-redis
+            mysql -h127.0.0.1 -P3306 -uroot -proot --default-character-set=utf8mb4 \
+              < backend-java/docs/sql/navicat/generated/00_一键重置数据库.sql
+
+            relationship_state="$(mysql -h127.0.0.1 -P3306 -uroot -proot -Nse "
+              USE wust_dormitory;
+              SELECT CONCAT(
+                (SELECT COUNT(*) FROM app_user u JOIN school_admin_identity i ON i.user_id=u.id
+                  WHERE u.username='accountadmin' AND u.user_type='ADMIN'
+                    AND i.account_domain='ACCOUNT' AND i.base_role='ACCOUNT_ADMIN' AND i.enabled=1), '|',
+                (SELECT COUNT(*) FROM app_user u JOIN school_admin_identity i ON i.user_id=u.id
+                  WHERE u.username='admin' AND u.user_type='ADMIN'
+                    AND i.account_domain='BUSINESS' AND i.base_role='BUSINESS_ADMIN' AND i.enabled=1), '|',
+                (SELECT COUNT(*) FROM app_user u JOIN school_admin_identity i ON i.user_id=u.id
+                  WHERE u.username='dormstaff' AND u.user_type='ADMIN'
+                    AND i.account_domain='BUSINESS' AND i.base_role='DORM_STAFF' AND i.enabled=1), '|',
+                (SELECT COUNT(*) FROM admin_authorization_profile p
+                  JOIN app_user target_user ON target_user.id=p.user_id
+                  JOIN app_user granter ON granter.id=p.granted_by
+                  WHERE target_user.username='admin' AND granter.username='accountadmin' AND p.enabled=1), '|',
+                (SELECT COUNT(*) FROM admin_authorization_profile p
+                  JOIN app_user target_user ON target_user.id=p.user_id
+                  JOIN app_user granter ON granter.id=p.granted_by
+                  WHERE target_user.username='dormstaff' AND granter.username='accountadmin' AND p.enabled=1), '|',
+                (SELECT COUNT(*) FROM app_user
+                  WHERE username IN ('accountadmin','admin','dormstaff') AND password_hash='{noop}0')
+              );")"
+            echo "relationship_state=${relationship_state}"
+            test "${relationship_state}" = "1|1|1|1|1|3"
+          done
