@@ -55,5 +55,14 @@ jobs:
         working-directory: private-repo/backend-java
         shell: bash
         run: |
-          set -euo pipefail
+          set +e
           mvn -B -ntp -pl server -am test
+          status=$?
+          if [ "$status" -ne 0 ]; then
+            echo "::group::Surefire failure summary"
+            find . -path '*/target/surefire-reports/*' -type f \( -name '*.txt' -o -name '*.xml' \) -print0 \
+              | xargs -0 grep -H -n -E 'FAILURE|ERROR|Failures:|Errors:|<<< FAILURE|<<< ERROR|AssertionFailedError|Caused by:' \
+              | head -250 || true
+            echo "::endgroup::"
+          fi
+          exit "$status"
