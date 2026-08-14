@@ -31,3 +31,5 @@ jobs:
       - name: Scenario matrix RED/GREEN contracts
         working-directory: private-repo
         run: python -m unittest scripts/db/test_scenario_matrix.py -v
+
+# rerun: v47-core
