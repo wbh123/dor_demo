@@ -36,9 +36,9 @@ jobs:
       - name: Run authorization contract
         working-directory: private-repo
         run: python3 scripts/ci/test_admin_high_risk_authorization.py
-      - name: Run selection bed verification policy test
+      - name: Run selection bed verification backend tests
         working-directory: private-repo/backend-java
-        run: mvn -B -ntp -pl server -am -Dtest=MobileSelectionBedVerificationPolicyTest -Dsurefire.failIfNoSpecifiedTests=false test
+        run: mvn -B -ntp -pl server -am -Dtest=MobileSelectionBedVerificationPolicyTest,MobileBedConfirmationDormStaffTest -Dsurefire.failIfNoSpecifiedTests=false test
       - name: Install mobile dependencies
         working-directory: private-repo/app
         run: npm install
