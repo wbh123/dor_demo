@@ -9,9 +9,9 @@ permissions:
   contents: read
 
 jobs:
-  targeted:
+  full-mobile:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - name: Checkout private branch
         uses: actions/checkout@v5
@@ -27,16 +27,26 @@ jobs:
         with:
           node-version: '22'
 
+      - name: Record private HEAD
+        working-directory: private-repo
+        run: git rev-parse HEAD
+
       - name: Install mobile dependencies
         working-directory: private-repo
         run: npm install --prefix app --no-audit --no-fund
 
-      - name: Verify tablet adaptive shell policy
-        working-directory: private-repo/app
-        run: node --experimental-strip-types --test src/platform/device-form-factor.spec.ts src/platform/orientation-policy.spec.ts src/platform/device-runtime.spec.ts src/platform/tablet-shell-layout.spec.ts src/platform/tablet-navigation.spec.ts src/platform/tablet-responsive-layout.spec.ts src/platform/login-device-layout.spec.ts
+      - name: Run all mobile tests
+        working-directory: private-repo
+        run: npm --prefix app test
 
-      - name: Verify mobile TypeScript
+      - name: Generate mobile OpenAPI types
+        working-directory: private-repo
+        run: npm --prefix app run generate:api
+
+      - name: Typecheck mobile app
         working-directory: private-repo
         run: npm --prefix app run typecheck
 
-# rerun: green-device-login
+      - name: Build mobile app
+        working-directory: private-repo
+        run: npm --prefix app run build
