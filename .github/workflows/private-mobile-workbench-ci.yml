@@ -1,0 +1,65 @@
+name: Private Mobile Workbench CI
+
+on:
+  push:
+    branches:
+      - 'private-compat/feat/mobile-global-header-workbench-20260814'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: private-mobile-workbench-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify-mobile-workbench:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout private mobile workbench branch
+        uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: feat/mobile-global-header-workbench-20260814
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: false
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: private-repo/app/package-lock.json
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: private-repo/backend-java/pom.xml
+
+      - name: Verify mobile tests and build
+        working-directory: private-repo/app
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci
+          npm test
+          npm run typecheck
+          npm run build
+
+      - name: Verify mobile residency backend contract
+        working-directory: private-repo/backend-java
+        shell: bash
+        run: |
+          set -euo pipefail
+          mvn -B -ntp -pl server -am -Dtest=MobileResidencyFilterContractTest -Dsurefire.failIfNoSpecifiedTests=false test
+
+      - name: Verify server test suite
+        working-directory: private-repo/backend-java
+        shell: bash
+        run: |
+          set -euo pipefail
+          mvn -B -ntp -pl server -am test
