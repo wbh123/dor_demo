@@ -1,0 +1,27 @@
+name: Private Admin Identity Compatibility
+on:
+  push:
+    branches:
+      - 'private-compat/refactor/admin-account-identity-menu-20260814'
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout private integration branch
+        uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: refactor/admin-account-identity-menu-20260814
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+      - name: Verify identity menu contract
+        working-directory: private-repo
+        run: node scripts/ci/test_admin_account_identity_menu.mjs
