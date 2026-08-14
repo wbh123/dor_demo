@@ -34,3 +34,5 @@ jobs:
             scripts.ops.test_backup_recovery_core \
             scripts.ops.test_backup_recovery_contract \
             scripts.db.test_scenario_matrix -v
+
+# rerun: core-and-scenario-green-1
