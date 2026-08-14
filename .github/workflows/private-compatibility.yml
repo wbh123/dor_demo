@@ -57,4 +57,16 @@ jobs:
 
       - name: Verify console Java behavior
         working-directory: private-repo/backend-java
-        run: mvn -B -ntp -pl server -am -Dtest=BackupRecoveryConsoleServiceTest -Dsurefire.failIfNoSpecifiedTests=false test
+        shell: bash
+        run: |
+          set -o pipefail
+          set +e
+          mvn -B -ntp -pl server -am -Dtest=BackupRecoveryConsoleServiceTest -Dsurefire.failIfNoSpecifiedTests=false test 2>&1 | tee /tmp/backup-console-java.log
+          status=${PIPESTATUS[0]}
+          {
+            echo '### Backup recovery console Java tail'
+            echo '```text'
+            tail -n 180 /tmp/backup-console-java.log
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit "$status"
