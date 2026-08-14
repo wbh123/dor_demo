@@ -1,3 +1,3 @@
 private_ref=feat/inspection-workflow-skeleton-mainline-20260814
-private_sha=3a98a2831f0bd5dd09f3c41125739e664631c63e
-reason=mobile-auth-401-regression-verification
+private_sha=cd320f4f36d72d22549c44a690f39dffc38d99d0
+reason=pre-main-merge-full-regression
