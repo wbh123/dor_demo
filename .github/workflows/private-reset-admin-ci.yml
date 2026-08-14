@@ -104,3 +104,5 @@ jobs:
         run: |
           git restore -- backend-java/docs/sql/navicat/generated/00_一键重置数据库.sql
           python scripts/db/generate_navicat_sql.py --scenario realistic --scale standard --students 1000 --seed 20260814 --check --skip-redis
+
+      # Final-tree rerun after syncing main #318.
