@@ -51,6 +51,13 @@ jobs:
         with:
           node-version: '22'
 
+      - name: Verify first-install server provisioning contract
+        working-directory: private-repo/app
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --experimental-strip-types --test src/platform/initial-server-provisioning.spec.ts
+
       - name: Verify startup update gate contract first
         working-directory: private-repo/app
         shell: bash
