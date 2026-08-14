@@ -48,7 +48,7 @@ jobs:
 
   mobile-app:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
         with:
@@ -61,11 +61,37 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: '22'
-      - name: Verify mobile inspection backend adapter
+      - name: Run mobile inspection verification with diagnostics
+        id: mobile_verify
         working-directory: private-repo/app
+        shell: bash
         run: |
-          npm install --no-audit --no-fund
-          npm run generate:api
-          npm test
-          npm run typecheck
-          npm run build
+          set +e
+          set -o pipefail
+          : > ../../mobile-inspection-p0b.log
+          failed=""
+          run_stage() {
+            stage="$1"; shift
+            echo "===== $stage =====" | tee -a ../../mobile-inspection-p0b.log
+            "$@" 2>&1 | tee -a ../../mobile-inspection-p0b.log
+            status=${PIPESTATUS[0]}
+            if [[ $status -ne 0 && -z "$failed" ]]; then failed="$stage"; fi
+            return $status
+          }
+          run_stage install npm install --no-audit --no-fund || true
+          if [[ -z "$failed" ]]; then run_stage generate-api npm run generate:api || true; fi
+          if [[ -z "$failed" ]]; then run_stage test npm test || true; fi
+          if [[ -z "$failed" ]]; then run_stage typecheck npm run typecheck || true; fi
+          if [[ -z "$failed" ]]; then run_stage build npm run build || true; fi
+          echo "failed_stage=$failed" >> "$GITHUB_OUTPUT"
+          exit 0
+      - name: Upload mobile diagnostics
+        if: steps.mobile_verify.outputs.failed_stage != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobile-inspection-p0b-${{ steps.mobile_verify.outputs.failed_stage }}
+          path: mobile-inspection-p0b.log
+          if-no-files-found: error
+      - name: Fail when mobile verification failed
+        if: steps.mobile_verify.outputs.failed_stage != ''
+        run: exit 1
