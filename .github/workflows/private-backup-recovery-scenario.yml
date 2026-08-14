@@ -1,0 +1,36 @@
+name: Private Backup Recovery Scenario CI
+
+on:
+  push:
+    branches:
+      - 'private-compat/feat/backup-recovery-scenario-data-20260814'
+
+permissions:
+  contents: read
+
+jobs:
+  targeted:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout private branch
+        uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: feat/backup-recovery-scenario-data-20260814
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: false
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Run backup and scenario contracts
+        working-directory: private-repo
+        run: |
+          python -m unittest \
+            scripts.ops.test_backup_recovery_core \
+            scripts.ops.test_backup_recovery_contract \
+            scripts.db.test_scenario_matrix -v
