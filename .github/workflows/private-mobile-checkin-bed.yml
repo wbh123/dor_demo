@@ -11,7 +11,7 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 30
     steps:
       - name: Checkout private fix branch
         uses: actions/checkout@v5
@@ -24,6 +24,29 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: '22'
+          cache: npm
+          cache-dependency-path: private-repo/app/package-lock.json
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: private-repo/backend-java/pom.xml
       - name: Run bed-before-checkin contract
         working-directory: private-repo/app
         run: node --experimental-strip-types --test src/platform/checkin-bed-workflow.spec.ts
+      - name: Install mobile dependencies
+        working-directory: private-repo/app
+        run: npm ci
+      - name: Run mobile tests
+        working-directory: private-repo/app
+        run: npm test
+      - name: Typecheck mobile app
+        working-directory: private-repo/app
+        run: npm run typecheck
+      - name: Build mobile app
+        working-directory: private-repo/app
+        run: npm run build
+      - name: Verify backend Java modules
+        working-directory: private-repo/backend-java
+        run: mvn -B -ntp test
