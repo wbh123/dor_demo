@@ -11,7 +11,20 @@ permissions:
 jobs:
   targeted:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_ROOT_HOST: "%"
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost -proot"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
     steps:
       - name: Checkout private branch
         uses: actions/checkout@v5
@@ -25,9 +38,11 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
-      - name: Install ops dependencies
-        working-directory: private-repo
-        run: python -m pip install -r scripts/ops/requirements.txt
+      - name: Install dependencies
+        run: |
+          python -m pip install -r private-repo/scripts/ops/requirements.txt
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq mysql-client
       - name: Backup recovery RED/GREEN contracts
         working-directory: private-repo
         run: python -m unittest scripts/ops/test_backup_recovery.py -v
@@ -46,5 +61,18 @@ jobs:
           python scripts/db/generate_navicat_sql.py --scenario recovery_mid_selection --scale standard --check
           python scripts/db/generate_navicat_sql.py --scenario redis_loss_recovery --scale large --check
           python scripts/db/generate_navicat_sql.py --scenario recovery_after_assignment --scale small --students 20000 --check
+      - name: Execute generated SQL on MySQL 8.4
+        working-directory: private-repo
+        env:
+          MYSQL_PWD: root
+        run: |
+          set -euo pipefail
+          SQL_FILE='backend-java/docs/sql/navicat/generated/00_一键重置数据库.sql'
+          for scenario in clean selection_peak authorization_matrix recovery_after_assignment mixed_extreme; do
+            echo "=== MySQL execute scenario: ${scenario} ==="
+            python scripts/db/generate_navicat_sql.py --scenario "${scenario}" --scale standard --skip-redis
+            mysql --protocol=TCP -h127.0.0.1 -P3306 -uroot --default-character-set=utf8mb4 --show-warnings < "${SQL_FILE}"
+            mysql --protocol=TCP -h127.0.0.1 -P3306 -uroot -N -e "SELECT '${scenario}', COUNT(*) FROM wust_dormitory.student;"
+          done
 
-# rerun: generated-sql-matrix
+# rerun: mysql-runtime-matrix
