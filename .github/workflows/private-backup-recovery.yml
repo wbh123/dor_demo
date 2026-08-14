@@ -35,4 +35,4 @@ jobs:
         working-directory: private-repo
         run: python -m unittest scripts/db/test_scenario_matrix.py -v
 
-# rerun: backup-cli-highload-green
+# rerun: workflow-anomaly-red
