@@ -72,7 +72,7 @@ jobs:
           set -euo pipefail
           node --experimental-strip-types --test src/platform/android-adaptive-shell-contract.spec.ts
 
-      - name: Verify adaptive mobile regressions
+      - name: Verify dependency-free adaptive mobile regressions
         working-directory: private-repo/app
         shell: bash
         run: |
@@ -80,7 +80,6 @@ jobs:
           node --experimental-strip-types --test \
             src/platform/device-form-factor.spec.ts \
             src/platform/orientation-policy.spec.ts \
-            src/platform/device-runtime.spec.ts \
             src/platform/tablet-navigation.spec.ts \
             src/platform/tablet-responsive-layout.spec.ts \
             src/platform/tablet-shell-layout.spec.ts \
