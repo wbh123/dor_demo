@@ -72,13 +72,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python - <<'PY'
-          from pathlib import Path
-          source = Path('frontend/src/account/useAccountAdminConsole.ts').read_text(encoding='utf-8')
-          expected = "baseRole === 'BUSINESS_ADMIN' ? ['BUSINESS_ADMIN', 'DORM_STAFF'].includes(targetRole) : targetRole === 'DORM_STAFF'"
-          if expected not in source:
-              raise AssertionError('BUSINESS_ADMIN must see both BUSINESS_ADMIN and DORM_STAFF published templates while DORM_STAFF remains restricted')
-          PY
+          node --experimental-strip-types --test frontend/src/account/templateCompatibility.spec.ts
+          node scripts/ci/test_account_grant_template_visibility.mjs
 
       - name: Verify admin session domain contract
         working-directory: private-repo
