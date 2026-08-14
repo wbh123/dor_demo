@@ -21,12 +21,18 @@ jobs:
           token: ${{ secrets.PRIVATE_CI }}
           path: private-repo
           persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '21'
           cache: maven
           cache-dependency-path: private-repo/backend-java/pom.xml
+      - name: Run mobile dorm staff bed verification contract
+        working-directory: private-repo/app
+        run: node --experimental-strip-types --test src/platform/dorm-staff-bed-verification.spec.ts
       - name: Run selection bed verification policy test
         working-directory: private-repo/backend-java
         run: mvn -B -ntp -pl server -am -Dtest=MobileSelectionBedVerificationPolicyTest -Dsurefire.failIfNoSpecifiedTests=false test
