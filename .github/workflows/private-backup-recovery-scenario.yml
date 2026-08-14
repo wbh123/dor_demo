@@ -32,7 +32,8 @@ jobs:
         run: |
           python -m unittest \
             scripts.ops.test_backup_recovery_core \
+            scripts.ops.test_backup_recovery_cli \
             scripts.ops.test_backup_recovery_contract \
             scripts.db.test_scenario_matrix -v
 
-# rerun: core-and-scenario-green-1
+# rerun: cli-and-v47-green
