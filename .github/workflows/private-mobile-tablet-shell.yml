@@ -34,3 +34,7 @@ jobs:
       - name: Verify device and shell policy
         working-directory: private-repo/app
         run: node --experimental-strip-types --test src/platform/device-form-factor.spec.ts src/platform/orientation-policy.spec.ts src/platform/device-runtime.spec.ts src/platform/tablet-shell-layout.spec.ts
+
+      - name: Verify mobile TypeScript
+        working-directory: private-repo
+        run: npm --prefix app run typecheck
