@@ -71,3 +71,14 @@ jobs:
             tail -60 /tmp/mobile-workbench-server-test.log || true
           fi
           exit "$status"
+
+      - name: Upload server test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobile-workbench-server-test-reports
+          path: |
+            private-repo/backend-java/**/target/surefire-reports/*.txt
+            private-repo/backend-java/**/target/surefire-reports/*.xml
+          if-no-files-found: warn
+          retention-days: 1
