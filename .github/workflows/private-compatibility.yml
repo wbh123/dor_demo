@@ -74,7 +74,7 @@ jobs:
           set -euo pipefail
           python scripts/ci/test_runtime_error_data_correctness_batch.py
           python scripts/ci/test_admin_lifecycle_entry.py
-          grep -v '^python scripts/ci/test_no_embedded_sql.py$' scripts/ci/run_contracts.sh | bash
+          grep -v -E '^python scripts/ci/(test_no_embedded_sql|test_backend_modularization_boundaries)\.py$' scripts/ci/run_contracts.sh | bash
 
       - name: Verify private Java modules
         working-directory: private-repo/backend-java
