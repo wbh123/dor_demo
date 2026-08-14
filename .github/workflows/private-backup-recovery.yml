@@ -1,0 +1,33 @@
+name: Private Backup Recovery Scenario CI
+
+on:
+  push:
+    branches:
+      - 'private-compat/feat/backup-recovery-scenarios-20260814'
+
+permissions:
+  contents: read
+
+jobs:
+  targeted:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout private branch
+        uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: feat/backup-recovery-scenarios-20260814
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Backup recovery RED/GREEN contracts
+        working-directory: private-repo
+        run: python -m unittest scripts/ops/test_backup_recovery.py -v
+      - name: Scenario matrix RED/GREEN contracts
+        working-directory: private-repo
+        run: python -m unittest scripts/db/test_scenario_matrix.py -v
