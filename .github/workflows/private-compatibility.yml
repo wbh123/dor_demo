@@ -44,10 +44,19 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
+          cache: maven
+          cache-dependency-path: private-repo/backend-java/pom.xml
 
       - uses: actions/setup-node@v6
         with:
           node-version: '22'
+
+      - name: Verify backend Java modules
+        working-directory: private-repo/backend-java
+        shell: bash
+        run: |
+          set -euo pipefail
+          mvn -B -ntp clean verify
 
       - name: Verify Vue mobile app
         working-directory: private-repo/app
