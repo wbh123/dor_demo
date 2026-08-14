@@ -50,6 +50,25 @@ jobs:
         working-directory: private-repo/backend-java
         run: mvn -B -ntp -pl server -am -Dtest=DormStaffWebControllerTest -Dsurefire.failIfNoSpecifiedTests=false test
 
+  verify-inspection-schema:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout private branch
+        uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: refactor/dorm-staff-web-shell-20260814
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Verify V46 inspection workflow schema
+        working-directory: private-repo
+        run: python scripts/db/test_v46_inspection_workflow_schema.py
+
   verify-frontend:
     runs-on: ubuntu-latest
     timeout-minutes: 20
