@@ -37,5 +37,14 @@ jobs:
       - name: Historical recovery RED/GREEN contracts
         working-directory: private-repo
         run: python -m unittest scripts/db/test_recovery_scenarios.py -v
+      - name: Generate SQL contract checks
+        working-directory: private-repo
+        run: |
+          python scripts/db/generate_navicat_sql.py --scenario selection_peak --scale standard --check
+          python scripts/db/generate_navicat_sql.py --scenario selection_peak --scale large --check
+          python scripts/db/generate_navicat_sql.py --scenario mixed_extreme --scale xlarge --check
+          python scripts/db/generate_navicat_sql.py --scenario recovery_mid_selection --scale standard --check
+          python scripts/db/generate_navicat_sql.py --scenario redis_loss_recovery --scale large --check
+          python scripts/db/generate_navicat_sql.py --scenario recovery_after_assignment --scale small --students 20000 --check
 
-# rerun: historical-recovery-green
+# rerun: generated-sql-matrix
