@@ -67,6 +67,19 @@ jobs:
           cache: npm
           cache-dependency-path: private-repo/frontend/package-lock.json
 
+      - name: Verify grant template visibility regression
+        working-directory: private-repo
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          source = Path('frontend/src/account/useAccountAdminConsole.ts').read_text(encoding='utf-8')
+          expected = "baseRole === 'BUSINESS_ADMIN' ? ['BUSINESS_ADMIN', 'DORM_STAFF'].includes(targetRole) : targetRole === 'DORM_STAFF'"
+          if expected not in source:
+              raise AssertionError('BUSINESS_ADMIN must see both BUSINESS_ADMIN and DORM_STAFF published templates while DORM_STAFF remains restricted')
+          PY
+
       - name: Verify admin session domain contract
         working-directory: private-repo
         shell: bash
