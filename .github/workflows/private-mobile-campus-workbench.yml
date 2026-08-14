@@ -11,13 +11,13 @@ permissions:
 jobs:
   verify-private-mobile-workbench:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 20
     steps:
-      - name: Checkout private feature branch
+      - name: Checkout private fix branch
         uses: actions/checkout@v5
         with:
           repository: wbh123/Wust-Dormitory-Select
-          ref: feat/mobile-campus-floor-room-workbench-20260814
+          ref: fix/mobile-student-workbench-500-20260814
           token: ${{ secrets.PRIVATE_CI }}
           path: private-repo
           persist-credentials: false
@@ -30,55 +30,9 @@ jobs:
           cache: maven
           cache-dependency-path: private-repo/backend-java/pom.xml
 
-      - uses: actions/setup-node@v6
-        with:
-          node-version: '22'
-
-      - name: Verify mobile tests and build
-        working-directory: private-repo/app
-        shell: bash
-        run: |
-          set -euo pipefail
-          npm install
-          npm test
-          npm run typecheck
-          npm run build
-
-      - name: Verify backend mobile workbench tests
+      - name: Reproduce mobile student workbench mapper failure
         working-directory: private-repo/backend-java
         shell: bash
         run: |
           set -euo pipefail
-          mvn -B -ntp -pl server -am -Dtest=RoomManagementQueryServiceTest,MobileWorkbenchThreeLevelContractTest,MobileResidencyFilterContractTest -Dsurefire.failIfNoSpecifiedTests=false test
-
-      - name: Verify server module
-        working-directory: private-repo/backend-java
-        shell: bash
-        run: |
-          set +e
-          mvn -B -ntp -pl server -am test > /tmp/mobile-workbench-server-test.log 2>&1
-          status=$?
-          if [ "$status" -ne 0 ]; then
-            echo "::group::Surefire failure summary"
-            find . -path '*/target/surefire-reports/*' -type f \( -name '*.txt' -o -name '*.xml' \) -print0 \
-              | xargs -0 grep -H -n -E 'FAILURE|ERROR|Failures:|Errors:|<<< FAILURE|<<< ERROR|AssertionFailedError|Caused by:' \
-              | head -250 || true
-            echo "::endgroup::"
-            echo "::group::Maven tail"
-            tail -160 /tmp/mobile-workbench-server-test.log || true
-            echo "::endgroup::"
-          else
-            tail -60 /tmp/mobile-workbench-server-test.log || true
-          fi
-          exit "$status"
-
-      - name: Upload server test reports
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: mobile-workbench-server-test-reports
-          path: |
-            private-repo/backend-java/**/target/surefire-reports/*.txt
-            private-repo/backend-java/**/target/surefire-reports/*.xml
-          if-no-files-found: warn
-          retention-days: 1
+          mvn -B -ntp -pl server -am -Dtest=MobileStudentWorkbenchMapperMySqlIntegrationTest -Dsurefire.failIfNoSpecifiedTests=false test
