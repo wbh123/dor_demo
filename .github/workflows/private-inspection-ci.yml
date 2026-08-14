@@ -5,9 +5,9 @@ on:
 permissions:
   contents: read
 jobs:
-  verify-inspection:
+  diagnose-contracts:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
         with:
@@ -20,14 +20,14 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
-      - uses: actions/setup-node@v6
-        with:
-          node-version: '22'
-      - name: Diagnose first failing private contract
+      - name: Locate first failing private contract
+        id: contract_diag
         working-directory: private-repo
         shell: bash
         run: |
           set -uo pipefail
+          failed_script=""
+          : > contract-failure.log
           while IFS= read -r command; do
             [[ "$command" == python\ * ]] || continue
             echo "==> $command"
@@ -35,11 +35,38 @@ jobs:
             status=$?
             printf '%s\n' "$output"
             if [[ $status -ne 0 ]]; then
-              detail=$(printf '%s\n' "$output" | tail -n 12 | tr '\n' ' ' | sed 's/%/%25/g; s/\r/%0D/g; s/\n/%0A/g' | cut -c1-1500)
-              echo "::error title=Private contract failure::$command :: $detail"
-              exit $status
+              failed_script=$(printf '%s' "$command" | awk '{print $2}' | xargs basename | sed 's/\.py$//; s/[^A-Za-z0-9._-]/-/g')
+              printf 'COMMAND: %s\n\n%s\n' "$command" "$output" > contract-failure.log
+              break
             fi
           done < scripts/ci/run_contracts.sh
+          echo "failed_script=$failed_script" >> "$GITHUB_OUTPUT"
+      - name: Upload contract failure diagnostics
+        if: steps.contract_diag.outputs.failed_script != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: contract-failure-${{ steps.contract_diag.outputs.failed_script }}
+          path: private-repo/contract-failure.log
+          if-no-files-found: error
+      - name: Fail when a private contract failed
+        if: steps.contract_diag.outputs.failed_script != ''
+        run: exit 1
+
+  verify-inspection:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: feat/inspection-workflow-skeleton-mainline-20260814
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: false
+          fetch-depth: 1
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
       - name: Verify inspection OpenAPI contract
         working-directory: private-repo
         run: python scripts/ci/test_inspection_openapi_contract.py
@@ -58,7 +85,6 @@ jobs:
         run: npm install --no-audit --no-fund
       - name: Typecheck school admin frontend
         id: admin_typecheck
-        continue-on-error: true
         working-directory: private-repo/frontend
         shell: bash
         run: |
@@ -67,22 +93,28 @@ jobs:
           output=$(npm run typecheck 2>&1)
           status=$?
           printf '%s\n' "$output" | tee ../../admin-typecheck.log
+          failed="false"
+          error_slug=""
           if [[ $status -ne 0 ]]; then
-            detail=$(printf '%s\n' "$output" | grep -m 1 -E 'error TS[0-9]+|error:' || printf '%s\n' "$output" | tail -n 8 | tr '\n' ' ')
-            detail=$(printf '%s' "$detail" | sed 's/%/%25/g; s/\r/%0D/g; s/\n/%0A/g' | cut -c1-1500)
-            echo "::error title=Admin TypeScript typecheck::$detail"
+            failed="true"
+            first=$(printf '%s\n' "$output" | grep -m 1 -E 'error TS[0-9]+' || true)
+            if [[ -z "$first" ]]; then first="typecheck-exit-$status"; fi
+            error_slug=$(printf '%s' "$first" | sed 's#src/##g; s#[/: ]#-#g; s/[^A-Za-z0-9._-]/-/g; s/--*/-/g' | cut -c1-160)
           fi
-          exit $status
+          echo "failed=$failed" >> "$GITHUB_OUTPUT"
+          echo "error_slug=$error_slug" >> "$GITHUB_OUTPUT"
+          exit 0
       - name: Upload admin typecheck diagnostics
-        if: always()
+        if: steps.admin_typecheck.outputs.failed == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: admin-typecheck-log
+          name: admin-typecheck-${{ steps.admin_typecheck.outputs.error_slug }}
           path: admin-typecheck.log
           if-no-files-found: error
       - name: Fail when admin typecheck failed
-        if: steps.admin_typecheck.outcome == 'failure'
+        if: steps.admin_typecheck.outputs.failed == 'true'
         run: exit 1
       - name: Build school admin frontend
+        if: steps.admin_typecheck.outputs.failed != 'true'
         working-directory: private-repo/frontend
         run: npm run build
