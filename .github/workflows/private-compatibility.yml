@@ -72,6 +72,20 @@ jobs:
           set -euo pipefail
           node --experimental-strip-types --test src/platform/android-adaptive-shell-contract.spec.ts
 
+      - name: Verify adaptive mobile regressions
+        working-directory: private-repo/app
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --experimental-strip-types --test \
+            src/platform/device-form-factor.spec.ts \
+            src/platform/orientation-policy.spec.ts \
+            src/platform/device-runtime.spec.ts \
+            src/platform/tablet-navigation.spec.ts \
+            src/platform/tablet-responsive-layout.spec.ts \
+            src/platform/tablet-shell-layout.spec.ts \
+            src/platform/login-device-layout.spec.ts
+
       - name: Verify backend Java modules
         working-directory: private-repo/backend-java
         shell: bash
