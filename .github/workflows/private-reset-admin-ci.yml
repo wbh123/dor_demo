@@ -32,7 +32,7 @@ jobs:
           ref: fix/reset-admin-relationship-20260814
           token: ${{ secrets.PRIVATE_CI }}
           path: private-repo
-          persist-credentials: true
+          persist-credentials: false
           fetch-depth: 0
 
       - uses: actions/setup-python@v6
@@ -48,12 +48,19 @@ jobs:
         working-directory: private-repo
         run: python scripts/db/test_reset_admin_relationships.py -v
 
-      - name: Execute representative reset scenarios on MySQL 8.4
+      - name: Execute every reset scenario on MySQL 8.4
         working-directory: private-repo
         shell: bash
         run: |
           set -euo pipefail
-          for scenario in clean realistic authorization_matrix; do
+          scenarios="$(python - <<'PY'
+          import sys
+          sys.path.insert(0, 'scripts/db')
+          from reset_scenario import VALID_SCENARIOS
+          print(' '.join(VALID_SCENARIOS))
+          PY
+          )"
+          for scenario in ${scenarios}; do
             echo "=== scenario: ${scenario} ==="
             python scripts/db/generate_navicat_sql.py \
               --scenario "${scenario}" \
@@ -87,10 +94,13 @@ jobs:
                 (SELECT COUNT(*) FROM app_user
                   WHERE username IN ('accountadmin','admin','dormstaff') AND password_hash='{noop}0')
               );")"
-            echo "relationship_state=${relationship_state}"
+            echo "${scenario}: relationship_state=${relationship_state}"
             test "${relationship_state}" = "1|1|1|1|1|3"
           done
 
       - name: Verify canonical default reset SQL is current
         working-directory: private-repo
-        run: python scripts/db/generate_navicat_sql.py --scenario realistic --scale standard --students 1000 --seed 20260814 --check --skip-redis
+        shell: bash
+        run: |
+          git restore -- backend-java/docs/sql/navicat/generated/00_一键重置数据库.sql
+          python scripts/db/generate_navicat_sql.py --scenario realistic --scale standard --students 1000 --seed 20260814 --check --skip-redis
