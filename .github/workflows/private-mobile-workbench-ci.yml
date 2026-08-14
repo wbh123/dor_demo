@@ -30,8 +30,6 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: '22'
-          cache: npm
-          cache-dependency-path: private-repo/app/package-lock.json
 
       - uses: actions/setup-java@v5
         with:
@@ -45,7 +43,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          npm ci
+          npm install --no-audit --no-fund
           npm test
           npm run typecheck
           npm run build
