@@ -16,7 +16,7 @@ jobs:
   verify-private-ref:
     name: Verify backup key management
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 35
     steps:
       - name: Resolve private branch name
         id: target
@@ -45,12 +45,22 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: '22'
-      - name: Verify backup key CLI behavior
+      - name: Install backup recovery Python dependencies
         working-directory: private-repo
-        run: python -m unittest scripts/ops/test_generate_backup_key.py -v
-      - name: Verify backup key Java behavior
+        run: python -m pip install -r scripts/ops/requirements.txt
+      - name: Verify backup key and existing recovery safety
+        working-directory: private-repo
+        run: |
+          python -m unittest \
+            scripts/ops/test_generate_backup_key.py \
+            scripts/ops/test_backup_recovery.py \
+            scripts/ops/test_backup_recovery_drill_safety.py -v
+      - name: Verify backup key focused Java behavior
         working-directory: private-repo/backend-java
         run: mvn -B -ntp -pl server -am -Dtest=BackupKeyManagementServiceTest,PythonBackupRecoveryCliGatewayTest -Dsurefire.failIfNoSpecifiedTests=false test
-      - name: Verify backup key console contract
+      - name: Verify Java full suite
+        working-directory: private-repo/backend-java
+        run: mvn -B -ntp clean verify
+      - name: Verify Web frontend full suite
         working-directory: private-repo
-        run: node scripts/ci/test_backup_key_management_console.mjs
+        run: bash scripts/ci/run_frontend.sh
