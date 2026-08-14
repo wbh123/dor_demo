@@ -34,3 +34,5 @@ jobs:
       - name: Verify device runtime policy
         working-directory: private-repo/app
         run: node --experimental-strip-types --test src/platform/device-form-factor.spec.ts src/platform/orientation-policy.spec.ts src/platform/device-runtime.spec.ts
+
+# rerun: green-device-runtime
