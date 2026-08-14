@@ -29,3 +29,5 @@ jobs:
       - name: Verify reset admin relationships
         working-directory: private-repo
         run: python scripts/db/test_reset_admin_relationships.py -v
+
+      # Rerun marker: hierarchy fix applied.
