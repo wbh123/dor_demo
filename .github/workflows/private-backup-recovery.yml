@@ -11,7 +11,7 @@ permissions:
 jobs:
   targeted:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     services:
       mysql:
         image: mysql:8.4
@@ -61,18 +61,37 @@ jobs:
           python scripts/db/generate_navicat_sql.py --scenario recovery_mid_selection --scale standard --check
           python scripts/db/generate_navicat_sql.py --scenario redis_loss_recovery --scale large --check
           python scripts/db/generate_navicat_sql.py --scenario recovery_after_assignment --scale small --students 20000 --check
-      - name: Execute generated SQL on MySQL 8.4
+      - name: Execute all generated scenarios on MySQL 8.4
         working-directory: private-repo
         env:
           MYSQL_PWD: root
         run: |
           set -euo pipefail
           SQL_FILE='backend-java/docs/sql/navicat/generated/00_一键重置数据库.sql'
-          for scenario in clean selection_peak authorization_matrix recovery_after_assignment mixed_extreme; do
+          scenarios=(
+            clean realistic selection_peak selection_collision near_capacity full_capacity
+            team_edge_cases waitlist_exchange import_quality anomaly_heavy inspection_heavy
+            notification_heavy authorization_matrix historical_multi_year retention_expired
+            recovery_baseline recovery_mid_selection recovery_after_assignment
+            redis_loss_recovery mixed_extreme
+          )
+          for scenario in "${scenarios[@]}"; do
             echo "=== MySQL execute scenario: ${scenario} ==="
             python scripts/db/generate_navicat_sql.py --scenario "${scenario}" --scale standard --skip-redis
             mysql --protocol=TCP -h127.0.0.1 -P3306 -uroot --default-character-set=utf8mb4 --show-warnings < "${SQL_FILE}"
             mysql --protocol=TCP -h127.0.0.1 -P3306 -uroot -N -e "SELECT '${scenario}', COUNT(*) FROM wust_dormitory.student;"
           done
+      - name: Generate canonical default SQL
+        working-directory: private-repo
+        run: |
+          python scripts/db/generate_navicat_sql.py --scenario realistic --scale standard --students 1000 --seed 20260814 --skip-redis
+          python scripts/db/generate_navicat_sql.py --scenario realistic --scale standard --students 1000 --seed 20260814 --check
+      - name: Upload canonical Navicat SQL
+        uses: actions/upload-artifact@v4
+        with:
+          name: canonical-navicat-sql
+          path: private-repo/backend-java/docs/sql/navicat/generated/00_一键重置数据库.sql
+          if-no-files-found: error
+          retention-days: 1
 
-# rerun: mysql-runtime-matrix
+# rerun: all-mysql-scenarios-and-canonical-sql
