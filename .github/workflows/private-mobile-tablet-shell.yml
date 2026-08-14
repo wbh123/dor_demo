@@ -38,3 +38,5 @@ jobs:
       - name: Verify mobile TypeScript
         working-directory: private-repo
         run: npm --prefix app run typecheck
+
+# rerun: green-device-login
