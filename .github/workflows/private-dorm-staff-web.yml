@@ -9,7 +9,7 @@ permissions:
   contents: read
 
 jobs:
-  verify-dorm-staff-web:
+  verify-shell-contract:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -27,3 +27,25 @@ jobs:
       - name: Verify dorm staff shell contract
         working-directory: private-repo
         run: node scripts/ci/test_dorm_staff_web_shell.mjs
+
+  verify-backend-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout private branch
+        uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: refactor/dorm-staff-web-shell-20260814
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: false
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: private-repo/backend-java/pom.xml
+      - name: Verify dorm staff web controller contract
+        working-directory: private-repo/backend-java
+        run: mvn -B -ntp -pl server -am -Dtest=DormStaffWebControllerTest -Dsurefire.failIfNoSpecifiedTests=false test
