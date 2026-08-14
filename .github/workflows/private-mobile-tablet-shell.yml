@@ -34,3 +34,5 @@ jobs:
       - name: Verify device form factor and orientation policy
         working-directory: private-repo/app
         run: node --experimental-strip-types --test src/platform/device-form-factor.spec.ts src/platform/orientation-policy.spec.ts
+
+# rerun: green-device-policy
