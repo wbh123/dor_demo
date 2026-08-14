@@ -34,5 +34,8 @@ jobs:
       - name: Scenario matrix RED/GREEN contracts
         working-directory: private-repo
         run: python -m unittest scripts/db/test_scenario_matrix.py -v
+      - name: Historical recovery RED/GREEN contracts
+        working-directory: private-repo
+        run: python -m unittest scripts/db/test_recovery_scenarios.py -v
 
-# rerun: inspection-notification-auth-green
+# rerun: historical-recovery-red
