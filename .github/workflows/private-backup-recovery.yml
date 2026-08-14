@@ -11,7 +11,7 @@ permissions:
 jobs:
   targeted:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     services:
       mysql:
         image: mysql:8.4
@@ -33,7 +33,7 @@ jobs:
           ref: feat/backup-recovery-scenarios-20260814
           token: ${{ secrets.PRIVATE_CI }}
           path: private-repo
-          persist-credentials: true
+          persist-credentials: false
           fetch-depth: 0
       - uses: actions/setup-python@v6
         with:
@@ -43,13 +43,36 @@ jobs:
           python -m pip install -r private-repo/scripts/ops/requirements.txt
           sudo apt-get update -qq
           sudo apt-get install -y -qq mysql-client
-      - name: Run backup recovery contracts
+      - name: Run all database and disaster recovery contracts
         working-directory: private-repo
         run: |
+          set -euo pipefail
           python -m unittest scripts/ops/test_backup_recovery.py -v
           python -m unittest scripts/ops/test_backup_recovery_drill_safety.py -v
           python -m unittest scripts/db/test_scenario_matrix.py scripts/db/test_recovery_scenarios.py -v
-      - name: Prepare realistic V47 source database
+          python -m unittest scripts/db/test_frozen_schema.py scripts/db/test_1000_student_sql.py -v
+      - name: Execute all 20 V47 scenarios on MySQL 8.4
+        working-directory: private-repo
+        env:
+          MYSQL_PWD: root
+        run: |
+          set -euo pipefail
+          SQL_FILE='backend-java/docs/sql/navicat/generated/00_一键重置数据库.sql'
+          scenarios=(
+            clean realistic selection_peak selection_collision near_capacity full_capacity
+            team_edge_cases waitlist_exchange import_quality anomaly_heavy inspection_heavy
+            notification_heavy authorization_matrix historical_multi_year retention_expired
+            recovery_baseline recovery_mid_selection recovery_after_assignment
+            redis_loss_recovery mixed_extreme
+          )
+          for scenario in "${scenarios[@]}"; do
+            echo "=== FINAL V47 MYSQL SCENARIO: ${scenario} ==="
+            python scripts/db/generate_navicat_sql.py --scenario "${scenario}" --scale standard --students 1000 --seed 20260814 --skip-redis
+            python scripts/db/generate_navicat_sql.py --scenario "${scenario}" --scale standard --students 1000 --seed 20260814 --check
+            mysql --protocol=TCP -h127.0.0.1 -P3306 -uroot --default-character-set=utf8mb4 --show-warnings < "${SQL_FILE}"
+            mysql --protocol=TCP -h127.0.0.1 -P3306 -uroot -N -e "SELECT CONCAT('${scenario}:',COUNT(*),':', (SELECT COUNT(*) FROM wust_dormitory.room), ':', (SELECT COUNT(*) FROM wust_dormitory.bed)) FROM wust_dormitory.student;"
+          done
+      - name: Recreate realistic source for final disaster recovery drill
         working-directory: private-repo
         env:
           MYSQL_PWD: root
@@ -59,7 +82,7 @@ jobs:
           python scripts/db/generate_navicat_sql.py --scenario realistic --scale standard --students 1000 --seed 20260814 --skip-redis
           python scripts/db/generate_navicat_sql.py --scenario realistic --scale standard --students 1000 --seed 20260814 --check
           mysql --protocol=TCP -h127.0.0.1 -P3306 -uroot --default-character-set=utf8mb4 --show-warnings < "${SQL_FILE}"
-      - name: Execute encrypted backup verify restore and staging drill
+      - name: Execute final encrypted backup restore and staging drill
         working-directory: private-repo
         env:
           MYSQL_PWD: root
@@ -70,7 +93,7 @@ jobs:
           WUST_DORMITORY_DB_NAME: wust_dormitory
         run: |
           set -euo pipefail
-          BACKUP_ROOT="${RUNNER_TEMP}/wust-dormitory-backups"
+          BACKUP_ROOT="${RUNNER_TEMP}/wust-dormitory-final-backups"
           rm -rf "${BACKUP_ROOT}"
           mkdir -p "${BACKUP_ROOT}"
           export WUST_DORMITORY_BACKUP_ENCRYPTION_KEY
@@ -81,25 +104,17 @@ jobs:
           )"
 
           BACKUP_JSON="$(python scripts/ops/backup_recovery.py backup-full --environment staging --backup-root "${BACKUP_ROOT}" --encrypt)"
-          echo "${BACKUP_JSON}"
           BACKUP_SET="$(python -c 'import json,sys; print(json.load(sys.stdin)["backupSet"])' <<<"${BACKUP_JSON}")"
-          test -f "${BACKUP_SET}/manifest.json"
-          test -f "${BACKUP_SET}/verify.json"
-          test -f "${BACKUP_SET}/full.sql.gz.enc"
-
           python scripts/ops/backup_recovery.py verify --environment staging --backup-root "${BACKUP_ROOT}" --backup-set "${BACKUP_SET}"
-          python scripts/ops/backup_recovery.py precheck --environment test --backup-root "${BACKUP_ROOT}" --backup-set "${BACKUP_SET}" --target-database wust_dormitory_restore_ci
-
-          mysql --protocol=TCP -h127.0.0.1 -P3306 -uroot -e 'DROP DATABASE IF EXISTS `wust_dormitory_restore_ci`;'
-          python scripts/ops/backup_recovery.py restore --environment test --backup-root "${BACKUP_ROOT}" --backup-set "${BACKUP_SET}" --target-database wust_dormitory_restore_ci
+          python scripts/ops/backup_recovery.py precheck --environment test --backup-root "${BACKUP_ROOT}" --backup-set "${BACKUP_SET}" --target-database wust_dormitory_restore_final
+          mysql --protocol=TCP -h127.0.0.1 -P3306 -uroot -e 'DROP DATABASE IF EXISTS `wust_dormitory_restore_final`;'
+          python scripts/ops/backup_recovery.py restore --environment test --backup-root "${BACKUP_ROOT}" --backup-set "${BACKUP_SET}" --target-database wust_dormitory_restore_final
 
           SOURCE_COUNTS="$(mysql --protocol=TCP -h127.0.0.1 -P3306 -uroot -N wust_dormitory -e "SELECT CONCAT_WS(',',(SELECT COUNT(*) FROM student),(SELECT COUNT(*) FROM room),(SELECT COUNT(*) FROM bed),(SELECT COUNT(*) FROM room_assignment WHERE assignment_status='ACTIVE'));" )"
-          RESTORE_COUNTS="$(mysql --protocol=TCP -h127.0.0.1 -P3306 -uroot -N wust_dormitory_restore_ci -e "SELECT CONCAT_WS(',',(SELECT COUNT(*) FROM student),(SELECT COUNT(*) FROM room),(SELECT COUNT(*) FROM bed),(SELECT COUNT(*) FROM room_assignment WHERE assignment_status='ACTIVE'));" )"
-          echo "source=${SOURCE_COUNTS} restore=${RESTORE_COUNTS}"
+          RESTORE_COUNTS="$(mysql --protocol=TCP -h127.0.0.1 -P3306 -uroot -N wust_dormitory_restore_final -e "SELECT CONCAT_WS(',',(SELECT COUNT(*) FROM student),(SELECT COUNT(*) FROM room),(SELECT COUNT(*) FROM bed),(SELECT COUNT(*) FROM room_assignment WHERE assignment_status='ACTIVE'));" )"
           test "${SOURCE_COUNTS}" = "${RESTORE_COUNTS}"
 
           REPORT_PATH="$(python scripts/ops/backup_recovery.py drill --environment staging --backup-root "${BACKUP_ROOT}" --backup-set "${BACKUP_SET}")"
-          test -f "${REPORT_PATH}"
           python - "${REPORT_PATH}" "${SOURCE_COUNTS}" <<'PY'
           import json
           import sys
@@ -107,26 +122,18 @@ jobs:
 
           report = json.loads(Path(sys.argv[1]).read_text(encoding='utf-8'))
           expected = [int(part) for part in sys.argv[2].split(',')]
-          assert report['status'] == 'PASSED', report
-          assert report['integrityStatus'] == 'PASSED', report
           counts = report['businessCounts']
           actual = [counts['students'], counts['rooms'], counts['beds'], counts['activeAssignments']]
+          assert report['status'] == 'PASSED', report
+          assert report['integrityStatus'] == 'PASSED', report
           assert actual == expected, (actual, expected)
-          assert report['targetDatabase'].startswith('wust_dormitory_drill_'), report['targetDatabase']
-          assert report['plannedRpoSeconds'] == 300
-          assert report['plannedRtoSeconds'] == 1800
-          print(json.dumps({
-              'status': report['status'],
-              'integrityStatus': report['integrityStatus'],
-              'businessCounts': counts,
-              'targetDatabase': report['targetDatabase'],
-              'actualRpoSeconds': report['actualRpoSeconds'],
-              'actualRtoSeconds': report['actualRtoSeconds'],
-          }, ensure_ascii=False))
+          assert report['targetDatabase'].startswith('wust_dormitory_drill_')
+          assert report['actualRpoSeconds'] <= report['plannedRpoSeconds'], report
+          assert report['actualRtoSeconds'] <= report['plannedRtoSeconds'], report
+          print(json.dumps(report, ensure_ascii=False))
           PY
-
           mysql --protocol=TCP -h127.0.0.1 -P3306 -uroot -N -e "SELECT COUNT(*) FROM information_schema.schemata WHERE schema_name LIKE 'wust_dormitory_drill_%';" | grep -qx '0'
-      - name: Regenerate and commit canonical V47 Navicat SQL
+      - name: Verify canonical Navicat SQL is deterministic and current
         working-directory: private-repo
         run: |
           set -euo pipefail
@@ -134,20 +141,8 @@ jobs:
           python scripts/db/generate_navicat_sql.py --scenario realistic --scale standard --students 1000 --seed 20260814 --skip-redis
           python scripts/db/generate_navicat_sql.py --scenario realistic --scale standard --students 1000 --seed 20260814 --check
           grep -q 'Flyway V1-V47' "${SQL_FILE}"
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -f "${SQL_FILE}"
-          if ! git diff --cached --quiet; then
-            git commit -m 'chore: refresh canonical Navicat reset SQL for V47'
-            git push origin HEAD:feat/backup-recovery-scenarios-20260814
-          fi
-      - name: Upload validation artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: backup-recovery-v47-validation
-          path: |
-            private-repo/backend-java/docs/sql/navicat/generated/00_一键重置数据库.sql
-          if-no-files-found: error
-          retention-days: 1
+          grep -q '数据规模：standard / 1000 students' "${SQL_FILE}"
+          grep -q '随机种子：20260814' "${SQL_FILE}"
+          git diff --exit-code -- "${SQL_FILE}"
 
-# rerun: encrypted-backup-restore-drill-v47
+# rerun: final-v47-full-gate
