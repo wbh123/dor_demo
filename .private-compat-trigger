@@ -1,3 +1,3 @@
 private_ref=refactor/inspection-workflow-p0b-mainline-20260814
-private_sha=ac6199fd2a57848565bce721be2f6b086834c72a
-reason=inspection-controller-contract-green
+private_sha=943bfe0e80285239e31462ebe015ce42b5f0473b
+reason=inspection-openapi-controller-alignment
