@@ -11,7 +11,7 @@ permissions:
 jobs:
   targeted:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 35
     steps:
       - name: Checkout private branch
         uses: actions/checkout@v5
@@ -31,9 +31,20 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: '22'
+          cache: npm
+          cache-dependency-path: private-repo/frontend/package-lock.json
       - name: Verify grant lifecycle frontend contract
         working-directory: private-repo
         run: node scripts/ci/test_account_admin_grant_lifecycle.mjs
       - name: Verify grant lifecycle service tests
         working-directory: private-repo/backend-java
         run: mvn -B -ntp -pl server -am -Dtest=AccountAdminGrantServiceTest -Dsurefire.failIfNoSpecifiedTests=false test
+      - name: Verify private Java modules
+        working-directory: private-repo/backend-java
+        run: mvn -B -ntp clean verify
+      - name: Verify private Web frontend
+        working-directory: private-repo
+        env:
+          VITE_INSTITUTION_NAME: Example University
+          VITE_CAMPUS_NAME: Example Campus
+        run: bash scripts/ci/run_frontend.sh
