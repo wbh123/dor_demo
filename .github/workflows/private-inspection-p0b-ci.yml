@@ -23,3 +23,25 @@ jobs:
       - name: Verify V46 inspection schema contract
         working-directory: private-repo
         run: python scripts/db/test_v46_inspection_workflow_schema.py
+
+  mapper-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: refactor/inspection-workflow-p0b-mainline-20260814
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: false
+          fetch-depth: 1
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: private-repo/backend-java/pom.xml
+      - name: Verify inspection mapper boundary
+        working-directory: private-repo/backend-java
+        run: mvn -B -ntp -pl server -am -Dtest=InspectionMapperContractTest -Dsurefire.failIfNoSpecifiedTests=false test
