@@ -1,0 +1,29 @@
+name: Private Dorm Staff Web CI
+
+on:
+  push:
+    branches:
+      - 'private-compat/refactor/dorm-staff-web-shell-20260814'
+
+permissions:
+  contents: read
+
+jobs:
+  verify-dorm-staff-web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout private branch
+        uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: refactor/dorm-staff-web-shell-20260814
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+      - name: Verify dorm staff shell contract
+        working-directory: private-repo
+        run: node scripts/ci/test_dorm_staff_web_shell.mjs
