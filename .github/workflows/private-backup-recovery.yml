@@ -46,6 +46,9 @@ jobs:
       - name: Backup recovery RED/GREEN contracts
         working-directory: private-repo
         run: python -m unittest scripts/ops/test_backup_recovery.py -v
+      - name: Drill isolation RED/GREEN contracts
+        working-directory: private-repo
+        run: python -m unittest scripts/ops/test_backup_recovery_drill_safety.py -v
       - name: Scenario matrix RED/GREEN contracts
         working-directory: private-repo
         run: python -m unittest scripts/db/test_scenario_matrix.py -v
@@ -94,4 +97,4 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
-# rerun: all-mysql-scenarios-and-canonical-sql
+# rerun: drill-isolation-red
