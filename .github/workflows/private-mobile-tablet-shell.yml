@@ -1,0 +1,36 @@
+name: Private Mobile Tablet Shell CI
+
+on:
+  push:
+    branches:
+      - 'private-compat/refactor/mobile-tablet-adaptive-shell-20260814'
+
+permissions:
+  contents: read
+
+jobs:
+  targeted:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout private branch
+        uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: refactor/mobile-tablet-adaptive-shell-20260814
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: false
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+
+      - name: Install mobile dependencies
+        working-directory: private-repo
+        run: npm install --prefix app --no-audit --no-fund
+
+      - name: Verify device form factor and orientation policy
+        working-directory: private-repo/app
+        run: node --experimental-strip-types --test src/platform/device-form-factor.spec.ts src/platform/orientation-policy.spec.ts
