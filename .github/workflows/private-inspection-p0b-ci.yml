@@ -1,0 +1,25 @@
+name: Private Inspection P0B CI
+on:
+  push:
+    branches: ['private-compat/refactor/inspection-workflow-p0b-mainline-20260814']
+permissions:
+  contents: read
+jobs:
+  schema-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: refactor/inspection-workflow-p0b-mainline-20260814
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: false
+          fetch-depth: 1
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Verify V46 inspection schema contract
+        working-directory: private-repo
+        run: python scripts/db/test_v46_inspection_workflow_schema.py
