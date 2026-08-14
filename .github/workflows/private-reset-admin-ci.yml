@@ -1,0 +1,31 @@
+name: Private Reset Admin Relationship CI
+
+on:
+  push:
+    branches:
+      - 'private-compat/fix/reset-admin-relationship-20260814'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout private branch
+        uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: fix/reset-admin-relationship-20260814
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: false
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Verify reset admin relationships
+        working-directory: private-repo
+        run: python scripts/db/test_reset_admin_relationships.py -v
