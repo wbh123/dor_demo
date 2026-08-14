@@ -92,7 +92,7 @@ jobs:
         run: |
           set +e
           set -o pipefail
-          output=$(npm run typecheck 2>&1)
+          output=$(npm run generate:api 2>&1 && npm run typecheck 2>&1)
           status=$?
           printf '%s\n' "$output" | tee ../../admin-typecheck.log
           failed="false"
