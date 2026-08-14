@@ -56,7 +56,7 @@ jobs:
         shell: bash
         run: |
           set +e
-          mvn -B -ntp -pl server -am test
+          mvn -B -ntp -pl server -am test > /tmp/mobile-workbench-server-test.log 2>&1
           status=$?
           if [ "$status" -ne 0 ]; then
             echo "::group::Surefire failure summary"
@@ -64,5 +64,10 @@ jobs:
               | xargs -0 grep -H -n -E 'FAILURE|ERROR|Failures:|Errors:|<<< FAILURE|<<< ERROR|AssertionFailedError|Caused by:' \
               | head -250 || true
             echo "::endgroup::"
+            echo "::group::Maven tail"
+            tail -160 /tmp/mobile-workbench-server-test.log || true
+            echo "::endgroup::"
+          else
+            tail -60 /tmp/mobile-workbench-server-test.log || true
           fi
           exit "$status"
