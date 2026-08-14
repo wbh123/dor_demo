@@ -31,9 +31,9 @@ jobs:
         working-directory: private-repo
         run: npm install --prefix app --no-audit --no-fund
 
-      - name: Verify device and shell policy
+      - name: Verify device shell and tablet navigation policy
         working-directory: private-repo/app
-        run: node --experimental-strip-types --test src/platform/device-form-factor.spec.ts src/platform/orientation-policy.spec.ts src/platform/device-runtime.spec.ts src/platform/tablet-shell-layout.spec.ts
+        run: node --experimental-strip-types --test src/platform/device-form-factor.spec.ts src/platform/orientation-policy.spec.ts src/platform/device-runtime.spec.ts src/platform/tablet-shell-layout.spec.ts src/platform/tablet-navigation.spec.ts
 
       - name: Verify mobile TypeScript
         working-directory: private-repo
