@@ -21,7 +21,7 @@ jobs:
   verify-private-ref:
     name: Verify private integration ref
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - name: Resolve private branch name
         id: target
@@ -66,6 +66,14 @@ jobs:
           node-version: '22'
           cache: npm
           cache-dependency-path: private-repo/frontend/package-lock.json
+
+      - name: Verify mobile Android bootstrap contract
+        working-directory: private-repo/app
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install
+          npm test
 
       - name: Verify private contracts
         working-directory: private-repo
