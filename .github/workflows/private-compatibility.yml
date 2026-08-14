@@ -1,25 +1,20 @@
-name: Private Compatibility CI
+name: Android Capacitor Compatibility CI
 
 on:
   push:
     branches:
       - 'private-compat/**'
-  pull_request:
-    branches:
-      - main
-    paths:
-      - '.private-compat-trigger'
 
 permissions:
   contents: read
 
 concurrency:
-  group: private-compat-${{ github.ref }}
+  group: android-private-compat-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  verify-private-ref:
-    name: Verify private integration ref
+  android-debug:
+    name: Android v1 debug build
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -28,14 +23,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          candidate="${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}"
-          private_ref="${candidate#private-compat/}"
-          if [[ -z "$private_ref" || "$private_ref" == "$candidate" ]]; then
+          private_ref="${GITHUB_REF_NAME#private-compat/}"
+          if [[ -z "$private_ref" || "$private_ref" == "$GITHUB_REF_NAME" ]]; then
             echo "Invalid compatibility branch name" >&2
-            exit 1
-          fi
-          if [[ ! "$private_ref" =~ ^[A-Za-z0-9._/-]+$ ]]; then
-            echo "Unsupported private ref characters" >&2
             exit 1
           fi
           echo "private_ref=$private_ref" >> "$GITHUB_OUTPUT"
@@ -50,52 +40,54 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
 
-      - uses: actions/setup-python@v6
-        with:
-          python-version: '3.12'
-
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '21'
-          cache: maven
-          cache-dependency-path: private-repo/backend-java/pom.xml
 
       - uses: actions/setup-node@v6
         with:
           node-version: '22'
-          cache: npm
-          cache-dependency-path: private-repo/frontend/package-lock.json
 
-      - name: Verify mobile Android bootstrap contract
+      - name: Verify Vue mobile app
         working-directory: private-repo/app
         shell: bash
         run: |
           set -euo pipefail
           npm install
           npm test
+          npm run typecheck
+          npm run build
 
-      - name: Verify private contracts
+      - name: Generate Android debug project
+        working-directory: private-repo/app
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx cap add android
+          sed -i 's/minSdkVersion = 24/minSdkVersion = 26/' android/variables.gradle
+          npx cap sync android
+          grep -q "minSdkVersion = 26" android/variables.gradle
+          grep -q "compileSdkVersion = 36" android/variables.gradle
+          grep -q "targetSdkVersion = 36" android/variables.gradle
+
+      - name: Verify no Google service runtime dependencies
         working-directory: private-repo
         shell: bash
         run: |
           set -euo pipefail
-          python scripts/ci/test_runtime_error_data_correctness_batch.py
-          bash scripts/ci/run_contracts.sh
+          bash scripts/ci/check_android_no_google.sh
+          cd app/android
+          ./gradlew :app:dependencies --configuration debugRuntimeClasspath > ../android-debug-runtime-dependencies.txt
+          if grep -EHi 'com\.google\.(firebase|android\.gms|mlkit)|firebase-|play-services-|mlkit' ../android-debug-runtime-dependencies.txt; then
+            echo 'Forbidden Google/Firebase runtime dependency detected' >&2
+            exit 1
+          fi
 
-      - name: Verify private Java modules
-        working-directory: private-repo/backend-java
+      - name: Assemble Android Debug APK
+        working-directory: private-repo/app/android
         shell: bash
         run: |
           set -euo pipefail
-          mvn -B -ntp clean verify
-
-      - name: Verify private frontend
-        working-directory: private-repo
-        shell: bash
-        env:
-          VITE_INSTITUTION_NAME: Example University
-          VITE_CAMPUS_NAME: Example Campus
-        run: |
-          set -euo pipefail
-          bash scripts/ci/run_frontend.sh
+          ./gradlew lintDebug assembleDebug
+          test -f app/build/outputs/apk/debug/app-debug.apk
