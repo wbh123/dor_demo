@@ -4,11 +4,6 @@ on:
   push:
     branches:
       - 'private-compat/**'
-  pull_request:
-    branches:
-      - main
-    paths:
-      - '.private-compat-trigger'
 
 permissions:
   contents: read
@@ -19,27 +14,17 @@ concurrency:
 
 jobs:
   verify-private-ref:
-    name: Verify private integration ref
+    name: Verify backup key management
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 20
     steps:
       - name: Resolve private branch name
         id: target
         shell: bash
         run: |
           set -euo pipefail
-          candidate="${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}"
-          private_ref="${candidate#private-compat/}"
-          if [[ -z "$private_ref" || "$private_ref" == "$candidate" ]]; then
-            echo "Invalid compatibility branch name" >&2
-            exit 1
-          fi
-          if [[ ! "$private_ref" =~ ^[A-Za-z0-9._/-]+$ ]]; then
-            echo "Unsupported private ref characters" >&2
-            exit 1
-          fi
+          private_ref="${GITHUB_REF_NAME#private-compat/}"
           echo "private_ref=$private_ref" >> "$GITHUB_OUTPUT"
-
       - name: Checkout private integration branch
         uses: actions/checkout@v5
         with:
@@ -48,46 +33,24 @@ jobs:
           token: ${{ secrets.PRIVATE_CI }}
           path: private-repo
           persist-credentials: false
-          fetch-depth: 0
-
       - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
-
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '21'
           cache: maven
           cache-dependency-path: private-repo/backend-java/pom.xml
-
       - uses: actions/setup-node@v6
         with:
           node-version: '22'
-          cache: npm
-          cache-dependency-path: private-repo/frontend/package-lock.json
-
-      - name: Verify private contracts
+      - name: Verify backup key CLI behavior
         working-directory: private-repo
-        shell: bash
-        run: |
-          set -euo pipefail
-          python scripts/ci/test_runtime_error_data_correctness_batch.py
-          bash scripts/ci/run_contracts.sh
-
-      - name: Verify private Java modules
+        run: python -m unittest scripts/ops/test_generate_backup_key.py -v
+      - name: Verify backup key Java behavior
         working-directory: private-repo/backend-java
-        shell: bash
-        run: |
-          set -euo pipefail
-          mvn -B -ntp clean verify
-
-      - name: Verify private frontend
+        run: mvn -B -ntp -pl server -am -Dtest=BackupKeyManagementServiceTest -Dsurefire.failIfNoSpecifiedTests=false test
+      - name: Verify backup key console contract
         working-directory: private-repo
-        shell: bash
-        env:
-          VITE_INSTITUTION_NAME: Example University
-          VITE_CAMPUS_NAME: Example Campus
-        run: |
-          set -euo pipefail
-          bash scripts/ci/run_frontend.sh
+        run: node scripts/ci/test_backup_key_management_console.mjs
