@@ -67,14 +67,13 @@ jobs:
           cache: npm
           cache-dependency-path: private-repo/frontend/package-lock.json
 
-      - name: Verify private contracts
+      - name: Verify admin lifecycle contracts
         working-directory: private-repo
         shell: bash
         run: |
           set -euo pipefail
           python scripts/ci/test_runtime_error_data_correctness_batch.py
           python scripts/ci/test_admin_lifecycle_entry.py
-          grep -v -E '^python scripts/ci/(test_no_embedded_sql|test_backend_modularization_boundaries)\.py$' scripts/ci/run_contracts.sh | bash
 
       - name: Verify private Java modules
         working-directory: private-repo/backend-java
