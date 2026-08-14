@@ -50,7 +50,7 @@ jobs:
         run: python -m unittest scripts/ops/test_generate_backup_key.py -v
       - name: Verify backup key Java behavior
         working-directory: private-repo/backend-java
-        run: mvn -B -ntp -pl server -am -Dtest=BackupKeyManagementServiceTest -Dsurefire.failIfNoSpecifiedTests=false test
+        run: mvn -B -ntp -pl server -am -Dtest=BackupKeyManagementServiceTest,PythonBackupRecoveryCliGatewayTest -Dsurefire.failIfNoSpecifiedTests=false test
       - name: Verify backup key console contract
         working-directory: private-repo
         run: node scripts/ci/test_backup_key_management_console.mjs
