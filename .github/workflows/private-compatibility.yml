@@ -67,13 +67,60 @@ jobs:
           cache: npm
           cache-dependency-path: private-repo/frontend/package-lock.json
 
-      - name: Verify private contracts
+      - name: Contract 01 campus management
+        working-directory: private-repo
+        run: python scripts/subscription/test_campus_management_contract.py
+
+      - name: Contract 02 building card density
+        working-directory: private-repo
+        run: python scripts/frontend/test_building_card_density_campus_filter.py
+
+      - name: Contract 03 single bed layout sync
+        working-directory: private-repo
+        run: python scripts/ci/test_single_bed_room_layout_dependency_sync.py
+
+      - name: Contract 04 notification structured action
+        working-directory: private-repo
+        run: python scripts/frontend/test_notification_structured_action_contract.py
+
+      - name: Contract 05 notification token translation
+        working-directory: private-repo
+        run: python scripts/frontend/test_notification_token_translation_contract.py
+
+      - name: Contract 06 feature authorization closure
+        working-directory: private-repo
+        run: python scripts/subscription/test_feature_authorization_closure.py
+
+      - name: Contract 07 feature code references
+        working-directory: private-repo
+        run: python scripts/subscription/test_feature_code_references.py
+
+      - name: Contract 08 feature catalog alignment
+        working-directory: private-repo
+        run: python scripts/subscription/test_feature_catalog_runtime_alignment.py
+
+      - name: Contract 09 runtime data correctness
+        working-directory: private-repo
+        run: python scripts/ci/test_runtime_error_data_correctness_batch.py
+
+      - name: Contract 10 backend service convergence
+        working-directory: private-repo
+        run: python scripts/ci/test_backend_small_service_convergence.py
+
+      - name: Contract 11 team service convergence
+        working-directory: private-repo
+        run: python scripts/ci/test_student_team_service_convergence.py
+
+      - name: Contract 12 OpenAPI controller split D1
+        working-directory: private-repo
+        run: python scripts/ci/test_openapi_controller_split_d1.py
+
+      - name: Contract remaining suite
         working-directory: private-repo
         shell: bash
         run: |
           set -euo pipefail
-          python scripts/ci/test_runtime_error_data_correctness_batch.py
-          bash scripts/ci/run_contracts.sh
+          tail -n +13 scripts/ci/run_contracts.sh | bash
 
       - name: Verify private Java modules
         working-directory: private-repo/backend-java
