@@ -1,0 +1,61 @@
+name: Mobile Room Detail Default Tab Verify
+
+on:
+  push:
+    branches:
+      - 'private-compat/fix/mobile-room-options-timeout-20260815'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout private integration branch
+        uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: integration/mobile-room-detail-default-tab-final-20260815
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: false
+          fetch-depth: 1
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Install mobile dependencies
+        working-directory: private-repo/app
+        run: npm install --no-audit --no-fund
+
+      - name: Run complete mobile tests
+        working-directory: private-repo/app
+        run: npm test
+
+      - name: Generate API types
+        working-directory: private-repo/app
+        run: npm run generate:api
+
+      - name: Typecheck
+        working-directory: private-repo/app
+        run: npm run typecheck
+
+      - name: Production build
+        working-directory: private-repo/app
+        run: npm run build
+
+      - name: Sync Capacitor Android
+        working-directory: private-repo/app
+        run: npx cap sync android
+
+      - name: Build Android debug APK
+        working-directory: private-repo/app/android
+        run: ./gradlew assembleDebug
