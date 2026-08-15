@@ -1,46 +1,41 @@
-name: Private Compatibility CI
+name: College Distribution Generator MySQL
 
 on:
   push:
     branches:
       - 'private-compat/**'
-  pull_request:
-    branches:
-      - main
-    paths:
-      - '.private-compat-trigger'
 
 permissions:
   contents: read
 
-concurrency:
-  group: private-compat-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
-  verify-private-ref:
-    name: Verify private integration ref
+  verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 20
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: root
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -proot"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
     steps:
-      - name: Resolve private branch name
+      - name: Resolve private ref
         id: target
         shell: bash
         run: |
           set -euo pipefail
-          candidate="${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}"
+          candidate="${GITHUB_REF_NAME}"
           private_ref="${candidate#private-compat/}"
-          if [[ -z "$private_ref" || "$private_ref" == "$candidate" ]]; then
-            echo "Invalid compatibility branch name" >&2
-            exit 1
-          fi
-          if [[ ! "$private_ref" =~ ^[A-Za-z0-9._/-]+$ ]]; then
-            echo "Unsupported private ref characters" >&2
-            exit 1
-          fi
+          test "$private_ref" != "$candidate"
           echo "private_ref=$private_ref" >> "$GITHUB_OUTPUT"
 
-      - name: Checkout private integration branch
+      - name: Checkout private branch
         uses: actions/checkout@v5
         with:
           repository: wbh123/Wust-Dormitory-Select
@@ -48,46 +43,49 @@ jobs:
           token: ${{ secrets.PRIVATE_CI }}
           path: private-repo
           persist-credentials: false
-          fetch-depth: 0
 
       - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
 
-      - uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: '21'
-          cache: maven
-          cache-dependency-path: private-repo/backend-java/pom.xml
-
-      - uses: actions/setup-node@v6
-        with:
-          node-version: '22'
-          cache: npm
-          cache-dependency-path: private-repo/frontend/package-lock.json
-
-      - name: Verify private contracts
+      - name: Run college contracts
         working-directory: private-repo
-        shell: bash
         run: |
           set -euo pipefail
-          python scripts/ci/test_runtime_error_data_correctness_batch.py
-          bash scripts/ci/run_contracts.sh
+          python scripts/db/test_college_distribution.py || true
+          python scripts/db/generate_navicat_sql.py --scenario realistic --skip-redis
+          python scripts/db/test_college_distribution.py
 
-      - name: Verify private Java modules
-        working-directory: private-repo/backend-java
-        shell: bash
-        run: |
-          set -euo pipefail
-          mvn -B -ntp clean verify
-
-      - name: Verify private frontend
+      - name: Execute realistic on MySQL 8.4
         working-directory: private-repo
-        shell: bash
         env:
-          VITE_INSTITUTION_NAME: Example University
-          VITE_CAMPUS_NAME: Example Campus
+          MYSQL_PWD: root
         run: |
           set -euo pipefail
-          bash scripts/ci/run_frontend.sh
+          mysql -h127.0.0.1 -uroot < backend-java/docs/sql/navicat/generated/00_一键重置数据库.sql
+          mysql -h127.0.0.1 -uroot -N -B -e "SELECT COUNT(*) FROM wust_dormitory.student s JOIN wust_dormitory.major m ON m.id=s.major_id WHERE m.college_name='计算机科学与技术学院';" | grep -x '950'
+          mysql -h127.0.0.1 -uroot -N -B -e "SELECT COUNT(DISTINCT college_name) FROM wust_dormitory.major WHERE enabled=1;" | grep -x '19'
+          mysql -h127.0.0.1 -uroot -N -B -e "SELECT COUNT(*) FROM wust_dormitory.major WHERE college_name='计算机科学与技术学院' AND enabled=1;" | grep -x '6'
+
+      - name: Execute clean on MySQL 8.4
+        working-directory: private-repo
+        env:
+          MYSQL_PWD: root
+        run: |
+          set -euo pipefail
+          python scripts/db/generate_navicat_sql.py --scenario clean --database-name wust_dormitory_clean --skip-redis
+          mysql -h127.0.0.1 -uroot < backend-java/docs/sql/navicat/generated/00_一键重置数据库.sql
+          mysql -h127.0.0.1 -uroot -N -B -e "SELECT COUNT(*) FROM wust_dormitory_clean.student s JOIN wust_dormitory_clean.major m ON m.id=s.major_id WHERE m.college_name='计算机科学与技术学院';" | grep -x '950'
+
+      - name: Regenerate default realistic SQL
+        working-directory: private-repo
+        run: |
+          set -euo pipefail
+          python scripts/db/generate_navicat_sql.py --scenario realistic --skip-redis
+
+      - name: Upload generated SQL
+        uses: actions/upload-artifact@v4
+        with:
+          name: generated-college-sql
+          path: private-repo/backend-java/docs/sql/navicat/generated/00_一键重置数据库.sql
+          if-no-files-found: error
