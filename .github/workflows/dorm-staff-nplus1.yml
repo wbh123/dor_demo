@@ -17,7 +17,7 @@ jobs:
         uses: actions/checkout@v5
         with:
           repository: wbh123/Wust-Dormitory-Select
-          ref: fix/dorm-staff-dashboard-room-options-nplus1-20260815
+          ref: fix/dorm-staff-nplus1-latest-20260815
           token: ${{ secrets.PRIVATE_CI }}
           path: private-repo
           persist-credentials: false
