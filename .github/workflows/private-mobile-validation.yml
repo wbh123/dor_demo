@@ -9,75 +9,21 @@ permissions:
   contents: read
 
 jobs:
-  baseline-main:
+  validate-red:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
         with:
           repository: wbh123/Wust-Dormitory-Select
-          ref: b3d962e2764072e712aa5a81736d5cbee5a75e82
-          token: ${{ secrets.PRIVATE_CI }}
-          path: baseline-repo
-          persist-credentials: false
-          fetch-depth: 1
-      - uses: actions/setup-node@v6
-        with:
-          node-version: '22'
-      - name: Install baseline dependencies
-        working-directory: baseline-repo/app
-        run: npm install
-      - name: Run baseline native scanner contract
-        working-directory: baseline-repo/app
-        run: node --experimental-strip-types --test src/platform/native-scanner-contract.spec.ts
-
-  validate-mobile:
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v5
-        with:
-          repository: wbh123/Wust-Dormitory-Select
-          ref: fix/mobile-scanner-preview-layout-20260815
+          ref: feat/app-version-label-selector-20260815
           token: ${{ secrets.PRIVATE_CI }}
           path: private-repo
           persist-credentials: false
           fetch-depth: 1
-
-      - uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: '21'
-
       - uses: actions/setup-node@v6
         with:
           node-version: '22'
-
-      - name: Install mobile dependencies
+      - name: Run natural resource sort red test
         working-directory: private-repo/app
-        run: npm install
-
-      - name: Validate native scanner contract
-        working-directory: private-repo/app
-        run: node --experimental-strip-types --test src/platform/native-scanner-contract.spec.ts
-
-      - name: Observe full mobile tests
-        continue-on-error: true
-        working-directory: private-repo/app
-        run: npm test
-
-      - name: Run mobile typecheck
-        working-directory: private-repo/app
-        run: npm run typecheck
-
-      - name: Build mobile web assets
-        working-directory: private-repo/app
-        run: npm run build
-
-      - name: Sync Capacitor Android
-        working-directory: private-repo/app
-        run: npx cap sync android
-
-      - name: Validate Android
-        working-directory: private-repo/app/android
-        run: ./gradlew testDebugUnitTest lintDebug assembleDebug
+        run: node --experimental-strip-types --test src/platform/natural-resource-sort.spec.ts
