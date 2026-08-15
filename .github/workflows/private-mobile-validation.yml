@@ -35,15 +35,25 @@ jobs:
         working-directory: private-repo/app
         run: npm install
 
-      - name: Validate label and scan contracts
+      - name: Validate resource label print layout
         working-directory: private-repo/app
-        run: >-
-          node --experimental-strip-types --test
-          src/platform/resource-label-print-layout.spec.ts
-          src/platform/resource-label.spec.ts
-          src/platform/label-scan-performance-contract.spec.ts
-          src/platform/native-scanner-contract.spec.ts
-          src/platform/action-overlay.spec.ts
+        run: node --experimental-strip-types --test src/platform/resource-label-print-layout.spec.ts
+
+      - name: Validate resource label parsing
+        working-directory: private-repo/app
+        run: node --experimental-strip-types --test src/platform/resource-label.spec.ts
+
+      - name: Validate label scan performance contract
+        working-directory: private-repo/app
+        run: node --experimental-strip-types --test src/platform/label-scan-performance-contract.spec.ts
+
+      - name: Validate native scanner contract
+        working-directory: private-repo/app
+        run: node --experimental-strip-types --test src/platform/native-scanner-contract.spec.ts
+
+      - name: Validate overlay contract
+        working-directory: private-repo/app
+        run: node --experimental-strip-types --test src/platform/action-overlay.spec.ts
 
       - name: Run full mobile tests
         working-directory: private-repo/app
