@@ -1,0 +1,30 @@
+name: Huangjiahu Generator Contract
+
+on:
+  push:
+    branches:
+      - 'private-compat/fix/huangjiahu-test-data-gender-20260815'
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout private branch
+        uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: fix/huangjiahu-test-data-gender-20260815
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: false
+          fetch-depth: 1
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Run Huangjiahu generator contract
+        working-directory: private-repo
+        run: python scripts/db/test_huangjiahu_dormitory_generation.py
