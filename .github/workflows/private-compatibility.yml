@@ -67,19 +67,12 @@ jobs:
           cache: npm
           cache-dependency-path: private-repo/frontend/package-lock.json
 
-      - name: Contracts 01-12
+      - name: Contracts 01-35
         working-directory: private-repo
         shell: bash
         run: |
           set -euo pipefail
-          grep '^python ' scripts/ci/run_contracts.sh | sed -n '1,12p' | bash
-
-      - name: Contracts 13-35
-        working-directory: private-repo
-        shell: bash
-        run: |
-          set -euo pipefail
-          grep '^python ' scripts/ci/run_contracts.sh | sed -n '13,35p' | bash
+          grep '^python ' scripts/ci/run_contracts.sh | sed -n '1,35p' | bash
 
       - name: Contracts 36-60
         working-directory: private-repo
@@ -95,26 +88,33 @@ jobs:
           set -euo pipefail
           grep '^python ' scripts/ci/run_contracts.sh | sed -n '61,85p' | bash
 
-      - name: Contracts 86-110
+      - name: Contracts 86-95
         working-directory: private-repo
         shell: bash
         run: |
           set -euo pipefail
-          grep '^python ' scripts/ci/run_contracts.sh | sed -n '86,110p' | bash
+          grep '^python ' scripts/ci/run_contracts.sh | sed -n '86,95p' | bash
 
-      - name: Contracts 111-135
+      - name: Contracts 96-105
         working-directory: private-repo
         shell: bash
         run: |
           set -euo pipefail
-          grep '^python ' scripts/ci/run_contracts.sh | sed -n '111,135p' | bash
+          grep '^python ' scripts/ci/run_contracts.sh | sed -n '96,105p' | bash
 
-      - name: Contracts 136-end
+      - name: Contracts 106-110
         working-directory: private-repo
         shell: bash
         run: |
           set -euo pipefail
-          grep '^python ' scripts/ci/run_contracts.sh | sed -n '136,$p' | bash
+          grep '^python ' scripts/ci/run_contracts.sh | sed -n '106,110p' | bash
+
+      - name: Contracts 111-end
+        working-directory: private-repo
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep '^python ' scripts/ci/run_contracts.sh | sed -n '111,$p' | bash
 
       - name: Verify private Java modules
         working-directory: private-repo/backend-java
