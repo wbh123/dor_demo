@@ -43,7 +43,7 @@ jobs:
         working-directory: private-repo/app
         run: node --experimental-strip-types --test src/platform/resource-label.spec.ts
 
-      - name: Validate label scan performance contract
+      - name: Validate bounded label queries
         working-directory: private-repo/app
         run: node --experimental-strip-types --test src/platform/label-scan-performance-contract.spec.ts
 
