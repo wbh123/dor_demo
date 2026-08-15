@@ -11,7 +11,19 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 35
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: root
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -proot"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
     steps:
       - name: Checkout private branch
         uses: actions/checkout@v5
@@ -27,3 +39,45 @@ jobs:
       - name: Run realistic parameterization contract
         working-directory: private-repo
         run: python scripts/db/test_realistic_parameterization.py
+      - name: Execute realistic scales on MySQL 8.4
+        working-directory: private-repo
+        env:
+          MYSQL_PWD: root
+        shell: bash
+        run: |
+          set -euo pipefail
+          run_case() {
+            local students="$1"
+            local database="$2"
+            local active="$3"
+            local room_assigned="$4"
+            local bed_assigned="$5"
+            local historical="$6"
+            local notifications="$7"
+            local college_count="$8"
+
+            python scripts/db/generate_navicat_sql.py \
+              --scenario realistic \
+              --students "$students" \
+              --database-name "$database" \
+              --seed 20260815 \
+              --skip-redis
+            mysql -h127.0.0.1 -uroot < backend-java/docs/sql/navicat/generated/00_一键重置数据库.sql
+
+            test "$(mysql -h127.0.0.1 -uroot -N -B -e "SELECT COUNT(*) FROM ${database}.student")" = "$students"
+            test "$(mysql -h127.0.0.1 -uroot -N -B -e "SELECT COUNT(*) FROM ${database}.room_assignment WHERE assignment_status='ACTIVE'")" = "$active"
+            test "$(mysql -h127.0.0.1 -uroot -N -B -e "SELECT COUNT(*) FROM ${database}.room_assignment WHERE assignment_status='ACTIVE' AND bed_id IS NULL")" = "$room_assigned"
+            test "$(mysql -h127.0.0.1 -uroot -N -B -e "SELECT COUNT(*) FROM ${database}.bed_assignment WHERE assignment_status='ACTIVE'")" = "$bed_assigned"
+            test "$(mysql -h127.0.0.1 -uroot -N -B -e "SELECT COUNT(*) FROM ${database}.room_assignment WHERE assignment_status='ACTIVE' AND batch_id IS NULL")" = "$historical"
+            test "$(mysql -h127.0.0.1 -uroot -N -B -e "SELECT COUNT(*) FROM ${database}.student_notification")" = "$notifications"
+            test "$(mysql -h127.0.0.1 -uroot -N -B -e "SELECT COUNT(*) FROM ${database}.student s JOIN ${database}.major m ON m.id=s.major_id WHERE m.college_name='计算机科学与技术学院'")" = "$college_count"
+            test "$(mysql -h127.0.0.1 -uroot -N -B -e "SELECT COUNT(*) FROM ${database}.room_assignment ra JOIN ${database}.student s ON s.id=ra.student_id JOIN ${database}.room r ON r.id=ra.room_id WHERE r.gender_restriction<>s.gender")" = "0"
+            test "$(mysql -h127.0.0.1 -uroot -N -B -e "SELECT COUNT(*) FROM ${database}.dormitory_building")" = "30"
+            test "$(mysql -h127.0.0.1 -uroot -N -B -e "SELECT COUNT(*) FROM ${database}.bed")" = "35900"
+          }
+
+          run_case 1000 realistic_1000 840 160 120 560 300 950
+          run_case 5000 realistic_5000 4200 800 600 2800 1500 4750
+          run_case 10000 realistic_10000 8400 1600 1200 5600 3000 9500
+          # 30000 人已超过男女各半条件下 24640 人本科平衡入住容量，验证安全封顶。
+          run_case 30000 realistic_30000 24640 4688 3520 16432 9000 28500
