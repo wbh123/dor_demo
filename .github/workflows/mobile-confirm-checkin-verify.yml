@@ -1,0 +1,38 @@
+name: Mobile Confirm Checkin Verify
+
+on:
+  push:
+    branches:
+      - 'private-compat/perf/mobile-confirm-checkin-lightweight-20260815'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout private performance branch
+        uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: perf/mobile-confirm-checkin-lightweight-20260815
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: false
+          fetch-depth: 1
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: private-repo/backend-java/pom.xml
+
+      - name: Run focused mobile confirm/checkin tests
+        working-directory: private-repo/backend-java
+        run: >-
+          mvn -B -ntp -pl server -am test
+          -Dtest=MobileConfirmCheckinPerformanceTest,MobileBedConfirmationFacadeTest,MobileBedConfirmationDormStaffTest,MobileRoomSelectionBedAuditTest
+          -Dsurefire.failIfNoSpecifiedTests=false
