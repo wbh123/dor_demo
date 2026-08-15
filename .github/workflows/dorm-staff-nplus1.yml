@@ -44,3 +44,5 @@ jobs:
           git diff --cached --quiet && exit 0
           git commit -m 'fix: 宿管工作台批量过滤寝室授权范围'
           git push origin HEAD:fix/dorm-staff-nplus1-latest-20260815
+
+# retry after matcher fix
