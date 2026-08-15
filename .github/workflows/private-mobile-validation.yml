@@ -9,9 +9,9 @@ permissions:
   contents: read
 
 jobs:
-  validate-red:
+  validate-feature:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v5
         with:
@@ -28,9 +28,36 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: '22'
-      - name: Validate natural resource sort
-        working-directory: private-repo/app
-        run: node --experimental-strip-types --test src/platform/natural-resource-sort.spec.ts
-      - name: Run APP release service red test
+      - name: Backend focused tests
         working-directory: private-repo/backend-java
-        run: mvn -pl server -am -Dtest=MobileAppReleaseServiceTest -Dsurefire.failIfNoSpecifiedTests=false test
+        run: mvn -pl server -am -Dtest=MobileAppReleaseServiceTest,MobileAppVersionControllerTest,ResourceLabelTargetServiceTest -Dsurefire.failIfNoSpecifiedTests=false test
+      - name: Install mobile dependencies
+        working-directory: private-repo/app
+        run: npm install
+      - name: Mobile version consistency
+        working-directory: private-repo/app
+        run: npm run version:check
+      - name: Mobile focused contracts
+        working-directory: private-repo/app
+        run: node --experimental-strip-types --test src/platform/natural-resource-sort.spec.ts src/platform/resource-label-print-layout.spec.ts src/platform/native-scanner-contract.spec.ts
+      - name: Mobile typecheck
+        working-directory: private-repo/app
+        run: npm run typecheck
+      - name: Mobile production build
+        working-directory: private-repo/app
+        run: npm run build
+      - name: Sync Capacitor Android
+        working-directory: private-repo/app
+        run: npx cap sync android
+      - name: Android validation
+        working-directory: private-repo/app/android
+        run: ./gradlew testDebugUnitTest lintDebug assembleDebug
+      - name: Install web dependencies
+        working-directory: private-repo/frontend
+        run: npm install
+      - name: Web typecheck
+        working-directory: private-repo/frontend
+        run: npm run typecheck
+      - name: Web production build
+        working-directory: private-repo/frontend
+        run: npm run build
