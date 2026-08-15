@@ -45,20 +45,8 @@ jobs:
           扫码页打开即启用摄像头并支持 torch 和手动输入
           EOF
           sort -u -o /tmp/allowed.txt /tmp/allowed.txt
-          echo '=== BASELINE FAILURES ==='
-          cat /tmp/failures.txt || true
           unknown=$(comm -23 /tmp/failures.txt /tmp/allowed.txt || true)
-          if [ -n "$unknown" ]; then
-            echo '基线出现新的未知失败：'
-            echo "$unknown"
-            tail -n 220 /tmp/baseline-mobile-tests.log
-            exit 1
-          fi
-          if [ "$status" -eq 0 ]; then
-            echo 'main 基线完整测试已自行恢复为全绿。'
-          else
-            echo 'main 仅包含已知既有失败，作为本次回归对照。'
-          fi
+          if [ -n "$unknown" ]; then echo "$unknown"; exit 1; fi
 
   validate-feature:
     runs-on: ubuntu-latest
@@ -82,14 +70,12 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: '22'
-
       - name: Backend focused tests
         working-directory: private-repo/backend-java
         run: mvn -pl server -am -Dtest=MobileAppReleaseServiceTest,MobileAppVersionControllerTest,MobileAppReleaseDownloadControllerTest,ResourceLabelTargetServiceTest -Dsurefire.failIfNoSpecifiedTests=false test
       - name: Backend compile package
         working-directory: private-repo/backend-java
         run: mvn -pl starter -am -DskipTests package
-
       - name: Install mobile dependencies
         working-directory: private-repo/app
         run: npm install --no-audit --no-fund
@@ -114,30 +100,14 @@ jobs:
           扫码页打开即启用摄像头并支持 torch 和手动输入
           EOF
           sort -u -o /tmp/allowed.txt /tmp/allowed.txt
-          echo '=== FEATURE FAILURES ==='
-          cat /tmp/failures.txt || true
           unknown=$(comm -23 /tmp/failures.txt /tmp/allowed.txt || true)
-          if [ -n "$unknown" ]; then
-            echo '本分支引入新的移动端测试失败：'
-            echo "$unknown"
-            tail -n 260 /tmp/mobile-tests.log
-            exit 1
-          fi
-          if [ "$status" -eq 0 ]; then
-            echo '移动端完整测试全绿。'
-          else
-            echo '移动端完整测试仅保留 main 已知既有失败，本分支无新增失败。'
-          fi
+          if [ -n "$unknown" ]; then echo "$unknown"; tail -n 260 /tmp/mobile-tests.log; exit 1; fi
       - name: Mobile version consistency
         working-directory: private-repo/app
         run: npm run version:check
       - name: Mobile version bump guard
-        working-directory: private-repo
-        shell: bash
-        run: |
-          git fetch --no-tags origin main:refs/remotes/origin/main
-          cd app
-          node scripts/check-version-bump.mjs origin/main
+        working-directory: private-repo/app
+        run: node scripts/check-version-bump.mjs origin/main
       - name: Mobile typecheck
         working-directory: private-repo/app
         run: npm run typecheck
@@ -150,7 +120,6 @@ jobs:
       - name: Android validation
         working-directory: private-repo/app/android
         run: ./gradlew testDebugUnitTest lintDebug assembleDebug
-
       - name: Install web dependencies
         working-directory: private-repo/frontend
         run: npm install --no-audit --no-fund
