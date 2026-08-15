@@ -24,6 +24,9 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: '22'
-      - name: Run natural resource sort red test
+      - name: Validate natural resource sort
         working-directory: private-repo/app
         run: node --experimental-strip-types --test src/platform/natural-resource-sort.spec.ts
+      - name: Validate scanner layout wait contract
+        working-directory: private-repo/app
+        run: node --experimental-strip-types --test src/platform/native-scanner-contract.spec.ts
