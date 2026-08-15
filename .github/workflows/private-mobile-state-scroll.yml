@@ -11,7 +11,7 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - name: Checkout private feature branch
         uses: actions/checkout@v5
@@ -24,6 +24,15 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: '22'
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: private-repo/backend-java/pom.xml
       - name: Run mobile state and scroll contract
         working-directory: private-repo/app
         run: node --experimental-strip-types --test src/platform/mobile-state-scroll-contract.spec.ts
+      - name: Run atomic onsite checkin contract
+        working-directory: private-repo/backend-java
+        run: mvn -pl server -am -Dtest=MobileSelectionOnsiteCheckinServiceTest -Dsurefire.failIfNoSpecifiedTests=false test
