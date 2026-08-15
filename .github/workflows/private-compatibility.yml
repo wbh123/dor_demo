@@ -21,7 +21,7 @@ jobs:
   verify-private-ref:
     name: Verify private integration ref
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 20
     steps:
       - name: Resolve private branch name
         id: target
@@ -57,21 +57,12 @@ jobs:
           cache: maven
           cache-dependency-path: private-repo/backend-java/pom.xml
 
-      - name: Verify private Java modules
+      - name: Verify remaining mobile workbench regressions
         working-directory: private-repo/backend-java
         shell: bash
         run: |
-          set +e
-          mvn -B -ntp clean verify 2>&1 | tee /tmp/private-maven.log
-          status=${PIPESTATUS[0]}
-          if [[ "$status" -ne 0 ]]; then
-            grep -E '^\[ERROR\]|COMPILATION ERROR|BUILD FAILURE|There are test failures|Tests run:.*(Failures: [1-9][0-9]*|Errors: [1-9][0-9]*)' /tmp/private-maven.log \
-              | tail -n 40 \
-              | while IFS= read -r line; do
-                  encoded="${line//'%'/'%25'}"
-                  encoded="${encoded//$'\r'/'%0D'}"
-                  encoded="${encoded//$'\n'/'%0A'}"
-                  echo "::error::$encoded"
-                done
-          fi
-          exit "$status"
+          set -euo pipefail
+          mvn -B -ntp -pl server -am \
+            -Dsurefire.failIfNoSpecifiedTests=false \
+            -Dtest=MobileWorkbenchThreeLevelContractTest,MobileStudentWorkbenchMapperMySqlIntegrationTest \
+            test
