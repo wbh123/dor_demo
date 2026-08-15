@@ -1,0 +1,102 @@
+name: Huangjiahu Generator MySQL
+
+on:
+  push:
+    branches:
+      - 'private-compat/fix/huangjiahu-test-data-gender-20260815'
+
+permissions:
+  contents: read
+
+jobs:
+  mysql-scenarios:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: root
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot --silent"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=30
+
+    steps:
+      - name: Checkout private branch
+        uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: fix/huangjiahu-test-data-gender-20260815
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: false
+          fetch-depth: 1
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Run generator contracts
+        working-directory: private-repo
+        run: |
+          set -euo pipefail
+          python scripts/db/test_huangjiahu_dormitory_generation.py
+          python scripts/db/test_generate_navicat_current_version.py
+
+      - name: Execute high-risk scenarios on MySQL 8.4
+        working-directory: private-repo
+        shell: bash
+        run: |
+          set -euo pipefail
+          mysql --version
+          output='backend-java/docs/sql/navicat/generated/00_一键重置数据库.sql'
+
+          run_scenario() {
+            local scenario="$1"
+            echo "===== SCENARIO: ${scenario} ====="
+            python scripts/db/generate_navicat_sql.py \
+              --database-name wust_dormitory_ci \
+              --scenario "${scenario}" \
+              --skip-redis
+            mysql --protocol=tcp -h127.0.0.1 -P3306 -uroot -proot \
+              --default-character-set=utf8mb4 < "${output}" > "/tmp/${scenario}.log"
+            grep -q 'GENERATED_DATA_SAFETY_OK' "/tmp/${scenario}.log"
+            grep -q 'NAVICAT_RESET_READY' "/tmp/${scenario}.log"
+            mysql --protocol=tcp -h127.0.0.1 -P3306 -uroot -proot -N -e "
+              SELECT CONCAT(
+                'buildings=',(SELECT COUNT(*) FROM wust_dormitory_ci.dormitory_building),
+                ',floors=',(SELECT COUNT(*) FROM wust_dormitory_ci.dormitory_floor),
+                ',rooms=',(SELECT COUNT(*) FROM wust_dormitory_ci.room),
+                ',beds=',(SELECT COUNT(*) FROM wust_dormitory_ci.bed),
+                ',gender_mismatch=',(
+                  SELECT COUNT(*)
+                  FROM wust_dormitory_ci.room_assignment ra
+                  JOIN wust_dormitory_ci.student s ON s.id=ra.student_id
+                  JOIN wust_dormitory_ci.room r ON r.id=ra.room_id
+                  WHERE r.gender_restriction<>s.gender
+                )
+              );"
+            test "$(mysql --protocol=tcp -h127.0.0.1 -P3306 -uroot -proot -N -e "
+              SELECT COUNT(*)
+              FROM wust_dormitory_ci.room_assignment ra
+              JOIN wust_dormitory_ci.student s ON s.id=ra.student_id
+              JOIN wust_dormitory_ci.room r ON r.id=ra.room_id
+              WHERE r.gender_restriction<>s.gender;")" = '0'
+            test "$(mysql --protocol=tcp -h127.0.0.1 -P3306 -uroot -proot -N -e "SELECT COUNT(*) FROM wust_dormitory_ci.dormitory_building;")" = '30'
+            test "$(mysql --protocol=tcp -h127.0.0.1 -P3306 -uroot -proot -N -e "SELECT COUNT(*) FROM wust_dormitory_ci.dormitory_floor;")" = '216'
+            test "$(mysql --protocol=tcp -h127.0.0.1 -P3306 -uroot -proot -N -e "SELECT COUNT(*) FROM wust_dormitory_ci.room;")" = '8900'
+            test "$(mysql --protocol=tcp -h127.0.0.1 -P3306 -uroot -proot -N -e "SELECT COUNT(*) FROM wust_dormitory_ci.bed;")" = '35900'
+          }
+
+          run_scenario realistic
+          run_scenario waitlist_exchange
+          run_scenario mixed_extreme
+          run_scenario historical_multi_year
+          run_scenario recovery_after_assignment
+          run_scenario redis_loss_recovery
+          run_scenario near_capacity
+          run_scenario full_capacity
