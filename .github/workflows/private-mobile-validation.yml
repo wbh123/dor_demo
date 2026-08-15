@@ -11,22 +11,26 @@ permissions:
 jobs:
   validate-red:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
         with:
           repository: wbh123/Wust-Dormitory-Select
-          ref: feat/app-version-label-selector-20260815
+          ref: feat/app-version-label-selector-v2-20260815
           token: ${{ secrets.PRIVATE_CI }}
           path: private-repo
           persist-credentials: false
           fetch-depth: 1
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
       - uses: actions/setup-node@v6
         with:
           node-version: '22'
       - name: Validate natural resource sort
         working-directory: private-repo/app
         run: node --experimental-strip-types --test src/platform/natural-resource-sort.spec.ts
-      - name: Validate scanner layout wait contract
-        working-directory: private-repo/app
-        run: node --experimental-strip-types --test src/platform/native-scanner-contract.spec.ts
+      - name: Run APP release service red test
+        working-directory: private-repo/backend-java
+        run: mvn -pl server -am -Dtest=MobileAppReleaseServiceTest -Dsurefire.failIfNoSpecifiedTests=false test
