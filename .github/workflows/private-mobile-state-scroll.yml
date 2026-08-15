@@ -43,9 +43,23 @@ jobs:
       - name: Install mobile dependencies
         working-directory: private-repo/app
         run: npm install
-      - name: Run full mobile tests
+      - name: Run full mobile tests with captured diagnostics
+        id: mobile_tests
         working-directory: private-repo/app
-        run: npm test
+        shell: bash
+        run: |
+          set +e
+          npm test 2>&1 | tee mobile-test.log
+          code=${PIPESTATUS[0]}
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          exit 0
+      - name: Upload mobile test diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: merged-main-mobile-test-log
+          path: private-repo/app/mobile-test.log
+          if-no-files-found: error
       - name: Type check mobile app
         working-directory: private-repo/app
         run: npx vue-tsc -b
@@ -64,3 +78,6 @@ jobs:
       - name: Run full backend Maven verification
         working-directory: private-repo/backend-java
         run: mvn -B -ntp clean verify
+      - name: Enforce full mobile test result
+        if: always()
+        run: test "${{ steps.mobile_tests.outputs.exit_code }}" = "0"
