@@ -33,7 +33,7 @@ jobs:
       - name: Run selection queue contract
         working-directory: private-repo/app
         run: node --experimental-strip-types --test src/platform/residency-workbench.spec.ts
-      - name: Run mobile checkin contracts
+      - name: Run mobile state, checkin and native overscroll contracts
         if: always()
         working-directory: private-repo/app
         run: |
