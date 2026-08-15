@@ -1,0 +1,31 @@
+name: Private Mobile Update Contract
+
+on:
+  push:
+    branches:
+      - 'private-compat/feat/mobile-app-update-flow-20260815'
+
+permissions:
+  contents: read
+
+jobs:
+  verify-update-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: feat/mobile-app-update-flow-20260815
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+      - name: Install mobile dependencies
+        working-directory: private-repo/app
+        run: npm install --ignore-scripts
+      - name: Run update flow contract
+        working-directory: private-repo/app
+        run: node --experimental-strip-types --test src/platform/app-update-flow.spec.ts
