@@ -1,0 +1,38 @@
+name: Mobile Workspace P0 Verify
+
+on:
+  push:
+    branches:
+      - 'private-compat/perf/mobile-workspace-p0-20260815'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout private performance branch
+        uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: perf/mobile-workspace-p0-20260815
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: false
+          fetch-depth: 1
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: private-repo/backend-java/pom.xml
+
+      - name: Run P0 mobile performance regressions and MySQL 8.4 checks
+        working-directory: private-repo/backend-java
+        run: >-
+          mvn -B -ntp -pl server -am test
+          -Dtest=MobileWorkspaceP0PerformanceTest,MobileWorkspaceP0MySqlIntegrationTest,MobileWorkspaceFacadeTest,MobileWorkspaceControllerTest,MobileBedConfirmationFacadeTest,MobileConfirmCheckinPerformanceTest,MybatisMapperXmlTest
+          -Dsurefire.failIfNoSpecifiedTests=false
