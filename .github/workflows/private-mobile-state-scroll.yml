@@ -30,9 +30,10 @@ jobs:
           java-version: '21'
           cache: maven
           cache-dependency-path: private-repo/backend-java/pom.xml
-      - name: Run mobile state and scroll contract
-        working-directory: private-repo/app
-        run: node --experimental-strip-types --test src/platform/mobile-state-scroll-contract.spec.ts
       - name: Run atomic onsite checkin contract
         working-directory: private-repo/backend-java
         run: mvn -pl server -am -Dtest=MobileSelectionOnsiteCheckinServiceTest -Dsurefire.failIfNoSpecifiedTests=false test
+      - name: Run mobile state and scroll contract
+        if: always()
+        working-directory: private-repo/app
+        run: node --experimental-strip-types --test src/platform/mobile-state-scroll-contract.spec.ts
