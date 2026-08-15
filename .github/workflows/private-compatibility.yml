@@ -67,26 +67,20 @@ jobs:
           cache: npm
           cache-dependency-path: private-repo/frontend/package-lock.json
 
-      - name: Contracts 01-125
+      - name: Contracts 01-140
         working-directory: private-repo
         shell: bash
         run: |
           set -euo pipefail
-          grep '^python ' scripts/ci/run_contracts.sh | sed -n '1,125p' | bash
+          grep '^python ' scripts/ci/run_contracts.sh | sed -n '1,140p' | bash
 
-      - name: Contracts 126-140
+      - name: Contract 141 reset admin relationships
         working-directory: private-repo
-        shell: bash
-        run: |
-          set -euo pipefail
-          grep '^python ' scripts/ci/run_contracts.sh | sed -n '126,140p' | bash
+        run: python scripts/db/test_reset_admin_relationships.py
 
-      - name: Contracts 141-end
+      - name: Contract 142 huangjiahu dormitory generation
         working-directory: private-repo
-        shell: bash
-        run: |
-          set -euo pipefail
-          grep '^python ' scripts/ci/run_contracts.sh | sed -n '141,$p' | bash
+        run: python scripts/db/test_huangjiahu_dormitory_generation.py
 
       - name: Verify private Java modules
         working-directory: private-repo/backend-java
