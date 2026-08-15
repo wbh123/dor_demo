@@ -11,7 +11,7 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - name: Checkout private feature branch
         uses: actions/checkout@v5
@@ -21,6 +21,7 @@ jobs:
           token: ${{ secrets.PRIVATE_CI }}
           path: private-repo
           persist-credentials: false
+          fetch-depth: 0
       - uses: actions/setup-node@v6
         with:
           node-version: '22'
@@ -30,23 +31,34 @@ jobs:
           java-version: '21'
           cache: maven
           cache-dependency-path: private-repo/backend-java/pom.xml
-      - name: Run selection queue contract
-        working-directory: private-repo/app
-        run: node --experimental-strip-types --test src/platform/residency-workbench.spec.ts
-      - name: Run mobile state, checkin and native overscroll contracts
+      - name: Run focused mobile contracts
         working-directory: private-repo/app
         run: |
+          node --experimental-strip-types --test src/platform/residency-workbench.spec.ts
           node --experimental-strip-types --test src/platform/mobile-state-scroll-contract.spec.ts
           node --experimental-strip-types --test src/platform/checkin-bed-workflow.spec.ts
       - name: Install mobile dependencies
         working-directory: private-repo/app
         run: npm install
+      - name: Run full mobile test diagnostics
+        continue-on-error: true
+        working-directory: private-repo/app
+        run: npm test
       - name: Type check mobile app
         working-directory: private-repo/app
         run: npx vue-tsc -b
       - name: Build mobile app
         working-directory: private-repo/app
         run: npm run build
-      - name: Run atomic onsite checkin tests
+      - name: Sync Capacitor Android
+        working-directory: private-repo/app
+        run: npx cap sync android
+      - name: Verify Android Gradle build
+        working-directory: private-repo/app/android
+        run: |
+          chmod +x ./gradlew
+          ./gradlew testDebugUnitTest lintDebug assembleDebug
+          test -f app/build/outputs/apk/debug/app-debug.apk
+      - name: Run full backend Maven verification
         working-directory: private-repo/backend-java
-        run: mvn -pl server -am -Dtest=MobileSelectionOnsiteCheckinServiceTest,MobileRoomSelectionBedAuditTest -Dsurefire.failIfNoSpecifiedTests=false test
+        run: mvn -B -ntp clean verify
