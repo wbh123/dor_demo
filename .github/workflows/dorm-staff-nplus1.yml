@@ -13,6 +13,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
+      - name: Checkout compatibility helpers
+        uses: actions/checkout@v5
+        with:
+          path: ci-repo
       - name: Checkout private branch
         uses: actions/checkout@v5
         with:
@@ -27,7 +31,7 @@ jobs:
           distribution: temurin
           java-version: '21'
       - name: Apply minimal batch-scope patch
-        run: python .github/scripts/patch_dorm_staff_nplus1.py
+        run: python ci-repo/.github/scripts/patch_dorm_staff_nplus1.py
       - name: Run focused regression test
         working-directory: private-repo
         run: mvn -f backend-java/pom.xml -pl server -am -Dtest=DormStaffWebControllerBatchScopeTest -Dsurefire.failIfNoSpecifiedTests=false test
