@@ -8,13 +8,16 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: private-print-template-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  verify:
+  backend:
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 30
     steps:
-      - name: Checkout private print template branch
-        uses: actions/checkout@v5
+      - uses: actions/checkout@v5
         with:
           repository: wbh123/Wust-Dormitory-Select
           ref: feat/mobile-print-template-main-20260815
@@ -22,26 +25,32 @@ jobs:
           path: private-repo
           persist-credentials: false
           fetch-depth: 0
-
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '21'
           cache: maven
           cache-dependency-path: private-repo/backend-java/pom.xml
-
-      - uses: actions/setup-node@v6
-        with:
-          node-version: '22'
-          cache: npm
-          cache-dependency-path: |
-            private-repo/frontend/package-lock.json
-            private-repo/app/package-lock.json
-
       - name: Verify Java modules
         working-directory: private-repo/backend-java
         run: mvn -B -ntp clean verify
 
+  frontend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: feat/mobile-print-template-main-20260815
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: private-repo/frontend/package-lock.json
       - name: Verify web frontend
         working-directory: private-repo
         env:
@@ -49,6 +58,22 @@ jobs:
           VITE_CAMPUS_NAME: Example Campus
         run: bash scripts/ci/run_frontend.sh
 
+  mobile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: feat/mobile-print-template-main-20260815
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: private-repo/app/package-lock.json
       - name: Verify mobile web app
         working-directory: private-repo/app
         run: |
@@ -56,6 +81,28 @@ jobs:
           npm test
           npm run build
 
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: feat/mobile-print-template-main-20260815
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: false
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: private-repo/app/package-lock.json
       - name: Verify Android debug build
         working-directory: private-repo/app
-        run: npm run android:build:debug
+        run: |
+          npm ci
+          npm run android:build:debug
