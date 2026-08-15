@@ -86,8 +86,20 @@ jobs:
         working-directory: private-repo/backend-java
         shell: bash
         run: |
-          set -euo pipefail
-          mvn -B -ntp clean verify
+          set +e
+          mvn -B -ntp clean verify 2>&1 | tee /tmp/private-maven.log
+          status=${PIPESTATUS[0]}
+          if [[ "$status" -ne 0 ]]; then
+            grep -E '^\[ERROR\]|COMPILATION ERROR|Tests run:.*(Failures|Errors)|BUILD FAILURE|There are test failures' /tmp/private-maven.log \
+              | tail -n 120 \
+              | while IFS= read -r line; do
+                  encoded="${line//'%'/'%25'}"
+                  encoded="${encoded//$'\r'/'%0D'}"
+                  encoded="${encoded//$'\n'/'%0A'}"
+                  echo "::error::$encoded"
+                done
+          fi
+          exit "$status"
 
       - name: Verify private frontend
         working-directory: private-repo
