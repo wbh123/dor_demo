@@ -30,20 +30,28 @@ jobs:
           java-version: '21'
           cache: maven
           cache-dependency-path: private-repo/backend-java/pom.xml
+      - name: Run selection queue contract
+        working-directory: private-repo/app
+        run: node --experimental-strip-types --test src/platform/residency-workbench.spec.ts
       - name: Run mobile checkin contracts
+        if: always()
         working-directory: private-repo/app
         run: |
           node --experimental-strip-types --test src/platform/mobile-state-scroll-contract.spec.ts
           node --experimental-strip-types --test src/platform/checkin-bed-workflow.spec.ts
       - name: Install mobile dependencies
+        if: success()
         working-directory: private-repo/app
         run: npm install
       - name: Type check mobile app
+        if: success()
         working-directory: private-repo/app
         run: npx vue-tsc -b
       - name: Build mobile app
+        if: success()
         working-directory: private-repo/app
         run: npm run build
       - name: Run atomic onsite checkin test
+        if: always()
         working-directory: private-repo/backend-java
         run: mvn -pl server -am -Dtest=MobileSelectionOnsiteCheckinServiceTest -Dsurefire.failIfNoSpecifiedTests=false test
