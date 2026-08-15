@@ -86,3 +86,5 @@ jobs:
       - name: Build Android debug package
         working-directory: private-repo/app/android
         run: ./gradlew assembleDebug
+
+      # Triggered after updating the toast contract to the latest check-in wording.
