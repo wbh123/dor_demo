@@ -67,47 +67,32 @@ jobs:
           cache: npm
           cache-dependency-path: private-repo/frontend/package-lock.json
 
-      - name: Contracts 01-35
+      - name: Contracts 01-105
         working-directory: private-repo
         shell: bash
         run: |
           set -euo pipefail
-          grep '^python ' scripts/ci/run_contracts.sh | sed -n '1,35p' | bash
+          grep '^python ' scripts/ci/run_contracts.sh | sed -n '1,105p' | bash
 
-      - name: Contracts 36-60
+      - name: Contract 106 admin route and brand assets
         working-directory: private-repo
-        shell: bash
-        run: |
-          set -euo pipefail
-          grep '^python ' scripts/ci/run_contracts.sh | sed -n '36,60p' | bash
+        run: python scripts/ci/test_admin_route_render_and_brand_assets.py
 
-      - name: Contracts 61-85
+      - name: Contract 107 entitlement recommendation concurrency
         working-directory: private-repo
-        shell: bash
-        run: |
-          set -euo pipefail
-          grep '^python ' scripts/ci/run_contracts.sh | sed -n '61,85p' | bash
+        run: python scripts/ci/test_entitlement_recommendation_concurrency.py
 
-      - name: Contracts 86-95
+      - name: Contract 108 audit notification analytics
         working-directory: private-repo
-        shell: bash
-        run: |
-          set -euo pipefail
-          grep '^python ' scripts/ci/run_contracts.sh | sed -n '86,95p' | bash
+        run: python scripts/ci/test_audit_notification_analytics.py
 
-      - name: Contracts 96-105
+      - name: Contract 109 governance OpenAPI
         working-directory: private-repo
-        shell: bash
-        run: |
-          set -euo pipefail
-          grep '^python ' scripts/ci/run_contracts.sh | sed -n '96,105p' | bash
+        run: python scripts/ci/test_governance_openapi.py
 
-      - name: Contracts 106-110
+      - name: Contract 110 governance schema alignment
         working-directory: private-repo
-        shell: bash
-        run: |
-          set -euo pipefail
-          grep '^python ' scripts/ci/run_contracts.sh | sed -n '106,110p' | bash
+        run: python scripts/ci/test_governance_schema_alignment.py
 
       - name: Contracts 111-end
         working-directory: private-repo
