@@ -67,39 +67,26 @@ jobs:
           cache: npm
           cache-dependency-path: private-repo/frontend/package-lock.json
 
-      - name: Contracts 01-105
+      - name: Contracts 01-110
         working-directory: private-repo
         shell: bash
         run: |
           set -euo pipefail
-          grep '^python ' scripts/ci/run_contracts.sh | sed -n '1,105p' | bash
+          grep '^python ' scripts/ci/run_contracts.sh | sed -n '1,110p' | bash
 
-      - name: Contract 106 admin route and brand assets
-        working-directory: private-repo
-        run: python scripts/ci/test_admin_route_render_and_brand_assets.py
-
-      - name: Contract 107 entitlement recommendation concurrency
-        working-directory: private-repo
-        run: python scripts/ci/test_entitlement_recommendation_concurrency.py
-
-      - name: Contract 108 audit notification analytics
-        working-directory: private-repo
-        run: python scripts/ci/test_audit_notification_analytics.py
-
-      - name: Contract 109 governance OpenAPI
-        working-directory: private-repo
-        run: python scripts/ci/test_governance_openapi.py
-
-      - name: Contract 110 governance schema alignment
-        working-directory: private-repo
-        run: python scripts/ci/test_governance_schema_alignment.py
-
-      - name: Contracts 111-end
+      - name: Contracts 111-125
         working-directory: private-repo
         shell: bash
         run: |
           set -euo pipefail
-          grep '^python ' scripts/ci/run_contracts.sh | sed -n '111,$p' | bash
+          grep '^python ' scripts/ci/run_contracts.sh | sed -n '111,125p' | bash
+
+      - name: Contracts 126-end
+        working-directory: private-repo
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep '^python ' scripts/ci/run_contracts.sh | sed -n '126,$p' | bash
 
       - name: Verify private Java modules
         working-directory: private-repo/backend-java
