@@ -44,8 +44,6 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: '22'
-          cache: npm
-          cache-dependency-path: private-repo/app/package-lock.json
 
       - uses: actions/setup-java@v5
         with:
@@ -54,7 +52,7 @@ jobs:
 
       - name: Install mobile dependencies
         working-directory: private-repo/app
-        run: npm ci --no-audit --no-fund
+        run: npm install --no-audit --no-fund
 
       - name: Run complete mobile test suite
         working-directory: private-repo/app
