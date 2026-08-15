@@ -36,8 +36,25 @@ jobs:
         run: npm install
 
       - name: Run mobile tests
+        id: mobile_tests
+        continue-on-error: true
         working-directory: private-repo/app
-        run: npm test
+        shell: bash
+        run: |
+          set -o pipefail
+          npm test 2>&1 | tee mobile-test.log
+
+      - name: Upload mobile test log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobile-test-log
+          path: private-repo/app/mobile-test.log
+          if-no-files-found: error
+
+      - name: Fail on mobile test errors
+        if: steps.mobile_tests.outcome != 'success'
+        run: exit 1
 
       - name: Run mobile typecheck
         working-directory: private-repo/app
