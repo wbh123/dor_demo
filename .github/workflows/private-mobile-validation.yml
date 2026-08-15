@@ -9,6 +9,41 @@ permissions:
   contents: read
 
 jobs:
+  baseline-mobile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: main
+          token: ${{ secrets.PRIVATE_CI }}
+          path: baseline-repo
+          persist-credentials: false
+          fetch-depth: 1
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+      - name: Install baseline mobile dependencies
+        working-directory: baseline-repo/app
+        run: npm install --no-audit --no-fund
+      - name: Baseline mobile full tests
+        working-directory: baseline-repo/app
+        shell: bash
+        run: |
+          set +e
+          npm test > /tmp/baseline-mobile-tests.log 2>&1
+          status=$?
+          if [ "$status" -ne 0 ]; then
+            echo '=== BASELINE MOBILE TEST FAILURE SUMMARY ==='
+            grep -nE 'not ok|AssertionError|ERR_|# fail|error:' /tmp/baseline-mobile-tests.log | tail -n 160 || true
+            echo '=== BASELINE MOBILE TEST LOG TAIL ==='
+            tail -n 260 /tmp/baseline-mobile-tests.log
+          else
+            tail -n 40 /tmp/baseline-mobile-tests.log
+          fi
+          exit "$status"
+
   validate-feature:
     runs-on: ubuntu-latest
     timeout-minutes: 35
