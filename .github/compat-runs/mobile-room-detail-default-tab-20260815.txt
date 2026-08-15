@@ -1,0 +1,3 @@
+private_branch=fix/mobile-room-detail-default-tab-20260815
+private_sha=b2c7cb2a390142a85800a99698f83c2379cb58fe
+purpose=verify mobile room detail default tab behavior
