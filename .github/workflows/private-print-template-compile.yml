@@ -1,0 +1,61 @@
+name: Private Print Template Compile
+
+on:
+  push:
+    branches:
+      - 'private-compat/feat/mobile-print-template-main-20260815'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Checkout private print template branch
+        uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: feat/mobile-print-template-main-20260815
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: false
+          fetch-depth: 0
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: private-repo/backend-java/pom.xml
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            private-repo/frontend/package-lock.json
+            private-repo/app/package-lock.json
+
+      - name: Verify Java modules
+        working-directory: private-repo/backend-java
+        run: mvn -B -ntp clean verify
+
+      - name: Verify web frontend
+        working-directory: private-repo
+        env:
+          VITE_INSTITUTION_NAME: Example University
+          VITE_CAMPUS_NAME: Example Campus
+        run: bash scripts/ci/run_frontend.sh
+
+      - name: Verify mobile web app
+        working-directory: private-repo/app
+        run: |
+          npm ci
+          npm test
+          npm run build
+
+      - name: Verify Android debug build
+        working-directory: private-repo/app
+        run: npm run android:build:debug
