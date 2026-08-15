@@ -102,3 +102,5 @@ jobs:
         run: |
           set -euo pipefail
           npm run android:build:debug
+
+      # Re-run marker: 2026-08-15T11:00+08:00
