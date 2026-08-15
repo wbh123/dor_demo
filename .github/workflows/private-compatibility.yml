@@ -1,25 +1,20 @@
-name: Private Compatibility CI
+name: Private Mobile App Verification
 
 on:
   push:
     branches:
       - 'private-compat/**'
-  pull_request:
-    branches:
-      - main
-    paths:
-      - '.private-compat-trigger'
 
 permissions:
   contents: read
 
 concurrency:
-  group: private-compat-${{ github.ref }}
+  group: private-mobile-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  verify-private-ref:
-    name: Verify private integration ref
+  verify-mobile-app:
+    name: Verify private mobile app
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -28,14 +23,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          candidate="${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}"
+          candidate="${GITHUB_REF_NAME}"
           private_ref="${candidate#private-compat/}"
           if [[ -z "$private_ref" || "$private_ref" == "$candidate" ]]; then
             echo "Invalid compatibility branch name" >&2
-            exit 1
-          fi
-          if [[ ! "$private_ref" =~ ^[A-Za-z0-9._/-]+$ ]]; then
-            echo "Unsupported private ref characters" >&2
             exit 1
           fi
           echo "private_ref=$private_ref" >> "$GITHUB_OUTPUT"
@@ -50,44 +41,50 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
 
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-node@v6
         with:
-          python-version: '3.12'
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: private-repo/app/package-lock.json
 
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '21'
-          cache: maven
-          cache-dependency-path: private-repo/backend-java/pom.xml
 
-      - uses: actions/setup-node@v6
-        with:
-          node-version: '22'
-          cache: npm
-          cache-dependency-path: private-repo/frontend/package-lock.json
+      - name: Install mobile dependencies
+        working-directory: private-repo/app
+        run: npm ci --no-audit --no-fund
 
-      - name: Verify private contracts
-        working-directory: private-repo
+      - name: Run complete mobile test suite
+        working-directory: private-repo/app
+        run: npm test
+
+      - name: Generate mobile OpenAPI types
+        working-directory: private-repo/app
+        run: npm run generate:api
+
+      - name: Type-check mobile app
+        working-directory: private-repo/app
+        run: npm run typecheck
+
+      - name: Build mobile web assets
+        working-directory: private-repo/app
+        run: npm run build
+
+      - name: Verify school emblem bundle
+        working-directory: private-repo/app
         shell: bash
         run: |
           set -euo pipefail
-          python scripts/ci/test_runtime_error_data_correctness_batch.py
-          bash scripts/ci/run_contracts.sh
+          test -f dist/logo-only.png
+          test -s dist/logo-only.png
+          echo "verified dist/logo-only.png"
 
-      - name: Verify private Java modules
-        working-directory: private-repo/backend-java
-        shell: bash
-        run: |
-          set -euo pipefail
-          mvn -B -ntp clean verify
+      - name: Sync Capacitor Android project
+        working-directory: private-repo/app
+        run: npx cap sync android
 
-      - name: Verify private frontend
-        working-directory: private-repo
-        shell: bash
-        env:
-          VITE_INSTITUTION_NAME: Example University
-          VITE_CAMPUS_NAME: Example Campus
-        run: |
-          set -euo pipefail
-          bash scripts/ci/run_frontend.sh
+      - name: Build Android debug package
+        working-directory: private-repo/app/android
+        run: ./gradlew assembleDebug
