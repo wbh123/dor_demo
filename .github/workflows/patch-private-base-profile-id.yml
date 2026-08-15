@@ -1,0 +1,43 @@
+name: Patch Private Base Profile Id
+
+on:
+  push:
+    branches:
+      - 'private-compat/fix/huangjiahu-test-data-gender-20260815'
+
+permissions:
+  contents: read
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout private feature branch
+        uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: fix/huangjiahu-test-data-gender-20260815
+          token: ${{ secrets.PRIVATE_CI }}
+          persist-credentials: true
+          fetch-depth: 1
+      - name: Patch profile id lookup and push
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('backend-java/docs/sql/test-data/1000_students_base.sql')
+          text = path.read_text(encoding='utf-8')
+          old = "SET @dorm_staff_profile_id=LAST_INSERT_ID();"
+          new = """SET @dorm_staff_profile_id=(\n    SELECT id FROM admin_authorization_profile\n    WHERE user_id=@dorm_staff_id AND profile_name='宿管人员'\n    LIMIT 1\n);"""
+          if old not in text:
+              raise SystemExit('expected LAST_INSERT_ID pattern not found')
+          text = text.replace(old, new, 1)
+          path.write_text(text, encoding='utf-8', newline='\n')
+          PY
+          git config user.name 'WangBinghao'
+          git config user.email '2495680763@qq.com'
+          git add backend-java/docs/sql/test-data/1000_students_base.sql
+          git diff --cached --check
+          git commit -m 'fix: 正确获取宿管授权配置ID'
+          git push origin HEAD:fix/huangjiahu-test-data-gender-20260815
