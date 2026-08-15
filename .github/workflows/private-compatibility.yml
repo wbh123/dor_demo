@@ -16,7 +16,7 @@ jobs:
   verify-private-ref:
     name: Verify mobile auth scope and labels
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 45
     steps:
       - name: Resolve private branch name
         id: target
@@ -70,12 +70,40 @@ jobs:
           print('V49/V50 contracts OK')
           PY
 
+      - name: Compile private Java modules
+        working-directory: private-repo/backend-java
+        shell: bash
+        run: |
+          set -o pipefail
+          mvn -B -ntp -DskipTests package 2>&1 | tee ../../java-compile.log
+
+      - name: Run focused Java tests
+        working-directory: private-repo/backend-java
+        shell: bash
+        run: |
+          set -o pipefail
+          mvn -B -ntp -pl server -am test \
+            -Dtest=AdminAuthorizationServiceTest,AccountAdminGrantServiceTest,ResourceLabelCodeGeneratorTest \
+            -Dsurefire.failIfNoSpecifiedTests=false 2>&1 | tee ../../java-focused-tests.log
+
       - name: Verify private Java modules
         working-directory: private-repo/backend-java
         shell: bash
         run: |
-          set -euo pipefail
-          mvn -B -ntp clean verify
+          set -o pipefail
+          mvn -B -ntp clean verify 2>&1 | tee ../../java-full-verify.log
+
+      - name: Upload Java validation logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: java-validation-logs
+          path: |
+            java-compile.log
+            java-focused-tests.log
+            java-full-verify.log
+          if-no-files-found: ignore
+          retention-days: 2
 
       - name: Verify private frontend
         working-directory: private-repo
@@ -102,5 +130,3 @@ jobs:
         run: |
           set -euo pipefail
           npm run android:build:debug
-
-      # Re-run marker: 2026-08-15T11:00+08:00
