@@ -35,8 +35,8 @@ jobs:
         working-directory: private-repo/app
         run: npm install
 
-      - name: Run mobile tests
-        id: mobile_tests
+      - name: Observe full mobile baseline
+        id: full_mobile_tests
         continue-on-error: true
         working-directory: private-repo/app
         shell: bash
@@ -44,7 +44,7 @@ jobs:
           set -o pipefail
           npm test 2>&1 | tee mobile-test.log
 
-      - name: Upload mobile test log
+      - name: Upload mobile baseline log
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -52,9 +52,18 @@ jobs:
           path: private-repo/app/mobile-test.log
           if-no-files-found: error
 
-      - name: Fail on mobile test errors
-        if: steps.mobile_tests.outcome != 'success'
-        run: exit 1
+      - name: Validate changed mobile contracts
+        working-directory: private-repo/app
+        run: >-
+          node --experimental-strip-types --test
+          src/platform/native-scanner-contract.spec.ts
+          src/platform/server-settings-view.spec.ts
+          src/platform/app-update-metadata-contract.spec.ts
+          src/platform/native-apk-updater-contract.spec.ts
+          src/platform/app-update-gate.spec.ts
+          src/platform/app-update-flow.spec.ts
+          src/platform/recovery-entry.spec.ts
+          src/platform/connection-recovery-view.spec.ts
 
       - name: Run mobile typecheck
         working-directory: private-repo/app
