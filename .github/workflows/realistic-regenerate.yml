@@ -1,0 +1,40 @@
+name: Regenerate Realistic Default SQL
+
+on:
+  push:
+    branches:
+      - 'private-compat/feat/realistic-parameterized-scale-20260815'
+
+permissions:
+  contents: read
+
+jobs:
+  regenerate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout private branch
+        uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: feat/realistic-parameterized-scale-20260815
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: true
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Regenerate default realistic SQL
+        working-directory: private-repo
+        run: |
+          set -euo pipefail
+          python scripts/db/generate_navicat_sql.py --scenario realistic --students 1000 --seed 20260814 --skip-redis
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add backend-java/docs/sql/navicat/generated/00_一键重置数据库.sql
+          if git diff --cached --quiet; then
+            echo 'Generated SQL already current.'
+            exit 0
+          fi
+          git commit -m 'chore: regenerate parameterized realistic default sql'
+          git push origin HEAD:feat/realistic-parameterized-scale-20260815
