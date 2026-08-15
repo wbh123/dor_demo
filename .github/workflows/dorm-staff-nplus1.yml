@@ -1,0 +1,31 @@
+name: Dorm Staff N Plus One
+
+on:
+  push:
+    branches:
+      - 'private-compat/fix/dorm-staff-nplus1-20260815'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout private branch
+        uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: fix/dorm-staff-dashboard-room-options-nplus1-20260815
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: false
+      - name: Set up Java 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Run focused regression test
+        working-directory: private-repo
+        run: mvn -f backend-java/pom.xml -pl server -am -Dtest=DormStaffWebControllerBatchScopeTest -Dsurefire.failIfNoSpecifiedTests=false test
