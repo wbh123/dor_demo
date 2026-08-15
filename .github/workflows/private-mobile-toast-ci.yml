@@ -1,0 +1,57 @@
+name: Private Mobile Toast CI
+
+on:
+  push:
+    branches:
+      - 'private-compat/refactor/mobile-global-toast-20260815'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout private branch
+        uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: refactor/mobile-global-toast-20260815
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: false
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+
+      - name: Run mobile notice contract
+        working-directory: private-repo/app
+        run: node --experimental-strip-types --test src/platform/mobile-notice.spec.ts
+
+      - name: Install dependencies
+        if: success()
+        working-directory: private-repo/app
+        run: npm install --no-audit --no-fund
+
+      - name: Run mobile tests
+        if: success()
+        working-directory: private-repo/app
+        run: npm test
+
+      - name: Typecheck mobile app
+        if: success()
+        working-directory: private-repo/app
+        run: npm run generate:api && npm run typecheck
+
+      - name: Build mobile app
+        if: success()
+        working-directory: private-repo/app
+        run: npm run build
+
+      - name: Verify emblem is bundled
+        if: success()
+        working-directory: private-repo/app
+        run: test -f dist/logo-only.png
