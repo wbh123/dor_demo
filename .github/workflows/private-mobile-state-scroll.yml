@@ -51,7 +51,7 @@ jobs:
         if: success()
         working-directory: private-repo/app
         run: npm run build
-      - name: Run atomic onsite checkin test
+      - name: Run atomic onsite checkin tests
         if: always()
         working-directory: private-repo/backend-java
-        run: mvn -pl server -am -Dtest=MobileSelectionOnsiteCheckinServiceTest -Dsurefire.failIfNoSpecifiedTests=false test
+        run: mvn -pl server -am -Dtest=MobileSelectionOnsiteCheckinServiceTest,MobileRoomSelectionBedAuditTest -Dsurefire.failIfNoSpecifiedTests=false test
