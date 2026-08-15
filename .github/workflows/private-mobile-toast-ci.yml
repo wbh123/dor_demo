@@ -49,9 +49,29 @@ jobs:
         run: npm install --no-audit --no-fund
 
       - name: Run mobile tests
+        id: mobile_tests
         if: success()
         working-directory: private-repo/app
-        run: npm test
+        shell: bash
+        run: |
+          set +e
+          npm test > ../mobile-test-output.txt 2>&1
+          status=$?
+          cat ../mobile-test-output.txt
+          echo "exit_code=${status}" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Upload mobile test output
+        if: always() && steps.mobile_tests.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobile-test-output
+          path: private-repo/mobile-test-output.txt
+          if-no-files-found: error
+
+      - name: Fail on mobile test errors
+        if: steps.mobile_tests.outputs.exit_code != '0'
+        run: exit 1
 
       - name: Typecheck mobile app
         if: success()
