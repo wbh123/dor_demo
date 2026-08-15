@@ -1,0 +1,53 @@
+name: Finalize Private Huangjiahu Once
+
+on:
+  push:
+    branches:
+      - 'private-compat/fix/huangjiahu-test-data-gender-20260815'
+
+permissions:
+  contents: read
+
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: fix/huangjiahu-test-data-gender-20260815
+          token: ${{ secrets.PRIVATE_CI }}
+          persist-credentials: true
+          fetch-depth: 1
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Cleanup helper duplication, regenerate default SQL and push
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('scripts/db/generate_navicat_sql.py')
+          s = p.read_text(encoding='utf-8')
+          block = '''    integrity = integrity.replace("USE `wust_dormitory`;", f"USE `{database_name}`;")\n    integrity = integrity.replace(\n        "IF DATABASE()<>'wust_dormitory' THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='当前数据库不是wust_dormitory'; END IF;",\n        f"IF DATABASE()<>'{database_name}' THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='当前数据库与生成目标不一致'; END IF;",\n    )\n'''
+          while block + block in s:
+              s = s.replace(block + block, block, 1)
+          p.write_text(s, encoding='utf-8', newline='\n')
+          PY
+
+          python scripts/db/test_huangjiahu_dormitory_generation.py
+          python scripts/db/test_generate_navicat_current_version.py
+          python scripts/db/generate_navicat_sql.py --scenario realistic --skip-redis
+          python scripts/db/test_generate_navicat_current_version.py
+
+          git config user.name 'WangBinghao'
+          git config user.email '2495680763@qq.com'
+          git add scripts/db/generate_navicat_sql.py \
+                  backend-java/docs/sql/navicat/generated/00_一键重置数据库.sql
+          git diff --cached --check
+          if ! git diff --cached --quiet; then
+            git commit -m 'chore: 生成黄家湖默认一键测试数据库SQL'
+            git push origin HEAD:fix/huangjiahu-test-data-gender-20260815
+          fi
