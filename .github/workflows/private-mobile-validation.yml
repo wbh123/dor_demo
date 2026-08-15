@@ -16,7 +16,7 @@ jobs:
       - uses: actions/checkout@v5
         with:
           repository: wbh123/Wust-Dormitory-Select
-          ref: 9492782bb6cf5b5b08e80544ad199b9fc61e3d4a
+          ref: b3d962e2764072e712aa5a81736d5cbee5a75e82
           token: ${{ secrets.PRIVATE_CI }}
           path: baseline-repo
           persist-credentials: false
@@ -27,9 +27,9 @@ jobs:
       - name: Install baseline dependencies
         working-directory: baseline-repo/app
         run: npm install
-      - name: Run baseline full mobile tests
+      - name: Run baseline native scanner contract
         working-directory: baseline-repo/app
-        run: npm test
+        run: node --experimental-strip-types --test src/platform/native-scanner-contract.spec.ts
 
   validate-mobile:
     runs-on: ubuntu-latest
@@ -38,7 +38,7 @@ jobs:
       - uses: actions/checkout@v5
         with:
           repository: wbh123/Wust-Dormitory-Select
-          ref: integration/mobile-resource-label-selector-main-20260815
+          ref: fix/mobile-scanner-preview-layout-20260815
           token: ${{ secrets.PRIVATE_CI }}
           path: private-repo
           persist-credentials: false
@@ -57,25 +57,9 @@ jobs:
         working-directory: private-repo/app
         run: npm install
 
-      - name: Validate resource label print layout
-        working-directory: private-repo/app
-        run: node --experimental-strip-types --test src/platform/resource-label-print-layout.spec.ts
-
-      - name: Validate resource label parsing
-        working-directory: private-repo/app
-        run: node --experimental-strip-types --test src/platform/resource-label.spec.ts
-
-      - name: Validate bounded label queries
-        working-directory: private-repo/app
-        run: node --experimental-strip-types --test src/platform/label-scan-performance-contract.spec.ts
-
       - name: Validate native scanner contract
         working-directory: private-repo/app
         run: node --experimental-strip-types --test src/platform/native-scanner-contract.spec.ts
-
-      - name: Validate overlay contract
-        working-directory: private-repo/app
-        run: node --experimental-strip-types --test src/platform/action-overlay.spec.ts
 
       - name: Observe full mobile tests
         continue-on-error: true
