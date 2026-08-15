@@ -1,3 +1,4 @@
 private_branch=fix/mobile-room-detail-default-tab-20260815
-private_sha=b2c7cb2a390142a85800a99698f83c2379cb58fe
+private_sha=c42689fa84824c24635fa932dda6944d57d9c498
 purpose=verify mobile room detail default tab behavior
+attempt=2
