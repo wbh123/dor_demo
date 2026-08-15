@@ -30,10 +30,9 @@ jobs:
           cache: maven
           cache-dependency-path: private-repo/backend-java/pom.xml
 
-      - name: Run room-options regression test
+      - name: Run focused room-options regression suite
         working-directory: private-repo/backend-java
-        run: mvn -B -ntp -pl server -am test -Dtest=MobileRoomOptionsPerformanceTest -Dsurefire.failIfNoSpecifiedTests=false
-
-      - name: Run server module tests
-        working-directory: private-repo/backend-java
-        run: mvn -B -ntp -pl server -am test
+        run: >-
+          mvn -B -ntp -pl server -am test
+          -Dtest=MobileRoomOptionsPerformanceTest,MobileWorkspaceFacadeTest,MobileWorkspaceControllerTest,MybatisMapperXmlTest,MybatisMySqlIntegrationTest
+          -Dsurefire.failIfNoSpecifiedTests=false
