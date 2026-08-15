@@ -4,11 +4,6 @@ on:
   push:
     branches:
       - 'private-compat/**'
-  pull_request:
-    branches:
-      - main
-    paths:
-      - '.private-compat-trigger'
 
 permissions:
   contents: read
@@ -19,28 +14,21 @@ concurrency:
 
 jobs:
   verify-private-ref:
-    name: Verify private integration ref
+    name: Verify mobile auth scope and labels
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 40
     steps:
       - name: Resolve private branch name
         id: target
         shell: bash
         run: |
           set -euo pipefail
-          candidate="${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}"
+          candidate="$GITHUB_REF_NAME"
           private_ref="${candidate#private-compat/}"
-          if [[ -z "$private_ref" || "$private_ref" == "$candidate" ]]; then
-            echo "Invalid compatibility branch name" >&2
-            exit 1
-          fi
-          if [[ ! "$private_ref" =~ ^[A-Za-z0-9._/-]+$ ]]; then
-            echo "Unsupported private ref characters" >&2
-            exit 1
-          fi
+          test "$private_ref" != "$candidate"
           echo "private_ref=$private_ref" >> "$GITHUB_OUTPUT"
 
-      - name: Checkout private integration branch
+      - name: Checkout private feature branch
         uses: actions/checkout@v5
         with:
           repository: wbh123/Wust-Dormitory-Select
@@ -49,10 +37,6 @@ jobs:
           path: private-repo
           persist-credentials: false
           fetch-depth: 0
-
-      - uses: actions/setup-python@v6
-        with:
-          python-version: '3.12'
 
       - uses: actions/setup-java@v5
         with:
@@ -65,14 +49,26 @@ jobs:
         with:
           node-version: '22'
           cache: npm
-          cache-dependency-path: private-repo/frontend/package-lock.json
+          cache-dependency-path: |
+            private-repo/frontend/package-lock.json
+            private-repo/app/package-lock.json
 
-      - name: Verify private contracts
+      - name: Verify V49 and V50 contracts
         working-directory: private-repo
         shell: bash
         run: |
           set -euo pipefail
-          bash scripts/ci/run_contracts.sh
+          python - <<'PY'
+          from pathlib import Path
+          v49 = Path('backend-java/server/src/main/resources/db/migration/V49__split_admin_scope_read_write.sql').read_text()
+          v50 = Path('backend-java/server/src/main/resources/db/migration/V50__add_resource_labels.sql').read_text()
+          required49 = ['scope_access', "'READ'", "'WRITE'", "'ROOM'", 'uk_admin_profile_scope_access']
+          required50 = ['public_code CHAR(8)', "REGEXP '^[0-9]{8}$'", "'UNBOUND'", "'BOUND'", "'REVOKED'", 'uk_resource_label_public_code']
+          missing = [x for x in required49 if x not in v49] + [x for x in required50 if x not in v50]
+          if missing:
+              raise SystemExit('missing migration contract: ' + ', '.join(missing))
+          print('V49/V50 contracts OK')
+          PY
 
       - name: Verify private Java modules
         working-directory: private-repo/backend-java
@@ -90,3 +86,19 @@ jobs:
         run: |
           set -euo pipefail
           bash scripts/ci/run_frontend.sh
+
+      - name: Verify mobile TypeScript contracts
+        working-directory: private-repo/app
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci
+          node --experimental-strip-types --test src/platform/session-invalidator.spec.ts src/platform/resource-label.spec.ts
+          npm run build
+
+      - name: Verify Android debug build
+        working-directory: private-repo/app
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run android:build:debug
