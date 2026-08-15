@@ -21,7 +21,7 @@ jobs:
   verify-private-ref:
     name: Verify private integration ref
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 45
     steps:
       - name: Resolve private branch name
         id: target
@@ -61,16 +61,41 @@ jobs:
           cache: maven
           cache-dependency-path: private-repo/backend-java/pom.xml
 
-      - name: Verify no embedded SQL
-        working-directory: private-repo
-        run: python scripts/ci/test_no_embedded_sql.py
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
 
-      - name: Verify SQL extraction Java regressions
+      - name: Verify private contracts
+        working-directory: private-repo
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/ci/test_runtime_error_data_correctness_batch.py
+          bash scripts/ci/run_contracts.sh
+
+      - name: Verify private Java modules
         working-directory: private-repo/backend-java
         shell: bash
         run: |
           set -euo pipefail
-          mvn -B -ntp -pl server -am \
-            -Dsurefire.failIfNoSpecifiedTests=false \
-            -Dtest=BatchScopeServiceTest,StudentImportRowMapperTest,MobileAppReleaseServiceTest,MobileAppVersionControllerTest,MobileAppReleaseDownloadControllerTest \
-            test
+          mvn -B -ntp clean verify
+
+      - name: Verify private frontend
+        working-directory: private-repo
+        shell: bash
+        env:
+          VITE_INSTITUTION_NAME: Example University
+          VITE_CAMPUS_NAME: Example Campus
+        run: |
+          set -euo pipefail
+          bash scripts/ci/run_frontend.sh
+
+      - name: Verify private mobile app
+        working-directory: private-repo/app
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci
+          npm test
+          npm run typecheck
+          npm run build
