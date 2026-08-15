@@ -28,18 +28,23 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: '22'
+
       - name: Backend focused tests
         working-directory: private-repo/backend-java
-        run: mvn -pl server -am -Dtest=MobileAppReleaseServiceTest,MobileAppVersionControllerTest,ResourceLabelTargetServiceTest -Dsurefire.failIfNoSpecifiedTests=false test
+        run: mvn -pl server -am -Dtest=MobileAppReleaseServiceTest,MobileAppVersionControllerTest,MobileAppReleaseDownloadControllerTest,ResourceLabelTargetServiceTest -Dsurefire.failIfNoSpecifiedTests=false test
+      - name: Backend compile package
+        working-directory: private-repo/backend-java
+        run: mvn -pl starter -am -DskipTests package
+
       - name: Install mobile dependencies
         working-directory: private-repo/app
-        run: npm install
+        run: npm install --no-audit --no-fund
+      - name: Mobile full tests
+        working-directory: private-repo/app
+        run: npm test
       - name: Mobile version consistency
         working-directory: private-repo/app
         run: npm run version:check
-      - name: Mobile focused contracts
-        working-directory: private-repo/app
-        run: node --experimental-strip-types --test src/platform/natural-resource-sort.spec.ts src/platform/resource-label-print-layout.spec.ts src/platform/native-scanner-contract.spec.ts
       - name: Mobile typecheck
         working-directory: private-repo/app
         run: npm run typecheck
@@ -52,9 +57,13 @@ jobs:
       - name: Android validation
         working-directory: private-repo/app/android
         run: ./gradlew testDebugUnitTest lintDebug assembleDebug
+
       - name: Install web dependencies
         working-directory: private-repo/frontend
-        run: npm install
+        run: npm install --no-audit --no-fund
+      - name: Web tests
+        working-directory: private-repo/frontend
+        run: npm test
       - name: Web typecheck
         working-directory: private-repo/frontend
         run: npm run typecheck
