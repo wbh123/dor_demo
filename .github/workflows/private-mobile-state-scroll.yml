@@ -1,0 +1,29 @@
+name: Private Mobile State Scroll
+
+on:
+  push:
+    branches:
+      - 'private-compat/fix/mobile-checkin-state-and-scroll-layout-20260815'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout private feature branch
+        uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: fix/mobile-checkin-state-and-scroll-layout-20260815
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+      - name: Run mobile state and scroll contract
+        working-directory: private-repo/app
+        run: node --experimental-strip-types --test src/platform/mobile-state-scroll-contract.spec.ts
