@@ -1,0 +1,98 @@
+name: Realistic Parameterization Matrix
+
+on:
+  push:
+    branches:
+      - 'private-compat/feat/realistic-parameterized-scale-20260815'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - students: 1000
+            active: 840
+            room: 160
+            bed: 120
+            historical: 560
+            notifications: 300
+            college: 950
+          - students: 5000
+            active: 4200
+            room: 800
+            bed: 600
+            historical: 2800
+            notifications: 1500
+            college: 4750
+          - students: 10000
+            active: 8400
+            room: 1600
+            bed: 1200
+            historical: 5600
+            notifications: 3000
+            college: 9500
+          - students: 30000
+            active: 24640
+            room: 4688
+            bed: 3520
+            historical: 16432
+            notifications: 9000
+            college: 28500
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: root
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -proot"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+    steps:
+      - name: Checkout private branch
+        uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: feat/realistic-parameterized-scale-20260815
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Run contract
+        working-directory: private-repo
+        run: python scripts/db/test_realistic_parameterization.py
+      - name: Generate and execute realistic
+        working-directory: private-repo
+        env:
+          MYSQL_PWD: root
+        shell: bash
+        run: |
+          set -euo pipefail
+          DB="realistic_${{ matrix.students }}"
+          python scripts/db/generate_navicat_sql.py \
+            --scenario realistic \
+            --students '${{ matrix.students }}' \
+            --database-name "$DB" \
+            --seed 20260815 \
+            --skip-redis
+          mysql -h127.0.0.1 -uroot < backend-java/docs/sql/navicat/generated/00_一键重置数据库.sql
+          test "$(mysql -h127.0.0.1 -uroot -N -B -e "SELECT COUNT(*) FROM ${DB}.student")" = '${{ matrix.students }}'
+          test "$(mysql -h127.0.0.1 -uroot -N -B -e "SELECT COUNT(*) FROM ${DB}.room_assignment WHERE assignment_status='ACTIVE'")" = '${{ matrix.active }}'
+          test "$(mysql -h127.0.0.1 -uroot -N -B -e "SELECT COUNT(*) FROM ${DB}.room_assignment WHERE assignment_status='ACTIVE' AND bed_id IS NULL")" = '${{ matrix.room }}'
+          test "$(mysql -h127.0.0.1 -uroot -N -B -e "SELECT COUNT(*) FROM ${DB}.bed_assignment WHERE assignment_status='ACTIVE'")" = '${{ matrix.bed }}'
+          test "$(mysql -h127.0.0.1 -uroot -N -B -e "SELECT COUNT(*) FROM ${DB}.room_assignment WHERE assignment_status='ACTIVE' AND batch_id IS NULL")" = '${{ matrix.historical }}'
+          test "$(mysql -h127.0.0.1 -uroot -N -B -e "SELECT COUNT(*) FROM ${DB}.student_notification")" = '${{ matrix.notifications }}'
+          test "$(mysql -h127.0.0.1 -uroot -N -B -e "SELECT COUNT(*) FROM ${DB}.student s JOIN ${DB}.major m ON m.id=s.major_id WHERE m.college_name='计算机科学与技术学院'")" = '${{ matrix.college }}'
+          test "$(mysql -h127.0.0.1 -uroot -N -B -e "SELECT COUNT(*) FROM ${DB}.room_assignment ra JOIN ${DB}.student s ON s.id=ra.student_id JOIN ${DB}.room r ON r.id=ra.room_id WHERE r.gender_restriction<>s.gender")" = '0'
+          test "$(mysql -h127.0.0.1 -uroot -N -B -e "SELECT COUNT(*) FROM ${DB}.dormitory_building")" = '30'
+          test "$(mysql -h127.0.0.1 -uroot -N -B -e "SELECT COUNT(*) FROM ${DB}.bed")" = '35900'
