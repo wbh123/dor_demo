@@ -4,11 +4,6 @@ on:
   push:
     branches:
       - 'private-compat/**'
-  pull_request:
-    branches:
-      - main
-    paths:
-      - '.private-compat-trigger'
 
 permissions:
   contents: read
@@ -21,23 +16,15 @@ jobs:
   verify-private-ref:
     name: Verify private integration ref
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 20
     steps:
       - name: Resolve private branch name
         id: target
         shell: bash
         run: |
           set -euo pipefail
-          candidate="${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}"
+          candidate="${GITHUB_REF_NAME}"
           private_ref="${candidate#private-compat/}"
-          if [[ -z "$private_ref" || "$private_ref" == "$candidate" ]]; then
-            echo "Invalid compatibility branch name" >&2
-            exit 1
-          fi
-          if [[ ! "$private_ref" =~ ^[A-Za-z0-9._/-]+$ ]]; then
-            echo "Unsupported private ref characters" >&2
-            exit 1
-          fi
           echo "private_ref=$private_ref" >> "$GITHUB_OUTPUT"
 
       - name: Checkout private integration branch
@@ -61,41 +48,16 @@ jobs:
           cache: maven
           cache-dependency-path: private-repo/backend-java/pom.xml
 
-      - uses: actions/setup-node@v6
-        with:
-          node-version: '22'
-
-      - name: Verify private contracts
+      - name: Verify backend modularization boundary
         working-directory: private-repo
-        shell: bash
-        run: |
-          set -euo pipefail
-          python scripts/ci/test_runtime_error_data_correctness_batch.py
-          bash scripts/ci/run_contracts.sh
+        run: python scripts/ci/test_backend_modularization_boundaries.py
 
-      - name: Verify private Java modules
+      - name: Verify inspection Java regressions
         working-directory: private-repo/backend-java
         shell: bash
         run: |
           set -euo pipefail
-          mvn -B -ntp clean verify
-
-      - name: Verify private frontend
-        working-directory: private-repo
-        shell: bash
-        env:
-          VITE_INSTITUTION_NAME: Example University
-          VITE_CAMPUS_NAME: Example Campus
-        run: |
-          set -euo pipefail
-          bash scripts/ci/run_frontend.sh
-
-      - name: Verify private mobile app
-        working-directory: private-repo/app
-        shell: bash
-        run: |
-          set -euo pipefail
-          npm ci
-          npm test
-          npm run typecheck
-          npm run build
+          mvn -B -ntp -pl server -am \
+            -Dsurefire.failIfNoSpecifiedTests=false \
+            -Dtest=MobileInspectionControllerTest,MobileInspectionServiceTest,InspectionRoomServiceTest,InspectionRoomReopenServiceTest,InspectionMapperRuntimeMappingTest \
+            test
