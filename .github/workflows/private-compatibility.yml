@@ -67,13 +67,12 @@ jobs:
           cache: npm
           cache-dependency-path: private-repo/frontend/package-lock.json
 
-      - name: Verify inspection schema contracts
+      - name: Verify private contracts
         working-directory: private-repo
         shell: bash
         run: |
           set -euo pipefail
-          python scripts/db/test_v46_inspection_workflow_schema.py
-          python scripts/db/test_v48_inspection_recurring_schedule_schema.py
+          bash scripts/ci/run_contracts.sh
 
       - name: Verify private Java modules
         working-directory: private-repo/backend-java
