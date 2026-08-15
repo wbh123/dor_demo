@@ -1,0 +1,4 @@
+private_branch=integration/mobile-room-detail-default-tab-main-20260815
+private_sha=872362060d6e506beb42e2fb757f19504191c598
+base_main=a23b787e695caebbc1430a4ac6264fa02a81d893
+purpose=verify latest main plus mobile room detail default tab behavior
