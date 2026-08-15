@@ -35,6 +35,10 @@ jobs:
         working-directory: private-repo/app
         run: node --experimental-strip-types --test src/platform/mobile-transient-notice-layout.spec.ts
 
+      - name: Run mobile login emblem contract
+        working-directory: private-repo/app
+        run: node --experimental-strip-types --test src/platform/login-emblem-layout.spec.ts
+
       - name: Install dependencies
         if: success()
         working-directory: private-repo/app
