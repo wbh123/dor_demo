@@ -1,0 +1,42 @@
+name: Cleanup Private Generator Once
+
+on:
+  push:
+    branches:
+      - 'private-compat/fix/huangjiahu-test-data-gender-20260815'
+
+permissions:
+  contents: read
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: fix/huangjiahu-test-data-gender-20260815
+          token: ${{ secrets.PRIVATE_CI }}
+          persist-credentials: true
+          fetch-depth: 1
+      - name: Remove duplicate integrity replacement block
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('scripts/db/generate_navicat_sql.py')
+          s = p.read_text(encoding='utf-8')
+          block = '''    integrity = integrity.replace("USE `wust_dormitory`;", f"USE `{database_name}`;")\n    integrity = integrity.replace(\n        "IF DATABASE()<>'wust_dormitory' THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='当前数据库不是wust_dormitory'; END IF;",\n        f"IF DATABASE()<>'{database_name}' THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='当前数据库与生成目标不一致'; END IF;",\n    )\n'''
+          doubled = block + block
+          if doubled not in s:
+              raise SystemExit('duplicate integrity replacement block not found')
+          s = s.replace(doubled, block, 1)
+          p.write_text(s, encoding='utf-8', newline='\n')
+          PY
+          git config user.name 'WangBinghao'
+          git config user.email '2495680763@qq.com'
+          git add scripts/db/generate_navicat_sql.py
+          git diff --cached --check
+          git commit -m 'chore: 清理生成器重复数据库名替换'
+          git push origin HEAD:fix/huangjiahu-test-data-gender-20260815
