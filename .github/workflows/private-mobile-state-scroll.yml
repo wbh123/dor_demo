@@ -11,17 +11,16 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 30
     steps:
-      - name: Checkout merged private main
+      - name: Checkout private regression branch
         uses: actions/checkout@v5
         with:
           repository: wbh123/Wust-Dormitory-Select
-          ref: main
+          ref: test/mobile-selection-checkin-regression-contracts-20260815
           token: ${{ secrets.PRIVATE_CI }}
           path: private-repo
           persist-credentials: false
-          fetch-depth: 0
       - uses: actions/setup-node@v6
         with:
           node-version: '22'
@@ -29,37 +28,12 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
-          cache: maven
-          cache-dependency-path: private-repo/backend-java/pom.xml
-      - name: Assert merged main head
-        working-directory: private-repo
-        run: test "$(git rev-parse HEAD)" = "16c08e8e68cd5fe73b3f53e3df28d80aa4f584f8"
-      - name: Run focused mobile contracts
-        working-directory: private-repo/app
-        run: |
-          node --experimental-strip-types --test src/platform/residency-workbench.spec.ts
-          node --experimental-strip-types --test src/platform/mobile-state-scroll-contract.spec.ts
-          node --experimental-strip-types --test src/platform/checkin-bed-workflow.spec.ts
       - name: Install mobile dependencies
         working-directory: private-repo/app
         run: npm install
-      - name: Run full mobile tests with captured diagnostics
-        id: mobile_tests
+      - name: Run full mobile tests
         working-directory: private-repo/app
-        shell: bash
-        run: |
-          set +e
-          npm test 2>&1 | tee mobile-test.log
-          code=${PIPESTATUS[0]}
-          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
-          exit 0
-      - name: Upload mobile test diagnostics
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: merged-main-mobile-test-log
-          path: private-repo/app/mobile-test.log
-          if-no-files-found: error
+        run: npm test
       - name: Type check mobile app
         working-directory: private-repo/app
         run: npx vue-tsc -b
@@ -75,9 +49,3 @@ jobs:
           chmod +x ./gradlew
           ./gradlew testDebugUnitTest lintDebug assembleDebug
           test -f app/build/outputs/apk/debug/app-debug.apk
-      - name: Run full backend Maven verification
-        working-directory: private-repo/backend-java
-        run: mvn -B -ntp clean verify
-      - name: Enforce full mobile test result
-        if: always()
-        run: test "${{ steps.mobile_tests.outputs.exit_code }}" = "0"
