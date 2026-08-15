@@ -13,11 +13,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
-      - name: Checkout private feature branch
+      - name: Checkout merged private main
         uses: actions/checkout@v5
         with:
           repository: wbh123/Wust-Dormitory-Select
-          ref: fix/mobile-checkin-state-and-scroll-layout-20260815
+          ref: main
           token: ${{ secrets.PRIVATE_CI }}
           path: private-repo
           persist-credentials: false
@@ -31,6 +31,9 @@ jobs:
           java-version: '21'
           cache: maven
           cache-dependency-path: private-repo/backend-java/pom.xml
+      - name: Assert merged main head
+        working-directory: private-repo
+        run: test "$(git rev-parse HEAD)" = "16c08e8e68cd5fe73b3f53e3df28d80aa4f584f8"
       - name: Run focused mobile contracts
         working-directory: private-repo/app
         run: |
@@ -40,8 +43,7 @@ jobs:
       - name: Install mobile dependencies
         working-directory: private-repo/app
         run: npm install
-      - name: Run full mobile test diagnostics
-        continue-on-error: true
+      - name: Run full mobile tests
         working-directory: private-repo/app
         run: npm test
       - name: Type check mobile app
