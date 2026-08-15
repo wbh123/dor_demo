@@ -11,72 +11,21 @@ permissions:
 jobs:
   validate-mobile:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
         with:
           repository: wbh123/Wust-Dormitory-Select
-          ref: fix/mobile-post-update-convergence-20260815
+          ref: feat/mobile-resource-label-selector-layout-20260815
           token: ${{ secrets.PRIVATE_CI }}
           path: private-repo
           persist-credentials: false
           fetch-depth: 1
 
-      - uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: '21'
-
       - uses: actions/setup-node@v6
         with:
           node-version: '22'
 
-      - name: Install mobile dependencies
+      - name: Verify resource label print layout contract is red
         working-directory: private-repo/app
-        run: npm install
-
-      - name: Observe full mobile baseline
-        id: full_mobile_tests
-        continue-on-error: true
-        working-directory: private-repo/app
-        shell: bash
-        run: |
-          set -o pipefail
-          npm test 2>&1 | tee mobile-test.log
-
-      - name: Upload mobile baseline log
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: mobile-test-log
-          path: private-repo/app/mobile-test.log
-          if-no-files-found: error
-
-      - name: Validate changed mobile contracts
-        working-directory: private-repo/app
-        run: >-
-          node --experimental-strip-types --test
-          src/platform/native-scanner-contract.spec.ts
-          src/platform/server-settings-view.spec.ts
-          src/platform/app-update-metadata-contract.spec.ts
-          src/platform/native-apk-updater-contract.spec.ts
-          src/platform/app-update-gate.spec.ts
-          src/platform/app-update-flow.spec.ts
-          src/platform/recovery-entry.spec.ts
-          src/platform/connection-recovery-view.spec.ts
-
-      - name: Run mobile typecheck
-        working-directory: private-repo/app
-        run: npm run typecheck
-
-      - name: Build mobile web assets
-        working-directory: private-repo/app
-        run: npm run build
-
-      - name: Sync Capacitor Android
-        working-directory: private-repo/app
-        run: npx cap sync android
-
-      - name: Validate Android
-        working-directory: private-repo/app/android
-        run: ./gradlew testDebugUnitTest lintDebug assembleDebug
+        run: node --experimental-strip-types --test src/platform/resource-label-print-layout.spec.ts
