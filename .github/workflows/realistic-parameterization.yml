@@ -1,0 +1,29 @@
+name: Realistic Parameterization
+
+on:
+  push:
+    branches:
+      - 'private-compat/feat/realistic-parameterized-scale-20260815'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout private branch
+        uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: feat/realistic-parameterized-scale-20260815
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Run realistic parameterization contract
+        working-directory: private-repo
+        run: python scripts/db/test_realistic_parameterization.py
