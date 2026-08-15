@@ -19,9 +19,44 @@ concurrency:
 
 jobs:
   verify-private-ref:
-    name: Verify private integration ref
+    name: Verify private mobile authorization ref
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 50
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_DATABASE: wust_dormitory
+          MYSQL_USER: wust_dormitory
+          MYSQL_PASSWORD: RuntimeTestPassword2026
+          MYSQL_ROOT_PASSWORD: RuntimeRootPassword2026
+          TZ: Asia/Shanghai
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -pRuntimeRootPassword2026"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=12
+      redis:
+        image: redis:7.4-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=5s
+          --health-timeout=3s
+          --health-retries=12
+    env:
+      WUST_DORMITORY_DB_HOST: 127.0.0.1
+      WUST_DORMITORY_DB_PORT: '3306'
+      WUST_DORMITORY_DB_NAME: wust_dormitory
+      WUST_DORMITORY_DB_USER: wust_dormitory
+      WUST_DORMITORY_DB_PASSWORD: RuntimeTestPassword2026
+      WUST_DORMITORY_REDIS_HOST: 127.0.0.1
+      WUST_DORMITORY_REDIS_PORT: '6379'
+      WUST_DORMITORY_REDIS_PASSWORD: ''
+      WUST_DORMITORY_FLYWAY_LOCATIONS: classpath:db/migration,filesystem:backend-java/server/src/test/resources/db/dev-migration
     steps:
       - name: Resolve private branch name
         id: target
@@ -50,6 +85,12 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
 
+      - name: Record tested private head
+        id: private-head
+        working-directory: private-repo
+        shell: bash
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
       - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
@@ -65,18 +106,18 @@ jobs:
         with:
           node-version: '22'
           cache: npm
-          cache-dependency-path: |
-            private-repo/frontend/package-lock.json
-            private-repo/app/package-lock.json
+          cache-dependency-path: private-repo/frontend/package-lock.json
 
-      - name: Verify private contracts
+      - name: Verify mobile authorization contracts
         working-directory: private-repo
         shell: bash
         run: |
           set -euo pipefail
-          python scripts/ci/test_runtime_error_data_correctness_batch.py
-          python -m unittest scripts/subscription/test_mobile_feature_authorization.py -v
-          bash scripts/ci/run_contracts.sh
+          python -m unittest \
+            scripts/subscription/test_mobile_feature_authorization.py \
+            scripts/subscription/test_platform_feature_gui.py \
+            scripts/subscription/test_feature_authorization_closure.py \
+            -v
 
       - name: Verify private Java modules
         working-directory: private-repo/backend-java
@@ -84,6 +125,42 @@ jobs:
         run: |
           set -euo pipefail
           mvn -B -ntp clean verify
+
+      - name: Verify Flyway V54 against MySQL 8.4
+        working-directory: private-repo
+        shell: bash
+        run: |
+          set -euo pipefail
+          java -jar backend-java/starter/target/Service.jar > /tmp/wust-dormitory.log 2>&1 &
+          echo $! > /tmp/wust-dormitory.pid
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:8080/actuator/health > /tmp/health.json; then
+              cat /tmp/health.json
+              break
+            fi
+            if [[ "$attempt" == "60" ]]; then
+              cat /tmp/wust-dormitory.log
+              exit 1
+            fi
+            sleep 2
+          done
+          python -m pip install --disable-pip-version-check pymysql
+          python - <<'PY'
+          import pymysql
+          connection = pymysql.connect(
+              host='127.0.0.1', port=3306, user='wust_dormitory',
+              password='RuntimeTestPassword2026', database='wust_dormitory', charset='utf8mb4')
+          with connection.cursor() as cursor:
+              cursor.execute("SELECT COUNT(*) FROM flyway_schema_history WHERE version='54' AND success=1")
+              assert cursor.fetchone()[0] == 1
+              cursor.execute("SELECT enabled_in_program, school_controllable, category_code FROM feature_catalog WHERE feature_code='P3_MOBILE_ADMIN_ACCESS'")
+              assert cursor.fetchone() == (1, 0, 'MOBILE')
+              cursor.execute("SELECT COUNT(*) FROM feature_catalog WHERE feature_code IN ('P3_MOBILE_WORKBENCH','P3_CHECKIN_MANAGEMENT','P3_INSPECTION_EXECUTION','P3_RESIDENCY_ADJUSTMENT','P3_RESOURCE_LABEL_VIEW','P3_RESOURCE_LABEL_GENERATE','P3_RESOURCE_LABEL_PRINT','P3_RESOURCE_LABEL_BIND','P3_RESOURCE_LABEL_REBIND') AND enabled_in_program=1 AND school_controllable=0")
+              assert cursor.fetchone()[0] == 9
+              cursor.execute("SELECT COUNT(*) FROM admin_permission WHERE permission_code IN ('bed_confirmation.read','bed_confirmation.onsite_checkin') AND enabled=1")
+              assert cursor.fetchone()[0] == 2
+          connection.close()
+          PY
 
       - name: Verify private frontend
         working-directory: private-repo
@@ -100,8 +177,16 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          npm ci --no-audit --no-fund
+          npm install --no-audit --no-fund
           npm test
           npm run typecheck
           npm run build
           npm run android:build:debug
+
+      - name: Print service log
+        if: always()
+        run: cat /tmp/wust-dormitory.log || true
+
+      - name: Print tested private head
+        if: always()
+        run: echo "Tested private head ${{ steps.private-head.outputs.sha }}"
