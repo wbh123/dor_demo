@@ -11,7 +11,7 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
     steps:
       - name: Checkout private feature branch
         uses: actions/checkout@v5
@@ -30,10 +30,20 @@ jobs:
           java-version: '21'
           cache: maven
           cache-dependency-path: private-repo/backend-java/pom.xml
-      - name: Run atomic onsite checkin contract
+      - name: Run mobile checkin contracts
+        working-directory: private-repo/app
+        run: |
+          node --experimental-strip-types --test src/platform/mobile-state-scroll-contract.spec.ts
+          node --experimental-strip-types --test src/platform/checkin-bed-workflow.spec.ts
+      - name: Install mobile dependencies
+        working-directory: private-repo/app
+        run: npm install
+      - name: Type check mobile app
+        working-directory: private-repo/app
+        run: npx vue-tsc -b
+      - name: Build mobile app
+        working-directory: private-repo/app
+        run: npm run build
+      - name: Run atomic onsite checkin test
         working-directory: private-repo/backend-java
         run: mvn -pl server -am -Dtest=MobileSelectionOnsiteCheckinServiceTest -Dsurefire.failIfNoSpecifiedTests=false test
-      - name: Run mobile state and scroll contract
-        if: always()
-        working-directory: private-repo/app
-        run: node --experimental-strip-types --test src/platform/mobile-state-scroll-contract.spec.ts
