@@ -9,9 +9,21 @@ permissions:
   contents: read
 
 jobs:
-  mysql-scenarios:
+  mysql-scenario:
+    strategy:
+      fail-fast: false
+      matrix:
+        scenario:
+          - realistic
+          - waitlist_exchange
+          - mixed_extreme
+          - historical_multi_year
+          - recovery_after_assignment
+          - redis_loss_recovery
+          - near_capacity
+          - full_capacity
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 20
     services:
       mysql:
         image: mysql:8.4
@@ -47,56 +59,38 @@ jobs:
           python scripts/db/test_huangjiahu_dormitory_generation.py
           python scripts/db/test_generate_navicat_current_version.py
 
-      - name: Execute high-risk scenarios on MySQL 8.4
+      - name: Execute ${{ matrix.scenario }} on MySQL 8.4
         working-directory: private-repo
+        env:
+          SCENARIO: ${{ matrix.scenario }}
         shell: bash
         run: |
           set -euo pipefail
-          mysql --version
           output='backend-java/docs/sql/navicat/generated/00_一键重置数据库.sql'
-
-          run_scenario() {
-            local scenario="$1"
-            echo "===== SCENARIO: ${scenario} ====="
-            python scripts/db/generate_navicat_sql.py \
-              --database-name wust_dormitory_ci \
-              --scenario "${scenario}" \
-              --skip-redis
-            mysql --protocol=tcp -h127.0.0.1 -P3306 -uroot -proot \
-              --default-character-set=utf8mb4 < "${output}" > "/tmp/${scenario}.log"
-            grep -q 'GENERATED_DATA_SAFETY_OK' "/tmp/${scenario}.log"
-            grep -q 'NAVICAT_RESET_READY' "/tmp/${scenario}.log"
-            mysql --protocol=tcp -h127.0.0.1 -P3306 -uroot -proot -N -e "
-              SELECT CONCAT(
-                'buildings=',(SELECT COUNT(*) FROM wust_dormitory_ci.dormitory_building),
-                ',floors=',(SELECT COUNT(*) FROM wust_dormitory_ci.dormitory_floor),
-                ',rooms=',(SELECT COUNT(*) FROM wust_dormitory_ci.room),
-                ',beds=',(SELECT COUNT(*) FROM wust_dormitory_ci.bed),
-                ',gender_mismatch=',(
-                  SELECT COUNT(*)
-                  FROM wust_dormitory_ci.room_assignment ra
-                  JOIN wust_dormitory_ci.student s ON s.id=ra.student_id
-                  JOIN wust_dormitory_ci.room r ON r.id=ra.room_id
-                  WHERE r.gender_restriction<>s.gender
-                )
-              );"
-            test "$(mysql --protocol=tcp -h127.0.0.1 -P3306 -uroot -proot -N -e "
-              SELECT COUNT(*)
-              FROM wust_dormitory_ci.room_assignment ra
-              JOIN wust_dormitory_ci.student s ON s.id=ra.student_id
-              JOIN wust_dormitory_ci.room r ON r.id=ra.room_id
-              WHERE r.gender_restriction<>s.gender;")" = '0'
-            test "$(mysql --protocol=tcp -h127.0.0.1 -P3306 -uroot -proot -N -e "SELECT COUNT(*) FROM wust_dormitory_ci.dormitory_building;")" = '30'
-            test "$(mysql --protocol=tcp -h127.0.0.1 -P3306 -uroot -proot -N -e "SELECT COUNT(*) FROM wust_dormitory_ci.dormitory_floor;")" = '216'
-            test "$(mysql --protocol=tcp -h127.0.0.1 -P3306 -uroot -proot -N -e "SELECT COUNT(*) FROM wust_dormitory_ci.room;")" = '8900'
-            test "$(mysql --protocol=tcp -h127.0.0.1 -P3306 -uroot -proot -N -e "SELECT COUNT(*) FROM wust_dormitory_ci.bed;")" = '35900'
-          }
-
-          run_scenario realistic
-          run_scenario waitlist_exchange
-          run_scenario mixed_extreme
-          run_scenario historical_multi_year
-          run_scenario recovery_after_assignment
-          run_scenario redis_loss_recovery
-          run_scenario near_capacity
-          run_scenario full_capacity
+          python scripts/db/generate_navicat_sql.py \
+            --database-name wust_dormitory_ci \
+            --scenario "${SCENARIO}" \
+            --skip-redis
+          mysql --protocol=tcp -h127.0.0.1 -P3306 -uroot -proot \
+            --default-character-set=utf8mb4 < "${output}" > "/tmp/${SCENARIO}.log"
+          grep -q 'GENERATED_DATA_SAFETY_OK' "/tmp/${SCENARIO}.log"
+          grep -q 'NAVICAT_RESET_READY' "/tmp/${SCENARIO}.log"
+          test "$(mysql --protocol=tcp -h127.0.0.1 -P3306 -uroot -proot -N -e "
+            SELECT COUNT(*)
+            FROM wust_dormitory_ci.room_assignment ra
+            JOIN wust_dormitory_ci.student s ON s.id=ra.student_id
+            JOIN wust_dormitory_ci.room r ON r.id=ra.room_id
+            WHERE r.gender_restriction<>s.gender;")" = '0'
+          test "$(mysql --protocol=tcp -h127.0.0.1 -P3306 -uroot -proot -N -e "SELECT COUNT(*) FROM wust_dormitory_ci.dormitory_building;")" = '30'
+          test "$(mysql --protocol=tcp -h127.0.0.1 -P3306 -uroot -proot -N -e "SELECT COUNT(*) FROM wust_dormitory_ci.dormitory_floor;")" = '216'
+          test "$(mysql --protocol=tcp -h127.0.0.1 -P3306 -uroot -proot -N -e "SELECT COUNT(*) FROM wust_dormitory_ci.room;")" = '8900'
+          test "$(mysql --protocol=tcp -h127.0.0.1 -P3306 -uroot -proot -N -e "SELECT COUNT(*) FROM wust_dormitory_ci.bed;")" = '35900'
+          mysql --protocol=tcp -h127.0.0.1 -P3306 -uroot -proot -N -e "
+            SELECT CONCAT(
+              'scenario=${SCENARIO}',
+              ',buildings=',(SELECT COUNT(*) FROM wust_dormitory_ci.dormitory_building),
+              ',rooms=',(SELECT COUNT(*) FROM wust_dormitory_ci.room),
+              ',beds=',(SELECT COUNT(*) FROM wust_dormitory_ci.bed),
+              ',assignments=',(SELECT COUNT(*) FROM wust_dormitory_ci.room_assignment),
+              ',gender_mismatch=0'
+            );"
