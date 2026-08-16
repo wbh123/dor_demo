@@ -32,7 +32,7 @@ jobs:
       - name: Prepare canonical font
         working-directory: private-repo/frontend
         run: node scripts/prepare-print-font.mjs
-      - name: Add full-layout performance probe
+      - name: Add full-preview performance probe
         working-directory: private-repo
         shell: bash
         run: |
@@ -41,10 +41,13 @@ jobs:
 
           import com.fasterxml.jackson.databind.ObjectMapper;
           import com.wust.dormitory.label.print.PrintTemplateLayoutValidator;
+          import com.wust.dormitory.label.print.pdf.model.ResolvedPrintLayout;
           import org.junit.jupiter.api.Test;
+          import java.util.List;
           import java.util.concurrent.CompletableFuture;
           import java.util.concurrent.TimeUnit;
           import static org.junit.jupiter.api.Assertions.assertNotNull;
+          import static org.junit.jupiter.api.Assertions.assertTrue;
 
           class PrintPreviewPerformanceProbeTest {
               private static final String SHA = "d68bafcb48a2707749396aa12bbbd833cb70401f3a9a689fd2902c7e0d295964";
@@ -63,33 +66,43 @@ jobs:
               private static final PrintLayoutEngine.PrintData DATA = new PrintLayoutEngine.PrintData(
                   "武汉科技大学", "黄家湖校区", "北一舍", 3, "301", "2号床", "08351724");
 
-              private PrintLayoutEngine engine() {
+              private Fixture fixture() {
                   String path = System.getProperty("fontPath");
                   PrintFontRegistry registry = new PrintFontRegistry(path, path, SHA, SHA);
                   ObjectMapper mapper = new ObjectMapper();
-                  return new PrintLayoutEngine(mapper, new PrintTemplateLayoutValidator(mapper),
+                  PrintLayoutEngine engine = new PrintLayoutEngine(mapper, new PrintTemplateLayoutValidator(mapper),
                       new PrintTextLayoutEngine(registry), new PrintQrLayoutEngine(), registry);
+                  return new Fixture(engine, new PrintPdfRenderer(registry));
               }
 
               @Test
-              void probeColdDefaultLayoutAndTwoConcurrentPreviewRequests() throws Exception {
-                  PrintLayoutEngine cold = engine();
+              void probeColdPdfAndActualConcurrentBrowserPreviewPair() throws Exception {
+                  Fixture cold = fixture();
                   long start = System.nanoTime();
-                  assertNotNull(cold.resolve(LAYOUT, 50, 30, DATA));
+                  ResolvedPrintLayout resolved = cold.engine.resolve(LAYOUT, 50, 30, DATA);
+                  byte[] pdf = cold.renderer.render(List.of(resolved), PrintPdfRenderer.LayoutCode.SINGLE, id -> null);
                   long coldMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
-                  System.out.println("PRINT_PREVIEW_COLD_DEFAULT_LAYOUT_MS=" + coldMs);
+                  System.out.println("PRINT_PREVIEW_COLD_LAYOUT_PLUS_PDF_MS=" + coldMs);
+                  System.out.println("PRINT_PREVIEW_PDF_BYTES=" + pdf.length);
+                  assertTrue(pdf.length > 1000);
 
-                  PrintLayoutEngine shared = engine();
+                  Fixture shared = fixture();
                   start = System.nanoTime();
-                  CompletableFuture<?> first = CompletableFuture.runAsync(() -> shared.resolve(LAYOUT, 50, 30, DATA));
-                  CompletableFuture<?> second = CompletableFuture.runAsync(() -> shared.resolve(LAYOUT, 50, 30, DATA));
-                  CompletableFuture.allOf(first, second).get(60, TimeUnit.SECONDS);
-                  long concurrentMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
-                  System.out.println("PRINT_PREVIEW_TWO_CONCURRENT_MS=" + concurrentMs);
+                  CompletableFuture<?> layoutRequest = CompletableFuture.runAsync(() -> shared.engine.resolve(LAYOUT, 50, 30, DATA));
+                  CompletableFuture<?> pdfRequest = CompletableFuture.runAsync(() -> {
+                      ResolvedPrintLayout label = shared.engine.resolve(LAYOUT, 50, 30, DATA);
+                      byte[] bytes = shared.renderer.render(List.of(label), PrintPdfRenderer.LayoutCode.SINGLE, id -> null);
+                      assertNotNull(bytes);
+                  });
+                  CompletableFuture.allOf(layoutRequest, pdfRequest).get(60, TimeUnit.SECONDS);
+                  long pairMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
+                  System.out.println("PRINT_PREVIEW_ACTUAL_CONCURRENT_PAIR_MS=" + pairMs);
               }
+
+              private record Fixture(PrintLayoutEngine engine, PrintPdfRenderer renderer) {}
           }
           JAVA
-      - name: Run full-layout performance probe
+      - name: Run full-preview performance probe
         working-directory: private-repo
         run: >-
           mvn -B -ntp -f backend-java/pom.xml -pl server -am
