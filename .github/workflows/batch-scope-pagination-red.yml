@@ -9,7 +9,7 @@ permissions:
   contents: read
 
 jobs:
-  frontend-red:
+  preflight-red:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -20,9 +20,6 @@ jobs:
           token: ${{ secrets.PRIVATE_CI }}
           path: private-repo
           persist-credentials: false
-      - uses: actions/setup-node@v6
-        with:
-          node-version: '22'
-      - name: Frontend RED contract
-        working-directory: private-repo/frontend
-        run: node --test src/features/admin-batch/admin-batch-scope-pagination.spec.ts
+      - name: Preflight SQL RED contract
+        working-directory: private-repo
+        run: python scripts/ci/test_batch_scope_preflight_sql.py
