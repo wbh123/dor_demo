@@ -1,0 +1,38 @@
+name: Validate batch scope filtered select all
+
+on:
+  push:
+    branches:
+      - diagnostics/batch-scope-pagination-20260816
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: fix/batch-scope-select-filtered-all-20260816
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: false
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+      - name: Backend focused tests
+        working-directory: private-repo/backend-java
+        run: mvn -B -ntp -pl server -am -Dtest=BatchScopeQueryServiceTest -Dsurefire.failIfNoSpecifiedTests=false test
+      - name: Frontend install
+        working-directory: private-repo/frontend
+        run: npm ci
+      - name: Frontend filtered-select regression
+        working-directory: private-repo/frontend
+        run: node --experimental-strip-types --test src/features/admin-batch/admin-batch-scope-pagination.spec.ts
