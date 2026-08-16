@@ -1,0 +1,72 @@
+name: Private Mobile File Diagnostics
+
+on:
+  push:
+    branches:
+      - 'private-compat/main'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: private-mobile-file-diagnostics-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  plan:
+    name: Resolve mobile test files
+    runs-on: ubuntu-latest
+    outputs:
+      files: ${{ steps.files.outputs.files }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: main
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: false
+          fetch-depth: 1
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+      - name: Resolve package test files
+        id: files
+        working-directory: private-repo/app
+        shell: bash
+        run: |
+          set -euo pipefail
+          files=$(node -e "const p=require('./package.json'); console.log(JSON.stringify(p.scripts.test.match(/src\\/[^ ]+\\.spec\\.ts/g) || []))")
+          [[ "$files" != "[]" ]]
+          echo "files=$files" >> "$GITHUB_OUTPUT"
+
+  test:
+    name: ${{ matrix.file }}
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      max-parallel: 16
+      matrix:
+        file: ${{ fromJSON(needs.plan.outputs.files) }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: main
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: false
+          fetch-depth: 1
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: private-repo/app/package-lock.json
+      - name: Install mobile dependencies
+        working-directory: private-repo/app
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Run isolated contract
+        working-directory: private-repo/app
+        run: node --experimental-strip-types --test "${{ matrix.file }}"
