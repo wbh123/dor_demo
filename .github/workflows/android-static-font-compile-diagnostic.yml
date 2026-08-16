@@ -1,0 +1,50 @@
+name: Android static font compile diagnostic
+
+on:
+  push:
+    branches:
+      - diagnostics/materialize-static-print-fonts-20260816
+
+permissions:
+  contents: read
+
+jobs:
+  compile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: fix/pdf-preview-font-weight-parity-20260816
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: false
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+      - name: Install mobile dependencies and copy canonical static fonts
+        working-directory: private-repo/app
+        run: |
+          npm install --ignore-scripts
+          npm run fonts:prepare
+      - name: Compile native Android Java and print focused errors
+        working-directory: private-repo/app/android
+        shell: bash
+        run: |
+          set +e
+          ./gradlew :app:compileDebugJavaWithJavac --no-daemon --stacktrace > /tmp/android-compile.log 2>&1
+          status=$?
+          set -e
+          if [ "$status" -ne 0 ]; then
+            echo '=== javac / Gradle errors ==='
+            grep -n -E 'error:|FAILURE:|What went wrong|Caused by:|NativePrintRecipePlugin' /tmp/android-compile.log | tail -n 120 || true
+            echo '=== final 180 lines ==='
+            tail -n 180 /tmp/android-compile.log
+            exit "$status"
+          fi
+          tail -n 80 /tmp/android-compile.log
