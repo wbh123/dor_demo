@@ -35,12 +35,8 @@ jobs:
         working-directory: private-repo/app
         run: npm run version:check
       - name: Verify APP version bump against main
-        working-directory: private-repo
-        shell: bash
-        run: |
-          git fetch origin main:refs/remotes/origin/main --force
-          cd app
-          node scripts/check-version-bump.mjs origin/main
+        working-directory: private-repo/app
+        run: node scripts/check-version-bump.mjs origin/main
       - name: Build APP
         working-directory: private-repo/app
         run: npm run build
