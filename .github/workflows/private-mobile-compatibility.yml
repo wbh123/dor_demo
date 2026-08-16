@@ -61,9 +61,25 @@ jobs:
           npm run generate:api
           git diff --exit-code -- src/api/schema.d.ts
 
-      - name: Verify auth and navigation tests
+      - name: Verify auth policy test
         working-directory: private-repo/app
-        run: node --experimental-strip-types --test src/api/auth-policy.spec.ts src/platform/navigation.spec.ts src/platform/header-navigation.spec.ts src/platform/tablet-navigation.spec.ts src/platform/account-identity-menu.spec.ts
+        run: node --experimental-strip-types --test src/api/auth-policy.spec.ts
+
+      - name: Verify navigation test
+        working-directory: private-repo/app
+        run: node --experimental-strip-types --test src/platform/navigation.spec.ts
+
+      - name: Verify header navigation test
+        working-directory: private-repo/app
+        run: node --experimental-strip-types --test src/platform/header-navigation.spec.ts
+
+      - name: Verify tablet navigation test
+        working-directory: private-repo/app
+        run: node --experimental-strip-types --test src/platform/tablet-navigation.spec.ts
+
+      - name: Verify account identity menu test
+        working-directory: private-repo/app
+        run: node --experimental-strip-types --test src/platform/account-identity-menu.spec.ts
 
       - name: Verify inspection tests
         working-directory: private-repo/app
