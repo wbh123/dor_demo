@@ -1,0 +1,30 @@
+name: Private App Home Entry Contract
+
+on:
+  push:
+    branches:
+      - 'private-compat/fix/app-home-remove-duplicate-scan-anomaly-20260816'
+
+permissions:
+  contents: read
+
+jobs:
+  home-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout private repair branch
+        uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: fix/app-home-remove-duplicate-scan-anomaly-20260816
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: false
+          fetch-depth: 1
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+      - name: Run APP home contract
+        working-directory: private-repo/app
+        run: node --experimental-strip-types --test src/platform/home-viewport.spec.ts
