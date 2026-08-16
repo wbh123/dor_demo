@@ -1,16 +1,10 @@
 name: Private Mobile Lockfile Commit
 
 on:
-  push:
-    branches:
-      - 'private-compat/**'
+  workflow_dispatch:
 
 permissions:
   contents: read
-
-concurrency:
-  group: private-mobile-lockfile-commit-${{ github.ref }}
-  cancel-in-progress: true
 
 jobs:
   commit:
