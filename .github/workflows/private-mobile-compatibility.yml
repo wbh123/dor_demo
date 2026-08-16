@@ -65,9 +65,18 @@ jobs:
       - name: Verify label scan performance test
         working-directory: private-repo/app
         run: node --experimental-strip-types --test src/platform/label-scan-performance-contract.spec.ts
-      - name: Verify workbench tests
+      - name: Verify room selection workbench tests
         working-directory: private-repo/app
-        run: node --experimental-strip-types --test src/platform/placement.spec.ts src/platform/room-options.spec.ts src/platform/room-selector.spec.ts src/platform/room-selector-layout.spec.ts src/platform/room-navigation.spec.ts src/platform/issue-room-context.spec.ts src/platform/bed-finder.spec.ts src/platform/bed-finder-layout.spec.ts src/platform/residency-workbench.spec.ts src/platform/student-adjustment-panel-layout.spec.ts src/platform/student-residency-workbench-layout.spec.ts src/platform/student-workbench-pagination.spec.ts src/platform/room-workbench-layout.spec.ts src/platform/room-confirmation-pipeline-layout.spec.ts src/platform/room-detail-layout.spec.ts src/platform/bed-confirmation-pagination.spec.ts src/platform/recent-workbench.spec.ts src/platform/room-workbench-home.spec.ts src/platform/room-workbench-state.spec.ts src/platform/student-workbench-filter.spec.ts src/platform/student-workbench-home.spec.ts
+        run: node --experimental-strip-types --test src/platform/placement.spec.ts src/platform/room-options.spec.ts src/platform/room-selector.spec.ts src/platform/room-selector-layout.spec.ts src/platform/room-navigation.spec.ts src/platform/issue-room-context.spec.ts src/platform/bed-finder.spec.ts src/platform/bed-finder-layout.spec.ts
+      - name: Verify residency and student workbench tests
+        working-directory: private-repo/app
+        run: node --experimental-strip-types --test src/platform/residency-workbench.spec.ts src/platform/student-adjustment-panel-layout.spec.ts src/platform/student-residency-workbench-layout.spec.ts src/platform/student-workbench-pagination.spec.ts
+      - name: Verify room confirmation workbench tests
+        working-directory: private-repo/app
+        run: node --experimental-strip-types --test src/platform/room-workbench-layout.spec.ts src/platform/room-confirmation-pipeline-layout.spec.ts src/platform/room-detail-layout.spec.ts src/platform/bed-confirmation-pagination.spec.ts
+      - name: Verify workbench home and state tests
+        working-directory: private-repo/app
+        run: node --experimental-strip-types --test src/platform/recent-workbench.spec.ts src/platform/room-workbench-home.spec.ts src/platform/room-workbench-state.spec.ts src/platform/student-workbench-filter.spec.ts src/platform/student-workbench-home.spec.ts
       - name: Verify runtime and recovery tests
         working-directory: private-repo/app
         run: node --experimental-strip-types --test src/platform/native-runtime.spec.ts src/platform/native-scanner-contract.spec.ts src/platform/native-app-runtime.spec.ts src/platform/network-runtime.spec.ts src/platform/server-profile.spec.ts src/platform/server-runtime-contract.spec.ts src/platform/secure-storage-contract.spec.ts src/platform/server-switch.spec.ts src/platform/server-control.spec.ts src/platform/server-scoped-cache.spec.ts src/platform/server-settings-view.spec.ts src/platform/native-recovery-contract.spec.ts src/platform/recovery-provisioning.spec.ts src/platform/recovery-runtime-contract.spec.ts src/platform/recovery-settings-view.spec.ts src/platform/recovery-entry.spec.ts src/platform/connection-recovery-view.spec.ts src/platform/initial-server-provisioning.spec.ts src/platform/native-http-gateway-contract.spec.ts src/platform/recovery-audit-contract.spec.ts src/platform/app-update-metadata-contract.spec.ts src/platform/native-apk-updater-contract.spec.ts src/platform/app-update-gate.spec.ts src/platform/app-update-flow.spec.ts
