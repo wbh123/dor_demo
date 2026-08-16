@@ -1,0 +1,46 @@
+name: Private Mobile Serial Diagnostics
+
+on:
+  push:
+    branches:
+      - 'private-compat/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: private-mobile-serial-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  diagnose:
+    name: Verify fresh serial layout contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Resolve private branch name
+        id: target
+        shell: bash
+        run: |
+          candidate="$GITHUB_REF_NAME"
+          private_ref="${candidate#private-compat/}"
+          [[ -n "$private_ref" && "$private_ref" != "$candidate" ]]
+          echo "private_ref=$private_ref" >> "$GITHUB_OUTPUT"
+      - name: Checkout private integration branch
+        uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: ${{ steps.target.outputs.private_ref }}
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: false
+          fetch-depth: 1
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+      - name: Install mobile dependencies
+        working-directory: private-repo/app
+        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund && npm ci
+      - name: Fresh serial grouped layout tests
+        working-directory: private-repo/app
+        run: node --experimental-strip-types --test --test-concurrency=1 src/platform/natural-resource-sort.spec.ts src/platform/vite-dev-proxy-contract.spec.ts src/platform/page-heading-layout.spec.ts src/platform/global-mobile-header-layout.spec.ts src/platform/home-viewport.spec.ts src/platform/device-form-factor.spec.ts src/platform/orientation-policy.spec.ts src/platform/device-runtime.spec.ts src/platform/tablet-responsive-layout.spec.ts src/platform/tablet-shell-layout.spec.ts src/platform/login-device-layout.spec.ts src/platform/android-adaptive-shell-contract.spec.ts src/platform/server-probe-login-entry.spec.ts src/platform/action-overlay.spec.ts src/platform/student-placement-overlay.spec.ts src/platform/room-detail-overlay.spec.ts src/platform/student-workbench-overlay.spec.ts src/platform/room-workbench-overlay.spec.ts src/platform/mobile-overlay-flow.spec.ts src/platform/issue-overlay-flow.spec.ts src/platform/checkin-bed-workflow.spec.ts src/platform/dorm-staff-bed-verification.spec.ts src/platform/mobile-notice.spec.ts src/platform/mobile-transient-notice-layout.spec.ts src/platform/mobile-notice-audit.spec.ts src/platform/login-emblem-layout.spec.ts
