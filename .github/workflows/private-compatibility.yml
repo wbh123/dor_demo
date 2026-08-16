@@ -56,7 +56,7 @@ jobs:
       WUST_DORMITORY_REDIS_HOST: 127.0.0.1
       WUST_DORMITORY_REDIS_PORT: '6379'
       WUST_DORMITORY_REDIS_PASSWORD: ''
-      WUST_DORMITORY_FLYWAY_LOCATIONS: classpath:db/migration,filesystem:backend-java/server/src/test/resources/db/dev-migration
+      WUST_DORMITORY_FLYWAY_LOCATIONS: classpath:db/migration
     steps:
       - name: Resolve private branch name
         id: target
