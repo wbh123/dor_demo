@@ -1,0 +1,54 @@
+name: Materialize static print fonts
+
+on:
+  push:
+    branches:
+      - diagnostics/materialize-static-print-fonts-20260816
+
+permissions:
+  contents: read
+
+jobs:
+  materialize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout private repair branch
+        uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: fix/pdf-preview-font-weight-parity-20260816
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          fetch-depth: 0
+          persist-credentials: true
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Install pinned FontTools
+        run: python -m pip install --disable-pip-version-check 'fonttools==4.63.0'
+
+      - name: Materialize Regular and Bold static TTFs
+        working-directory: private-repo
+        run: python scripts/fonts/materialize_noto_sans_sc_static.py --remove-variable-source
+
+      - name: Show generated manifest
+        working-directory: private-repo
+        run: cat backend-java/server/src/main/resources/print-fonts/manifest.json
+
+      - name: Commit generated binary resources back to private branch
+        working-directory: private-repo
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'Wust Dormitory CI'
+          git config user.email 'ci@wust-dormitory.local'
+          git add \
+            backend-java/server/src/main/resources/print-fonts/NotoSansSC-Regular.ttf \
+            backend-java/server/src/main/resources/print-fonts/NotoSansSC-Bold.ttf \
+            backend-java/server/src/main/resources/print-fonts/manifest.json \
+            backend-java/server/src/main/resources/print-fonts/NotoSansSC-VF.ttf
+          git commit -m 'chore: materialize static Noto Sans SC print fonts'
+          git push origin HEAD:fix/pdf-preview-font-weight-parity-20260816
