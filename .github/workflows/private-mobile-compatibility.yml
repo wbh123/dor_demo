@@ -46,7 +46,7 @@ jobs:
         run: npm run generate:api && git diff --exit-code -- src/api/schema.d.ts
       - name: Verify auth navigation and inspection tests
         working-directory: private-repo/app
-        run: node --experimental-strip-types --test src/api/auth-policy.spec.ts src/platform/navigation.spec.ts src/platform/header-navigation.spec.ts src/platform/tablet-navigation.spec.ts src/platform/account-identity-menu.spec.ts src/inspection/state.spec.ts src/inspection/store.spec.ts src/platform/inspection-navigation.spec.ts src/platform/inspection-workflow-layout.spec.ts src/platform/inspection-scanner.spec.ts
+        run: node --experimental-strip-types --test src/api/auth-policy.spec.ts src/platform/navigation.spec.ts src/platform/header-navigation.spec.ts src/platform/tablet-navigation.spec.ts src/platform/account-identity-menu.spec.ts src/inspection/state.spec.ts src/inspection/store.spec.ts src/platform/inspection-navigation.spec.ts src/platform/inspection-api.spec.ts src/platform/inspection-workflow-layout.spec.ts src/platform/inspection-scanner.spec.ts
       - name: Verify scanner test
         working-directory: private-repo/app
         run: node --experimental-strip-types --test src/platform/scanner.spec.ts
@@ -56,6 +56,9 @@ jobs:
       - name: Verify resource label print layout test
         working-directory: private-repo/app
         run: node --experimental-strip-types --test src/platform/resource-label-print-layout.spec.ts
+      - name: Verify native print device compatibility test
+        working-directory: private-repo/app
+        run: node --experimental-strip-types --test src/platform/native-print-device-compat.spec.ts
       - name: Verify tablet print fixed test
         working-directory: private-repo/app
         run: node --experimental-strip-types --test src/platform/tablet-print-fixed-contract.spec.ts
