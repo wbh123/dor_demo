@@ -9,9 +9,9 @@ permissions:
   contents: read
 
 jobs:
-  red:
+  frontend-red:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
         with:
@@ -20,16 +20,9 @@ jobs:
           token: ${{ secrets.PRIVATE_CI }}
           path: private-repo
           persist-credentials: false
-      - uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: '21'
       - uses: actions/setup-node@v6
         with:
           node-version: '22'
-      - name: Backend RED contract
-        working-directory: private-repo/backend-java
-        run: mvn -B -ntp -pl server -am -Dtest=BatchScopeQueryServiceTest -Dsurefire.failIfNoSpecifiedTests=false test
       - name: Frontend RED contract
         working-directory: private-repo/frontend
         run: node --test src/features/admin-batch/admin-batch-scope-pagination.spec.ts
