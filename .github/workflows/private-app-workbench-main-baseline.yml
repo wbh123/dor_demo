@@ -1,0 +1,37 @@
+name: Private APP Workbench Main Baseline
+
+on:
+  push:
+    branches:
+      - 'private-compat/fix/app-workbench-scroll-boundaries-v2-20260816'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: private-app-workbench-main-baseline-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  baseline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout private main
+        uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: main
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: false
+          fetch-depth: 1
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+      - name: Install APP dependencies
+        working-directory: private-repo/app
+        run: npm ci
+      - name: Run APP full tests on main
+        working-directory: private-repo/app
+        run: npm test
