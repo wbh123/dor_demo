@@ -16,7 +16,7 @@ jobs:
   verify-private-ref:
     name: Verify private integration ref
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 45
     steps:
       - name: Resolve private branch name
         id: target
@@ -48,16 +48,62 @@ jobs:
           cache: maven
           cache-dependency-path: private-repo/backend-java/pom.xml
 
-      - name: Verify backend modularization boundary
-        working-directory: private-repo
-        run: python scripts/ci/test_backend_modularization_boundaries.py
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: private-repo/frontend/package-lock.json
 
-      - name: Verify inspection Java regressions
+      - name: Verify all private contracts
+        working-directory: private-repo
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash scripts/ci/run_contracts.sh
+
+      - name: Verify Java 21 modules
         working-directory: private-repo/backend-java
         shell: bash
         run: |
           set -euo pipefail
-          mvn -B -ntp -pl server -am \
-            -Dsurefire.failIfNoSpecifiedTests=false \
-            -Dtest=MobileInspectionControllerTest,MobileInspectionServiceTest,InspectionRoomServiceTest,InspectionRoomReopenServiceTest,InspectionMapperRuntimeMappingTest \
-            test
+          mvn -B -ntp clean verify
+
+      - name: Verify web frontend
+        working-directory: private-repo
+        shell: bash
+        env:
+          VITE_INSTITUTION_NAME: Example University
+          VITE_CAMPUS_NAME: Example Campus
+        run: |
+          set -euo pipefail
+          bash scripts/ci/run_frontend.sh
+
+      - name: Install mobile app dependencies
+        working-directory: private-repo/app
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --package-lock=false --no-audit --no-fund
+
+      - name: Verify mobile OpenAPI generated contract
+        working-directory: private-repo/app
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run generate:api
+          git -C .. diff --exit-code -- app/src/api/schema.d.ts
+
+      - name: Verify mobile app tests and types
+        working-directory: private-repo/app
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm test
+          npm run typecheck
+
+      - name: Verify mobile app production build
+        working-directory: private-repo/app
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run build
