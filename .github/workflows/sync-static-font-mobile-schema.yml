@@ -1,0 +1,43 @@
+name: Sync static font mobile schema
+
+on:
+  push:
+    branches:
+      - diagnostics/materialize-static-print-fonts-20260816
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: fix/pdf-preview-font-weight-parity-20260816
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          fetch-depth: 0
+          persist-credentials: true
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+      - name: Install and regenerate mobile OpenAPI types
+        working-directory: private-repo/app
+        run: |
+          npm install --ignore-scripts
+          npm run generate:api
+      - name: Commit generated schema when changed
+        working-directory: private-repo
+        run: |
+          if git diff --quiet -- app/src/api/schema.d.ts; then
+            echo 'schema already in sync'
+            exit 0
+          fi
+          git config user.name 'Wust Dormitory CI'
+          git config user.email 'ci@wust-dormitory.local'
+          git add app/src/api/schema.d.ts
+          git commit -m 'chore: regenerate mobile API types for print recipe v2'
+          git push origin HEAD:fix/pdf-preview-font-weight-parity-20260816
