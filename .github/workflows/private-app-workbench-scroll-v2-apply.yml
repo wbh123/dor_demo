@@ -1,88 +1,13 @@
 name: Private APP Workbench Scroll V2 Apply
 
 on:
-  push:
-    branches:
-      - 'private-compat/fix/app-workbench-scroll-boundaries-v2-20260816'
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
-  apply:
+  retired:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
     steps:
-      - name: Checkout clean private candidate
-        uses: actions/checkout@v5
-        with:
-          repository: wbh123/Wust-Dormitory-Select
-          ref: fix/app-workbench-scroll-boundaries-v2-20260816
-          token: ${{ secrets.PRIVATE_CI }}
-          path: private-repo
-          persist-credentials: true
-          fetch-depth: 0
-      - name: Reuse verified workbench blobs and bump current version
-        working-directory: private-repo
-        shell: bash
-        run: |
-          set -euo pipefail
-          git fetch origin refs/heads/fix/app-workbench-scroll-boundaries-20260816:refs/remotes/origin/verified-workbench --force
-          git checkout refs/remotes/origin/verified-workbench -- \
-            app/src/views/StudentWorkbenchEntryView.vue \
-            app/src/views/RoomWorkbenchEntryView.vue \
-            app/src/platform/student-workbench-home.spec.ts \
-            app/src/platform/room-workbench-home.spec.ts
-          python - <<'PY'
-          from pathlib import Path
-          import json
-          import os
-          import subprocess
-
-          package_path = Path('app/package.json')
-          package = json.loads(package_path.read_text())
-          if package.get('version') != '1.5.0':
-              raise SystemExit(f"unexpected package version: {package.get('version')}")
-          package['version'] = '1.5.1'
-          package_path.write_text(json.dumps(package, ensure_ascii=False, indent=2) + '\n')
-
-          version_path = Path('app/version.json')
-          version = json.loads(version_path.read_text())
-          if version.get('versionName') != '1.5.0' or version.get('versionCode') != 20:
-              raise SystemExit(f"unexpected version baseline: {version}")
-          released_at = subprocess.check_output(
-              ['bash', '-lc', "TZ=Asia/Shanghai date '+%Y-%m-%dT%H:%M:%S+08:00'"],
-              text=True,
-          ).strip()
-          version['versionName'] = '1.5.1'
-          version['versionCode'] = 21
-          version['releasedAt'] = released_at
-          version['notes'] = '固定学生工作台顶部搜索区域与寝室工作台控制区域，仅允许结果列表滚动；同步最新主线 1.5.x 版本治理。'
-          version_path.write_text(json.dumps(version, ensure_ascii=False, indent=2) + '\n')
-          PY
-          git diff --check
-          git add \
-            app/src/views/StudentWorkbenchEntryView.vue \
-            app/src/views/RoomWorkbenchEntryView.vue \
-            app/src/platform/student-workbench-home.spec.ts \
-            app/src/platform/room-workbench-home.spec.ts \
-            app/package.json app/version.json
-          actual="$(git diff --cached --name-only | sort)"
-          expected="$(printf '%s\n' \
-            app/package.json \
-            app/src/platform/room-workbench-home.spec.ts \
-            app/src/platform/student-workbench-home.spec.ts \
-            app/src/views/RoomWorkbenchEntryView.vue \
-            app/src/views/StudentWorkbenchEntryView.vue \
-            app/version.json | sort)"
-          test "$actual" = "$expected"
-          test "$(git show HEAD:app/package-lock.json | git hash-object --stdin)" = "$(git hash-object app/package-lock.json)"
-      - name: Commit and push clean candidate
-        working-directory: private-repo
-        shell: bash
-        run: |
-          set -euo pipefail
-          git config user.name "Wust Dormitory CI"
-          git config user.email "actions@users.noreply.github.com"
-          git commit -m "fix(app): constrain workbench scrolling to result areas"
-          git push origin HEAD:refs/heads/fix/app-workbench-scroll-boundaries-v2-20260816
+      - run: echo 'One-shot private writer retired after candidate creation.'
