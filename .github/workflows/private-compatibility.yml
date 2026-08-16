@@ -14,24 +14,15 @@ concurrency:
 
 jobs:
   verify-private-ref:
-    name: Verify private integration ref
+    name: Verify current private main baseline
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: Resolve private branch name
-        id: target
-        shell: bash
-        run: |
-          set -euo pipefail
-          candidate="${GITHUB_REF_NAME}"
-          private_ref="${candidate#private-compat/}"
-          echo "private_ref=$private_ref" >> "$GITHUB_OUTPUT"
-
-      - name: Checkout private integration branch
+      - name: Checkout current private main
         uses: actions/checkout@v5
         with:
           repository: wbh123/Wust-Dormitory-Select
-          ref: ${{ steps.target.outputs.private_ref }}
+          ref: main
           token: ${{ secrets.PRIVATE_CI }}
           path: private-repo
           persist-credentials: false
@@ -41,6 +32,6 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Verify current main modularization boundary
+      - name: Verify student-team large Java baseline
         working-directory: private-repo
-        run: python scripts/ci/test_backend_modularization_boundaries.py
+        run: python scripts/ci/test_student_team_service_convergence.py
