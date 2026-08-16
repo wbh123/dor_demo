@@ -1,0 +1,50 @@
+name: Private Mobile Lockfile Export
+
+on:
+  push:
+    branches:
+      - 'private-compat/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: private-mobile-lockfile-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  export:
+    name: Export generated private mobile lockfile
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Resolve private branch name
+        id: target
+        shell: bash
+        run: |
+          candidate="$GITHUB_REF_NAME"
+          private_ref="${candidate#private-compat/}"
+          [[ -n "$private_ref" && "$private_ref" != "$candidate" ]]
+          echo "private_ref=$private_ref" >> "$GITHUB_OUTPUT"
+      - name: Checkout private integration branch
+        uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: ${{ steps.target.outputs.private_ref }}
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: false
+          fetch-depth: 1
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+      - name: Generate package lock
+        working-directory: private-repo/app
+        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+      - name: Upload package lock
+        uses: actions/upload-artifact@v4
+        with:
+          name: private-mobile-package-lock
+          path: private-repo/app/package-lock.json
+          if-no-files-found: error
+          retention-days: 1
