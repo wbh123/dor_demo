@@ -1,0 +1,35 @@
+name: Validate student list filters
+
+on:
+  push:
+    branches:
+      - diagnostics/batch-scope-pagination-20260816
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: feat/student-list-advanced-filters-20260816
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: false
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+      - name: Backend focused test
+        working-directory: private-repo/backend-java
+        run: mvn -B -ntp -pl server -am -Dtest=StudentAdminSortedQueryServiceTest -Dsurefire.failIfNoSpecifiedTests=false test
+      - name: Frontend filter regression
+        working-directory: private-repo/frontend
+        run: node --experimental-strip-types --test src/features/admin-data/admin-data-student-filters.spec.ts
