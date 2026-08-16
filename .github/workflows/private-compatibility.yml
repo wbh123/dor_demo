@@ -217,6 +217,15 @@ jobs:
         if: always()
         run: cat /tmp/wust-dormitory.log || true
 
+      - name: Upload service log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: private-service-log
+          path: /tmp/wust-dormitory.log
+          if-no-files-found: warn
+          retention-days: 1
+
       - name: Print tested private head
         if: always()
         run: echo "Tested private head ${{ steps.private-head.outputs.sha }}"
