@@ -1,0 +1,103 @@
+name: Static print font parity GREEN
+
+on:
+  push:
+    branches:
+      - diagnostics/materialize-static-print-fonts-20260816
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: fix/pdf-preview-font-weight-parity-20260816
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: false
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: private-repo/backend-java/pom.xml
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: private-repo/frontend/package-lock.json
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Verify canonical static font binaries
+        working-directory: private-repo
+        shell: bash
+        run: |
+          set -euo pipefail
+          test ! -e backend-java/server/src/main/resources/print-fonts/NotoSansSC-VF.ttf
+          test -f backend-java/server/src/main/resources/print-fonts/NotoSansSC-Regular.ttf
+          test -f backend-java/server/src/main/resources/print-fonts/NotoSansSC-Bold.ttf
+          echo 'd4f5f0d3897f1ed286010dbecf8b63818e9fc2fbcfcd3ef34f59b4fc9575d992  backend-java/server/src/main/resources/print-fonts/NotoSansSC-Regular.ttf' | sha256sum -c -
+          echo '8ed50d467dedc57ee8e87f1ddcc3863a88b714470adcfdf757d339174e037c26  backend-java/server/src/main/resources/print-fonts/NotoSansSC-Bold.ttf' | sha256sum -c -
+          python -m pip install --disable-pip-version-check 'fonttools==4.63.0'
+          python - <<'PY'
+          from fontTools.ttLib import TTFont
+          for path, weight in [
+              ('backend-java/server/src/main/resources/print-fonts/NotoSansSC-Regular.ttf', 400),
+              ('backend-java/server/src/main/resources/print-fonts/NotoSansSC-Bold.ttf', 700),
+          ]:
+              font = TTFont(path)
+              assert font['OS/2'].usWeightClass == weight, (path, font['OS/2'].usWeightClass)
+              for table in ('fvar','gvar','HVAR','MVAR','avar'):
+                  assert table not in font, (path, table)
+              font.close()
+          PY
+
+      - name: Backend print-font and PDF parity tests
+        working-directory: private-repo/backend-java
+        run: mvn -B -ntp -pl server -am -Dtest=PrintFontRegistryTest,PrintPdfRendererTest,MobilePrintRecipeContractTest -Dsurefire.failIfNoSpecifiedTests=false test
+
+      - name: Frontend install
+        working-directory: private-repo/frontend
+        run: npm ci
+      - name: Frontend prepare static fonts
+        working-directory: private-repo/frontend
+        run: npm run fonts:prepare
+      - name: Frontend full tests
+        working-directory: private-repo/frontend
+        run: npm test
+      - name: Frontend typecheck
+        working-directory: private-repo/frontend
+        run: npm run typecheck
+      - name: Frontend production build
+        working-directory: private-repo/frontend
+        run: npm run build
+
+      - name: Mobile install
+        working-directory: private-repo/app
+        run: npm install --ignore-scripts
+      - name: Mobile prepare static fonts
+        working-directory: private-repo/app
+        run: npm run fonts:prepare
+      - name: Mobile version contract
+        working-directory: private-repo/app
+        run: npm run version:check
+      - name: Mobile full tests
+        working-directory: private-repo/app
+        run: npm test
+      - name: Mobile typecheck
+        working-directory: private-repo/app
+        run: npm run typecheck
+      - name: Mobile production build
+        working-directory: private-repo/app
+        run: npm run build
+
+      - name: Android/HarmonyOS native Java compile
+        working-directory: private-repo/app/android
+        run: ./gradlew :app:compileDebugJavaWithJavac --no-daemon
