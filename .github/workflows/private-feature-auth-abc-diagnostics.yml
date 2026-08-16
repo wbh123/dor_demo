@@ -41,3 +41,6 @@ jobs:
       - name: Run feature authorization ABC regression
         working-directory: private-repo
         run: python scripts/subscription/test_platform_feature_gui.py -v
+      - name: Run latest migration generator contract
+        working-directory: private-repo
+        run: python scripts/db/test_generate_navicat_current_version.py -v
