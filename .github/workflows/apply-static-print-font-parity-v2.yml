@@ -1,0 +1,76 @@
+name: Apply static print font parity v2
+
+on:
+  push:
+    branches:
+      - diagnostics/materialize-static-print-fonts-20260816
+
+permissions:
+  contents: read
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          path: public-repo
+      - uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: fix/pdf-preview-font-weight-parity-20260816
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Reuse exact patch body from audited workflow
+        shell: python
+        run: |
+          from pathlib import Path
+          import os
+          text = Path('public-repo/.github/workflows/apply-static-print-font-parity.yml').read_text(encoding='utf-8')
+          start_marker = '      - name: Apply exact runtime patches\n        working-directory: private-repo\n        shell: python\n        run: |\n'
+          end_marker = '\n      - name: Assert old runtime variable font identity is gone\n'
+          if text.count(start_marker) != 1 or text.count(end_marker) != 1:
+              raise SystemExit('cannot extract audited patch body')
+          body = text.split(start_marker, 1)[1].split(end_marker, 1)[0]
+          lines = []
+          for line in body.splitlines():
+              if line.startswith('          '): line = line[10:]
+              lines.append(line)
+          os.chdir('private-repo')
+          exec(compile('\n'.join(lines), '<static-font-patch>', 'exec'), {})
+
+      - name: Assert legacy variable font is absent from runtime production code
+        working-directory: private-repo
+        shell: bash
+        run: |
+          set -euo pipefail
+          test ! -e backend-java/server/src/main/resources/print-fonts/NotoSansSC-VF.ttf
+          test ! -e frontend/public/fonts/NotoSansSC-VF.ttf
+          test ! -e app/android/app/src/main/assets/fonts/NotoSansSC-VF.ttf
+          ! grep -n -E 'NotoSansSC-VF\.ttf|NOTO_SANS_SC_VF|ANDROID-LOCAL-1|setFontVariationSettings' \
+            backend-java/server/src/main/java/com/wust/dormitory/label/print/recipe/MobilePrintRecipeService.java \
+            frontend/src/api/mobilePrintTemplates.ts \
+            frontend/src/views/admin/AdminMobilePrintTemplateView.vue \
+            app/src/platform/resource-label-recipe.ts \
+            app/src/platform/native-print-recipe.ts \
+            app/android/app/src/main/java/com/wust/dormitory/mobile/NativePrintRecipePlugin.java \
+            app/scripts/prepare-print-font.mjs \
+            frontend/scripts/prepare-print-font.mjs
+
+      - name: Commit runtime parity implementation back to private branch
+        working-directory: private-repo
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'Wust Dormitory CI'
+          git config user.email 'ci@wust-dormitory.local'
+          git add frontend/src/views/admin/AdminMobilePrintTemplateView.vue \
+                  backend-java/server/src/main/java/com/wust/dormitory/label/print/recipe/MobilePrintRecipeService.java \
+                  app/android/app/src/main/java/com/wust/dormitory/mobile/NativePrintRecipePlugin.java \
+                  app/version.json app/package.json
+          git commit -m 'fix: align PDF preview and mobile renderer with static font weights'
+          git push origin HEAD:fix/pdf-preview-font-weight-parity-20260816
