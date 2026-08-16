@@ -9,9 +9,9 @@ permissions:
   contents: read
 
 jobs:
-  home-contract:
+  app-verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     steps:
       - name: Checkout private repair branch
         uses: actions/checkout@v5
@@ -25,6 +25,14 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: '22'
-      - name: Run APP home contract
+          cache: npm
+          cache-dependency-path: private-repo/app/package-lock.json
+      - name: Install APP dependencies
         working-directory: private-repo/app
-        run: node --experimental-strip-types --test src/platform/home-viewport.spec.ts
+        run: npm ci
+      - name: Run APP tests
+        working-directory: private-repo/app
+        run: npm test
+      - name: Build APP
+        working-directory: private-repo/app
+        run: npm run build
