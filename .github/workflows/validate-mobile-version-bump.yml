@@ -1,0 +1,32 @@
+name: Validate mobile version bump
+
+on:
+  push:
+    branches:
+      - diagnostics/mobile-profile-account-menu-20260816
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: fix/mobile-version-bump-1.4.2-20260816
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+      - name: Version consistency
+        working-directory: private-repo/app
+        run: node scripts/check-version-sync.mjs
+      - name: Version bump guard
+        working-directory: private-repo/app
+        run: node scripts/check-version-bump.mjs 890e72dcc34dc45bd13d5374f1ab3577e0c6e0e1
