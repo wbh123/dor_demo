@@ -54,11 +54,6 @@ jobs:
           cache: npm
           cache-dependency-path: private-repo/frontend/package-lock.json
 
-      - name: Record legacy full-contract status
-        continue-on-error: true
-        working-directory: private-repo
-        run: bash scripts/ci/run_contracts.sh
-
       - name: Verify inspection OpenAPI contract
         working-directory: private-repo
         run: python scripts/ci/test_inspection_openapi_contract.py
@@ -84,10 +79,6 @@ jobs:
             fi
           done < <(git diff --name-only origin/main...HEAD -- backend-java/server/src/main/java)
           exit "$failed"
-
-      - name: Verify Java 21 modules
-        working-directory: private-repo/backend-java
-        run: mvn -B -ntp clean verify
 
       - name: Verify web frontend
         working-directory: private-repo
@@ -121,3 +112,12 @@ jobs:
       - name: Verify mobile app production build
         working-directory: private-repo/app
         run: npm run build
+
+      - name: Verify Java 21 modules
+        working-directory: private-repo/backend-java
+        run: mvn -B -ntp clean verify
+
+      - name: Record legacy full-contract status
+        continue-on-error: true
+        working-directory: private-repo
+        run: bash scripts/ci/run_contracts.sh
