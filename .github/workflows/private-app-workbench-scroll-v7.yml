@@ -1,0 +1,89 @@
+name: Private APP Workbench Scroll V7
+
+on:
+  push:
+    branches:
+      - 'private-compat/fix/app-workbench-scroll-boundaries-v7-20260816'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: private-app-workbench-scroll-v7-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout private v7 candidate
+        uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: cd3e24e8e2a05909281178b0eaf4f50dd3d14f99
+          token: ${{ secrets.PRIVATE_CI }}
+          path: candidate
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Checkout latest-main baseline
+        uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: b2fe51976a8449d213dae2266b83e8d4836f4dda
+          token: ${{ secrets.PRIVATE_CI }}
+          path: baseline
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+      - name: Install candidate dependencies
+        working-directory: candidate/app
+        run: npm ci
+      - name: Install baseline dependencies
+        working-directory: baseline/app
+        run: npm ci
+      - name: Verify focused workbench scroll contracts
+        working-directory: candidate/app
+        run: node --experimental-strip-types --test src/platform/student-workbench-home.spec.ts src/platform/room-workbench-home.spec.ts
+      - name: Verify APP version metadata
+        working-directory: candidate/app
+        run: npm run version:check
+      - name: Verify APP version bump against latest main
+        working-directory: candidate/app
+        run: node scripts/check-version-bump.mjs b2fe51976a8449d213dae2266b83e8d4836f4dda
+      - name: Verify package lock inherited from latest main
+        working-directory: candidate
+        run: git diff --exit-code b2fe51976a8449d213dae2266b83e8d4836f4dda -- app/package-lock.json
+      - name: Build candidate APP
+        working-directory: candidate/app
+        run: npm run build
+      - name: Compare full-test failures with latest main
+        shell: bash
+        run: |
+          set +e
+          (cd candidate/app && npm test) > candidate-test.log 2>&1
+          candidate_rc=$?
+          (cd baseline/app && npm test) > baseline-test.log 2>&1
+          baseline_rc=$?
+          set -e
+          echo "candidate exit=$candidate_rc"
+          grep -E '^# (tests|pass|fail) ' candidate-test.log || true
+          echo "baseline exit=$baseline_rc"
+          grep -E '^# (tests|pass|fail) ' baseline-test.log || true
+          node <<'NODE'
+          const fs = require('fs')
+          const readFailures = (file) => {
+            const text = fs.readFileSync(file, 'utf8')
+            return [...text.matchAll(/^not ok \d+ - (.+)$/gm)].map((m) => m[1].trim()).sort()
+          }
+          const candidate = readFailures('candidate-test.log')
+          const baseline = readFailures('baseline-test.log')
+          console.log('candidate failures:', candidate)
+          console.log('baseline failures:', baseline)
+          if (JSON.stringify(candidate) !== JSON.stringify(baseline)) {
+            console.error('candidate full-test failure set differs from latest main baseline')
+            process.exit(1)
+          }
+          NODE
