@@ -1,27 +1,27 @@
-name: Private Mobile Sequential Diagnostics
+name: Private Mobile Contract Baseline Fix Validation
 
 on:
   push:
     branches:
-      - 'private-compat/main'
+      - 'private-compat/diagnose-mobile-contract-baseline-20260817'
 
 permissions:
   contents: read
 
 concurrency:
-  group: private-mobile-sequential-${{ github.ref }}
+  group: private-mobile-contract-baseline-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   diagnose:
-    name: Diagnose private main mobile tests sequentially
+    name: Validate private mobile contract baseline fix
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
         with:
           repository: wbh123/Wust-Dormitory-Select
-          ref: main
+          ref: fix/mobile-contract-baseline-after-dark-mode-20260817
           token: ${{ secrets.PRIVATE_CI }}
           path: private-repo
           persist-credentials: false
@@ -104,7 +104,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: private-main-mobile-sequential-diagnostics
+          name: mobile-contract-baseline-fix-diagnostics
           path: private-repo/app/test-results
           if-no-files-found: error
           retention-days: 7
