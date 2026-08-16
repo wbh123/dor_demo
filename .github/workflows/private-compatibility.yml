@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   verify-private-ref:
-    name: Fix and verify print preview request stall
+    name: Verify full frontend after print preview fix
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -33,129 +33,7 @@ jobs:
           ref: ${{ steps.target.outputs.private_ref }}
           token: ${{ secrets.PRIVATE_CI }}
           path: private-repo
-          persist-credentials: true
-          fetch-depth: 0
-      - name: Apply minimal single-flight fix
-        working-directory: private-repo
-        shell: bash
-        run: |
-          set -euo pipefail
-          python - <<'PY'
-          from pathlib import Path
-
-          api_path = Path('frontend/src/api/mobilePrintTemplates.ts')
-          api = api_path.read_text(encoding='utf-8')
-          anchor = "const CANONICAL_PRINT_FONT_URL = `/fonts/NotoSansSC-VF.ttf?v=${CANONICAL_PRINT_FONT_SHA256}`"
-          assert api.count(anchor) == 1
-          api = api.replace(anchor, anchor + "\nlet canonicalPrintFontPromise: Promise<ArrayBuffer> | null = null", 1)
-          old_loader = '''export async function loadCanonicalPrintFont(_weight: 400 | 700): Promise<ArrayBuffer> {
-            const response = await fetch(CANONICAL_PRINT_FONT_URL, { cache: 'no-cache' })
-            if (!response.ok) {
-              throw new Error(`统一打印字体加载失败: HTTP ${response.status}。请重新执行前端字体准备与构建。`)
-            }
-            const bytes = await response.arrayBuffer()
-            if (!isTrueTypeFont(bytes)) {
-              throw new Error('统一打印字体静态资源无效，可能被前端页面回退文件替代。请重新执行 npm run fonts:prepare && npm run build。')
-            }
-            const actualSha256 = await sha256Hex(bytes)
-            if (actualSha256 !== CANONICAL_PRINT_FONT_SHA256) {
-              throw new Error(`统一打印字体校验失败: SHA-256=${actualSha256}`)
-            }
-            return bytes
-          }'''.replace('          ', '')
-          new_loader = '''async function fetchCanonicalPrintFont(): Promise<ArrayBuffer> {
-            const response = await fetch(CANONICAL_PRINT_FONT_URL, { cache: 'no-cache' })
-            if (!response.ok) {
-              throw new Error(`统一打印字体加载失败: HTTP ${response.status}。请重新执行前端字体准备与构建。`)
-            }
-            const bytes = await response.arrayBuffer()
-            if (!isTrueTypeFont(bytes)) {
-              throw new Error('统一打印字体静态资源无效，可能被前端页面回退文件替代。请重新执行 npm run fonts:prepare && npm run build。')
-            }
-            const actualSha256 = await sha256Hex(bytes)
-            if (actualSha256 !== CANONICAL_PRINT_FONT_SHA256) {
-              throw new Error(`统一打印字体校验失败: SHA-256=${actualSha256}`)
-            }
-            return bytes
-          }
-
-          export function loadCanonicalPrintFont(_weight: 400 | 700): Promise<ArrayBuffer> {
-            canonicalPrintFontPromise ??= fetchCanonicalPrintFont().catch(reason => {
-              canonicalPrintFontPromise = null
-              throw reason
-            })
-            return canonicalPrintFontPromise
-          }'''.replace('          ', '')
-          assert api.count(old_loader) == 1, 'font loader changed unexpectedly'
-          api = api.replace(old_loader, new_loader, 1)
-          api_path.write_text(api, encoding='utf-8')
-
-          view_path = Path('frontend/src/views/admin/AdminMobilePrintTemplateView.vue')
-          view = view_path.read_text(encoding='utf-8')
-          old_vars = "let previewTimer: number | null = null\nlet previewSequence = 0\nlet fontsReady = false"
-          new_vars = "let previewTimer: number | null = null\nlet previewSequence = 0\nlet previewRefreshPromise: Promise<void> | null = null\nlet previewRefreshQueued = false\nlet fontsReady = false"
-          assert view.count(old_vars) == 1
-          view = view.replace(old_vars, new_vars, 1)
-
-          old_fonts = """async function ensureCanonicalFonts(){
-            if(fontsReady)return
-            const [regular,bold]=await Promise.all([loadCanonicalPrintFont(400),loadCanonicalPrintFont(700)])
-            const regularFace=new FontFace(FONT_FAMILY,regular,{weight:'400'});const boldFace=new FontFace(FONT_FAMILY,bold,{weight:'700'})
-            await Promise.all([regularFace.load(),boldFace.load()]);document.fonts.add(regularFace);document.fonts.add(boldFace);fontsReady=true
-          }""".replace('          ', '')
-          new_fonts = """async function ensureCanonicalFonts(){
-            if(fontsReady)return
-            const fontBytes=await loadCanonicalPrintFont(400)
-            const regularFace=new FontFace(FONT_FAMILY,fontBytes,{weight:'400'});const boldFace=new FontFace(FONT_FAMILY,fontBytes.slice(0),{weight:'700'})
-            await Promise.all([regularFace.load(),boldFace.load()]);document.fonts.add(regularFace);document.fonts.add(boldFace);fontsReady=true
-          }""".replace('          ', '')
-          assert view.count(old_fonts) == 1
-          view = view.replace(old_fonts, new_fonts, 1)
-
-          old_preview = """function revokePdfUrl(){if(previewPdfUrl.value)URL.revokeObjectURL(previewPdfUrl.value);previewPdfUrl.value=''}
-          function schedulePreview(){previewReadyKey.value='';if(previewTimer!=null)window.clearTimeout(previewTimer);previewTimer=window.setTimeout(()=>void refreshCanonicalPreview(),250)}
-          async function refreshCanonicalPreview(){
-            const sequence=++previewSequence;previewBusy.value=true
-            try{
-              await ensureCanonicalFonts()
-              const input={labelWidthMm:form.widthMm,labelHeightMm:form.heightMm,layout:layout.value}
-              const [resolvedValue,pdf]=await Promise.all([previewMobilePrintTemplateLayout(input),previewMobilePrintTemplatePdf(input)])
-              if(sequence!==previewSequence)return
-              resolvedLayout.value=resolvedValue;revokePdfUrl();previewPdfUrl.value=URL.createObjectURL(pdf);previewReadyKey.value=currentPreviewKey.value
-            }catch(reason){if(sequence===previewSequence){previewReadyKey.value='';error.value=reason instanceof Error?reason.message:'统一打印预览失败'}}finally{if(sequence===previewSequence)previewBusy.value=false}
-          }""".replace('          ', '')
-          new_preview = """function revokePdfUrl(){if(previewPdfUrl.value)URL.revokeObjectURL(previewPdfUrl.value);previewPdfUrl.value=''}
-          function schedulePreview(){previewReadyKey.value='';if(previewTimer!=null)window.clearTimeout(previewTimer);previewTimer=window.setTimeout(()=>void runCanonicalPreview(),250)}
-          async function runCanonicalPreview(){
-            if(previewRefreshPromise){previewRefreshQueued=true;return previewRefreshPromise}
-            previewRefreshPromise=refreshCanonicalPreview()
-            try{await previewRefreshPromise}finally{
-              previewRefreshPromise=null
-              if(previewRefreshQueued&&editorOpen.value){previewRefreshQueued=false;schedulePreview()}else{previewRefreshQueued=false}
-            }
-          }
-          async function refreshCanonicalPreview(){
-            const sequence=++previewSequence;previewBusy.value=true
-            try{
-              await ensureCanonicalFonts()
-              const previewKey=currentPreviewKey.value
-              const input={labelWidthMm:form.widthMm,labelHeightMm:form.heightMm,layout:layout.value}
-              const [resolvedValue,pdf]=await Promise.all([previewMobilePrintTemplateLayout(input),previewMobilePrintTemplatePdf(input)])
-              if(sequence!==previewSequence)return
-              resolvedLayout.value=resolvedValue;revokePdfUrl();previewPdfUrl.value=URL.createObjectURL(pdf);previewReadyKey.value=previewKey
-            }catch(reason){if(sequence===previewSequence){previewReadyKey.value='';error.value=reason instanceof Error?reason.message:'统一打印预览失败'}}finally{if(sequence===previewSequence)previewBusy.value=false}
-          }""".replace('          ', '')
-          assert view.count(old_preview) == 1, 'preview block changed unexpectedly'
-          view = view.replace(old_preview, new_preview, 1)
-          view_path.write_text(view, encoding='utf-8')
-          PY
-          git diff --check
-          git diff -- frontend/src/api/mobilePrintTemplates.ts frontend/src/views/admin/AdminMobilePrintTemplateView.vue frontend/src/views/admin/admin-print-font-contract.spec.ts
-          git config user.name "WangBinghao"
-          git config user.email "2495680763@qq.com"
-          git add frontend/src/api/mobilePrintTemplates.ts frontend/src/views/admin/AdminMobilePrintTemplateView.vue frontend/src/views/admin/admin-print-font-contract.spec.ts
-          git commit -m "fix: 防止打印模板预览阻塞全局请求"
-          git push origin "HEAD:${{ steps.target.outputs.private_ref }}"
+          persist-credentials: false
       - uses: actions/setup-node@v6
         with:
           node-version: '22'
@@ -164,9 +42,9 @@ jobs:
       - name: Install frontend dependencies
         working-directory: private-repo/frontend
         run: npm ci
-      - name: Run request-stall regression
+      - name: Run full frontend tests
         working-directory: private-repo/frontend
-        run: node --test src/views/admin/admin-print-font-contract.spec.ts
+        run: npm test
       - name: Run frontend typecheck
         working-directory: private-repo/frontend
         run: npm run typecheck
