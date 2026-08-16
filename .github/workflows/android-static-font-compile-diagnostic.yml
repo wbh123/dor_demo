@@ -27,11 +27,11 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: '22'
-      - name: Install mobile dependencies and copy canonical static fonts
+      - name: Install mobile dependencies and materialize Capacitor Android project
         working-directory: private-repo/app
         run: |
           npm install --ignore-scripts
-          npm run fonts:prepare
+          npm run android:sync
       - name: Compile native Android Java and print focused errors
         working-directory: private-repo/app/android
         shell: bash
@@ -42,9 +42,9 @@ jobs:
           set -e
           if [ "$status" -ne 0 ]; then
             echo '=== javac / Gradle errors ==='
-            grep -n -E 'error:|FAILURE:|What went wrong|Caused by:|NativePrintRecipePlugin' /tmp/android-compile.log | tail -n 120 || true
-            echo '=== final 180 lines ==='
-            tail -n 180 /tmp/android-compile.log
+            grep -n -E 'error:|FAILURE:|What went wrong|Caused by:|NativePrintRecipePlugin' /tmp/android-compile.log | tail -n 160 || true
+            echo '=== final 220 lines ==='
+            tail -n 220 /tmp/android-compile.log
             exit "$status"
           fi
-          tail -n 80 /tmp/android-compile.log
+          tail -n 120 /tmp/android-compile.log
