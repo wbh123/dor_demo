@@ -1,9 +1,7 @@
 name: Private Feature Authorization DB Generation Fix
 
 on:
-  push:
-    branches:
-      - 'private-compat/fix/feature-authorization-abc-catalog-20260816'
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -11,73 +9,5 @@ permissions:
 jobs:
   patch:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
     steps:
-      - name: Checkout private repair branch
-        uses: actions/checkout@v5
-        with:
-          repository: wbh123/Wust-Dormitory-Select
-          ref: fix/feature-authorization-abc-catalog-20260816
-          token: ${{ secrets.PRIVATE_CI }}
-          path: private-repo
-          persist-credentials: true
-          fetch-depth: 1
-      - name: Register V56 and regenerate database artifacts
-        working-directory: private-repo
-        shell: bash
-        run: |
-          set -euo pipefail
-          test "$(git rev-parse HEAD)" = "11cf3c721ffe306674be2ca9ae67500cef99b1ff"
-          python - <<'PY'
-          from pathlib import Path
-          path = Path('scripts/db/generate_navicat_sql.py')
-          text = path.read_text(encoding='utf-8')
-          anchor = '    "-- >>> BEGIN QINGSHAN CAMPUS EXTENSION",\n'
-          addition = (
-              '    "-- >>> BEGIN V56__repair_feature_category_catalog.sql",\n'
-              '    "基础业务功能",\n'
-              '    "增强业务功能",\n'
-              '    "移动管理端",\n'
-          )
-          if text.count(anchor) != 1:
-              raise SystemExit(f'expected one generator insertion anchor, found {text.count(anchor)}')
-          if 'V56__repair_feature_category_catalog.sql' in text:
-              raise SystemExit('V56 already registered unexpectedly')
-          path.write_text(text.replace(anchor, addition + anchor), encoding='utf-8')
-          PY
-          python scripts/db/generate_navicat_sql.py --scenario realistic --skip-redis
-          python scripts/db/generate_school_deployment_sql.py
-          python scripts/db/test_generate_navicat_current_version.py -v
-          python scripts/db/test_generate_navicat_latest_database.py -v
-          git diff --check
-          python - <<'PY'
-          import subprocess
-          allowed = {
-              'scripts/db/generate_navicat_sql.py',
-              'backend-java/docs/sql/navicat/generated/00_一键重置数据库.sql',
-              'backend-java/docs/sql/deployment/generated/00_学校全新部署.sql',
-              'backend-java/docs/sql/deployment/generated/01_清空运营数据.sql',
-          }
-          changed = set(subprocess.check_output(['git','diff','--name-only'], text=True).splitlines())
-          unexpected = changed - allowed
-          if unexpected:
-              raise SystemExit(f'unexpected generated changes: {sorted(unexpected)}')
-          required = {
-              'scripts/db/generate_navicat_sql.py',
-              'backend-java/docs/sql/navicat/generated/00_一键重置数据库.sql',
-              'backend-java/docs/sql/deployment/generated/00_学校全新部署.sql',
-          }
-          missing = required - changed
-          if missing:
-              raise SystemExit(f'expected generated changes missing: {sorted(missing)}')
-          PY
-      - name: Commit generated database repair
-        working-directory: private-repo
-        shell: bash
-        run: |
-          set -euo pipefail
-          git config user.name "Wust Dormitory CI"
-          git config user.email "actions@users.noreply.github.com"
-          git add scripts/db/generate_navicat_sql.py backend-java/docs/sql/navicat/generated/00_一键重置数据库.sql backend-java/docs/sql/deployment/generated/00_学校全新部署.sql backend-java/docs/sql/deployment/generated/01_清空运营数据.sql
-          git commit -m "build(db): regenerate V56 deployment SQL"
-          git push origin HEAD:refs/heads/fix/feature-authorization-abc-catalog-20260816
+      - run: echo "Retired after confirming pre-existing Navicat generator drift."
