@@ -29,7 +29,7 @@ jobs:
           node-version: '22'
       - name: Backend focused tests
         working-directory: private-repo/backend-java
-        run: mvn -B -ntp -pl server -am -Dtest=BatchScopeQueryServiceTest -Dsurefire.failIfNoSpecifiedTests=false test
+        run: mvn -B -ntp -pl server -am -Dtest=BatchScopeQueryServiceTest,BatchRoomLockServiceStudentConflictTest -Dsurefire.failIfNoSpecifiedTests=false test
       - name: Frontend install
         working-directory: private-repo/frontend
         run: npm ci
