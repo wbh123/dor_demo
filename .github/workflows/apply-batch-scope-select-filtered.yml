@@ -1,0 +1,423 @@
+name: Apply batch scope filtered select all
+
+on:
+  push:
+    branches:
+      - diagnostics/batch-scope-pagination-20260816
+
+permissions:
+  contents: read
+
+jobs:
+  apply:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: fix/batch-scope-select-filtered-all-20260816
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+      - name: Apply filtered select-all implementation
+        working-directory: private-repo
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace(path, old, new, count=1):
+              p = Path(path)
+              text = p.read_text()
+              if old not in text:
+                  raise SystemExit(f'marker not found in {path}: {old[:120]!r}')
+              p.write_text(text.replace(old, new, count))
+
+          service = 'backend-java/server/src/main/java/com/wust/dormitory/admin/BatchScopeQueryService.java'
+          replace(service, '''        StringBuilder where = new StringBuilder(" WHERE m.enabled=1 ");
+                  addTextFilter(where, params, query.keyword(), "keyword", """
+                          AND (LOWER(s.student_number) LIKE :keyword
+                            OR LOWER(s.student_name) LIKE :keyword
+                            OR LOWER(m.major_name) LIKE :keyword
+                            OR LOWER(m.major_code) LIKE :keyword)
+                          """);
+                  addEqualsFilter(where, params, query.gender(), "gender", "s.gender");
+                  addEqualsFilter(where, params, query.category(), "category", "s.student_category");
+                  addEqualsFilter(where, params, query.degree(), "degree", "s.degree_level");
+                  if (query.majorId() != null && query.majorId() > 0) {
+                      where.append(" AND s.major_id=:majorId ");
+                      params.addValue("majorId", query.majorId());
+                  }
+                  addEqualsFilter(where, params, query.grade(), "grade", "s.grade_year");
+          ''', '''        StringBuilder where = studentWhere(params, query);
+          ''')
+          replace(service, '''        StringBuilder where = new StringBuilder(" WHERE b.enabled=1 ");
+                  addTextFilter(where, params, query.keyword(), "keyword", """
+                          AND (LOWER(b.building_code) LIKE :keyword
+                            OR LOWER(b.building_name) LIKE :keyword
+                            OR LOWER(r.room_number) LIKE :keyword
+                            OR CAST(f.floor_number AS CHAR) LIKE :keyword)
+                          """);
+                  addEqualsFilter(where, params, query.gender(), "gender", "r.gender_restriction");
+                  addEqualsFilter(where, params, query.residentScope(), "residentScope", "r.resident_scope");
+                  if (query.campusId() != null && query.campusId() > 0) {
+                      where.append(" AND c.id=:campusId ");
+                      params.addValue("campusId", query.campusId());
+                  }
+                  if (query.buildingId() != null && query.buildingId() > 0) {
+                      where.append(" AND b.id=:buildingId ");
+                      params.addValue("buildingId", query.buildingId());
+                  }
+                  addEqualsFilter(where, params, query.floor(), "floor", "f.floor_number");
+          ''', '''        StringBuilder where = roomWhere(params, query);
+          ''')
+          replace(service, '''    public Map<String, Object> rooms(long batchId, RoomQuery query) {
+          ''', '''    public Map<String, Object> studentIds(long batchId, StudentQuery query) {
+              currentBatch(batchId, new MapSqlParameterSource("batchId", batchId));
+              MapSqlParameterSource params = new MapSqlParameterSource("batchId", batchId);
+              StringBuilder where = studentWhere(params, query);
+              List<Long> matchingIds = ids(jdbc.queryForList("""
+                      SELECT s.id
+                      FROM student s
+                      JOIN major m ON m.id=s.major_id
+                      """ + where + " ORDER BY s.id ASC", params), "id");
+              return idResult(matchingIds);
+          }
+
+              public Map<String, Object> rooms(long batchId, RoomQuery query) {
+          ''')
+          replace(service, '''    private Map<String, Object> currentBatch(long batchId, MapSqlParameterSource params) {
+          ''', '''    public Map<String, Object> roomIds(long batchId, RoomQuery query) {
+              currentBatch(batchId, new MapSqlParameterSource("batchId", batchId));
+              MapSqlParameterSource params = new MapSqlParameterSource("batchId", batchId);
+              StringBuilder where = roomWhere(params, query);
+              List<Long> matchingIds = ids(jdbc.queryForList("""
+                      SELECT r.id
+                      FROM room r
+                      JOIN dormitory_floor f ON f.id=r.floor_id
+                      JOIN dormitory_building b ON b.id=f.building_id
+                      JOIN campus c ON c.id=b.campus_id
+                      LEFT JOIN active_batch_room_lock conflict_lock
+                             ON conflict_lock.room_id=r.id AND conflict_lock.batch_id<>:batchId
+                      """ + where + " AND r.operational_status='ENABLED' AND conflict_lock.room_id IS NULL ORDER BY r.id ASC", params), "id");
+              return idResult(matchingIds);
+          }
+
+              private StringBuilder studentWhere(MapSqlParameterSource params, StudentQuery query) {
+              StringBuilder where = new StringBuilder(" WHERE m.enabled=1 ");
+              addTextFilter(where, params, query.keyword(), "keyword", """
+                      AND (LOWER(s.student_number) LIKE :keyword
+                        OR LOWER(s.student_name) LIKE :keyword
+                        OR LOWER(m.major_name) LIKE :keyword
+                        OR LOWER(m.major_code) LIKE :keyword)
+                      """);
+              addEqualsFilter(where, params, query.gender(), "gender", "s.gender");
+              addEqualsFilter(where, params, query.category(), "category", "s.student_category");
+              addEqualsFilter(where, params, query.degree(), "degree", "s.degree_level");
+              if (query.majorId() != null && query.majorId() > 0) {
+                  where.append(" AND s.major_id=:majorId ");
+                  params.addValue("majorId", query.majorId());
+              }
+              addEqualsFilter(where, params, query.grade(), "grade", "s.grade_year");
+              return where;
+          }
+
+              private StringBuilder roomWhere(MapSqlParameterSource params, RoomQuery query) {
+              StringBuilder where = new StringBuilder(" WHERE b.enabled=1 ");
+              addTextFilter(where, params, query.keyword(), "keyword", """
+                      AND (LOWER(b.building_code) LIKE :keyword
+                        OR LOWER(b.building_name) LIKE :keyword
+                        OR LOWER(r.room_number) LIKE :keyword
+                        OR CAST(f.floor_number AS CHAR) LIKE :keyword)
+                      """);
+              addEqualsFilter(where, params, query.gender(), "gender", "r.gender_restriction");
+              addEqualsFilter(where, params, query.residentScope(), "residentScope", "r.resident_scope");
+              if (query.campusId() != null && query.campusId() > 0) {
+                  where.append(" AND c.id=:campusId ");
+                  params.addValue("campusId", query.campusId());
+              }
+              if (query.buildingId() != null && query.buildingId() > 0) {
+                  where.append(" AND b.id=:buildingId ");
+                  params.addValue("buildingId", query.buildingId());
+              }
+              addEqualsFilter(where, params, query.floor(), "floor", "f.floor_number");
+              return where;
+          }
+
+              private Map<String, Object> idResult(List<Long> matchingIds) {
+              Map<String, Object> result = new LinkedHashMap<>();
+              result.put("count", matchingIds.size());
+              result.put("ids", matchingIds);
+              return result;
+          }
+
+              private Map<String, Object> currentBatch(long batchId, MapSqlParameterSource params) {
+          ''')
+
+          controller = 'backend-java/server/src/main/java/com/wust/dormitory/admin/BatchScopeQueryController.java'
+          replace(controller, '''    @GetMapping("/scope-rooms")
+          ''', '''    @GetMapping("/scope-student-ids")
+              public ResponseEntity<ObjectSuccessResponse> studentIds(
+                      @PathVariable long batchId,
+                      @RequestParam(defaultValue = "") String keyword,
+                      @RequestParam(defaultValue = "") String gender,
+                      @RequestParam(defaultValue = "") String category,
+                      @RequestParam(defaultValue = "") String degree,
+                      @RequestParam(required = false) Long majorId,
+                      @RequestParam(defaultValue = "") String grade) {
+                  SecurityUsers.requireAdmin();
+                  return ResponseEntity.ok(ResponseFactory.object(service.studentIds(batchId,
+                          new BatchScopeQueryService.StudentQuery(1, 1, keyword, gender, category,
+                                  degree, majorId, grade, "student_number", "asc"))));
+              }
+
+              @GetMapping("/scope-room-ids")
+              public ResponseEntity<ObjectSuccessResponse> roomIds(
+                      @PathVariable long batchId,
+                      @RequestParam(defaultValue = "") String keyword,
+                      @RequestParam(defaultValue = "") String gender,
+                      @RequestParam(defaultValue = "") String residentScope,
+                      @RequestParam(required = false) Long campusId,
+                      @RequestParam(required = false) Long buildingId,
+                      @RequestParam(defaultValue = "") String floor) {
+                  SecurityUsers.requireAdmin();
+                  return ResponseEntity.ok(ResponseFactory.object(service.roomIds(batchId,
+                          new BatchScopeQueryService.RoomQuery(1, 1, keyword, gender, residentScope,
+                                  campusId, buildingId, floor, "building_name", "asc"))));
+              }
+
+              @GetMapping("/scope-rooms")
+          ''')
+
+          openapi = 'backend-java/model/src/main/resources/admin/openapi-batch-selection.yaml'
+          replace(openapi, '  version: 1.2.0\n', '  version: 1.3.0\n')
+          replace(openapi, '''  /api/v1/admin/batches/{batchId}/scope-rooms:
+          ''', '''  /api/v1/admin/batches/{batchId}/scope-student-ids:
+              get:
+                tags: [BatchScopeQuery]
+                operationId: listBatchScopeStudentIds
+                summary: 查询当前筛选条件下全部学生编号，不受分页大小限制
+                security: [{ bearerAuth: [] }]
+                parameters:
+                  - $ref: '#/components/parameters/BatchIdPath'
+                  - { name: keyword, in: query, schema: { type: string, default: '' } }
+                  - { name: gender, in: query, schema: { type: string, default: '' } }
+                  - { name: category, in: query, schema: { type: string, default: '' } }
+                  - { name: degree, in: query, schema: { type: string, default: '' } }
+                  - { name: majorId, in: query, schema: { type: integer, format: int64 } }
+                  - { name: grade, in: query, schema: { type: string, default: '' } }
+                responses:
+                  '200': { $ref: '#/components/responses/ObjectSuccess' }
+                  '404': { $ref: '#/components/responses/ErrorResponse' }
+
+              /api/v1/admin/batches/{batchId}/scope-rooms:
+          ''')
+          replace(openapi, '''  /api/v1/admin/batches/{batchId}/room-preflight:
+          ''', '''  /api/v1/admin/batches/{batchId}/scope-room-ids:
+              get:
+                tags: [BatchScopeQuery]
+                operationId: listBatchScopeRoomIds
+                summary: 查询当前筛选条件下全部可用宿舍编号，不受分页大小限制
+                security: [{ bearerAuth: [] }]
+                parameters:
+                  - $ref: '#/components/parameters/BatchIdPath'
+                  - { name: keyword, in: query, schema: { type: string, default: '' } }
+                  - { name: gender, in: query, schema: { type: string, default: '' } }
+                  - { name: residentScope, in: query, schema: { type: string, default: '' } }
+                  - { name: campusId, in: query, schema: { type: integer, format: int64 } }
+                  - { name: buildingId, in: query, schema: { type: integer, format: int64 } }
+                  - { name: floor, in: query, schema: { type: string, default: '' } }
+                responses:
+                  '200': { $ref: '#/components/responses/ObjectSuccess' }
+                  '404': { $ref: '#/components/responses/ErrorResponse' }
+
+              /api/v1/admin/batches/{batchId}/room-preflight:
+          ''')
+          replace(openapi, '          maxItems: 10000\n', '          maxItems: 50000\n', count=2)
+
+          interface = 'backend-java/model/src/main/resources/openapi-interface.yaml'
+          replace(interface, '''  /api/v1/admin/batches/{batchId}/scope-students:
+              $ref: 'admin/openapi-batch-selection.yaml#/paths/~1api~1v1~1admin~1batches~1{batchId}~1scope-students'
+          ''', '''  /api/v1/admin/batches/{batchId}/scope-students:
+              $ref: 'admin/openapi-batch-selection.yaml#/paths/~1api~1v1~1admin~1batches~1{batchId}~1scope-students'
+            /api/v1/admin/batches/{batchId}/scope-student-ids:
+              $ref: 'admin/openapi-batch-selection.yaml#/paths/~1api~1v1~1admin~1batches~1{batchId}~1scope-student-ids'
+          ''')
+          replace(interface, '''  /api/v1/admin/batches/{batchId}/scope-rooms:
+              $ref: 'admin/openapi-batch-selection.yaml#/paths/~1api~1v1~1admin~1batches~1{batchId}~1scope-rooms'
+          ''', '''  /api/v1/admin/batches/{batchId}/scope-rooms:
+              $ref: 'admin/openapi-batch-selection.yaml#/paths/~1api~1v1~1admin~1batches~1{batchId}~1scope-rooms'
+            /api/v1/admin/batches/{batchId}/scope-room-ids:
+              $ref: 'admin/openapi-batch-selection.yaml#/paths/~1api~1v1~1admin~1batches~1{batchId}~1scope-room-ids'
+          ''')
+
+          pagination = 'frontend/src/features/admin-batch/composables/useBatchScopePagination.ts'
+          replace(pagination, '''  const studentPageLoading = ref(false), roomPageLoading = ref(false)
+          ''', '''  const studentPageLoading = ref(false), roomPageLoading = ref(false)
+            const studentFilteredSelectionLoading = ref(false), roomFilteredSelectionLoading = ref(false)
+          ''')
+          replace(pagination, '''  async function loadStudentPage() {
+          ''', '''  function studentFilterParams() {
+              return {
+                keyword: studentFilter.value,
+                gender: studentGenderFilter.value,
+                category: studentCategoryFilter.value,
+                degree: studentDegreeFilter.value,
+                majorId: studentMajorFilter.value || undefined,
+                grade: studentGradeFilter.value,
+              }
+            }
+
+            function roomFilterParams() {
+              return {
+                keyword: roomFilter.value,
+                gender: roomGenderFilter.value,
+                residentScope: roomScopeFilter.value,
+                campusId: roomCampusFilter.value || undefined,
+                buildingId: roomBuildingFilter.value || undefined,
+                floor: roomFloorFilter.value,
+              }
+            }
+
+            async function loadStudentPage() {
+          ''')
+          replace(pagination, '''      const response = await api.get<ObjectSuccessResponse>(`/api/v1/admin/batches/${batchId}/scope-students`, { params: {
+                  page: studentPage.value,
+                  pageSize: studentPageSize.value,
+                  keyword: studentFilter.value,
+                  gender: studentGenderFilter.value,
+                  category: studentCategoryFilter.value,
+                  degree: studentDegreeFilter.value,
+                  majorId: studentMajorFilter.value || undefined,
+                  grade: studentGradeFilter.value,
+                  sortBy: studentSortField.value,
+                  sortDirection: studentSortDirection.value,
+                } })
+          ''', '''      const response = await api.get<ObjectSuccessResponse>(`/api/v1/admin/batches/${batchId}/scope-students`, { params: {
+                  page: studentPage.value,
+                  pageSize: studentPageSize.value,
+                  ...studentFilterParams(),
+                  sortBy: studentSortField.value,
+                  sortDirection: studentSortDirection.value,
+                } })
+          ''')
+          replace(pagination, '''      const response = await api.get<ObjectSuccessResponse>(`/api/v1/admin/batches/${batchId}/scope-rooms`, { params: {
+                  page: roomPage.value,
+                  pageSize: roomPageSize.value,
+                  keyword: roomFilter.value,
+                  gender: roomGenderFilter.value,
+                  residentScope: roomScopeFilter.value,
+                  campusId: roomCampusFilter.value || undefined,
+                  buildingId: roomBuildingFilter.value || undefined,
+                  floor: roomFloorFilter.value,
+                  sortBy: roomSortField.value,
+                  sortDirection: roomSortDirection.value,
+                } })
+          ''', '''      const response = await api.get<ObjectSuccessResponse>(`/api/v1/admin/batches/${batchId}/scope-rooms`, { params: {
+                  page: roomPage.value,
+                  pageSize: roomPageSize.value,
+                  ...roomFilterParams(),
+                  sortBy: roomSortField.value,
+                  sortDirection: roomSortDirection.value,
+                } })
+          ''')
+          replace(pagination, '''  function selectAllStudents() {
+          ''', '''  async function selectAllFilteredStudents() {
+              const batchId = activeBatchId.value
+              if (!batchId || studentFilteredSelectionLoading.value) return
+              const filterKey = JSON.stringify(studentFilterParams())
+              studentFilteredSelectionLoading.value = true
+              try {
+                const response = await api.get<ObjectSuccessResponse>(`/api/v1/admin/batches/${batchId}/scope-student-ids`, { params: studentFilterParams() })
+                if (filterKey !== JSON.stringify(studentFilterParams())) return
+                const data = (response.data.data ?? {}) as DataObject
+                selectedStudentIds.value = uniqueIds([...selectedStudentIds.value, ...numericIds(data.ids)])
+              } finally {
+                studentFilteredSelectionLoading.value = false
+              }
+            }
+
+            async function selectAllFilteredRooms() {
+              const batchId = activeBatchId.value
+              if (!batchId || roomFilteredSelectionLoading.value) return
+              const filterKey = JSON.stringify(roomFilterParams())
+              roomFilteredSelectionLoading.value = true
+              try {
+                const response = await api.get<ObjectSuccessResponse>(`/api/v1/admin/batches/${batchId}/scope-room-ids`, { params: roomFilterParams() })
+                if (filterKey !== JSON.stringify(roomFilterParams())) return
+                const data = (response.data.data ?? {}) as DataObject
+                selectedRoomIds.value = uniqueIds([...selectedRoomIds.value, ...numericIds(data.ids)])
+              } finally {
+                roomFilteredSelectionLoading.value = false
+              }
+            }
+
+            function selectAllStudents() {
+          ''')
+          replace(pagination, '''    studentTotal, roomTotal, studentPage, roomPage, studentPageSize, roomPageSize, studentPageLoading, roomPageLoading,
+              openScopePagination, loadStudentPage, loadRoomPage, resetScopePagination, selectAllStudents, selectAllRooms,
+          ''', '''    studentTotal, roomTotal, studentPage, roomPage, studentPageSize, roomPageSize, studentPageLoading, roomPageLoading,
+              studentFilteredSelectionLoading, roomFilteredSelectionLoading,
+              openScopePagination, loadStudentPage, loadRoomPage, resetScopePagination, selectAllStudents, selectAllRooms,
+              selectAllFilteredStudents, selectAllFilteredRooms,
+          ''')
+
+          admin_view = 'frontend/src/features/admin-batch/composables/useAdminBatchView.ts'
+          replace(admin_view, '''    studentTotal, roomTotal, studentPage, roomPage, studentPageSize, roomPageSize, studentPageLoading, roomPageLoading,
+              openScopePagination, loadStudentPage, loadRoomPage, resetScopePagination, selectAllStudents, selectAllRooms,
+          ''', '''    studentTotal, roomTotal, studentPage, roomPage, studentPageSize, roomPageSize, studentPageLoading, roomPageLoading,
+              studentFilteredSelectionLoading, roomFilteredSelectionLoading,
+              openScopePagination, loadStudentPage, loadRoomPage, resetScopePagination, selectAllStudents, selectAllRooms,
+              selectAllFilteredStudents, selectAllFilteredRooms,
+          ''')
+          replace(admin_view, '''studentPageLoading, roomPageLoading, publishAfterScope''', '''studentPageLoading, roomPageLoading, studentFilteredSelectionLoading, roomFilteredSelectionLoading, publishAfterScope''')
+          replace(admin_view, '''selectAllStudents, selectAllRooms, toggleId''', '''selectAllStudents, selectAllRooms, selectAllFilteredStudents, selectAllFilteredRooms, toggleId''')
+
+          view = 'frontend/src/views/admin/AdminBatchView.vue'
+          replace(view, '''studentPageLoading, roomPageLoading, publishAfterScope,''', '''studentPageLoading, roomPageLoading, studentFilteredSelectionLoading, roomFilteredSelectionLoading, publishAfterScope,''', count=2)
+          replace(view, '''selectAllStudents, selectAllRooms, loadStudentPage, loadRoomPage,''', '''selectAllStudents, selectAllRooms, selectAllFilteredStudents, selectAllFilteredRooms, loadStudentPage, loadRoomPage,''', count=2)
+
+          template = 'frontend/src/views/admin/AdminBatchView.template.html'
+          replace(template, '''    :room-page-loading="roomPageLoading"
+          ''', '''    :room-page-loading="roomPageLoading"
+              :student-filtered-selection-loading="studentFilteredSelectionLoading"
+              :room-filtered-selection-loading="roomFilteredSelectionLoading"
+          ''')
+          replace(template, '''    @select-all-students="selectAllStudents"
+          ''', '''    @select-all-students="selectAllStudents"
+              @select-filtered-students="selectAllFilteredStudents"
+          ''')
+          replace(template, '''    @select-all-rooms="selectAllRooms"
+          ''', '''    @select-all-rooms="selectAllRooms"
+              @select-filtered-rooms="selectAllFilteredRooms"
+          ''')
+
+          dialog = 'frontend/src/features/admin-batch/components/BatchScopeDialog.vue'
+          replace(dialog, '''  roomPageLoading: boolean
+              publishAfterScope: boolean
+          ''', '''  roomPageLoading: boolean
+              studentFilteredSelectionLoading: boolean
+              roomFilteredSelectionLoading: boolean
+              publishAfterScope: boolean
+          ''')
+          replace(dialog, '''  'select-all-students': []
+              'clear-students': []
+              'select-all-rooms': []
+          ''', '''  'select-all-students': []
+              'select-filtered-students': []
+              'clear-students': []
+              'select-all-rooms': []
+              'select-filtered-rooms': []
+          ''')
+          replace(dialog, '''<header class="scope-column-header"><div><strong>参与学生</strong><small>服务端筛选、排序与分页，跨页选择会保留</small></div><div class="button-row"><button class="button ghost small" type="button" @click="emit('select-all-students')">全选本页</button><button class="button ghost small" type="button" @click="emit('clear-students')">清空</button></div></header>
+          ''', '''<header class="scope-column-header"><div><strong>参与学生</strong><small>服务端筛选、排序与分页，跨页选择会保留</small></div><div class="button-row"><button class="button ghost small" type="button" @click="emit('select-all-students')">全选本页</button><button class="button secondary small" type="button" :disabled="studentFilteredSelectionLoading || studentTotal === 0" @click="emit('select-filtered-students')">{{ studentFilteredSelectionLoading ? '正在全选…' : '全选筛选结果' }}</button><button class="button ghost small" type="button" @click="emit('clear-students')">清空</button></div></header>
+          ''')
+          replace(dialog, '''<header class="scope-column-header"><div><strong>可选宿舍</strong><small>先按校区、楼栋定位；跨页选择会保留</small></div><div class="button-row"><button class="button ghost small" type="button" @click="emit('select-all-rooms')">全选本页可用</button><button class="button ghost small" type="button" @click="emit('clear-rooms')">清空</button></div></header>
+          ''', '''<header class="scope-column-header"><div><strong>可选宿舍</strong><small>先按校区、楼栋定位；跨页选择会保留</small></div><div class="button-row"><button class="button ghost small" type="button" @click="emit('select-all-rooms')">全选本页可用</button><button class="button secondary small" type="button" :disabled="roomFilteredSelectionLoading || roomTotal === 0" @click="emit('select-filtered-rooms')">{{ roomFilteredSelectionLoading ? '正在全选…' : '全选筛选可用宿舍' }}</button><button class="button ghost small" type="button" @click="emit('clear-rooms')">清空</button></div></header>
+          ''')
+          replace(dialog, '''.scope-column-header{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex:0 0 auto}''', '''.scope-column-header{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex:0 0 auto}.scope-column-header .button-row{flex-wrap:wrap;justify-content:flex-end}''')
+          PY
+          git config user.name "Wust Dormitory CI"
+          git config user.email "ci@wust-dormitory.local"
+          git add backend-java frontend
+          git commit -m "feat: 支持按筛选条件一键全选批次范围"
+          git push origin HEAD:fix/batch-scope-select-filtered-all-20260816
