@@ -1,37 +1,13 @@
 name: Private Campus Actions Sync Main
 
 on:
-  push:
-    branches:
-      - 'private-compat/fix/campus-disable-delete-actions-20260816'
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
-  sync:
+  retired:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
     steps:
-      - name: Checkout private repair branch
-        uses: actions/checkout@v5
-        with:
-          repository: wbh123/Wust-Dormitory-Select
-          ref: fix/campus-disable-delete-actions-20260816
-          token: ${{ secrets.PRIVATE_CI }}
-          path: private-repo
-          persist-credentials: true
-          fetch-depth: 0
-      - name: Merge latest main without overwriting campus changes
-        working-directory: private-repo
-        shell: bash
-        run: |
-          set -euo pipefail
-          test "$(git rev-parse HEAD)" = "0a378596663d09bc06f81861e093b6ce96b8897d"
-          git fetch origin main
-          test "$(git rev-parse origin/main)" = "dcdb98bd33a04d5a449816b334742b1b0df942ff"
-          git config user.name "Wust Dormitory CI"
-          git config user.email "actions@users.noreply.github.com"
-          git merge --no-edit origin/main
-          git diff --check origin/main...HEAD
-          git push origin HEAD:refs/heads/fix/campus-disable-delete-actions-20260816
+      - run: echo "one-shot private main sync retired"
