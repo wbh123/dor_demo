@@ -113,10 +113,34 @@ jobs:
         shell: bash
         run: python -m unittest scripts/subscription/test_mobile_feature_authorization.py -v
 
-      - name: Verify platform feature GUI contract
+      - name: Verify platform entitlement backend contract
+        id: platform-backend
+        continue-on-error: true
         working-directory: private-repo
         shell: bash
-        run: python -m unittest scripts/subscription/test_platform_feature_gui.py -v
+        run: python -m unittest scripts.subscription.test_platform_feature_gui.PlatformFeatureGuiContractTest.test_backend_exposes_entitlement_projection_and_final_state_commands -v
+
+      - name: Verify platform entitlement OpenAPI contract
+        id: platform-openapi
+        continue-on-error: true
+        working-directory: private-repo
+        shell: bash
+        run: python -m unittest scripts.subscription.test_platform_feature_gui.PlatformFeatureGuiContractTest.test_openapi_declares_gui_entitlement_endpoints -v
+
+      - name: Verify platform entitlement frontend contract
+        id: platform-frontend
+        continue-on-error: true
+        working-directory: private-repo
+        shell: bash
+        run: python -m unittest scripts.subscription.test_platform_feature_gui.PlatformFeatureGuiContractTest.test_frontend_uses_authoritative_categories_switches_filters_and_batch_actions -v
+
+      - name: Enforce platform feature GUI contract
+        if: always()
+        shell: bash
+        run: |
+          if [[ "${{ steps.platform-backend.outcome }}" != "success" || "${{ steps.platform-openapi.outcome }}" != "success" || "${{ steps.platform-frontend.outcome }}" != "success" ]]; then
+            exit 1
+          fi
 
       - name: Verify feature authorization closure contract
         working-directory: private-repo
