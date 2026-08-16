@@ -71,9 +71,18 @@ jobs:
       - name: Verify residency and student workbench tests
         working-directory: private-repo/app
         run: node --experimental-strip-types --test src/platform/residency-workbench.spec.ts src/platform/student-adjustment-panel-layout.spec.ts src/platform/student-residency-workbench-layout.spec.ts src/platform/student-workbench-pagination.spec.ts
-      - name: Verify room confirmation workbench tests
+      - name: Verify room workbench layout test
         working-directory: private-repo/app
-        run: node --experimental-strip-types --test src/platform/room-workbench-layout.spec.ts src/platform/room-confirmation-pipeline-layout.spec.ts src/platform/room-detail-layout.spec.ts src/platform/bed-confirmation-pagination.spec.ts
+        run: node --experimental-strip-types --test src/platform/room-workbench-layout.spec.ts
+      - name: Verify room confirmation pipeline test
+        working-directory: private-repo/app
+        run: node --experimental-strip-types --test src/platform/room-confirmation-pipeline-layout.spec.ts
+      - name: Verify room detail layout test
+        working-directory: private-repo/app
+        run: node --experimental-strip-types --test src/platform/room-detail-layout.spec.ts
+      - name: Verify bed confirmation pagination test
+        working-directory: private-repo/app
+        run: node --experimental-strip-types --test src/platform/bed-confirmation-pagination.spec.ts
       - name: Verify workbench home and state tests
         working-directory: private-repo/app
         run: node --experimental-strip-types --test src/platform/recent-workbench.spec.ts src/platform/room-workbench-home.spec.ts src/platform/room-workbench-state.spec.ts src/platform/student-workbench-filter.spec.ts src/platform/student-workbench-home.spec.ts
