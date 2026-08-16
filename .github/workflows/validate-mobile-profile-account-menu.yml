@@ -1,0 +1,28 @@
+name: Validate mobile profile account menu
+
+on:
+  push:
+    branches:
+      - diagnostics/mobile-profile-account-menu-20260816
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: fix/mobile-profile-account-menu-fixed-scroll-20260816
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+      - name: Focused account menu regression
+        working-directory: private-repo/app
+        run: node --experimental-strip-types --test src/platform/account-identity-menu.spec.ts
