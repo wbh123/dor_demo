@@ -1,0 +1,54 @@
+name: Private APP Android Resource Diagnose
+
+on:
+  push:
+    branches:
+      - 'private-compat/**'
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Resolve private branch name
+        id: target
+        shell: bash
+        run: |
+          set -euo pipefail
+          candidate="$GITHUB_REF_NAME"
+          private_ref="${candidate#private-compat/}"
+          [[ -n "$private_ref" && "$private_ref" != "$candidate" ]]
+          echo "private_ref=$private_ref" >> "$GITHUB_OUTPUT"
+      - name: Checkout private branch
+        uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: ${{ steps.target.outputs.private_ref }}
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: false
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Capture Android resource processing output
+        working-directory: private-repo/app/android
+        shell: bash
+        run: |
+          set +e
+          ./gradlew :app:processDebugResources --stacktrace --info > android-resource.log 2>&1
+          code=$?
+          echo "$code" > android-resource-exit-code.txt
+          tail -n 160 android-resource.log
+          exit 0
+      - name: Upload Android resource diagnostics
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-resource-diagnostics
+          path: |
+            private-repo/app/android/android-resource.log
+            private-repo/app/android/android-resource-exit-code.txt
+          if-no-files-found: error
