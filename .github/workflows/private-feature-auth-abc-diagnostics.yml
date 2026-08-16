@@ -1,0 +1,43 @@
+name: Private Feature Authorization ABC Diagnostic
+
+on:
+  push:
+    branches:
+      - 'private-compat/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: private-feature-auth-abc-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Resolve private branch
+        id: target
+        shell: bash
+        run: |
+          set -euo pipefail
+          private_ref="${GITHUB_REF_NAME#private-compat/}"
+          test -n "$private_ref"
+          test "$private_ref" != "$GITHUB_REF_NAME"
+          echo "private_ref=$private_ref" >> "$GITHUB_OUTPUT"
+      - name: Checkout private branch
+        uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: ${{ steps.target.outputs.private_ref }}
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: false
+          fetch-depth: 1
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Run feature authorization ABC regression
+        working-directory: private-repo
+        run: python scripts/subscription/test_platform_feature_gui.py -v
