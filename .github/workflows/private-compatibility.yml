@@ -76,6 +76,13 @@ jobs:
           node scripts/check-version-bump.mjs origin/main
           npm run build
 
+      - name: Prepare Android Capacitor project
+        working-directory: private-repo/app
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx cap sync android
+
       - name: Verify Android launcher resources
         working-directory: private-repo/app/android
         shell: bash
