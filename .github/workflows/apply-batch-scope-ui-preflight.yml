@@ -1,0 +1,103 @@
+name: Apply batch scope UI and preflight
+
+on:
+  push:
+    branches:
+      - diagnostics/batch-scope-pagination-20260816
+
+permissions:
+  contents: read
+
+jobs:
+  apply:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: fix/batch-scope-select-filtered-all-20260816
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+      - name: Patch remaining UI and root OpenAPI
+        working-directory: private-repo
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def patch(path, old, new, count=1):
+              p = Path(path)
+              text = p.read_text()
+              actual = text.count(old)
+              if actual < count:
+                  raise SystemExit(f'{path}: marker count {actual} < {count}: {old!r}')
+              p.write_text(text.replace(old, new, count))
+
+          interface = 'backend-java/model/src/main/resources/openapi-interface.yaml'
+          patch(interface,
+                "  /api/v1/admin/batches/{batchId}/scope-students:\n    $ref: 'admin/openapi-batch-selection.yaml#/paths/~1api~1v1~1admin~1batches~1{batchId}~1scope-students'\n",
+                "  /api/v1/admin/batches/{batchId}/scope-students:\n    $ref: 'admin/openapi-batch-selection.yaml#/paths/~1api~1v1~1admin~1batches~1{batchId}~1scope-students'\n  /api/v1/admin/batches/{batchId}/scope-student-ids:\n    $ref: 'admin/openapi-batch-selection.yaml#/paths/~1api~1v1~1admin~1batches~1{batchId}~1scope-student-ids'\n")
+          patch(interface,
+                "  /api/v1/admin/batches/{batchId}/scope-rooms:\n    $ref: 'admin/openapi-batch-selection.yaml#/paths/~1api~1v1~1admin~1batches~1{batchId}~1scope-rooms'\n",
+                "  /api/v1/admin/batches/{batchId}/scope-rooms:\n    $ref: 'admin/openapi-batch-selection.yaml#/paths/~1api~1v1~1admin~1batches~1{batchId}~1scope-rooms'\n  /api/v1/admin/batches/{batchId}/scope-room-ids:\n    $ref: 'admin/openapi-batch-selection.yaml#/paths/~1api~1v1~1admin~1batches~1{batchId}~1scope-room-ids'\n")
+
+          admin = 'frontend/src/features/admin-batch/composables/useAdminBatchView.ts'
+          patch(admin,
+                '    studentTotal, roomTotal, studentPage, roomPage, studentPageSize, roomPageSize, studentPageLoading, roomPageLoading,\n    openScopePagination, loadStudentPage, loadRoomPage, resetScopePagination, selectAllStudents, selectAllRooms,\n',
+                '    studentTotal, roomTotal, studentPage, roomPage, studentPageSize, roomPageSize, studentPageLoading, roomPageLoading,\n    studentFilteredSelectionLoading, roomFilteredSelectionLoading,\n    openScopePagination, loadStudentPage, loadRoomPage, resetScopePagination, selectAllStudents, selectAllRooms,\n    selectAllFilteredStudents, selectAllFilteredRooms,\n')
+          patch(admin,
+                "  function buildPreflightMissingSteps(snapshot: DataObject) { const steps: string[] = []; if (Number(snapshot.roomCount ?? 0) === 0) steps.push('选择至少一间可用宿舍'); if (((snapshot.blockers ?? []) as unknown[]).length) steps.push('处理阻断发布的宿舍状态或床位映射问题'); if (!steps.length) steps.push('根据预检提示完成剩余发布准备'); return steps }",
+                "  function buildPreflightMissingSteps(snapshot: DataObject) { const steps: string[] = []; if (Number(snapshot.studentConflictCount ?? 0) > 0) steps.push('移除已参加其他活动批次的学生'); if (Number(snapshot.roomCount ?? 0) === 0) steps.push('选择至少一间可用宿舍'); if (((snapshot.blockers ?? []) as unknown[]).length) steps.push('处理阻断发布的宿舍状态或床位映射问题'); if (!steps.length) steps.push('根据预检提示完成剩余发布准备'); return steps }")
+          patch(admin,
+                'studentPageLoading, roomPageLoading, publishAfterScope,',
+                'studentPageLoading, roomPageLoading, studentFilteredSelectionLoading, roomFilteredSelectionLoading, publishAfterScope,')
+          patch(admin,
+                'selectAllStudents, selectAllRooms, toggleId, uniqueIds,',
+                'selectAllStudents, selectAllRooms, selectAllFilteredStudents, selectAllFilteredRooms, toggleId, uniqueIds,')
+
+          view = 'frontend/src/views/admin/AdminBatchView.vue'
+          patch(view,
+                'studentPageLoading, roomPageLoading, publishAfterScope,',
+                'studentPageLoading, roomPageLoading, studentFilteredSelectionLoading, roomFilteredSelectionLoading, publishAfterScope,',
+                count=2)
+          patch(view,
+                'selectAllStudents, selectAllRooms, loadStudentPage, loadRoomPage,',
+                'selectAllStudents, selectAllRooms, selectAllFilteredStudents, selectAllFilteredRooms, loadStudentPage, loadRoomPage,',
+                count=2)
+
+          template = 'frontend/src/views/admin/AdminBatchView.template.html'
+          patch(template,
+                '    :room-page-loading="roomPageLoading"\n',
+                '    :room-page-loading="roomPageLoading"\n    :student-filtered-selection-loading="studentFilteredSelectionLoading"\n    :room-filtered-selection-loading="roomFilteredSelectionLoading"\n')
+          patch(template,
+                '    @select-all-students="selectAllStudents"\n',
+                '    @select-all-students="selectAllStudents"\n    @select-filtered-students="selectAllFilteredStudents"\n')
+          patch(template,
+                '    @select-all-rooms="selectAllRooms"\n',
+                '    @select-all-rooms="selectAllRooms"\n    @select-filtered-rooms="selectAllFilteredRooms"\n')
+
+          dialog = 'frontend/src/features/admin-batch/components/BatchScopeDialog.vue'
+          patch(dialog,
+                '  roomPageLoading: boolean\n  publishAfterScope: boolean\n',
+                '  roomPageLoading: boolean\n  studentFilteredSelectionLoading: boolean\n  roomFilteredSelectionLoading: boolean\n  publishAfterScope: boolean\n')
+          patch(dialog,
+                "  'select-all-students': []\n  'clear-students': []\n",
+                "  'select-all-students': []\n  'select-filtered-students': []\n  'clear-students': []\n")
+          patch(dialog,
+                "  'select-all-rooms': []\n  'clear-rooms': []\n",
+                "  'select-all-rooms': []\n  'select-filtered-rooms': []\n  'clear-rooms': []\n")
+          patch(dialog,
+                '<header class="scope-column-header"><div><strong>参与学生</strong><small>服务端筛选、排序与分页，跨页选择会保留</small></div><div class="button-row"><button class="button ghost small" type="button" @click="emit(\'select-all-students\')">全选本页</button><button class="button ghost small" type="button" @click="emit(\'clear-students\')">清空</button></div></header>',
+                '<header class="scope-column-header"><div><strong>参与学生</strong><small>服务端筛选、排序与分页，跨页选择会保留</small></div><div class="button-row"><button class="button ghost small" type="button" @click="emit(\'select-all-students\')">全选本页</button><button class="button secondary small" type="button" :disabled="studentFilteredSelectionLoading || studentTotal === 0" @click="emit(\'select-filtered-students\')">{{ studentFilteredSelectionLoading ? \'正在全选…\' : \'全选筛选结果\' }}</button><button class="button ghost small" type="button" @click="emit(\'clear-students\')">清空</button></div></header>')
+          patch(dialog,
+                '<header class="scope-column-header"><div><strong>可选宿舍</strong><small>先按校区、楼栋定位；跨页选择会保留</small></div><div class="button-row"><button class="button ghost small" type="button" @click="emit(\'select-all-rooms\')">全选本页可用</button><button class="button ghost small" type="button" @click="emit(\'clear-rooms\')">清空</button></div></header>',
+                '<header class="scope-column-header"><div><strong>可选宿舍</strong><small>先按校区、楼栋定位；跨页选择会保留</small></div><div class="button-row"><button class="button ghost small" type="button" @click="emit(\'select-all-rooms\')">全选本页可用</button><button class="button secondary small" type="button" :disabled="roomFilteredSelectionLoading || roomTotal === 0" @click="emit(\'select-filtered-rooms\')">{{ roomFilteredSelectionLoading ? \'正在全选…\' : \'全选筛选可用宿舍\' }}</button><button class="button ghost small" type="button" @click="emit(\'clear-rooms\')">清空</button></div></header>')
+          patch(dialog,
+                '.scope-column-header{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex:0 0 auto}',
+                '.scope-column-header{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex:0 0 auto}.scope-column-header .button-row{flex-wrap:wrap;justify-content:flex-end}')
+          PY
+          git config user.name "Wust Dormitory CI"
+          git config user.email "ci@wust-dormitory.local"
+          git add backend-java/model/src/main/resources/openapi-interface.yaml frontend/src/features/admin-batch frontend/src/views/admin
+          git commit -m "feat: 接入批次筛选全选与学生冲突预检界面"
+          git push origin HEAD:fix/batch-scope-select-filtered-all-20260816
