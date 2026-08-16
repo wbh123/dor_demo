@@ -1,0 +1,51 @@
+name: Private Feature Authorization Frontend Fix
+
+on:
+  push:
+    branches:
+      - 'private-compat/fix/feature-authorization-abc-catalog-20260816'
+
+permissions:
+  contents: read
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout private repair branch
+        uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: fix/feature-authorization-abc-catalog-20260816
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: true
+          fetch-depth: 1
+      - name: Apply exact permission-class repair
+        working-directory: private-repo
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('frontend/src/views/platform/PlatformFeaturesView.vue')
+          text = path.read_text(encoding='utf-8')
+          old = "  if (!feature.enabledInProgram) return 'C'\n"
+          if text.count(old) != 1:
+              raise SystemExit(f'expected exactly one old permission-class guard, found {text.count(old)}')
+          path.write_text(text.replace(old, ''), encoding='utf-8')
+          PY
+          test "$(git diff --name-only | wc -l)" -eq 1
+          test "$(git diff --name-only)" = "frontend/src/views/platform/PlatformFeaturesView.vue"
+          git diff --check
+      - name: Commit repair
+        working-directory: private-repo
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "Wust Dormitory CI"
+          git config user.email "actions@users.noreply.github.com"
+          git add frontend/src/views/platform/PlatformFeaturesView.vue
+          git commit -m "fix: classify feature permissions by phase"
+          git push origin HEAD:refs/heads/fix/feature-authorization-abc-catalog-20260816
