@@ -57,52 +57,57 @@ jobs:
       - name: Record legacy full-contract status
         continue-on-error: true
         working-directory: private-repo
-        shell: bash
-        run: |
-          set -euo pipefail
-          bash scripts/ci/run_contracts.sh
+        run: bash scripts/ci/run_contracts.sh
 
-      - name: Verify inspection contracts and modularization
+      - name: Verify inspection OpenAPI contract
+        working-directory: private-repo
+        run: python scripts/ci/test_inspection_openapi_contract.py
+
+      - name: Reject newly-large Java classes
         working-directory: private-repo
         shell: bash
         run: |
           set -euo pipefail
-          python scripts/ci/test_inspection_openapi_contract.py
-          python scripts/ci/test_backend_modularization_boundaries.py
+          failed=0
+          while IFS= read -r path; do
+            [[ -z "$path" || ! -f "$path" ]] && continue
+            current=$(wc -l < "$path")
+            (( current <= 300 )) && continue
+            if git cat-file -e "origin/main:$path" 2>/dev/null; then
+              base=$(git show "origin/main:$path" | wc -l)
+            else
+              base=0
+            fi
+            if (( base <= 300 )); then
+              echo "新增大型 Java 类: $path ($base -> $current)" >&2
+              failed=1
+            fi
+          done < <(git diff --name-only origin/main...HEAD -- backend-java/server/src/main/java)
+          exit "$failed"
 
       - name: Verify Java 21 modules
         working-directory: private-repo/backend-java
-        shell: bash
-        run: |
-          set -euo pipefail
-          mvn -B -ntp clean verify
+        run: mvn -B -ntp clean verify
 
       - name: Verify web frontend
         working-directory: private-repo
-        shell: bash
         env:
           VITE_INSTITUTION_NAME: Example University
           VITE_CAMPUS_NAME: Example Campus
-        run: |
-          set -euo pipefail
-          bash scripts/ci/run_frontend.sh
+        run: bash scripts/ci/run_frontend.sh
 
       - name: Install mobile app dependencies
         working-directory: private-repo/app
-        shell: bash
-        run: |
-          set -euo pipefail
-          npm install --package-lock=false --no-audit --no-fund
+        run: npm install --package-lock=false --no-audit --no-fund
 
       - name: Generate mobile OpenAPI types
         working-directory: private-repo/app
-        shell: bash
         run: npm run generate:api
 
       - name: Check generated mobile OpenAPI drift
+        id: schema_drift
         continue-on-error: true
         working-directory: private-repo
-        shell: bash
         run: git diff --exit-code -- app/src/api/schema.d.ts
 
       - name: Verify mobile app tests
