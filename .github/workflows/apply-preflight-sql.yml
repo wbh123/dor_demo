@@ -1,0 +1,170 @@
+name: Apply preflight SQL optimization
+
+on:
+  push:
+    branches:
+      - diagnostics/batch-scope-pagination-20260816
+
+permissions:
+  contents: read
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: fix/batch-scope-server-pagination-20260816
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: true
+      - name: Patch preflight SQL
+        working-directory: private-repo
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          p = Path('backend-java/server/src/main/resources/mapper/residency/ResidencyPolicyMapper.xml')
+          text = p.read_text()
+          old = '''    <select id="findRoomIdsForBatch" resultType="long">
+                  SELECT DISTINCT r.id
+                  FROM room r
+                  JOIN dormitory_floor f ON f.id=r.floor_id
+                  JOIN dormitory_building b ON b.id=f.building_id
+                  LEFT JOIN batch_room_scope rs
+                         ON rs.batch_id=#{batchId} AND rs.room_id=r.id
+                  LEFT JOIN batch_building_scope bs
+                         ON bs.batch_id=#{batchId} AND bs.building_id=b.id
+                  LEFT JOIN batch_bed_scope bds
+                         ON bds.batch_id=#{batchId}
+                  LEFT JOIN bed scoped_bed
+                         ON scoped_bed.id=bds.bed_id AND scoped_bed.room_id=r.id
+                  WHERE rs.id IS NOT NULL OR bs.id IS NOT NULL OR scoped_bed.id IS NOT NULL
+                  ORDER BY r.id
+              </select>'''
+          new = '''    <select id="findRoomIdsForBatch" resultType="long">
+                  SELECT scoped.room_id
+                  FROM (
+                      SELECT rs.room_id
+                      FROM batch_room_scope rs
+                      WHERE rs.batch_id=#{batchId}
+                      UNION
+                      SELECT r.id AS room_id
+                      FROM batch_building_scope bs
+                      JOIN dormitory_floor f ON f.building_id=bs.building_id
+                      JOIN room r ON r.floor_id=f.id
+                      WHERE bs.batch_id=#{batchId}
+                      UNION
+                      SELECT scoped_bed.room_id
+                      FROM batch_bed_scope bds
+                      JOIN bed scoped_bed ON scoped_bed.id=bds.bed_id
+                      WHERE bds.batch_id=#{batchId}
+                  ) scoped
+                  ORDER BY scoped.room_id
+              </select>'''
+          if old not in text:
+              raise SystemExit('ResidencyPolicyMapper anchor missing')
+          p.write_text(text.replace(old, new))
+
+          p = Path('backend-java/server/src/main/resources/mapper/residency/RoomOccupancySnapshotMapper.xml')
+          text = p.read_text()
+          marker = '    <select id="countAvailableBedsForBatch" resultType="int">'
+          if marker not in text:
+              raise SystemExit('snapshot marker missing')
+          block = '''    <select id="findSnapshotsForBatch" resultMap="RoomOccupancySnapshotResultMap">
+                  WITH scoped_rooms AS (
+                      SELECT rs.room_id
+                      FROM batch_room_scope rs
+                      WHERE rs.batch_id = #{batchId}
+                      UNION
+                      SELECT r.id AS room_id
+                      FROM batch_building_scope bs
+                      JOIN dormitory_floor f ON f.building_id = bs.building_id
+                      JOIN room r ON r.floor_id = f.id
+                      WHERE bs.batch_id = #{batchId}
+                      UNION
+                      SELECT scoped_bed.room_id
+                      FROM batch_bed_scope bds
+                      JOIN bed scoped_bed ON scoped_bed.id = bds.bed_id
+                      WHERE bds.batch_id = #{batchId}
+                  ),
+                  resident_stats AS (
+                      SELECT ra.room_id,
+                             COUNT(*) AS active_residents,
+                             SUM(CASE WHEN ra.bed_id IS NULL THEN 1 ELSE 0 END) AS unknown_beds
+                      FROM room_assignment ra
+                      JOIN scoped_rooms scoped ON scoped.room_id = ra.room_id
+                      WHERE ra.assignment_status = 'ACTIVE'
+                      GROUP BY ra.room_id
+                  ),
+                  bed_stats AS (
+                      SELECT bed.room_id,
+                             SUM(CASE
+                                     WHEN bed.operational_status = 'ENABLED' AND occupied.id IS NULL THEN 1
+                                     ELSE 0
+                                 END) AS available_beds
+                      FROM scoped_rooms scoped
+                      JOIN bed ON bed.room_id = scoped.room_id
+                      LEFT JOIN room_assignment occupied
+                             ON occupied.room_id = bed.room_id
+                            AND occupied.bed_id = bed.id
+                            AND occupied.assignment_status = 'ACTIVE'
+                      GROUP BY bed.room_id
+                  )
+                  SELECT r.id,
+                         r.room_number,
+                         r.room_type,
+                         r.capacity,
+                         r.gender_restriction,
+                         r.resident_scope,
+                         r.operational_status,
+                         r.state_version,
+                         f.floor_number,
+                         b.id AS building_id,
+                         b.building_code,
+                         b.building_name,
+                         COALESCE(residents.active_residents, 0) AS active_residents,
+                         COALESCE(residents.unknown_beds, 0) AS unknown_beds,
+                         COALESCE(beds.available_beds, 0) AS available_beds,
+                         conflict_lock.batch_id AS conflict_batch_id,
+                         conflict_batch.batch_name AS conflict_batch_name,
+                         conflict_lock.selection_mode AS conflict_selection_mode
+                  FROM scoped_rooms scoped
+                  JOIN room r ON r.id = scoped.room_id
+                  JOIN dormitory_floor f ON f.id = r.floor_id
+                  JOIN dormitory_building b ON b.id = f.building_id
+                  LEFT JOIN resident_stats residents ON residents.room_id = r.id
+                  LEFT JOIN bed_stats beds ON beds.room_id = r.id
+                  LEFT JOIN active_batch_room_lock conflict_lock
+                         ON conflict_lock.room_id = r.id
+                        AND conflict_lock.batch_id &lt;&gt; #{batchId}
+                  LEFT JOIN selection_batch conflict_batch ON conflict_batch.id = conflict_lock.batch_id
+                  ORDER BY r.id
+              </select>
+
+          '''
+          if 'id="findSnapshotsForBatch"' not in text:
+              text = text.replace(marker, block + marker)
+          p.write_text(text)
+
+          p = Path('backend-java/server/src/main/java/com/wust/dormitory/residency/BatchRoomLockService.java')
+          text = p.read_text()
+          old = '''        Set<Long> roomIds = policy.roomIdsForBatch(batchId);
+                  List<RoomOccupancySnapshotRow> snapshots = roomIds.isEmpty()
+                          ? List.of()
+                          : roomOccupancySnapshotMapper.findSnapshots(batchId, new ArrayList<>(roomIds));'''
+          new = '''        List<RoomOccupancySnapshotRow> snapshots = roomOccupancySnapshotMapper.findSnapshotsForBatch(batchId);'''
+          if old not in text:
+              raise SystemExit('BatchRoomLockService preview anchor missing')
+          p.write_text(text.replace(old, new))
+          PY
+          python scripts/ci/test_batch_scope_preflight_sql.py
+          git diff --check
+          git config user.name 'Wust Dormitory CI'
+          git config user.email 'ci@wust-dormitory.local'
+          git add backend-java/server/src/main/resources/mapper/residency/ResidencyPolicyMapper.xml backend-java/server/src/main/resources/mapper/residency/RoomOccupancySnapshotMapper.xml backend-java/server/src/main/java/com/wust/dormitory/residency/BatchRoomLockService.java
+          git commit -m 'perf: 消除批次宿舍预检笛卡尔扫描'
+          git push origin HEAD:fix/batch-scope-server-pagination-20260816
