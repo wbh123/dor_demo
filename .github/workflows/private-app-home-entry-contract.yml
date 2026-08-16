@@ -9,12 +9,11 @@ permissions:
   contents: read
 
 jobs:
-  app-verify:
+  candidate-tests:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 15
     steps:
-      - name: Checkout private repair branch
-        uses: actions/checkout@v5
+      - uses: actions/checkout@v5
         with:
           repository: wbh123/Wust-Dormitory-Select
           ref: fix/app-home-remove-duplicate-scan-anomaly-20260816
@@ -27,12 +26,54 @@ jobs:
           node-version: '22'
           cache: npm
           cache-dependency-path: private-repo/app/package-lock.json
-      - name: Install APP dependencies
-        working-directory: private-repo/app
+      - working-directory: private-repo/app
         run: npm ci
-      - name: Run APP tests
+      - name: Run candidate APP tests
         working-directory: private-repo/app
         run: npm test
-      - name: Build APP
+
+  baseline-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: main
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: false
+          fetch-depth: 1
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: private-repo/app/package-lock.json
+      - working-directory: private-repo/app
+        run: npm ci
+      - name: Run main baseline APP tests
+        working-directory: private-repo/app
+        run: npm test
+
+  candidate-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: fix/app-home-remove-duplicate-scan-anomaly-20260816
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: false
+          fetch-depth: 1
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: private-repo/app/package-lock.json
+      - working-directory: private-repo/app
+        run: npm ci
+      - name: Build candidate APP
         working-directory: private-repo/app
         run: npm run build
