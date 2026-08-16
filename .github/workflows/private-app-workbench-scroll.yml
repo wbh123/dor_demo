@@ -1,0 +1,33 @@
+name: Private APP Workbench Scroll
+
+on:
+  push:
+    branches:
+      - 'private-compat/fix/app-workbench-scroll-boundaries-20260816'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout private branch
+        uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: fix/app-workbench-scroll-boundaries-20260816
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: false
+          fetch-depth: 1
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+      - name: Install APP dependencies
+        working-directory: private-repo/app
+        run: npm ci
+      - name: Run workbench scroll contracts
+        working-directory: private-repo/app
+        run: node --experimental-strip-types --test src/platform/student-workbench-home.spec.ts src/platform/room-workbench-home.spec.ts
