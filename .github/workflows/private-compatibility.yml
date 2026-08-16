@@ -1,25 +1,20 @@
-name: Private Compatibility CI
+name: Brand Icon Compatibility CI
 
 on:
   push:
     branches:
       - 'private-compat/**'
-  pull_request:
-    branches:
-      - main
-    paths:
-      - '.private-compat-trigger'
 
 permissions:
   contents: read
 
 concurrency:
-  group: private-compat-${{ github.ref }}
+  group: brand-icon-compat-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  verify-private-ref:
-    name: Verify private integration ref
+  verify-brand-icons:
+    name: Verify private brand icon integration
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -28,16 +23,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          candidate="${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}"
+          candidate="$GITHUB_REF_NAME"
           private_ref="${candidate#private-compat/}"
-          if [[ -z "$private_ref" || "$private_ref" == "$candidate" ]]; then
-            echo "Invalid compatibility branch name" >&2
-            exit 1
-          fi
-          if [[ ! "$private_ref" =~ ^[A-Za-z0-9._/-]+$ ]]; then
-            echo "Unsupported private ref characters" >&2
-            exit 1
-          fi
+          test -n "$private_ref"
+          test "$private_ref" != "$candidate"
           echo "private_ref=$private_ref" >> "$GITHUB_OUTPUT"
 
       - name: Checkout private integration branch
@@ -50,44 +39,58 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
 
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-node@v6
         with:
-          python-version: '3.12'
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            private-repo/app/package-lock.json
+            private-repo/frontend/package-lock.json
 
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '21'
-          cache: maven
-          cache-dependency-path: private-repo/backend-java/pom.xml
 
-      - uses: actions/setup-node@v6
-        with:
-          node-version: '22'
-          cache: npm
-          cache-dependency-path: private-repo/frontend/package-lock.json
-
-      - name: Verify private contracts
+      - name: Verify single-source icon wiring
         working-directory: private-repo
         shell: bash
         run: |
           set -euo pipefail
-          python scripts/ci/test_runtime_error_data_correctness_batch.py
-          bash scripts/ci/run_contracts.sh
+          test -s app/src/assets/icon.png
+          cmp app/src/assets/icon.png app/android/app/src/main/res/drawable-nodpi/app_icon_artwork.png
+          cmp app/src/assets/icon.png app/public/favicon.png
+          cmp app/src/assets/icon.png frontend/public/favicon.png
+          grep -q 'android:icon="@mipmap/app_icon"' app/android/app/src/main/AndroidManifest.xml
+          grep -q 'android:roundIcon="@mipmap/app_icon_round"' app/android/app/src/main/AndroidManifest.xml
+          grep -q 'href="/favicon.png"' app/index.html
+          grep -q 'href="/favicon.png"' frontend/index.html
 
-      - name: Verify private Java modules
-        working-directory: private-repo/backend-java
+      - name: Verify mobile version and web build
+        working-directory: private-repo/app
         shell: bash
         run: |
           set -euo pipefail
-          mvn -B -ntp clean verify
+          npm ci
+          npm run version:check
+          node scripts/check-version-bump.mjs origin/main
+          npm run build
 
-      - name: Verify private frontend
-        working-directory: private-repo
+      - name: Verify Android launcher resources
+        working-directory: private-repo/app/android
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x gradlew
+          ./gradlew --no-daemon :app:processDebugResources
+
+      - name: Verify shared web frontend build
+        working-directory: private-repo/frontend
         shell: bash
         env:
           VITE_INSTITUTION_NAME: Example University
           VITE_CAMPUS_NAME: Example Campus
         run: |
           set -euo pipefail
-          bash scripts/ci/run_frontend.sh
+          npm ci
+          npm run build
