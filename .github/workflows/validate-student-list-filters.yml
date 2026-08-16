@@ -27,9 +27,23 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: '22'
+          cache: npm
+          cache-dependency-path: private-repo/frontend/package-lock.json
       - name: Backend focused test
         working-directory: private-repo/backend-java
         run: mvn -B -ntp -pl server -am -Dtest=StudentAdminSortedQueryServiceTest -Dsurefire.failIfNoSpecifiedTests=false test
-      - name: Frontend filter regression
+      - name: Backend compile package
+        working-directory: private-repo/backend-java
+        run: mvn -B -ntp -pl server -am -DskipTests package
+      - name: Frontend install
         working-directory: private-repo/frontend
-        run: node --experimental-strip-types --test src/features/admin-data/admin-data-student-filters.spec.ts
+        run: npm ci
+      - name: Frontend tests
+        working-directory: private-repo/frontend
+        run: npm test
+      - name: Frontend typecheck
+        working-directory: private-repo/frontend
+        run: npm run typecheck
+      - name: Frontend production build
+        working-directory: private-repo/frontend
+        run: npm run build
