@@ -1,0 +1,44 @@
+name: Validate batch scope final
+
+on:
+  push:
+    branches:
+      - diagnostics/batch-scope-pagination-20260816
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: fix/batch-scope-select-filtered-all-20260816
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: false
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+      - name: Backend clean verify
+        working-directory: private-repo/backend-java
+        run: mvn -B -ntp clean verify
+      - name: Frontend install
+        working-directory: private-repo/frontend
+        run: npm ci
+      - name: Frontend tests
+        working-directory: private-repo/frontend
+        run: npm test
+      - name: Frontend typecheck
+        working-directory: private-repo/frontend
+        run: npm run typecheck
+      - name: Frontend production build
+        working-directory: private-repo/frontend
+        run: npm run build
