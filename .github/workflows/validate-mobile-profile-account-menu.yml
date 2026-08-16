@@ -11,7 +11,7 @@ permissions:
 jobs:
   validate:
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
         with:
@@ -23,6 +23,18 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: '22'
+      - name: Install dependencies
+        working-directory: private-repo/app
+        run: npm ci
       - name: Focused account menu regression
         working-directory: private-repo/app
         run: node --experimental-strip-types --test src/platform/account-identity-menu.spec.ts
+      - name: Complete mobile app tests
+        working-directory: private-repo/app
+        run: npm test
+      - name: Typecheck
+        working-directory: private-repo/app
+        run: npm run typecheck
+      - name: Production build
+        working-directory: private-repo/app
+        run: npm run build
