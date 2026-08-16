@@ -1,0 +1,48 @@
+name: Fix batch scope composable integration
+
+on:
+  push:
+    branches:
+      - diagnostics/batch-scope-pagination-20260816
+
+permissions:
+  contents: read
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: fix/batch-scope-server-pagination-20260816
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: true
+      - name: Restore admin batch scope functions
+        working-directory: private-repo
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('frontend/src/features/admin-batch/composables/useAdminBatchView.ts')
+          text = p.read_text()
+          anchor = """  async function saveScopeAndContinuePublish() {\n"""
+          if 'function closeScope()' not in text:
+              block = """  function closeScope() { if (publishFlowBusy.value || publishFlowState.value === 'WAITING_CONFIRMATION') return; recoverPublishFlow(); resetScopeDialog() }\n  function resetScopeDialog() { scopeDialog.value = false; scopeBatch.value = null; resetScopePagination(); publishAfterScope.value = false }\n  function toggleStudent(id: number) { selectedStudentIds.value = toggleId(selectedStudentIds.value, id) }\n  function toggleRoom(id: number) { selectedRoomIds.value = toggleId(selectedRoomIds.value, id) }\n  async function persistScope(batch: DataObject) { await api.put(`/api/v1/admin/batches/${Number(batch.id)}/scope`, { studentIds: selectedStudentIds.value, roomIds: selectedRoomIds.value }) }\n  async function requestPreflight(batch: DataObject) { const response = await api.get<ObjectSuccessResponse>(`/api/v1/admin/batches/${Number(batch.id)}/room-preflight`); return (response.data.data ?? {}) as DataObject }\n  function buildPreflightMissingSteps(snapshot: DataObject) { const steps: string[] = []; if (Number(snapshot.roomCount ?? 0) === 0) steps.push('选择至少一间可用宿舍'); if (((snapshot.blockers ?? []) as unknown[]).length) steps.push('处理阻断发布的宿舍状态或床位映射问题'); if (!steps.length) steps.push('根据预检提示完成剩余发布准备'); return steps }\n  async function saveScope() {\n    const batch = scopeBatch.value; if (!batch || publishFlowBusy.value) return; recoverPublishFlow(); movePublishFlow('SAVING_SCOPE'); error.value = ''\n    try { await persistScope(batch); movePublishFlow('SUCCEEDED'); message.value = `已保存${selectedStudentIds.value.length}名学生和${selectedRoomIds.value.length}间宿舍。`; await load(); movePublishFlow('IDLE'); resetScopeDialog() }\n    catch (reason) { movePublishFlow('FAILED'); error.value = reason instanceof Error ? reason.message : '批次范围保存失败' }\n  }\n"""
+              if anchor not in text:
+                  raise SystemExit('saveScopeAndContinuePublish anchor missing')
+              text = text.replace(anchor, block + anchor)
+          required = ['function closeScope()', 'function resetScopeDialog()', 'function toggleStudent(', 'function toggleRoom(', 'async function persistScope(', 'async function requestPreflight(', 'function buildPreflightMissingSteps(', 'async function saveScope()']
+          missing = [item for item in required if item not in text]
+          if missing:
+              raise SystemExit(f'missing restored functions: {missing}')
+          p.write_text(text)
+          PY
+          git diff --check
+          git config user.name 'Wust Dormitory CI'
+          git config user.email 'ci@wust-dormitory.local'
+          git add frontend/src/features/admin-batch/composables/useAdminBatchView.ts
+          git commit -m 'fix: 恢复批次范围分页接入后的保存与预检函数'
+          git push origin HEAD:fix/batch-scope-server-pagination-20260816
