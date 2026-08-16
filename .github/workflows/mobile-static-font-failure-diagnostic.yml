@@ -1,0 +1,58 @@
+name: Mobile static font failure diagnostic
+
+on:
+  push:
+    branches:
+      - diagnostics/materialize-static-print-fonts-20260816
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: fix/pdf-preview-font-weight-parity-20260816
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+      - name: Scan remaining legacy runtime and contract references
+        working-directory: private-repo
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo '=== legacy runtime/protocol references ==='
+          grep -R -n -E 'NotoSansSC-VF\.ttf|NOTO_SANS_SC_VF|ANDROID-LOCAL-1|"recipeVersion"[[:space:]]*:[[:space:]]*1' \
+            app/src backend-java/model/src/main/resources/mobile backend-java/server/src/main/java \
+            --exclude-dir=node_modules || true
+          echo '=== stale version expectations ==='
+          grep -R -n -E '1\.4\.0|versionCode[^0-9]*16' app/src app/scripts --exclude-dir=node_modules || true
+      - name: Install mobile dependencies
+        working-directory: private-repo/app
+        run: npm install --ignore-scripts
+      - name: Prepare canonical static fonts
+        working-directory: private-repo/app
+        run: npm run fonts:prepare
+      - name: Run mobile tests and print only failure context
+        working-directory: private-repo/app
+        shell: bash
+        run: |
+          set +e
+          npm test > /tmp/mobile-tests.log 2>&1
+          status=$?
+          set -e
+          if [ "$status" -ne 0 ]; then
+            echo '=== failing tests ==='
+            grep -n -E '^not ok|ERR_ASSERTION|AssertionError|error:|expected:|actual:|operator:|failureType:' /tmp/mobile-tests.log || true
+            echo '=== final 160 lines ==='
+            tail -n 160 /tmp/mobile-tests.log
+            exit "$status"
+          fi
+          tail -n 40 /tmp/mobile-tests.log
