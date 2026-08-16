@@ -1,0 +1,52 @@
+name: Private APP Workbench Scroll V5
+
+on:
+  push:
+    branches:
+      - 'private-compat/fix/app-workbench-scroll-boundaries-v5-20260816'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: private-app-workbench-scroll-v5-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout private v5 candidate
+        uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: a14483089421e17a940cd70f57f7e14dcda6980f
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+      - name: Install APP dependencies
+        working-directory: private-repo/app
+        run: npm ci
+      - name: Verify focused workbench scroll contracts
+        working-directory: private-repo/app
+        run: node --experimental-strip-types --test src/platform/student-workbench-home.spec.ts src/platform/room-workbench-home.spec.ts
+      - name: Verify APP version metadata
+        working-directory: private-repo/app
+        run: npm run version:check
+      - name: Verify APP version bump against parent main
+        working-directory: private-repo/app
+        run: node scripts/check-version-bump.mjs 80c759a07d53f3f6d54b829541a2e7dd42c084ba
+      - name: Verify package lock inherited from parent main
+        working-directory: private-repo
+        run: git diff --exit-code 80c759a07d53f3f6d54b829541a2e7dd42c084ba -- app/package-lock.json
+      - name: Build APP
+        working-directory: private-repo/app
+        run: npm run build
+      - name: Run APP full tests
+        working-directory: private-repo/app
+        run: npm test
