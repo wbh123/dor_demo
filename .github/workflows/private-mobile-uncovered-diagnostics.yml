@@ -1,0 +1,46 @@
+name: Private Mobile Uncovered Diagnostics
+
+on:
+  push:
+    branches:
+      - 'private-compat/main'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: private-mobile-uncovered-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  uncovered:
+    name: Verify uncovered mobile contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: main
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: false
+          fetch-depth: 1
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+      - name: Install mobile dependencies
+        working-directory: private-repo/app
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Verify inspection API contract
+        working-directory: private-repo/app
+        run: node --experimental-strip-types --test src/platform/inspection-api.spec.ts
+      - name: Verify full room confirmation contract
+        working-directory: private-repo/app
+        run: node --experimental-strip-types --test src/platform/room-confirmation-pipeline-layout.spec.ts
+      - name: Verify mobile typecheck
+        working-directory: private-repo/app
+        run: npm run typecheck
+      - name: Verify mobile production build
+        working-directory: private-repo/app
+        run: npm run build
