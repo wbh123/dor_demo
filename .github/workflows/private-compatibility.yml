@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   verify-private-ref:
-    name: Apply and verify print template unit toggle
+    name: Verify full frontend after unit toggle
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -34,50 +34,7 @@ jobs:
           ref: ${{ steps.target.outputs.private_ref }}
           token: ${{ secrets.PRIVATE_CI }}
           path: private-repo
-          persist-credentials: true
-          fetch-depth: 0
-
-      - name: Apply minimal unit-toggle fix
-        working-directory: private-repo
-        shell: bash
-        run: |
-          set -euo pipefail
-          python - <<'PY'
-          from pathlib import Path
-
-          path = Path('frontend/src/views/admin/AdminMobilePrintTemplateView.vue')
-          source = path.read_text(encoding='utf-8')
-
-          anchor = "function templateStatus(item:PrintTemplateSummary){if(item.draftRevisionId)return '有未发布草稿';if(item.publishedRevisionId)return '已发布';return '未发布'}"
-          helpers = """function semanticUnit(type:PrintElementType){if(type==='FLOOR_NUMBER')return '层';if(type==='ROOM_NUMBER')return '寝室';return ''}\nfunction isUnitVisible(item:PrintTemplateElement){const unit=semanticUnit(item.type);return !!unit&&(item.suffix??unit)!==''}\nfunction setUnitVisible(item:PrintTemplateElement,visible:boolean){const unit=semanticUnit(item.type);if(!unit)return;item.suffix=visible?unit:''}\nfunction onUnitToggle(event:Event){if(!selectedElement.value)return;setUnitVisible(selectedElement.value,(event.target as HTMLInputElement).checked)}"""
-          assert source.count(anchor) == 1, 'templateStatus anchor changed unexpectedly'
-          source = source.replace(anchor, anchor + '\n' + helpers, 1)
-
-          old_add = "  if(type==='FIXED_TEXT')item.text='固定文字';layout.value.elements.push(item);selectedElementId.value=item.id"
-          new_add = "  const unit=semanticUnit(type);if(unit)item.suffix=unit;if(type==='FIXED_TEXT')item.text='固定文字';layout.value.elements.push(item);selectedElementId.value=item.id"
-          assert source.count(old_add) == 1, 'addElement body changed unexpectedly'
-          source = source.replace(old_add, new_add, 1)
-
-          old_controls = '<div class="property-inline"><label>前缀<input v-model="selectedElement.prefix" maxlength="32"></label><label>后缀<input v-model="selectedElement.suffix" maxlength="32"></label></div>'
-          new_controls = '<div class="property-inline"><label>前缀<input v-model="selectedElement.prefix" maxlength="32"></label><label v-if="!semanticUnit(selectedElement.type)">后缀<input v-model="selectedElement.suffix" maxlength="32"></label><label v-else class="unit-toggle"><span>显示单位（{{ semanticUnit(selectedElement.type) }}）</span><input type="checkbox" :checked="isUnitVisible(selectedElement)" @change="onUnitToggle"></label></div>'
-          assert source.count(old_controls) == 1, 'property suffix controls changed unexpectedly'
-          source = source.replace(old_controls, new_controls, 1)
-
-          old_css = '.property-wide{display:grid;margin-bottom:9px}.property-wide textarea{min-height:64px}.property-actions'
-          new_css = '.property-wide{display:grid;margin-bottom:9px}.property-wide textarea{min-height:64px}.unit-toggle{display:flex!important;flex-direction:row!important;align-items:center;justify-content:space-between;gap:8px}.unit-toggle input{width:auto!important;margin:0}.property-actions'
-          assert source.count(old_css) == 1, 'property style anchor changed unexpectedly'
-          source = source.replace(old_css, new_css, 1)
-
-          path.write_text(source, encoding='utf-8')
-          PY
-
-          git diff --check
-          git diff -- frontend/src/views/admin/AdminMobilePrintTemplateView.vue frontend/src/views/admin/admin-mobile-print-template.spec.ts
-          git config user.name "WangBinghao"
-          git config user.email "2495680763@qq.com"
-          git add frontend/src/views/admin/AdminMobilePrintTemplateView.vue frontend/src/views/admin/admin-mobile-print-template.spec.ts
-          git commit -m "fix: 修复打印模板单位重复并增加显示开关"
-          git push origin "HEAD:${{ steps.target.outputs.private_ref }}"
+          persist-credentials: false
 
       - uses: actions/setup-node@v6
         with:
@@ -89,9 +46,9 @@ jobs:
         working-directory: private-repo/frontend
         run: npm ci
 
-      - name: Run print-template contract
+      - name: Run full frontend contracts
         working-directory: private-repo/frontend
-        run: node --test src/views/admin/admin-mobile-print-template.spec.ts
+        run: npm test
 
       - name: Run frontend typecheck
         working-directory: private-repo/frontend
