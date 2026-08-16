@@ -1,0 +1,133 @@
+name: Private APP Workbench Scroll Apply
+
+on:
+  push:
+    branches:
+      - 'private-compat/fix/app-workbench-scroll-boundaries-20260816'
+
+permissions:
+  contents: read
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout private branch
+        uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: fix/app-workbench-scroll-boundaries-20260816
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: true
+          fetch-depth: 1
+      - name: Apply bounded workbench layout changes
+        working-directory: private-repo
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace_once(text, old, new, label):
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'{label}: expected exactly one match, got {count}')
+              return text.replace(old, new, 1)
+
+          student_path = Path('app/src/views/StudentWorkbenchEntryView.vue')
+          student = student_path.read_text()
+          student = replace_once(
+              student,
+              '<main class="mobile-page">\n    <div class="mobile-container stack workbench-search-page">',
+              '<main class="mobile-page workbench-viewport-page">\n    <div class="mobile-container student-workbench-shell">',
+              'student shell',
+          )
+          student = replace_once(
+              student,
+              '      </section>\n\n      <section class="panel workbench-section">',
+              '      </section>\n\n      <div class="student-workbench-scroll stack">\n        <section class="panel workbench-section">',
+              'student scroll open',
+          )
+          student = replace_once(
+              student,
+              '      </section>\n    </div>\n\n    <ActionOverlay',
+              '        </section>\n      </div>\n    </div>\n\n    <ActionOverlay',
+              'student scroll close',
+          )
+          student = replace_once(
+              student,
+              '.workbench-search-page{padding-top:8px}.search-panel{display:grid;gap:8px;padding:10px}',
+              '.workbench-viewport-page{height:100dvh;min-height:0;overflow:hidden}.student-workbench-shell{height:100%;display:flex;flex-direction:column;gap:10px;min-height:0;overflow:hidden;padding-top:8px}.search-panel{flex:0 0 auto;display:grid;gap:8px;padding:10px}.student-workbench-scroll{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding-bottom:2px}:global(.phone-shell.has-global-header) .workbench-viewport-page{height:calc(100dvh - 46px - var(--safe-top))}:global([data-form-factor="tablet"]) .workbench-viewport-page{height:calc(100dvh - var(--tablet-topbar-height));min-height:0}',
+              'student css',
+          )
+          student_path.write_text(student)
+
+          room_path = Path('app/src/views/RoomWorkbenchEntryView.vue')
+          room = room_path.read_text()
+          room = replace_once(
+              room,
+              '<main class="mobile-page">\n    <div class="mobile-container stack workbench-search-page">',
+              '<main class="mobile-page workbench-viewport-page">\n    <div class="mobile-container room-workbench-shell">',
+              'room shell',
+          )
+          room = replace_once(
+              room,
+              '      <template v-if="buildingId != null && floorNumber != null">\n        <section class="panel workbench-summary">',
+              '      <template v-if="buildingId != null && floorNumber != null">\n        <div class="room-workbench-fixed stack">\n          <section class="panel workbench-summary">',
+              'room fixed open',
+          )
+          room = replace_once(
+              room,
+              '        </nav>\n\n        <section class="panel workbench-section">',
+              '        </nav>\n        </div>\n\n        <div class="room-workbench-scroll">\n          <section class="panel workbench-section">',
+              'room scroll open',
+          )
+          room = replace_once(
+              room,
+              '        </section>\n      </template>\n\n      <section v-else class="panel workbench-empty-guide">',
+              '          </section>\n        </div>\n      </template>\n\n      <section v-else class="panel workbench-empty-guide">',
+              'room scroll close',
+          )
+          room = replace_once(
+              room,
+              '.workbench-search-page{padding-top:8px}.location-toolbar{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:7px;padding:9px}',
+              '.workbench-viewport-page{height:100dvh;min-height:0;overflow:hidden}.room-workbench-shell{height:100%;display:flex;flex-direction:column;gap:10px;min-height:0;overflow:hidden;padding-top:8px}.location-toolbar{flex:0 0 auto;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:7px;padding:9px}.room-workbench-fixed{flex:0 0 auto}.room-workbench-scroll{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding-bottom:2px}:global(.phone-shell.has-global-header) .workbench-viewport-page{height:calc(100dvh - 46px - var(--safe-top))}:global([data-form-factor="tablet"]) .workbench-viewport-page{height:calc(100dvh - var(--tablet-topbar-height));min-height:0}',
+              'room css',
+          )
+          room_path.write_text(room)
+
+          version_path = Path('app/version.json')
+          version = version_path.read_text()
+          version = replace_once(version, '"versionName": "1.4.3"', '"versionName": "1.4.4"', 'version name')
+          version = replace_once(version, '"versionCode": 19', '"versionCode": 20', 'version code')
+          version_path.write_text(version)
+
+          package_path = Path('app/package.json')
+          package = package_path.read_text()
+          package = replace_once(package, '"version": "1.4.3"', '"version": "1.4.4"', 'package version')
+          package_path.write_text(package)
+
+          lock_path = Path('app/package-lock.json')
+          lock = lock_path.read_text()
+          count = lock.count('"version": "1.4.3"')
+          if count != 2:
+              raise SystemExit(f'package-lock version: expected 2 matches, got {count}')
+          lock = lock.replace('"version": "1.4.3"', '"version": "1.4.4"')
+          lock_path.write_text(lock)
+          PY
+          git diff --check
+          git add app/src/views/StudentWorkbenchEntryView.vue app/src/views/RoomWorkbenchEntryView.vue app/version.json app/package.json app/package-lock.json
+          actual="$(git diff --cached --name-only | sort)"
+          expected="$(printf '%s\n' app/package-lock.json app/package.json app/src/views/RoomWorkbenchEntryView.vue app/src/views/StudentWorkbenchEntryView.vue app/version.json | sort)"
+          test "$actual" = "$expected"
+      - name: Commit and push private changes
+        working-directory: private-repo
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "Wust Dormitory CI"
+          git config user.email "actions@users.noreply.github.com"
+          git commit -m "fix(app): constrain workbench scrolling to result areas"
+          git push origin HEAD:refs/heads/fix/app-workbench-scroll-boundaries-20260816
