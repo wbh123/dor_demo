@@ -1,0 +1,52 @@
+name: Patch static font OpenAPI
+
+on:
+  push:
+    branches:
+      - diagnostics/materialize-static-print-fonts-20260816
+
+permissions:
+  contents: read
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: fix/pdf-preview-font-weight-parity-20260816
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          fetch-depth: 0
+          persist-credentials: true
+      - name: Patch recipe v2 font schema
+        working-directory: private-repo
+        shell: python
+        run: |
+          from pathlib import Path
+          p = Path('backend-java/model/src/main/resources/mobile/openapi-mobile-interface.yaml')
+          text = p.read_text(encoding='utf-8')
+          old = '''        recipeVersion:\n          type: integer\n          enum: [1]\n        rendererVersion:\n          type: string\n          enum: [ANDROID-LOCAL-1]\n        batchId:\n'''
+          new = '''        recipeVersion:\n          type: integer\n          enum: [2]\n        rendererVersion:\n          type: string\n          enum: [ANDROID-LOCAL-2]\n        batchId:\n'''
+          if text.count(old) != 1:
+              raise SystemExit('recipe version block drifted')
+          text = text.replace(old, new)
+          old_font = '''        font:\n          type: object\n          required: [familyId, version, fileName, sha256, weights]\n          properties:\n            familyId:\n              type: string\n              enum: [NOTO_SANS_SC_VF]\n            version:\n              type: integer\n              enum: [1]\n            fileName:\n              type: string\n              enum: [NotoSansSC-VF.ttf]\n            sha256:\n              type: string\n              pattern: '^[0-9a-f]{64}$'\n            weights:\n'''
+          new_font = '''        font:\n          type: object\n          required: [familyId, version, regularFileName, regularSha256, boldFileName, boldSha256, bundleSha256, weights]\n          properties:\n            familyId:\n              type: string\n              enum: [WDS_NOTO_SANS_SC]\n            version:\n              type: integer\n              enum: [2]\n            regularFileName:\n              type: string\n              enum: [NotoSansSC-Regular.ttf]\n            regularSha256:\n              type: string\n              pattern: '^[0-9a-f]{64}$'\n            boldFileName:\n              type: string\n              enum: [NotoSansSC-Bold.ttf]\n            boldSha256:\n              type: string\n              pattern: '^[0-9a-f]{64}$'\n            bundleSha256:\n              type: string\n              pattern: '^[0-9a-f]{64}$'\n            weights:\n'''
+          if text.count(old_font) != 1:
+              raise SystemExit('font schema block drifted')
+          p.write_text(text.replace(old_font, new_font), encoding='utf-8')
+      - name: Assert no legacy VF identity remains in mobile OpenAPI
+        working-directory: private-repo
+        run: |
+          ! grep -n -E 'ANDROID-LOCAL-1|NOTO_SANS_SC_VF|NotoSansSC-VF\.ttf|enum: \[1\]' backend-java/model/src/main/resources/mobile/openapi-mobile-interface.yaml
+      - name: Commit schema
+        working-directory: private-repo
+        run: |
+          git config user.name 'Wust Dormitory CI'
+          git config user.email 'ci@wust-dormitory.local'
+          git add backend-java/model/src/main/resources/mobile/openapi-mobile-interface.yaml
+          git commit -m 'fix: align mobile print recipe schema with static fonts'
+          git push origin HEAD:fix/pdf-preview-font-weight-parity-20260816
