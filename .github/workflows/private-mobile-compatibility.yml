@@ -74,9 +74,24 @@ jobs:
       - name: Verify room workbench layout test
         working-directory: private-repo/app
         run: node --experimental-strip-types --test src/platform/room-workbench-layout.spec.ts
-      - name: Verify room confirmation pipeline test
+      - name: Verify confirmation pipeline actions contract
         working-directory: private-repo/app
-        run: node --experimental-strip-types --test src/platform/room-confirmation-pipeline-layout.spec.ts
+        run: node --experimental-strip-types --test --test-name-pattern='选寝模式连续确认面板' src/platform/room-confirmation-pipeline-layout.spec.ts
+      - name: Verify occupied bed confirmation contract
+        working-directory: private-repo/app
+        run: node --experimental-strip-types --test --test-name-pattern='已占床只用于定位占用学生' src/platform/room-confirmation-pipeline-layout.spec.ts
+      - name: Verify room confirmation permission contract
+        working-directory: private-repo/app
+        run: node --experimental-strip-types --test --test-name-pattern='寝室详情是统一确认工作台' src/platform/room-confirmation-pipeline-layout.spec.ts
+      - name: Verify confirmation soft refresh contract
+        working-directory: private-repo/app
+        run: node --experimental-strip-types --test --test-name-pattern='流水线确认成功后软刷新寝室数据' src/platform/room-confirmation-pipeline-layout.spec.ts
+      - name: Verify confirmation worklist deep-link contract
+        working-directory: private-repo/app
+        run: node --experimental-strip-types --test --test-name-pattern='确认任务列表的选房与选床入口' src/platform/room-confirmation-pipeline-layout.spec.ts
+      - name: Verify legacy confirmation redirect contract
+        working-directory: private-repo/app
+        run: node --experimental-strip-types --test --test-name-pattern='旧独立寝室确认页面被移除' src/platform/room-confirmation-pipeline-layout.spec.ts
       - name: Verify room detail layout test
         working-directory: private-repo/app
         run: node --experimental-strip-types --test src/platform/room-detail-layout.spec.ts
