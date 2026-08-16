@@ -1,0 +1,296 @@
+name: Private APP Theme Apply
+
+on:
+  push:
+    branches:
+      - 'private-compat/**'
+
+permissions:
+  contents: read
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Resolve private branch name
+        id: target
+        shell: bash
+        run: |
+          candidate="$GITHUB_REF_NAME"
+          private_ref="${candidate#private-compat/}"
+          [[ -n "$private_ref" && "$private_ref" != "$candidate" ]]
+          echo "private_ref=$private_ref" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout private branch
+        uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: ${{ steps.target.outputs.private_ref }}
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: true
+          fetch-depth: 0
+
+      - name: Apply dark mode and icon safe-zone implementation
+        working-directory: private-repo
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected='e0478b6b9a6b5d3ebd7ee3c2a25628e42d5df65a'
+          test "$(git rev-parse HEAD)" = "$expected"
+          python - <<'PY'
+          from pathlib import Path
+          import json
+
+          def replace_once(path, old, new):
+              p = Path(path)
+              text = p.read_text()
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'{path}: expected one match, got {count}: {old[:80]!r}')
+              p.write_text(text.replace(old, new, 1))
+
+          Path('app/src/styles/tokens.css').write_text(""":root {
+            font-family: Inter, 'Noto Sans SC', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            color: #172033;
+            background: #f3f6fb;
+            color-scheme: light;
+            font-synthesis: none;
+            text-rendering: optimizeLegibility;
+            --primary: #1d5dd8;
+            --primary-dark: #123f9c;
+            --accent: #7657e8;
+            --success: #158467;
+            --warning: #b66a16;
+            --danger: #c33c4b;
+            --page-bg: #f3f6fb;
+            --ink: #172033;
+            --muted: #69758b;
+            --line: #dde4ef;
+            --panel: #ffffff;
+            --soft: #f7f9fc;
+            --control-bg: #ffffff;
+            --control-border: #d7dfeb;
+            --nav-bg: rgba(255, 255, 255, .96);
+            --overlay-bg: rgba(8, 20, 45, .48);
+            --overlay-handle: #c7cfdd;
+            --primary-soft: #edf3ff;
+            --info-ink: #24568f;
+            --info-soft: #f4f8fc;
+            --info-line: #c7d6e6;
+            --success-ink: #17664f;
+            --success-soft: #e8f8f2;
+            --success-line: #c9eadf;
+            --warning-ink: #9a5714;
+            --warning-soft: #fff3df;
+            --warning-line: #efd2aa;
+            --danger-ink: #9b2838;
+            --danger-soft: #fff0f2;
+            --danger-line: #f3ccd2;
+            --progress-track: #e4eaf3;
+            --shadow: 0 16px 40px rgba(22, 43, 82, 0.08);
+            --radius-lg: 20px;
+            --radius-md: 14px;
+            --radius-sm: 11px;
+            --safe-top: env(safe-area-inset-top, 0px);
+            --safe-bottom: env(safe-area-inset-bottom, 0px);
+          }
+
+          html[data-app-theme='green'] {
+            --primary: #16845b;
+            --primary-dark: #0f6545;
+            --accent: #2f9b72;
+            --success: #16845b;
+            --primary-soft: #eaf7f1;
+            --shadow: 0 16px 40px rgba(20, 105, 75, 0.09);
+          }
+
+          @media (prefers-color-scheme: dark) {
+            :root {
+              color: #edf3fb;
+              background: #0d1420;
+              color-scheme: dark;
+              --primary: #6f9df6;
+              --primary-dark: #c5d8ff;
+              --accent: #a895ff;
+              --success: #69d1ad;
+              --warning: #f0b869;
+              --danger: #ff8b99;
+              --page-bg: #0d1420;
+              --ink: #edf3fb;
+              --muted: #a7b4c8;
+              --line: #2b3a50;
+              --panel: #151f2e;
+              --soft: #1b2738;
+              --control-bg: #111a27;
+              --control-border: #35475f;
+              --nav-bg: rgba(17, 26, 39, .96);
+              --overlay-bg: rgba(0, 0, 0, .64);
+              --overlay-handle: #627189;
+              --primary-soft: #1a2e50;
+              --info-ink: #9bc5f5;
+              --info-soft: #172b43;
+              --info-line: #365476;
+              --success-ink: #8be0c2;
+              --success-soft: #17352d;
+              --success-line: #2f5f50;
+              --warning-ink: #ffd39a;
+              --warning-soft: #3a2b18;
+              --warning-line: #665033;
+              --danger-ink: #ffabb5;
+              --danger-soft: #3b2028;
+              --danger-line: #6b3d47;
+              --progress-track: #2a374a;
+              --shadow: 0 16px 40px rgba(0, 0, 0, .28);
+            }
+            html[data-app-theme='green'] {
+              --primary: #61c99f;
+              --primary-dark: #b8ead7;
+              --accent: #7ed8b6;
+              --success: #61c99f;
+              --primary-soft: #17352d;
+              --shadow: 0 16px 40px rgba(0, 0, 0, .28);
+            }
+          }
+          """)
+
+          replace_once('app/src/styles/base.css', "body { min-height: 100dvh; overflow-x: hidden; background: #f3f6fb; }", "body { min-height: 100dvh; overflow-x: hidden; color: var(--ink); background: var(--page-bg); }")
+          replace_once('app/src/styles/base.css', "background: #fff; cursor: pointer;", "background: var(--control-bg); cursor: pointer;")
+          replace_once('app/src/styles/base.css', "border: 1px solid #d7dfeb; border-radius: var(--radius-sm); outline: 0; background: #fff;", "border: 1px solid var(--control-border); border-radius: var(--radius-sm); outline: 0; background: var(--control-bg);")
+          replace_once('app/src/styles/base.css', ".button.secondary { color: var(--primary-dark); border-color: #d6e2fb; background: #edf3ff; }", ".button.secondary { color: var(--primary-dark); border-color: var(--control-border); background: var(--primary-soft); }")
+          replace_once('app/src/styles/base.css', ".button.ghost { color: var(--muted); border-color: var(--line); background: #fff; }", ".button.ghost { color: var(--muted); border-color: var(--line); background: var(--control-bg); }")
+          replace_once('app/src/styles/base.css', ".status.success { color: #17664f; background: #e8f8f2; }", ".status.success { color: var(--success-ink); background: var(--success-soft); }")
+          replace_once('app/src/styles/base.css', ".status.warning { color: #9a5714; background: #fff3df; }", ".status.warning { color: var(--warning-ink); background: var(--warning-soft); }")
+          replace_once('app/src/styles/base.css', ".status.danger { color: #9b2838; background: #fff0f2; }", ".status.danger { color: var(--danger-ink); background: var(--danger-soft); }")
+          replace_once('app/src/styles/base.css', ".status.neutral { color: #526078; background: #eef2f8; }", ".status.neutral { color: var(--muted); background: var(--soft); }")
+          replace_once('app/src/styles/base.css', ".notice.error { color: #9b2838; border: 1px solid #f3ccd2; background: #fff0f2; }", ".notice.error { color: var(--danger-ink); border: 1px solid var(--danger-line); background: var(--danger-soft); }")
+          replace_once('app/src/styles/base.css', ".notice.success { color: #17664f; border: 1px solid #c9eadf; background: #edf9f5; }", ".notice.success { color: var(--success-ink); border: 1px solid var(--success-line); background: var(--success-soft); }")
+
+          replace_once('app/src/styles/components.css', "border: 1px solid rgba(221, 228, 239, .92); border-bottom: 0; border-radius: 18px 18px 0 0; background: rgba(255,255,255,.96);", "border: 1px solid var(--line); border-bottom: 0; border-radius: 18px 18px 0 0; background: var(--nav-bg);")
+          replace_once('app/src/styles/components.css', ".bottom-nav a.router-link-exact-active { color: var(--primary); background: #edf3ff; }", ".bottom-nav a.router-link-exact-active { color: var(--primary); background: var(--primary-soft); }")
+          replace_once('app/src/styles/components.css', "border: 1px solid var(--line); border-radius: 13px; background: #fff; cursor: pointer;", "border: 1px solid var(--line); border-radius: 13px; background: var(--panel); cursor: pointer;")
+          replace_once('app/src/styles/components.css', ".bed-card.current { border-color: #7598e3; background: #eef4ff; }", ".bed-card.current { border-color: var(--primary); background: var(--primary-soft); }")
+          replace_once('app/src/styles/components.css', ".bed-card.available { border-color: #bfe2d7; background: #f1fbf7; }", ".bed-card.available { border-color: var(--success-line); background: var(--success-soft); }")
+          replace_once('app/src/styles/components.css', ".bed-card.occupied { border-color: #f0d3a9; background: #fff8ed; }", ".bed-card.occupied { border-color: var(--warning-line); background: var(--warning-soft); }")
+          replace_once('app/src/styles/components.css', "background: #fff; cursor: pointer; }\n.bed-card.current", "background: var(--panel); cursor: pointer; }\n.bed-card.current")
+
+          replace_once('app/src/styles/action-overlay.css', "background: #c7cfdd;", "background: var(--overlay-handle);")
+
+          replace_once('app/src/styles/tablet.css', "background: #f3f6fb;", "background: var(--page-bg);",)
+          text = Path('app/src/styles/tablet.css').read_text()
+          text = text.replace("    #f3f6fb;", "    var(--page-bg);")
+          text = text.replace("border-bottom: 1px solid rgba(214, 223, 237, .86);\n  background: rgba(250, 252, 255, .93);", "border-bottom: 1px solid var(--line);\n  background: var(--nav-bg);")
+          text = text.replace("border: 1px solid #d7dfeb;", "border: 1px solid var(--control-border);")
+          text = text.replace("background: #fff;\n  cursor: pointer;", "background: var(--control-bg);\n  cursor: pointer;")
+          text = text.replace("background: #f6f9ff;", "background: var(--soft);")
+          Path('app/src/styles/tablet.css').write_text(text)
+
+          replace_once('app/src/styles/p1.css', "color: #8b4d10; border: 1px solid #efd2aa; background: #fff7e8;", "color: var(--warning-ink); border: 1px solid var(--warning-line); background: var(--warning-soft);")
+
+          replace_once('app/src/views/LoginView.vue', "background:#fff;box-shadow:0 30px 80px rgba(7,26,63,.28)", "background:var(--panel);box-shadow:var(--shadow)")
+          replace_once('app/src/views/LoginView.vue', "color:#64789c", "color:var(--muted)")
+          replace_once('app/src/views/LoginView.vue', "color:#526078", "color:var(--muted)")
+          replace_once('app/src/views/LoginView.vue', "color:#a0aabd", "color:var(--muted)")
+
+          replace_once('app/src/views/FirstPasswordView.vue', "background:#fff;box-shadow:0 30px 80px rgba(7,26,63,.28)", "background:var(--panel);box-shadow:var(--shadow)")
+          replace_once('app/src/views/FirstPasswordView.vue', "color:#526078", "color:var(--muted)")
+
+          replace_once('app/src/views/UpdateRequiredView.vue', "background:linear-gradient(155deg,#edf4ff 0%,#f7f9fc 55%,#eef3fb 100%)", "background:linear-gradient(155deg,var(--page-bg) 0%,var(--soft) 55%,var(--page-bg) 100%)")
+          replace_once('app/src/views/UpdateRequiredView.vue', "background:#fff;box-shadow:0 22px 70px rgba(18,42,83,.15)", "background:var(--panel);box-shadow:var(--shadow)")
+          replace_once('app/src/views/UpdateRequiredView.vue', "background:#f7f9fc", "background:var(--soft)")
+          replace_once('app/src/views/UpdateRequiredView.vue', "background:#e4eaf3", "background:var(--progress-track)")
+
+          notice = Path('app/src/components/MobileNoticeHost.vue').read_text()
+          notice = notice.replace("border: 1px solid #c7d6e6;", "border: 1px solid var(--info-line);")
+          notice = notice.replace("background: #f4f8fc;\n  color: #24568f;", "background: var(--info-soft);\n  color: var(--info-ink);")
+          notice = notice.replace("color: #166647; background: #eff9f4; border-color: #bddfce;", "color: var(--success-ink); background: var(--success-soft); border-color: var(--success-line);")
+          notice = notice.replace("color: #8a4b08; background: #fff7e8; border-color: #ead0a7;", "color: var(--warning-ink); background: var(--warning-soft); border-color: var(--warning-line);")
+          notice = notice.replace("color: #a12d36; background: #fff1f2; border-color: #e7bcc0;", "color: var(--danger-ink); background: var(--danger-soft); border-color: var(--danger-line);")
+          notice = notice.replace("background:rgba(8, 18, 38, .48);", "background:var(--overlay-bg);")
+          notice = notice.replace("background:#fff; box-shadow", "background:var(--panel); box-shadow")
+          notice = notice.replace("background:#eef4ff; color:var(--primary);", "background:var(--primary-soft); color:var(--primary);")
+          notice = notice.replace("background:#fff0f1; color:#a12d36;", "background:var(--danger-soft); color:var(--danger-ink);")
+          Path('app/src/components/MobileNoticeHost.vue').write_text(notice)
+
+          overlay = Path('app/src/components/ServerUnavailableOverlay.vue').read_text()
+          overlay = overlay.replace("background:rgba(245,248,252,.96);", "background:var(--page-bg);")
+          overlay = overlay.replace("background:#fff;box-shadow", "background:var(--panel);box-shadow")
+          overlay = overlay.replace("background:#fff0f0;color:var(--danger);", "background:var(--danger-soft);color:var(--danger);")
+          Path('app/src/components/ServerUnavailableOverlay.vue').write_text(overlay)
+
+          replace_once('app/src/components/ResourceLabelPrintPanel.vue', ".manager-tabs button.active{background:#fff;color:var(--primary);", ".manager-tabs button.active{background:var(--panel);color:var(--primary);")
+          replace_once('app/src/views/ScanView.vue', ".scanner-controls{display:flex;justify-content:flex-end;gap:7px;padding:9px;background:#fff}", ".scanner-controls{display:flex;justify-content:flex-end;gap:7px;padding:9px;background:var(--panel)}")
+
+          print_path = Path('app/src/styles/print-layout.css')
+          print_css = print_path.read_text().replace("background: rgba(255, 255, 255, .97) !important;", "background: var(--nav-bg) !important;")
+          print_css += """
+
+/* Printing and server-rendered PDF previews must stay paper-white even when the
+   surrounding WebView follows the system dark theme. */
+.resource-label-print-page .print-paper,
+.resource-label-print-page .print-sheet,
+.resource-label-print-page .pdf-paper {
+  color-scheme: light;
+  color: #000;
+  background: #fff;
+}
+
+@media print {
+  html, body, #app,
+  .resource-label-print-page,
+  .resource-label-print-page .print-paper,
+  .resource-label-print-page .print-sheet,
+  .resource-label-print-page .pdf-paper {
+    color-scheme: light !important;
+    color: #000 !important;
+    background: #fff !important;
+  }
+}
+"""
+          print_path.write_text(print_css)
+
+          styles = Path('app/android/app/src/main/res/values/styles.xml').read_text()
+          styles = styles.replace('Theme.AppCompat.Light.DarkActionBar', 'Theme.AppCompat.DayNight.DarkActionBar')
+          styles = styles.replace('        <item name="android:background">@null</item>\n', '        <item name="android:background">@null</item>\n        <item name="android:statusBarColor">@color/app_system_bar_background</item>\n        <item name="android:navigationBarColor">@color/app_system_bar_background</item>\n        <item name="android:windowLightStatusBar">@bool/app_system_bar_light</item>\n        <item name="android:windowLightNavigationBar">@bool/app_system_bar_light</item>\n')
+          Path('app/android/app/src/main/res/values/styles.xml').write_text(styles)
+
+          Path('app/android/app/src/main/res/values/colors.xml').write_text('''<?xml version="1.0" encoding="utf-8"?>\n<resources>\n    <color name="app_system_bar_background">#F3F6FB</color>\n    <bool name="app_system_bar_light">true</bool>\n</resources>\n''')
+          night = Path('app/android/app/src/main/res/values-night')
+          night.mkdir(parents=True, exist_ok=True)
+          (night / 'colors.xml').write_text('''<?xml version="1.0" encoding="utf-8"?>\n<resources>\n    <color name="app_system_bar_background">#0D1420</color>\n    <bool name="app_system_bar_light">false</bool>\n</resources>\n''')
+
+          Path('app/android/app/src/main/res/drawable/app_icon_foreground_safe.xml').write_text('''<?xml version="1.0" encoding="utf-8"?>\n<scale xmlns:android="http://schemas.android.com/apk/res/android"\n    android:drawable="@drawable/app_icon_artwork"\n    android:scaleGravity="center"\n    android:scaleWidth="16%"\n    android:scaleHeight="16%"\n    android:level="1" />\n''')
+          for name in ('app_icon.xml','app_icon_round.xml','ic_launcher.xml','ic_launcher_round.xml'):
+              p = Path('app/android/app/src/main/res/mipmap-anydpi-v26') / name
+              text = p.read_text()
+              import re
+              text, n = re.subn(r'<foreground android:drawable="@[^"]+"\s*/>', '<foreground android:drawable="@drawable/app_icon_foreground_safe" />', text, count=1)
+              if n != 1:
+                  raise SystemExit(f'{p}: adaptive foreground replacement failed')
+              p.write_text(text)
+
+          pkg = Path('app/package.json')
+          data = json.loads(pkg.read_text())
+          test_cmd = data['scripts']['test']
+          marker = 'src/platform/device-runtime.spec.ts'
+          addition = ' src/platform/system-dark-mode.spec.ts src/platform/android-icon-safe-zone.spec.ts'
+          if 'system-dark-mode.spec.ts' not in test_cmd:
+              test_cmd = test_cmd.replace(marker, marker + addition)
+          data['scripts']['test'] = test_cmd
+          pkg.write_text(json.dumps(data, ensure_ascii=False, indent=2) + '\n')
+          PY
+
+          allowed='^(app/package.json|app/src/styles/(tokens|base|components|action-overlay|tablet|p1|print-layout)\.css|app/src/views/(LoginView|FirstPasswordView|UpdateRequiredView|ScanView)\.vue|app/src/components/(MobileNoticeHost|ServerUnavailableOverlay|ResourceLabelPrintPanel)\.vue|app/android/app/src/main/res/values/(styles|colors)\.xml|app/android/app/src/main/res/values-night/colors\.xml|app/android/app/src/main/res/drawable/app_icon_foreground_safe\.xml|app/android/app/src/main/res/mipmap-anydpi-v26/(app_icon|app_icon_round|ic_launcher|ic_launcher_round)\.xml)$'
+          changed="$(git status --porcelain | awk '{print $2}')"
+          printf '%s\n' "$changed"
+          test -n "$changed"
+          if printf '%s\n' "$changed" | grep -Ev "$allowed"; then
+            echo 'Unexpected changed file' >&2
+            exit 1
+          fi
+          git config user.name 'Wust Dormitory CI'
+          git config user.email 'actions@users.noreply.github.com'
+          git add $changed
+          git commit -m 'feat(app): follow system dark mode and shrink adaptive icon'
+          git push origin "HEAD:refs/heads/${{ steps.target.outputs.private_ref }}"
