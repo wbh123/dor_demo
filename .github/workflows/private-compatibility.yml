@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   verify-private-ref:
-    name: Verify print template editor regression
+    name: Apply and verify print template unit fix
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -34,7 +34,92 @@ jobs:
           ref: ${{ steps.target.outputs.private_ref }}
           token: ${{ secrets.PRIVATE_CI }}
           path: private-repo
-          persist-credentials: false
+          persist-credentials: true
+          fetch-depth: 0
+
+      - name: Apply minimal editor fix
+        working-directory: private-repo
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          view_path = Path('frontend/src/views/admin/AdminMobilePrintTemplateView.vue')
+          source = view_path.read_text(encoding='utf-8')
+
+          old_values = "  BUILDING_NAME: '北一舍', FLOOR_NUMBER: '3层', ROOM_NUMBER: '301寝室', BED_CODE: '2号床',"
+          new_values = "  BUILDING_NAME: '北一舍', FLOOR_NUMBER: '3', ROOM_NUMBER: '301', BED_CODE: '2号床',"
+          assert old_values in source, 'preview value source changed unexpectedly'
+          source = source.replace(old_values, new_values, 1)
+
+          old_preview = """function previewText(item: PrintTemplateElement) {
+            const raw = item.type === 'FIXED_TEXT' ? (item.text || '固定文字') : previewValues[item.type]
+            return `${item.prefix ?? ''}${raw}${item.suffix ?? ''}`
+          }
+          """
+          new_preview = """function semanticUnit(type: PrintElementType) {
+            if (type === 'FLOOR_NUMBER') return '层'
+            if (type === 'ROOM_NUMBER') return '寝室'
+            return ''
+          }
+
+          function isUnitVisible(item: PrintTemplateElement) {
+            const unit = semanticUnit(item.type)
+            return !!unit && (item.suffix ?? unit) !== ''
+          }
+
+          function setUnitVisible(item: PrintTemplateElement, visible: boolean) {
+            const unit = semanticUnit(item.type)
+            if (!unit) return
+            item.suffix = visible ? unit : ''
+          }
+
+          function onUnitToggle(event: Event) {
+            if (!selectedElement.value) return
+            setUnitVisible(selectedElement.value, (event.target as HTMLInputElement).checked)
+          }
+
+          function previewText(item: PrintTemplateElement) {
+            const raw = item.type === 'FIXED_TEXT' ? (item.text || '固定文字') : previewValues[item.type]
+            const suffix = item.suffix ?? semanticUnit(item.type)
+            return `${item.prefix ?? ''}${raw}${suffix}`
+          }
+          """
+          assert old_preview in source, 'preview function changed unexpectedly'
+          source = source.replace(old_preview, new_preview, 1)
+
+          old_affix = """                <div class=\"property-inline affix-controls\">
+                  <label>前缀<input v-model=\"selectedElement.prefix\" maxlength=\"32\"></label>
+                  <label>后缀<input v-model=\"selectedElement.suffix\" maxlength=\"32\"></label>
+                </div>
+          """
+          new_affix = """                <div class=\"property-inline affix-controls\">
+                  <label>前缀<input v-model=\"selectedElement.prefix\" maxlength=\"32\"></label>
+                  <label v-if=\"!semanticUnit(selectedElement.type)\">后缀<input v-model=\"selectedElement.suffix\" maxlength=\"32\"></label>
+                  <label v-else class=\"check\"><input type=\"checkbox\" :checked=\"isUnitVisible(selectedElement)\" @change=\"onUnitToggle\"> 显示单位（{{ semanticUnit(selectedElement.type) }}）</label>
+                </div>
+          """
+          assert old_affix in source, 'affix editor changed unexpectedly'
+          source = source.replace(old_affix, new_affix, 1)
+          view_path.write_text(source, encoding='utf-8')
+
+          test_path = Path('frontend/src/views/admin/admin-mobile-print-template.spec.ts')
+          test_source = test_path.read_text(encoding='utf-8')
+          stale = '  assert.match(view, /class="revision-panel"/)'
+          current = '  assert.match(view, /class="revision-panel panel"/)'
+          assert stale in test_source, 'revision panel assertion already changed'
+          test_source = test_source.replace(stale, current, 1)
+          test_path.write_text(test_source, encoding='utf-8')
+          PY
+
+          git diff --check
+          git diff -- frontend/src/views/admin/AdminMobilePrintTemplateView.vue frontend/src/views/admin/admin-mobile-print-template.spec.ts
+          git config user.name "WangBinghao"
+          git config user.email "2495680763@qq.com"
+          git add frontend/src/views/admin/AdminMobilePrintTemplateView.vue frontend/src/views/admin/admin-mobile-print-template.spec.ts
+          git commit -m "fix: 修复打印模板单位重复并增加显示开关"
+          git push origin "HEAD:${{ steps.target.outputs.private_ref }}"
 
       - uses: actions/setup-node@v6
         with:
