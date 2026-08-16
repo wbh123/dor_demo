@@ -1,0 +1,241 @@
+name: Validate private main print template integration
+
+on:
+  push:
+    branches:
+      - 'ci/validate-private-main-print-template-20260816'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: validate-private-main-print-template-20260816
+  cancel-in-progress: true
+
+env:
+  PRIVATE_REPO: wbh123/Wust-Dormitory-Select
+  PRIVATE_SHA: d565710ea877e4b90471f67707e87a17ded3ffd3
+
+jobs:
+  backend-and-admin:
+    name: Backend verify and admin frontend build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact private main merge
+        uses: actions/checkout@v5
+        with:
+          repository: ${{ env.PRIVATE_REPO }}
+          ref: ${{ env.PRIVATE_SHA }}
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: private-repo/backend-java/pom.xml
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: private-repo/frontend/package-lock.json
+      - name: Verify exact commit
+        working-directory: private-repo
+        run: test "$(git rev-parse HEAD)" = "$PRIVATE_SHA"
+      - name: Maven clean verify
+        working-directory: private-repo
+        run: mvn -f backend-java/pom.xml --batch-mode --no-transfer-progress clean verify
+      - name: Install admin frontend dependencies
+        working-directory: private-repo/frontend
+        run: npm install --no-audit --no-fund
+      - name: Run configured frontend tests
+        working-directory: private-repo/frontend
+        run: npm test
+      - name: Run print-template editor contract
+        working-directory: private-repo/frontend
+        run: node --experimental-strip-types --test src/views/admin/admin-mobile-print-template.spec.ts
+      - name: Generate OpenAPI types and build admin frontend
+        working-directory: private-repo/frontend
+        run: npm run build
+
+  database-runtime:
+    name: Flyway V54 and runtime smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_DATABASE: wust_dormitory
+          MYSQL_USER: wust_dormitory
+          MYSQL_PASSWORD: RuntimeTestPassword2026
+          MYSQL_ROOT_PASSWORD: RuntimeRootPassword2026
+          TZ: Asia/Shanghai
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -pRuntimeRootPassword2026"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=12
+      redis:
+        image: redis:7.4-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=5s
+          --health-timeout=3s
+          --health-retries=12
+    env:
+      WUST_DORMITORY_DB_HOST: 127.0.0.1
+      WUST_DORMITORY_DB_PORT: '3306'
+      WUST_DORMITORY_DB_NAME: wust_dormitory
+      WUST_DORMITORY_DB_USER: wust_dormitory
+      WUST_DORMITORY_DB_PASSWORD: RuntimeTestPassword2026
+      WUST_DORMITORY_REDIS_HOST: 127.0.0.1
+      WUST_DORMITORY_REDIS_PORT: '6379'
+      WUST_DORMITORY_REDIS_PASSWORD: ''
+      WUST_DORMITORY_FLYWAY_LOCATIONS: classpath:db/migration,filesystem:backend-java/server/src/test/resources/db/dev-migration
+    steps:
+      - name: Checkout exact private main merge
+        uses: actions/checkout@v5
+        with:
+          repository: ${{ env.PRIVATE_REPO }}
+          ref: ${{ env.PRIVATE_SHA }}
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: private-repo/backend-java/pom.xml
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Build executable service
+        working-directory: private-repo
+        run: mvn -f backend-java/pom.xml --batch-mode --no-transfer-progress clean package -DskipTests
+      - name: Start service and wait for health
+        working-directory: private-repo
+        run: |
+          java -jar backend-java/starter/target/Service.jar > /tmp/wust-dormitory.log 2>&1 &
+          echo $! > /tmp/wust-dormitory.pid
+          for attempt in $(seq 1 75); do
+            if curl --fail --silent http://127.0.0.1:8080/actuator/health > /tmp/health.json; then
+              cat /tmp/health.json
+              exit 0
+            fi
+            sleep 2
+          done
+          cat /tmp/wust-dormitory.log
+          exit 1
+      - name: Verify Flyway V54 print-template schema and entitlement
+        run: |
+          python -m pip install --disable-pip-version-check pymysql
+          python - <<'PY'
+          import pymysql
+          connection = pymysql.connect(
+              host='127.0.0.1', port=3306, user='wust_dormitory',
+              password='RuntimeTestPassword2026', database='wust_dormitory', charset='utf8mb4'
+          )
+          with connection.cursor() as cursor:
+              cursor.execute("SELECT MAX(CAST(version AS UNSIGNED)) FROM flyway_schema_history WHERE success=1")
+              latest = int(cursor.fetchone()[0])
+              assert latest >= 54, latest
+              for table in ('mobile_print_template', 'mobile_print_template_revision', 'mobile_print_template_asset'):
+                  cursor.execute(f"SHOW TABLES LIKE '{table}'")
+                  assert cursor.fetchone() is not None, table
+              cursor.execute("SELECT enabled_in_program, school_controllable, school_default_enabled FROM feature_catalog WHERE feature_code='P3_MOBILE_PRINT_TEMPLATE_MANAGE'")
+              row = cursor.fetchone()
+              assert row == (1, 0, 1), row
+          connection.close()
+          PY
+      - name: Print service log
+        if: always()
+        run: cat /tmp/wust-dormitory.log || true
+
+  database-generation:
+    name: Navicat reset generator includes V54
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact private main merge
+        uses: actions/checkout@v5
+        with:
+          repository: ${{ env.PRIVATE_REPO }}
+          ref: ${{ env.PRIVATE_SHA }}
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install generator dependencies
+        run: python -m pip install --disable-pip-version-check pyyaml
+      - name: Generate clean reset SQL and run generator check
+        working-directory: private-repo
+        run: |
+          python scripts/db/generate_navicat_sql.py --scenario clean --skip-redis
+          python scripts/db/generate_navicat_sql.py --scenario clean --check
+          grep -n 'V54__add_mobile_print_templates.sql' backend-java/docs/sql/navicat/generated/00_一键重置数据库.sql
+          grep -n 'P3_MOBILE_PRINT_TEMPLATE_MANAGE' backend-java/docs/sql/navicat/generated/00_一键重置数据库.sql
+          grep -n 'CREATE TABLE mobile_print_template' backend-java/docs/sql/navicat/generated/00_一键重置数据库.sql
+          grep -n 'CREATE TABLE mobile_print_template_revision' backend-java/docs/sql/navicat/generated/00_一键重置数据库.sql
+          grep -n 'CREATE TABLE mobile_print_template_asset' backend-java/docs/sql/navicat/generated/00_一键重置数据库.sql
+
+  mobile-android:
+    name: Mobile tests and Android debug build
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout exact private main merge
+        uses: actions/checkout@v5
+        with:
+          repository: ${{ env.PRIVATE_REPO }}
+          ref: ${{ env.PRIVATE_SHA }}
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: private-repo/app/package-lock.json
+      - name: Install mobile dependencies
+        working-directory: private-repo/app
+        run: npm install --no-audit --no-fund
+      - name: Check mobile release version
+        working-directory: private-repo/app
+        run: npm run version:check
+      - name: Run mobile contract tests
+        working-directory: private-repo/app
+        run: npm test
+      - name: Run mobile typecheck
+        working-directory: private-repo/app
+        run: npm run typecheck
+      - name: Build Android debug APK
+        working-directory: private-repo/app
+        run: npm run android:build:debug
+      - name: Verify APK exists
+        run: test -f private-repo/app/android/app/build/outputs/apk/debug/app-debug.apk
+      - name: Upload validated debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobile-print-template-debug-apk
+          path: private-repo/app/android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 3
