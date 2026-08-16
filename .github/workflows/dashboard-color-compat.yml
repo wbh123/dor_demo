@@ -1,0 +1,31 @@
+name: Dashboard Color Compatibility CI
+
+on:
+  push:
+    branches:
+      - 'private-compat/style/admin-dashboard-accent-colors-20260816'
+
+permissions:
+  contents: read
+
+jobs:
+  dashboard-color-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout private branch
+        uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: style/admin-dashboard-accent-colors-20260816
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: false
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+
+      - name: Run dashboard color contract
+        working-directory: private-repo/frontend
+        run: node --experimental-strip-types --test src/views/admin/admin-dashboard-color-contract.spec.ts
