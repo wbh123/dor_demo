@@ -27,7 +27,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD)" = "9643001db7375dfb2cec9886e24f90ceb6854fba"
+          test "$(git rev-parse HEAD)" = "11cf3c721ffe306674be2ca9ae67500cef99b1ff"
           git fetch origin main
           git config user.name "Wust Dormitory CI"
           git config user.email "actions@users.noreply.github.com"
