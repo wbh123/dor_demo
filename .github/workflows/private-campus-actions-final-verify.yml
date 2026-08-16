@@ -1,0 +1,74 @@
+name: Private Campus Actions Final Verify
+
+on:
+  push:
+    branches:
+      - 'private-compat/fix/campus-disable-delete-actions-20260816'
+
+permissions:
+  contents: read
+
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: fix/campus-disable-delete-actions-20260816
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: false
+          fetch-depth: 1
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Verify campus and OpenAPI contracts
+        working-directory: private-repo
+        run: |
+          python scripts/subscription/test_campus_management_contract.py -v
+          python scripts/ci/test_governance_openapi.py
+
+  backend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: fix/campus-disable-delete-actions-20260816
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: false
+          fetch-depth: 1
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: private-repo/backend-java/pom.xml
+      - name: Verify Java modules
+        working-directory: private-repo/backend-java
+        run: mvn -B -ntp clean verify
+
+  frontend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: fix/campus-disable-delete-actions-20260816
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: false
+          fetch-depth: 1
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: private-repo/frontend/package-lock.json
+      - name: Verify web frontend
+        working-directory: private-repo
+        run: bash scripts/ci/run_frontend.sh
