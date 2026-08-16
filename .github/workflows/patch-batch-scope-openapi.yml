@@ -1,0 +1,44 @@
+name: Patch batch scope pagination OpenAPI
+
+on:
+  push:
+    branches:
+      - diagnostics/batch-scope-pagination-20260816
+
+permissions:
+  contents: read
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: fix/batch-scope-server-pagination-20260816
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: true
+      - name: Patch root OpenAPI refs
+        working-directory: private-repo
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('backend-java/model/src/main/resources/openapi-interface.yaml')
+          text = p.read_text()
+          anchor = """  /api/v1/admin/batches/{batchId}/scope:\n    $ref: 'admin/openapi-batch-selection.yaml#/paths/~1api~1v1~1admin~1batches~1{batchId}~1scope'\n"""
+          addition = anchor + """  /api/v1/admin/batches/{batchId}/scope-summary:\n    $ref: 'admin/openapi-batch-selection.yaml#/paths/~1api~1v1~1admin~1batches~1{batchId}~1scope-summary'\n  /api/v1/admin/batches/{batchId}/scope-students:\n    $ref: 'admin/openapi-batch-selection.yaml#/paths/~1api~1v1~1admin~1batches~1{batchId}~1scope-students'\n  /api/v1/admin/batches/{batchId}/scope-rooms:\n    $ref: 'admin/openapi-batch-selection.yaml#/paths/~1api~1v1~1admin~1batches~1{batchId}~1scope-rooms'\n"""
+          if 'scope-summary' not in text:
+              if anchor not in text:
+                  raise SystemExit('batch scope root ref anchor missing')
+              text = text.replace(anchor, addition)
+          p.write_text(text)
+          PY
+          git diff --check
+          git config user.name 'Wust Dormitory CI'
+          git config user.email 'ci@wust-dormitory.local'
+          git add backend-java/model/src/main/resources/openapi-interface.yaml
+          git commit -m 'docs: 注册批次范围分页接口到主契约'
+          git push origin HEAD:fix/batch-scope-server-pagination-20260816
