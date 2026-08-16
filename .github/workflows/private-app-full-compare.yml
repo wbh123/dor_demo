@@ -1,0 +1,82 @@
+name: Private APP Full Test Compare
+
+on:
+  push:
+    branches:
+      - 'private-compat/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: private-app-full-compare-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Resolve private branch name
+        id: target
+        shell: bash
+        run: |
+          set -euo pipefail
+          candidate="$GITHUB_REF_NAME"
+          private_ref="${candidate#private-compat/}"
+          [[ -n "$private_ref" && "$private_ref" != "$candidate" ]]
+          echo "private_ref=$private_ref" >> "$GITHUB_OUTPUT"
+      - name: Checkout candidate
+        uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: ${{ steps.target.outputs.private_ref }}
+          token: ${{ secrets.PRIVATE_CI }}
+          path: candidate
+          persist-credentials: false
+      - name: Checkout main baseline
+        uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: main
+          token: ${{ secrets.PRIVATE_CI }}
+          path: baseline
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+      - name: Install candidate dependencies
+        working-directory: candidate/app
+        run: npm ci
+      - name: Install baseline dependencies
+        working-directory: baseline/app
+        run: npm ci
+      - name: Compare APP full-test failure sets
+        shell: bash
+        run: |
+          set +e
+          (cd candidate/app && npm test) > candidate.log 2>&1
+          candidate_code=$?
+          (cd baseline/app && npm test) > baseline.log 2>&1
+          baseline_code=$?
+          set -e
+          python - <<'PY'
+          from pathlib import Path
+          import re, sys
+          def failures(path):
+              names=[]
+              for line in Path(path).read_text(errors='replace').splitlines():
+                  m=re.match(r'\s*not ok\s+\d+\s+-\s+(.*)', line)
+                  if m:
+                      names.append(m.group(1).strip())
+              return sorted(names)
+          candidate=failures('candidate.log')
+          baseline=failures('baseline.log')
+          print('candidate failures:', candidate)
+          print('baseline failures:', baseline)
+          if candidate != baseline:
+              print('candidate introduced a different full-test failure set', file=sys.stderr)
+              sys.exit(1)
+          print('full-test failure sets are identical')
+          PY
+          echo "candidate exit=$candidate_code baseline exit=$baseline_code"
