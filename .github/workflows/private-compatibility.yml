@@ -8,18 +8,13 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: private-compat-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
   verify-private-ref:
-    name: Verify current private main baseline
+    name: Verify current private main modularization scanner
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: Checkout current private main
-        uses: actions/checkout@v5
+      - uses: actions/checkout@v5
         with:
           repository: wbh123/Wust-Dormitory-Select
           ref: main
@@ -27,11 +22,9 @@ jobs:
           path: private-repo
           persist-credentials: false
           fetch-depth: 0
-
       - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
-
-      - name: Verify student-team large Java baseline
+      - name: Run current modularization scanner
         working-directory: private-repo
-        run: python scripts/ci/test_student_team_service_convergence.py
+        run: python scripts/ci/test_backend_modularization_boundaries.py
