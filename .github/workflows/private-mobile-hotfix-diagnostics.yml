@@ -1,0 +1,93 @@
+name: Private Mobile Hotfix Diagnostics
+
+on:
+  push:
+    branches:
+      - 'private-compat/fix/mobile-contract-regression-20260816'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: private-mobile-hotfix-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  diagnose:
+    name: Capture remaining mobile contract failures
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Resolve private branch name
+        id: target
+        shell: bash
+        run: |
+          set -euo pipefail
+          candidate="$GITHUB_REF_NAME"
+          private_ref="${candidate#private-compat/}"
+          [[ -n "$private_ref" && "$private_ref" != "$candidate" ]]
+          echo "private_ref=$private_ref" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: ${{ steps.target.outputs.private_ref }}
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: false
+          fetch-depth: 1
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+
+      - name: Install mobile dependencies
+        working-directory: private-repo/app
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+          npm ci
+
+      - name: Run every mobile contract independently
+        id: contracts
+        continue-on-error: true
+        working-directory: private-repo/app
+        shell: bash
+        run: |
+          set -uo pipefail
+          mkdir -p hotfix-results
+          : > hotfix-results/failures.txt
+          mapfile -t test_files < <(node -e "const p=require('./package.json'); for (const f of (p.scripts.test.match(/src\\/[^ ]+\\.spec\\.ts/g) || [])) console.log(f)")
+          failed=0
+          index=0
+          printf 'resolved=%s\n' "${#test_files[@]}" > hotfix-results/summary.txt
+          for test_file in "${test_files[@]}"; do
+            index=$((index + 1))
+            safe_name=$(printf '%03d-%s' "$index" "$test_file" | tr '/:' '__')
+            log="hotfix-results/${safe_name}.log"
+            if node --experimental-strip-types --test "$test_file" >"$log" 2>&1; then
+              echo "PASS $test_file" >> hotfix-results/summary.txt
+            else
+              status=$?
+              failed=$((failed + 1))
+              echo "FAIL $test_file exit=$status" | tee -a hotfix-results/failures.txt hotfix-results/summary.txt
+              cat "$log"
+            fi
+          done
+          printf 'failed=%s\n' "$failed" | tee -a hotfix-results/summary.txt
+          [[ $failed -eq 0 ]]
+
+      - name: Upload diagnostic logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: private-mobile-hotfix-diagnostics
+          path: private-repo/app/hotfix-results
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Enforce contracts
+        if: always()
+        shell: bash
+        run: test "${{ steps.contracts.outcome }}" = success
