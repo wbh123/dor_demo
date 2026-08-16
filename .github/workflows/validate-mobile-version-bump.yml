@@ -20,10 +20,25 @@ jobs:
           token: ${{ secrets.PRIVATE_CI }}
           path: private-repo
           fetch-depth: 0
-          persist-credentials: false
+          persist-credentials: true
       - uses: actions/setup-node@v6
         with:
           node-version: '22'
+      - name: Sync package lock version
+        working-directory: private-repo/app
+        run: npm install --package-lock-only --ignore-scripts
+      - name: Commit synchronized lockfile
+        working-directory: private-repo
+        run: |
+          if git diff --quiet -- app/package-lock.json; then
+            echo 'package-lock already synchronized'
+          else
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git add app/package-lock.json
+            git commit -m 'chore: sync mobile package lock version'
+            git push origin HEAD:fix/mobile-version-bump-1.4.2-20260816
+          fi
       - name: Version consistency
         working-directory: private-repo/app
         run: node scripts/check-version-sync.mjs
