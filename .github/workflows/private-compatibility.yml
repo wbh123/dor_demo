@@ -108,16 +108,20 @@ jobs:
           cache: npm
           cache-dependency-path: private-repo/frontend/package-lock.json
 
-      - name: Verify mobile authorization contracts
+      - name: Verify mobile authorization contract
         working-directory: private-repo
         shell: bash
-        run: |
-          set -euo pipefail
-          python -m unittest \
-            scripts/subscription/test_mobile_feature_authorization.py \
-            scripts/subscription/test_platform_feature_gui.py \
-            scripts/subscription/test_feature_authorization_closure.py \
-            -v
+        run: python -m unittest scripts/subscription/test_mobile_feature_authorization.py -v
+
+      - name: Verify platform feature GUI contract
+        working-directory: private-repo
+        shell: bash
+        run: python -m unittest scripts/subscription/test_platform_feature_gui.py -v
+
+      - name: Verify feature authorization closure contract
+        working-directory: private-repo
+        shell: bash
+        run: python -m unittest scripts/subscription/test_feature_authorization_closure.py -v
 
       - name: Verify private Java modules
         working-directory: private-repo/backend-java
