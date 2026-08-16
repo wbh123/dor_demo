@@ -1,0 +1,39 @@
+name: Private Campus Actions Diagnostic
+
+on:
+  push:
+    branches:
+      - 'private-compat/fix/campus-disable-delete-actions-20260816'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout private repair branch
+        uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: fix/campus-disable-delete-actions-20260816
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: false
+          fetch-depth: 1
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: private-repo/backend-java/pom.xml
+      - name: Run campus contract
+        working-directory: private-repo
+        run: python scripts/subscription/test_campus_management_contract.py -v
+      - name: Run campus service tests
+        working-directory: private-repo/backend-java
+        run: mvn -B -ntp -pl server -am -Dtest=CampusManagementServiceTest -Dsurefire.failIfNoSpecifiedTests=false test
