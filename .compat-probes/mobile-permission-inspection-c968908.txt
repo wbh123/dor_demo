@@ -1,0 +1,2 @@
+Private compatibility probe for integrate/mobile-permission-gates-20260816
+Private head expected to include c968908 (mobile inspection entitlement route mapping + contract guard).
