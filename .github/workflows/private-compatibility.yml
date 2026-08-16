@@ -89,19 +89,10 @@ jobs:
           assert old_preview in source, 'preview function changed unexpectedly'
           source = source.replace(old_preview, new_preview, 1)
 
-          old_affix = """                <div class=\"property-inline affix-controls\">
-                  <label>前缀<input v-model=\"selectedElement.prefix\" maxlength=\"32\"></label>
-                  <label>后缀<input v-model=\"selectedElement.suffix\" maxlength=\"32\"></label>
-                </div>
-          """
-          new_affix = """                <div class=\"property-inline affix-controls\">
-                  <label>前缀<input v-model=\"selectedElement.prefix\" maxlength=\"32\"></label>
-                  <label v-if=\"!semanticUnit(selectedElement.type)\">后缀<input v-model=\"selectedElement.suffix\" maxlength=\"32\"></label>
-                  <label v-else class=\"check\"><input type=\"checkbox\" :checked=\"isUnitVisible(selectedElement)\" @change=\"onUnitToggle\"> 显示单位（{{ semanticUnit(selectedElement.type) }}）</label>
-                </div>
-          """
-          assert old_affix in source, 'affix editor changed unexpectedly'
-          source = source.replace(old_affix, new_affix, 1)
+          old_suffix = '<label>后缀<input v-model="selectedElement.suffix" maxlength="32"></label>'
+          new_suffix = '<label v-if="!semanticUnit(selectedElement.type)">后缀<input v-model="selectedElement.suffix" maxlength="32"></label>\n                  <label v-else class="check"><input type="checkbox" :checked="isUnitVisible(selectedElement)" @change="onUnitToggle"> 显示单位（{{ semanticUnit(selectedElement.type) }}）</label>'
+          assert old_suffix in source, 'suffix editor changed unexpectedly'
+          source = source.replace(old_suffix, new_suffix, 1)
           view_path.write_text(source, encoding='utf-8')
 
           test_path = Path('frontend/src/views/admin/admin-mobile-print-template.spec.ts')
