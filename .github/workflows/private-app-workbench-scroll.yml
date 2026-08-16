@@ -11,7 +11,7 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - name: Checkout private branch
         uses: actions/checkout@v5
@@ -21,7 +21,7 @@ jobs:
           token: ${{ secrets.PRIVATE_CI }}
           path: private-repo
           persist-credentials: false
-          fetch-depth: 1
+          fetch-depth: 0
       - uses: actions/setup-node@v6
         with:
           node-version: '22'
@@ -31,3 +31,19 @@ jobs:
       - name: Run workbench scroll contracts
         working-directory: private-repo/app
         run: node --experimental-strip-types --test src/platform/student-workbench-home.spec.ts src/platform/room-workbench-home.spec.ts
+      - name: Verify APP version metadata
+        working-directory: private-repo/app
+        run: npm run version:check
+      - name: Verify APP version bump against main
+        working-directory: private-repo
+        shell: bash
+        run: |
+          git fetch origin main:refs/remotes/origin/main --force
+          cd app
+          node scripts/check-version-bump.mjs origin/main
+      - name: Build APP
+        working-directory: private-repo/app
+        run: npm run build
+      - name: Run APP full tests
+        working-directory: private-repo/app
+        run: npm test
