@@ -1,0 +1,118 @@
+name: Private Mobile Sequential Diagnostics
+
+on:
+  push:
+    branches:
+      - 'private-compat/main'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: private-mobile-sequential-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  diagnose:
+    name: Diagnose private main mobile tests sequentially
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: main
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: false
+          fetch-depth: 1
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+
+      - name: Install mobile dependencies
+        working-directory: private-repo/app
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+          npm ci
+
+      - name: Run all mobile contract files with process isolation
+        id: tests
+        working-directory: private-repo/app
+        shell: bash
+        continue-on-error: true
+        run: |
+          set -uo pipefail
+          mkdir -p test-results
+          : > test-results/failures.txt
+          mapfile -t test_files < <(node -e "const p=require('./package.json'); for (const f of (p.scripts.test.match(/src\\/[^ ]+\\.spec\\.ts/g) || [])) console.log(f)")
+          printf 'resolved=%s\n' "${#test_files[@]}" | tee test-results/summary.txt
+          if [[ ${#test_files[@]} -eq 0 ]]; then
+            echo 'No mobile tests resolved from package.json' | tee -a test-results/failures.txt
+            exit 1
+          fi
+          failed=0
+          index=0
+          for test_file in "${test_files[@]}"; do
+            index=$((index + 1))
+            safe_name=$(printf '%03d-%s' "$index" "$test_file" | tr '/:' '__')
+            log="test-results/${safe_name}.log"
+            echo "[$index/${#test_files[@]}] $test_file"
+            if node --experimental-strip-types --test "$test_file" >"$log" 2>&1; then
+              echo "PASS $test_file" >> test-results/summary.txt
+            else
+              status=$?
+              failed=$((failed + 1))
+              echo "FAIL $test_file exit=$status" | tee -a test-results/failures.txt test-results/summary.txt
+              cat "$log"
+            fi
+          done
+          printf 'failed=%s\n' "$failed" | tee -a test-results/summary.txt
+          if [[ $failed -ne 0 ]]; then
+            exit 1
+          fi
+
+      - name: Verify mobile typecheck
+        id: typecheck
+        continue-on-error: true
+        working-directory: private-repo/app
+        shell: bash
+        run: npm run typecheck > test-results/typecheck.log 2>&1
+
+      - name: Verify mobile production build
+        id: build
+        continue-on-error: true
+        working-directory: private-repo/app
+        shell: bash
+        run: npm run build > test-results/build.log 2>&1
+
+      - name: Record diagnostic outcomes
+        if: always()
+        working-directory: private-repo/app
+        shell: bash
+        run: |
+          {
+            echo "tests=${{ steps.tests.outcome }}"
+            echo "typecheck=${{ steps.typecheck.outcome }}"
+            echo "build=${{ steps.build.outcome }}"
+          } | tee test-results/outcomes.txt
+
+      - name: Upload mobile diagnostic logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: private-main-mobile-sequential-diagnostics
+          path: private-repo/app/test-results
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Enforce diagnostic result
+        if: always()
+        shell: bash
+        run: |
+          [[ "${{ steps.tests.outcome }}" == "success" ]]
+          [[ "${{ steps.typecheck.outcome }}" == "success" ]]
+          [[ "${{ steps.build.outcome }}" == "success" ]]
