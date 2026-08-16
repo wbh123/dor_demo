@@ -1,0 +1,61 @@
+name: Private Mobile Npm Test Diagnostics
+
+on:
+  push:
+    branches:
+      - 'private-compat/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: private-mobile-npm-test-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  diagnose:
+    name: Capture private mobile npm test output
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Resolve private branch name
+        id: target
+        shell: bash
+        run: |
+          candidate="$GITHUB_REF_NAME"
+          private_ref="${candidate#private-compat/}"
+          [[ -n "$private_ref" && "$private_ref" != "$candidate" ]]
+          echo "private_ref=$private_ref" >> "$GITHUB_OUTPUT"
+      - name: Checkout private branch
+        uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: ${{ steps.target.outputs.private_ref }}
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: false
+          fetch-depth: 1
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+      - name: Install mobile dependencies
+        working-directory: private-repo/app
+        run: npm ci
+      - name: Capture full npm test output
+        working-directory: private-repo/app
+        shell: bash
+        run: |
+          set +e
+          npm test > ../../npm-test.log 2>&1
+          code=$?
+          echo "$code" > ../../npm-test.exit
+          exit 0
+      - name: Upload diagnostic output
+        uses: actions/upload-artifact@v4
+        with:
+          name: private-mobile-npm-test-output
+          path: |
+            npm-test.log
+            npm-test.exit
+          if-no-files-found: error
+          retention-days: 1
