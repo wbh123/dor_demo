@@ -1,0 +1,72 @@
+name: Private Mobile Compatibility CI
+
+on:
+  push:
+    branches:
+      - 'private-compat/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: private-mobile-compat-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify-private-mobile:
+    name: Verify private mobile app
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Resolve private branch name
+        id: target
+        shell: bash
+        run: |
+          set -euo pipefail
+          candidate="$GITHUB_REF_NAME"
+          private_ref="${candidate#private-compat/}"
+          if [[ -z "$private_ref" || "$private_ref" == "$candidate" ]]; then
+            echo "Invalid compatibility branch name" >&2
+            exit 1
+          fi
+          echo "private_ref=$private_ref" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout private integration branch
+        uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: ${{ steps.target.outputs.private_ref }}
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: false
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: private-repo/app/package-lock.json
+
+      - name: Install mobile dependencies
+        working-directory: private-repo/app
+        run: npm ci
+
+      - name: Verify mobile OpenAPI drift
+        working-directory: private-repo/app
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run generate:api
+          git diff --exit-code -- src/api/schema.d.ts
+
+      - name: Verify mobile tests
+        working-directory: private-repo/app
+        run: npm test
+
+      - name: Verify mobile typecheck
+        working-directory: private-repo/app
+        run: npm run typecheck
+
+      - name: Verify mobile production build
+        working-directory: private-repo/app
+        run: npm run build
