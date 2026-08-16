@@ -51,7 +51,6 @@ jobs:
 
       - name: Run every mobile contract independently
         id: contracts
-        continue-on-error: true
         working-directory: private-repo/app
         shell: bash
         run: |
@@ -86,8 +85,3 @@ jobs:
           path: private-repo/app/hotfix-results
           if-no-files-found: error
           retention-days: 7
-
-      - name: Enforce contracts
-        if: always()
-        shell: bash
-        run: test "${{ steps.contracts.outcome }}" = success
