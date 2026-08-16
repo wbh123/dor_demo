@@ -1,0 +1,31 @@
+name: Sync batch scope branch with main
+
+on:
+  push:
+    branches:
+      - diagnostics/batch-scope-pagination-20260816
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: fix/batch-scope-server-pagination-20260816
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          fetch-depth: 0
+          persist-credentials: true
+      - name: Merge latest main
+        working-directory: private-repo
+        run: |
+          git config user.name 'Wust Dormitory CI'
+          git config user.email 'ci@wust-dormitory.local'
+          git fetch origin main
+          git merge --no-edit origin/main
+          git push origin HEAD:fix/batch-scope-server-pagination-20260816
