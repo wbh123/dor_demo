@@ -44,12 +44,14 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: '22'
-          cache: npm
-          cache-dependency-path: private-repo/app/package-lock.json
 
       - name: Install mobile dependencies
         working-directory: private-repo/app
-        run: npm ci
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+          npm ci
 
       - name: Verify mobile OpenAPI drift
         working-directory: private-repo/app
