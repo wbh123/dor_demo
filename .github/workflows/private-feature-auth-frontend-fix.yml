@@ -1,9 +1,7 @@
 name: Private Feature Authorization Frontend Fix
 
 on:
-  push:
-    branches:
-      - 'private-compat/fix/feature-authorization-abc-catalog-20260816'
+  workflow_dispatch:
 
 permissions:
   contents: read
