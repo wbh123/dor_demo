@@ -1,90 +1,13 @@
 name: Repair private print template generator
 
 on:
-  push:
-    branches:
-      - 'ci/validate-private-main-print-template-20260816'
   workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
-  repair-generator:
-    name: Reproduce, repair and verify Navicat generator
+  archived:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
     steps:
-      - name: Checkout private repair branch
-        uses: actions/checkout@v5
-        with:
-          repository: wbh123/Wust-Dormitory-Select
-          ref: fix/print-template-validation-20260816
-          token: ${{ secrets.PRIVATE_CI }}
-          path: private-repo
-          fetch-depth: 0
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-      - name: Install generator dependencies
-        run: python -m pip install --disable-pip-version-check pyyaml
-      - name: RED - reproduce feature catalog UPSERT parser failure
-        working-directory: private-repo
-        shell: bash
-        run: |
-          set +e
-          python scripts/db/test_feature_catalog_upsert_parser.py > /tmp/red.log 2>&1
-          status=$?
-          set -e
-          cat /tmp/red.log
-          if [ "$status" -eq 0 ]; then
-            echo 'Regression test unexpectedly passed before the parser fix.' >&2
-            exit 1
-          fi
-          grep -q 'SQL括号不匹配' /tmp/red.log
-      - name: Apply minimal parser boundary and database-contract fix
-        working-directory: private-repo
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-
-          core = Path('scripts/db/generate_navicat_sql_core.py')
-          text = core.read_text(encoding='utf-8')
-          old = '''FEATURE_CATALOG_INSERT_PATTERN = re.compile(\n    r"\\bINSERT\\s+(?:IGNORE\\s+)?INTO\\s+feature_catalog\\s*"\n    r"\\((?P<columns>.*?)\\)\\s*VALUES\\s*(?P<values>.*?);",\n    re.IGNORECASE | re.DOTALL,\n)'''
-          new = '''FEATURE_CATALOG_INSERT_PATTERN = re.compile(\n    r"\\bINSERT\\s+(?:IGNORE\\s+)?INTO\\s+feature_catalog\\s*"\n    r"\\((?P<columns>.*?)\\)\\s*VALUES\\s*"\n    r"(?P<values>.*?)(?=\\s+ON\\s+DUPLICATE\\s+KEY\\s+UPDATE\\b|\\s*;)",\n    re.IGNORECASE | re.DOTALL,\n)'''
-          if old not in text:
-              raise SystemExit('feature_catalog parser source no longer matches expected baseline')
-          core.write_text(text.replace(old, new, 1), encoding='utf-8')
-
-          entry = Path('scripts/db/generate_navicat_sql.py')
-          text = entry.read_text(encoding='utf-8')
-          old_tail = '''    "-- >>> BEGIN V51__add_dormitory_area_and_private_bathroom.sql",\n    "CREATE TABLE dormitory_area",\n    "dormitory_area_id",\n    "has_private_bathroom",\n)'''
-          new_tail = '''    "-- >>> BEGIN V51__add_dormitory_area_and_private_bathroom.sql",\n    "CREATE TABLE dormitory_area",\n    "dormitory_area_id",\n    "has_private_bathroom",\n    "-- >>> BEGIN V52__add_mobile_dashboard_query_indexes.sql",\n    "idx_residency_history_assignment_event",\n    "-- >>> BEGIN V53__add_mobile_app_release_management.sql",\n    "CREATE TABLE mobile_app_release",\n    "uk_mobile_app_release_version_code",\n    "-- >>> BEGIN V54__add_mobile_print_templates.sql",\n    "P3_MOBILE_PRINT_TEMPLATE_MANAGE",\n    "CREATE TABLE mobile_print_template",\n    "CREATE TABLE mobile_print_template_revision",\n    "CREATE TABLE mobile_print_template_asset",\n)'''
-          if old_tail not in text:
-              raise SystemExit('database contract token tail no longer matches expected baseline')
-          entry.write_text(text.replace(old_tail, new_tail, 1), encoding='utf-8')
-          PY
-      - name: GREEN - parser regression tests
-        working-directory: private-repo
-        run: python scripts/db/test_feature_catalog_upsert_parser.py
-      - name: GREEN - generate and verify V54 reset SQL
-        working-directory: private-repo
-        run: |
-          python scripts/db/generate_navicat_sql.py --scenario clean --skip-redis
-          python scripts/db/generate_navicat_sql.py --scenario clean --check
-          grep -n 'V54__add_mobile_print_templates.sql' backend-java/docs/sql/navicat/generated/00_一键重置数据库.sql
-          grep -n 'P3_MOBILE_PRINT_TEMPLATE_MANAGE' backend-java/docs/sql/navicat/generated/00_一键重置数据库.sql
-          grep -n 'CREATE TABLE mobile_print_template' backend-java/docs/sql/navicat/generated/00_一键重置数据库.sql
-          python scripts/db/test_generate_navicat_latest_database.py
-      - name: Commit repair to private branch
-        working-directory: private-repo
-        run: |
-          git config user.name 'dor-demo-validation'
-          git config user.email 'actions@users.noreply.github.com'
-          git add scripts/db/generate_navicat_sql_core.py scripts/db/generate_navicat_sql.py scripts/db/test_feature_catalog_upsert_parser.py
-          if git diff --cached --quiet; then
-            echo 'No changes to commit.'
-            exit 0
-          fi
-          git commit -m 'fix: support feature catalog upserts in reset generator'
-          git push origin HEAD:fix/print-template-validation-20260816
+      - run: echo 'One-shot repair already completed successfully; see run 31920186909.'
