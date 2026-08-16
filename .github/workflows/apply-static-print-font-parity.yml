@@ -1,0 +1,125 @@
+name: Apply static print font parity
+
+on:
+  push:
+    branches:
+      - diagnostics/materialize-static-print-fonts-20260816
+
+permissions:
+  contents: read
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: fix/pdf-preview-font-weight-parity-20260816
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Apply exact runtime patches
+        working-directory: private-repo
+        shell: python
+        run: |
+          from pathlib import Path
+          import json
+
+          def replace(path, old, new, count=1):
+              p = Path(path)
+              text = p.read_text(encoding='utf-8')
+              actual = text.count(old)
+              if actual != count:
+                  raise SystemExit(f'{path}: expected {count} occurrences, got {actual}: {old[:100]!r}')
+              p.write_text(text.replace(old, new), encoding='utf-8')
+
+          # Admin designer: load distinct static 400/700 bytes.
+          replace(
+              'frontend/src/views/admin/AdminMobilePrintTemplateView.vue',
+              """async function ensureCanonicalFonts(){\n  if(fontsReady)return\n  const fontBytes=await loadCanonicalPrintFont(400)\n  const regularFace=new FontFace(FONT_FAMILY,fontBytes,{weight:'400'});const boldFace=new FontFace(FONT_FAMILY,fontBytes.slice(0),{weight:'700'})\n  await Promise.all([regularFace.load(),boldFace.load()]);document.fonts.add(regularFace);document.fonts.add(boldFace);fontsReady=true\n}""",
+              """async function ensureCanonicalFonts(){\n  if(fontsReady)return\n  const [regularBytes,boldBytes]=await Promise.all([loadCanonicalPrintFont(400),loadCanonicalPrintFont(700)])\n  const regularFace=new FontFace(FONT_FAMILY,regularBytes,{weight:'400'});const boldFace=new FontFace(FONT_FAMILY,boldBytes,{weight:'700'})\n  await Promise.all([regularFace.load(),boldFace.load()]);document.fonts.add(regularFace);document.fonts.add(boldFace);fontsReady=true\n}""",
+          )
+
+          # Backend immutable recipe identity v2.
+          path = Path('backend-java/server/src/main/java/com/wust/dormitory/label/print/recipe/MobilePrintRecipeService.java')
+          text = path.read_text(encoding='utf-8')
+          old = '''    public static final int RECIPE_VERSION = 1;\n    public static final String RENDERER_VERSION = "ANDROID-LOCAL-1";\n    public static final String FONT_FAMILY_ID = "NOTO_SANS_SC_VF";\n    public static final int FONT_VERSION = 1;\n    public static final String FONT_FILE_NAME = "NotoSansSC-VF.ttf";\n    /** SHA-256 of notofonts/noto-cjk Sans/Variable/TTF/Subset/NotoSansSC-VF.ttf. */\n    public static final String FONT_SHA256 = "d68bafcb48a2707749396aa12bbbd833cb70401f3a9a689fd2902c7e0d295964";'''
+          new = '''    public static final int RECIPE_VERSION = 2;\n    public static final String RENDERER_VERSION = "ANDROID-LOCAL-2";\n    public static final String FONT_FAMILY_ID = "WDS_NOTO_SANS_SC";\n    public static final int FONT_VERSION = 2;\n    public static final String REGULAR_FONT_FILE_NAME = "NotoSansSC-Regular.ttf";\n    public static final String BOLD_FONT_FILE_NAME = "NotoSansSC-Bold.ttf";\n    public static final String REGULAR_FONT_SHA256 = "d4f5f0d3897f1ed286010dbecf8b63818e9fc2fbcfcd3ef34f59b4fc9575d992";\n    public static final String BOLD_FONT_SHA256 = "8ed50d467dedc57ee8e87f1ddcc3863a88b714470adcfdf757d339174e037c26";\n    /** SHA-256 of \"400:<regularSha>|700:<boldSha>\"; keeps the database identity column stable. */\n    public static final String FONT_BUNDLE_SHA256 = "089443a9af0a67025ae4532f6e8392b3d2cf9f4f5b6b3959d402b40051d2c474";'''
+          if text.count(old) != 1:
+              raise SystemExit('MobilePrintRecipeService constants drifted')
+          text = text.replace(old, new)
+          if text.count('values.put("fontSha256", FONT_SHA256);') != 1:
+              raise SystemExit('MobilePrintRecipeService fontSha256 assignment drifted')
+          text = text.replace('values.put("fontSha256", FONT_SHA256);', 'values.put("fontSha256", FONT_BUNDLE_SHA256);')
+          old_font = '''        Map<String, Object> font = new LinkedHashMap<>();\n        font.put("familyId", FONT_FAMILY_ID);\n        font.put("version", FONT_VERSION);\n        font.put("fileName", FONT_FILE_NAME);\n        font.put("sha256", FONT_SHA256);\n        font.put("weights", List.of(400, 700));'''
+          new_font = '''        Map<String, Object> font = new LinkedHashMap<>();\n        font.put("familyId", FONT_FAMILY_ID);\n        font.put("version", FONT_VERSION);\n        font.put("regularFileName", REGULAR_FONT_FILE_NAME);\n        font.put("regularSha256", REGULAR_FONT_SHA256);\n        font.put("boldFileName", BOLD_FONT_FILE_NAME);\n        font.put("boldSha256", BOLD_FONT_SHA256);\n        font.put("bundleSha256", FONT_BUNDLE_SHA256);\n        font.put("weights", List.of(400, 700));'''
+          if text.count(old_font) != 1:
+              raise SystemExit('MobilePrintRecipeService font map drifted')
+          path.write_text(text.replace(old_font, new_font), encoding='utf-8')
+
+          # Android/HarmonyOS native renderer: static font files, no variation-axis API.
+          path = Path('app/android/app/src/main/java/com/wust/dormitory/mobile/NativePrintRecipePlugin.java')
+          text = path.read_text(encoding='utf-8')
+          old = '''    private static final String RENDERER_VERSION = "ANDROID-LOCAL-1";\n    private static final String FONT_FAMILY_ID = "NOTO_SANS_SC_VF";\n    private static final int FONT_VERSION = 1;\n    private static final String FONT_ASSET = "fonts/NotoSansSC-VF.ttf";\n    private static final String FONT_SHA256 = "d68bafcb48a2707749396aa12bbbd833cb70401f3a9a689fd2902c7e0d295964";'''
+          new = '''    private static final int RECIPE_VERSION = 2;\n    private static final String RENDERER_VERSION = "ANDROID-LOCAL-2";\n    private static final String FONT_FAMILY_ID = "WDS_NOTO_SANS_SC";\n    private static final int FONT_VERSION = 2;\n    private static final String REGULAR_FONT_ASSET = "fonts/NotoSansSC-Regular.ttf";\n    private static final String BOLD_FONT_ASSET = "fonts/NotoSansSC-Bold.ttf";\n    private static final String REGULAR_FONT_SHA256 = "d4f5f0d3897f1ed286010dbecf8b63818e9fc2fbcfcd3ef34f59b4fc9575d992";\n    private static final String BOLD_FONT_SHA256 = "8ed50d467dedc57ee8e87f1ddcc3863a88b714470adcfdf757d339174e037c26";\n    private static final String FONT_BUNDLE_SHA256 = "089443a9af0a67025ae4532f6e8392b3d2cf9f4f5b6b3959d402b40051d2c474";'''
+          if text.count(old) != 1:
+              raise SystemExit('NativePrintRecipePlugin constants drifted')
+          text = text.replace(old, new)
+          old_validate = '''        if (recipe.optInt("recipeVersion", -1) != 1) throw new IllegalArgumentException("不支持的打印配方版本");\n        if (!RENDERER_VERSION.equals(recipe.optString("rendererVersion", ""))) throw new IllegalArgumentException("不支持的客户端渲染器版本");\n        JSONObject font = recipe.optJSONObject("font");\n        if (font == null\n                || !FONT_FAMILY_ID.equals(font.optString("familyId", ""))\n                || font.optInt("version", -1) != FONT_VERSION\n                || !FONT_SHA256.equalsIgnoreCase(font.optString("sha256", ""))) {\n            throw new IllegalArgumentException("打印配方字体版本与客户端不一致");\n        }'''
+          new_validate = '''        if (recipe.optInt("recipeVersion", -1) != RECIPE_VERSION) throw new IllegalArgumentException("不支持的打印配方版本");\n        if (!RENDERER_VERSION.equals(recipe.optString("rendererVersion", ""))) throw new IllegalArgumentException("不支持的客户端渲染器版本");\n        JSONObject font = recipe.optJSONObject("font");\n        if (font == null\n                || !FONT_FAMILY_ID.equals(font.optString("familyId", ""))\n                || font.optInt("version", -1) != FONT_VERSION\n                || !REGULAR_FONT_ASSET.endsWith(font.optString("regularFileName", ""))\n                || !REGULAR_FONT_SHA256.equalsIgnoreCase(font.optString("regularSha256", ""))\n                || !BOLD_FONT_ASSET.endsWith(font.optString("boldFileName", ""))\n                || !BOLD_FONT_SHA256.equalsIgnoreCase(font.optString("boldSha256", ""))\n                || !FONT_BUNDLE_SHA256.equalsIgnoreCase(font.optString("bundleSha256", ""))) {\n            throw new IllegalArgumentException("打印配方字体版本与客户端不一致");\n        }'''
+          if text.count(old_validate) != 1:
+              raise SystemExit('NativePrintRecipePlugin validation drifted')
+          text = text.replace(old_validate, new_validate)
+          old_load = '''            if (regularTypeface == null || boldTypeface == null) {\n                verifyFontAsset();\n                regularTypeface = new Typeface.Builder(getContext().getAssets(), FONT_ASSET)\n                        .setFontVariationSettings("'wght' 400")\n                        .build();\n                boldTypeface = new Typeface.Builder(getContext().getAssets(), FONT_ASSET)\n                        .setFontVariationSettings("'wght' 700")\n                        .build();\n            }'''
+          new_load = '''            if (regularTypeface == null || boldTypeface == null) {\n                verifyFontAsset(REGULAR_FONT_ASSET, REGULAR_FONT_SHA256);\n                verifyFontAsset(BOLD_FONT_ASSET, BOLD_FONT_SHA256);\n                regularTypeface = new Typeface.Builder(getContext().getAssets(), REGULAR_FONT_ASSET).build();\n                boldTypeface = new Typeface.Builder(getContext().getAssets(), BOLD_FONT_ASSET).build();\n            }'''
+          if text.count(old_load) != 1:
+              raise SystemExit('NativePrintRecipePlugin font loading drifted')
+          text = text.replace(old_load, new_load)
+          old_verify = '''    private void verifyFontAsset() throws Exception {\n        MessageDigest digest = MessageDigest.getInstance("SHA-256");\n        try (InputStream input = getContext().getAssets().open(FONT_ASSET)) {\n            byte[] buffer = new byte[64 * 1024];\n            int read;\n            while ((read = input.read(buffer)) >= 0) digest.update(buffer, 0, read);\n        }\n        String actual = hex(digest.digest());\n        if (!FONT_SHA256.equalsIgnoreCase(actual)) {\n            throw new IllegalStateException("内置打印字体SHA-256不匹配，拒绝使用系统字体替代");\n        }\n    }'''
+          new_verify = '''    private void verifyFontAsset(String assetPath, String expectedSha256) throws Exception {\n        MessageDigest digest = MessageDigest.getInstance("SHA-256");\n        try (InputStream input = getContext().getAssets().open(assetPath)) {\n            byte[] buffer = new byte[64 * 1024];\n            int read;\n            while ((read = input.read(buffer)) >= 0) digest.update(buffer, 0, read);\n        }\n        String actual = hex(digest.digest());\n        if (!expectedSha256.equalsIgnoreCase(actual)) {\n            throw new IllegalStateException("内置打印字体SHA-256不匹配: " + assetPath + "，拒绝使用系统字体替代");\n        }\n    }'''
+          if text.count(old_verify) != 1:
+              raise SystemExit('NativePrintRecipePlugin font verification drifted')
+          path.write_text(text.replace(old_verify, new_verify), encoding='utf-8')
+
+          # Mobile app release bump because native font renderer changed.
+          version_path = Path('app/version.json')
+          version = json.loads(version_path.read_text(encoding='utf-8'))
+          if version != {'versionName': '1.4.0', 'versionCode': 16}:
+              raise SystemExit(f'unexpected mobile version baseline: {version}')
+          version_path.write_text(json.dumps({'versionName': '1.4.1', 'versionCode': 17}, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+          pkg_path = Path('app/package.json')
+          pkg = json.loads(pkg_path.read_text(encoding='utf-8'))
+          if pkg.get('version') != '1.4.0':
+              raise SystemExit(f'unexpected package version: {pkg.get("version")}')
+          pkg['version'] = '1.4.1'
+          pkg_path.write_text(json.dumps(pkg, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+
+      - name: Assert old runtime variable font identity is gone
+        working-directory: private-repo
+        shell: bash
+        run: |
+          set -euo pipefail
+          test ! -e backend-java/server/src/main/resources/print-fonts/NotoSansSC-VF.ttf
+          test ! -e frontend/public/fonts/NotoSansSC-VF.ttf
+          test ! -e app/android/app/src/main/assets/fonts/NotoSansSC-VF.ttf
+          ! grep -R -n --exclude-dir=.git --exclude='*.md' --exclude='materialize_noto_sans_sc_static.py' \
+            -E 'NotoSansSC-VF\.ttf|NOTO_SANS_SC_VF|ANDROID-LOCAL-1|setFontVariationSettings' \
+            backend-java/server/src/main/java frontend/src app/src app/android/app/src/main/java app/scripts frontend/scripts
+
+      - name: Commit runtime parity implementation back to private branch
+        working-directory: private-repo
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'Wust Dormitory CI'
+          git config user.email 'ci@wust-dormitory.local'
+          git add frontend/src/views/admin/AdminMobilePrintTemplateView.vue \
+                  backend-java/server/src/main/java/com/wust/dormitory/label/print/recipe/MobilePrintRecipeService.java \
+                  app/android/app/src/main/java/com/wust/dormitory/mobile/NativePrintRecipePlugin.java \
+                  app/version.json app/package.json
+          git commit -m 'fix: align PDF preview and mobile renderer with static font weights'
+          git push origin HEAD:fix/pdf-preview-font-weight-parity-20260816
