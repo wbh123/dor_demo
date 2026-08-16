@@ -22,7 +22,6 @@ jobs:
         id: target
         shell: bash
         run: |
-          set -euo pipefail
           candidate="$GITHUB_REF_NAME"
           private_ref="${candidate#private-compat/}"
           [[ -n "$private_ref" && "$private_ref" != "$candidate" ]]
@@ -45,37 +44,22 @@ jobs:
       - name: Verify mobile OpenAPI drift
         working-directory: private-repo/app
         run: npm run generate:api && git diff --exit-code -- src/api/schema.d.ts
-      - name: Verify auth policy test
+      - name: Verify auth navigation and inspection tests
         working-directory: private-repo/app
-        run: node --experimental-strip-types --test src/api/auth-policy.spec.ts
-      - name: Verify navigation test
+        run: node --experimental-strip-types --test src/api/auth-policy.spec.ts src/platform/navigation.spec.ts src/platform/header-navigation.spec.ts src/platform/tablet-navigation.spec.ts src/platform/account-identity-menu.spec.ts src/inspection/state.spec.ts src/inspection/store.spec.ts src/platform/inspection-navigation.spec.ts src/platform/inspection-workflow-layout.spec.ts src/platform/inspection-scanner.spec.ts
+      - name: Verify scanner and label tests
         working-directory: private-repo/app
-        run: node --experimental-strip-types --test src/platform/navigation.spec.ts
-      - name: Verify header navigation test
+        run: node --experimental-strip-types --test src/platform/scanner.spec.ts src/platform/resource-label.spec.ts src/platform/resource-label-print-layout.spec.ts src/platform/tablet-print-fixed-contract.spec.ts src/platform/mobile-label-tools-navigation.spec.ts src/platform/label-scan-performance-contract.spec.ts
+      - name: Verify workbench tests
         working-directory: private-repo/app
-        run: node --experimental-strip-types --test src/platform/header-navigation.spec.ts
-      - name: Verify tablet navigation test
+        run: node --experimental-strip-types --test src/platform/placement.spec.ts src/platform/room-options.spec.ts src/platform/room-selector.spec.ts src/platform/room-selector-layout.spec.ts src/platform/room-navigation.spec.ts src/platform/issue-room-context.spec.ts src/platform/bed-finder.spec.ts src/platform/bed-finder-layout.spec.ts src/platform/residency-workbench.spec.ts src/platform/student-adjustment-panel-layout.spec.ts src/platform/student-residency-workbench-layout.spec.ts src/platform/student-workbench-pagination.spec.ts src/platform/room-workbench-layout.spec.ts src/platform/room-confirmation-pipeline-layout.spec.ts src/platform/room-detail-layout.spec.ts src/platform/bed-confirmation-pagination.spec.ts src/platform/recent-workbench.spec.ts src/platform/room-workbench-home.spec.ts src/platform/room-workbench-state.spec.ts src/platform/student-workbench-filter.spec.ts src/platform/student-workbench-home.spec.ts
+      - name: Verify runtime and recovery tests
         working-directory: private-repo/app
-        run: node --experimental-strip-types --test src/platform/tablet-navigation.spec.ts
-      - name: Verify account identity menu test
+        run: node --experimental-strip-types --test src/platform/native-runtime.spec.ts src/platform/native-scanner-contract.spec.ts src/platform/native-app-runtime.spec.ts src/platform/network-runtime.spec.ts src/platform/server-profile.spec.ts src/platform/server-runtime-contract.spec.ts src/platform/secure-storage-contract.spec.ts src/platform/server-switch.spec.ts src/platform/server-control.spec.ts src/platform/server-scoped-cache.spec.ts src/platform/server-settings-view.spec.ts src/platform/native-recovery-contract.spec.ts src/platform/recovery-provisioning.spec.ts src/platform/recovery-runtime-contract.spec.ts src/platform/recovery-settings-view.spec.ts src/platform/recovery-entry.spec.ts src/platform/connection-recovery-view.spec.ts src/platform/initial-server-provisioning.spec.ts src/platform/native-http-gateway-contract.spec.ts src/platform/recovery-audit-contract.spec.ts src/platform/app-update-metadata-contract.spec.ts src/platform/native-apk-updater-contract.spec.ts src/platform/app-update-gate.spec.ts src/platform/app-update-flow.spec.ts
+      - name: Verify layout overlay and notice tests
         working-directory: private-repo/app
-        run: node --experimental-strip-types --test src/platform/account-identity-menu.spec.ts
-      - name: Verify inspection state test
-        working-directory: private-repo/app
-        run: node --experimental-strip-types --test src/inspection/state.spec.ts
-      - name: Verify inspection store test
-        working-directory: private-repo/app
-        run: node --experimental-strip-types --test src/inspection/store.spec.ts
-      - name: Verify inspection navigation test
-        working-directory: private-repo/app
-        run: node --experimental-strip-types --test src/platform/inspection-navigation.spec.ts
-      - name: Verify inspection workflow layout test
-        working-directory: private-repo/app
-        run: node --experimental-strip-types --test src/platform/inspection-workflow-layout.spec.ts
-      - name: Verify inspection scanner test
-        working-directory: private-repo/app
-        run: node --experimental-strip-types --test src/platform/inspection-scanner.spec.ts
-      - name: Verify remaining mobile tests
+        run: node --experimental-strip-types --test src/platform/natural-resource-sort.spec.ts src/platform/vite-dev-proxy-contract.spec.ts src/platform/page-heading-layout.spec.ts src/platform/global-mobile-header-layout.spec.ts src/platform/home-viewport.spec.ts src/platform/device-form-factor.spec.ts src/platform/orientation-policy.spec.ts src/platform/device-runtime.spec.ts src/platform/tablet-responsive-layout.spec.ts src/platform/tablet-shell-layout.spec.ts src/platform/login-device-layout.spec.ts src/platform/android-adaptive-shell-contract.spec.ts src/platform/server-probe-login-entry.spec.ts src/platform/action-overlay.spec.ts src/platform/student-placement-overlay.spec.ts src/platform/room-detail-overlay.spec.ts src/platform/student-workbench-overlay.spec.ts src/platform/room-workbench-overlay.spec.ts src/platform/mobile-overlay-flow.spec.ts src/platform/issue-overlay-flow.spec.ts src/platform/checkin-bed-workflow.spec.ts src/platform/dorm-staff-bed-verification.spec.ts src/platform/mobile-notice.spec.ts src/platform/mobile-transient-notice-layout.spec.ts src/platform/mobile-notice-audit.spec.ts src/platform/login-emblem-layout.spec.ts
+      - name: Verify full mobile test script
         working-directory: private-repo/app
         run: npm test
       - name: Verify mobile typecheck
