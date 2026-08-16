@@ -1,0 +1,1 @@
+Trigger final private compatibility validation for Wust-Dormitory-Select integrate/mobile-permission-gates-20260816 at 76746cf8add78e080115a5747f51ba8ed6541734.
