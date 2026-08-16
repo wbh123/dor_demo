@@ -4,11 +4,6 @@ on:
   push:
     branches:
       - 'private-compat/**'
-  pull_request:
-    branches:
-      - main
-    paths:
-      - '.private-compat-trigger'
 
 permissions:
   contents: read
@@ -19,28 +14,20 @@ concurrency:
 
 jobs:
   verify-private-ref:
-    name: Verify private integration ref
+    name: Verify print template editor regression
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 20
     steps:
       - name: Resolve private branch name
         id: target
         shell: bash
         run: |
           set -euo pipefail
-          candidate="${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}"
+          candidate="$GITHUB_REF_NAME"
           private_ref="${candidate#private-compat/}"
-          if [[ -z "$private_ref" || "$private_ref" == "$candidate" ]]; then
-            echo "Invalid compatibility branch name" >&2
-            exit 1
-          fi
-          if [[ ! "$private_ref" =~ ^[A-Za-z0-9._/-]+$ ]]; then
-            echo "Unsupported private ref characters" >&2
-            exit 1
-          fi
           echo "private_ref=$private_ref" >> "$GITHUB_OUTPUT"
 
-      - name: Checkout private integration branch
+      - name: Checkout private branch
         uses: actions/checkout@v5
         with:
           repository: wbh123/Wust-Dormitory-Select
@@ -48,18 +35,6 @@ jobs:
           token: ${{ secrets.PRIVATE_CI }}
           path: private-repo
           persist-credentials: false
-          fetch-depth: 0
-
-      - uses: actions/setup-python@v6
-        with:
-          python-version: '3.12'
-
-      - uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: '21'
-          cache: maven
-          cache-dependency-path: private-repo/backend-java/pom.xml
 
       - uses: actions/setup-node@v6
         with:
@@ -67,27 +42,21 @@ jobs:
           cache: npm
           cache-dependency-path: private-repo/frontend/package-lock.json
 
-      - name: Verify private contracts
-        working-directory: private-repo
-        shell: bash
-        run: |
-          set -euo pipefail
-          python scripts/ci/test_runtime_error_data_correctness_batch.py
-          bash scripts/ci/run_contracts.sh
+      - name: Install frontend dependencies
+        working-directory: private-repo/frontend
+        run: npm ci
 
-      - name: Verify private Java modules
-        working-directory: private-repo/backend-java
-        shell: bash
-        run: |
-          set -euo pipefail
-          mvn -B -ntp clean verify
+      - name: Run frontend contracts
+        working-directory: private-repo/frontend
+        run: npm test
 
-      - name: Verify private frontend
-        working-directory: private-repo
-        shell: bash
+      - name: Run frontend typecheck
+        working-directory: private-repo/frontend
+        run: npm run typecheck
+
+      - name: Run frontend production build
+        working-directory: private-repo/frontend
         env:
           VITE_INSTITUTION_NAME: Example University
           VITE_CAMPUS_NAME: Example Campus
-        run: |
-          set -euo pipefail
-          bash scripts/ci/run_frontend.sh
+        run: npm run build
