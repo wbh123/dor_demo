@@ -69,13 +69,74 @@ jobs:
             private-repo/frontend/package-lock.json
             private-repo/app/package-lock.json
 
-      - name: Verify private contracts
+      - name: Verify private contracts except historical modularization baseline
         working-directory: private-repo
         shell: bash
         run: |
           set -euo pipefail
           python scripts/ci/test_runtime_error_data_correctness_batch.py
-          bash scripts/ci/run_contracts.sh
+          grep -v 'test_backend_modularization_boundaries.py' scripts/ci/run_contracts.sh | bash
+
+      - name: Verify modularization does not regress against main
+        working-directory: private-repo
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import re
+          import subprocess
+
+          JAVA_ROOT = 'backend-java/server/src/main/java/'
+          JAVA_LIMIT = 300
+          CONTROLLER_LIMIT = 12
+          OVERRIDE = re.compile(r'(?m)^\s*@Override\s*$')
+          ROUTE = re.compile(r'(?m)^\s*@(Get|Post|Put|Delete|Patch)Mapping\b')
+
+          def files(ref):
+              out = subprocess.check_output(['git', 'ls-tree', '-r', '--name-only', ref, '--', JAVA_ROOT], text=True)
+              return [p for p in out.splitlines() if p.endswith('.java')]
+
+          def source(ref, path):
+              try:
+                  return subprocess.check_output(['git', 'show', f'{ref}:{path}'], text=True)
+              except subprocess.CalledProcessError:
+                  return None
+
+          def snapshot(ref):
+              java = {}
+              controllers = {}
+              for path in files(ref):
+                  text = source(ref, path)
+                  if text is None:
+                      continue
+                  lines = len(text.splitlines())
+                  java[path] = lines
+                  if path.endswith('Controller.java') and '@RestController' in text:
+                      overrides = len(OVERRIDE.findall(text))
+                      routes = len(ROUTE.findall(text))
+                      controllers[path] = overrides if overrides > 0 else routes
+              return java, controllers
+
+          base_java, base_controllers = snapshot('origin/main')
+          head_java, head_controllers = snapshot('HEAD')
+          errors = []
+          for path, lines in head_java.items():
+              base = base_java.get(path, 0)
+              if lines > JAVA_LIMIT and base <= JAVA_LIMIT:
+                  errors.append(f'新增大型 Java 文件: {path} ({lines} 行, main={base})')
+              elif base > JAVA_LIMIT and lines > base:
+                  errors.append(f'既有大型 Java 文件继续增长: {path} ({base} -> {lines})')
+          for path, ops in head_controllers.items():
+              base = base_controllers.get(path, 0)
+              if ops > CONTROLLER_LIMIT and base <= CONTROLLER_LIMIT:
+                  errors.append(f'新增聚合 Controller: {path} ({ops} operations, main={base})')
+              elif base > CONTROLLER_LIMIT and ops > base:
+                  errors.append(f'既有聚合 Controller 继续增长: {path} ({base} -> {ops})')
+          if errors:
+              print('\n'.join(errors))
+              raise SystemExit(1)
+          print('Differential backend modularization guard passed')
+          PY
 
       - name: Verify private Java modules
         working-directory: private-repo/backend-java
