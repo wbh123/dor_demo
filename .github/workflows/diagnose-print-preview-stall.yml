@@ -1,0 +1,72 @@
+name: Diagnose print preview stall
+
+on:
+  push:
+    branches:
+      - 'diagnostics/print-preview-stall-*'
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: main
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: private-repo/backend-java/pom.xml
+      - name: Prepare canonical font
+        working-directory: private-repo/frontend
+        run: node scripts/prepare-print-font.mjs
+      - name: Add performance probe
+        working-directory: private-repo
+        shell: bash
+        run: |
+          cat > backend-java/server/src/test/java/com/wust/dormitory/label/print/pdf/PrintFontRegistryPerformanceProbeTest.java <<'JAVA'
+          package com.wust.dormitory.label.print.pdf;
+
+          import org.junit.jupiter.api.Test;
+          import static org.junit.jupiter.api.Assertions.assertTrue;
+
+          class PrintFontRegistryPerformanceProbeTest {
+              @Test
+              void probeCanonicalFontMeasurementCost() {
+                  String path = System.getProperty("fontPath");
+                  String sha = "d68bafcb48a2707749396aa12bbbd833cb70401f3a9a689fd2902c7e0d295964";
+                  PrintFontRegistry registry = new PrintFontRegistry(path, path, sha, sha);
+                  String[] values = {
+                      "武汉科技大学", "黄家湖校区", "北一舍", "3层", "301寝室", "2号床", "08351724",
+                      "武汉科技大学黄家湖校区北一舍301寝室2号床"
+                  };
+                  long start = System.nanoTime();
+                  for (String value : values) {
+                      float width = registry.stringWidthPt(value, 9f, 400);
+                      assertTrue(width > 0f);
+                  }
+                  long elapsedMs = (System.nanoTime() - start) / 1_000_000L;
+                  System.out.println("PRINT_FONT_8_UNIQUE_MEASUREMENTS_MS=" + elapsedMs);
+              }
+          }
+          JAVA
+      - name: Run performance probe
+        working-directory: private-repo
+        run: >-
+          mvn -B -ntp -f backend-java/pom.xml -pl server -am
+          -Dtest=PrintFontRegistryPerformanceProbeTest
+          -Dsurefire.failIfNoSpecifiedTests=false
+          -DfontPath="$GITHUB_WORKSPACE/private-repo/frontend/public/fonts/NotoSansSC-VF.ttf"
+          test
