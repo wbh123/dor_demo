@@ -45,7 +45,7 @@ jobs:
           set -euo pipefail
           test ! -f app/package-lock.json
           (cd app && npm install --package-lock-only --ignore-scripts --no-audit --no-fund)
-          node -e "const p=require('./app/package-lock.json'); if(p.lockfileVersion!==3||p.packages[''].version!=='1.2.1') process.exit(1)"
+          node -e "const p=require('./app/package-lock.json'); if(p.lockfileVersion!==3||p.packages[''].version!=='1.2.2') process.exit(1)"
           git add app/package-lock.json
           test "$(git diff --cached --name-only | wc -l)" -eq 1
           test "$(git diff --cached --name-only)" = "app/package-lock.json"
