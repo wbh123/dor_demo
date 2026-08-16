@@ -1,0 +1,147 @@
+name: Private Mobile Layout Diagnostics
+
+on:
+  push:
+    branches:
+      - 'private-compat/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: private-mobile-layout-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  diagnose:
+    name: Diagnose private mobile layout contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Resolve private branch name
+        id: target
+        shell: bash
+        run: |
+          candidate="$GITHUB_REF_NAME"
+          private_ref="${candidate#private-compat/}"
+          [[ -n "$private_ref" && "$private_ref" != "$candidate" ]]
+          echo "private_ref=$private_ref" >> "$GITHUB_OUTPUT"
+      - name: Checkout private integration branch
+        uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: ${{ steps.target.outputs.private_ref }}
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: false
+          fetch-depth: 1
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+      - name: Install mobile dependencies
+        working-directory: private-repo/app
+        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund && npm ci
+      - name: natural-resource-sort
+        continue-on-error: true
+        working-directory: private-repo/app
+        run: node --experimental-strip-types --test src/platform/natural-resource-sort.spec.ts
+      - name: vite-dev-proxy-contract
+        continue-on-error: true
+        working-directory: private-repo/app
+        run: node --experimental-strip-types --test src/platform/vite-dev-proxy-contract.spec.ts
+      - name: page-heading-layout
+        continue-on-error: true
+        working-directory: private-repo/app
+        run: node --experimental-strip-types --test src/platform/page-heading-layout.spec.ts
+      - name: global-mobile-header-layout
+        continue-on-error: true
+        working-directory: private-repo/app
+        run: node --experimental-strip-types --test src/platform/global-mobile-header-layout.spec.ts
+      - name: home-viewport
+        continue-on-error: true
+        working-directory: private-repo/app
+        run: node --experimental-strip-types --test src/platform/home-viewport.spec.ts
+      - name: device-form-factor
+        continue-on-error: true
+        working-directory: private-repo/app
+        run: node --experimental-strip-types --test src/platform/device-form-factor.spec.ts
+      - name: orientation-policy
+        continue-on-error: true
+        working-directory: private-repo/app
+        run: node --experimental-strip-types --test src/platform/orientation-policy.spec.ts
+      - name: device-runtime
+        continue-on-error: true
+        working-directory: private-repo/app
+        run: node --experimental-strip-types --test src/platform/device-runtime.spec.ts
+      - name: tablet-responsive-layout
+        continue-on-error: true
+        working-directory: private-repo/app
+        run: node --experimental-strip-types --test src/platform/tablet-responsive-layout.spec.ts
+      - name: tablet-shell-layout
+        continue-on-error: true
+        working-directory: private-repo/app
+        run: node --experimental-strip-types --test src/platform/tablet-shell-layout.spec.ts
+      - name: login-device-layout
+        continue-on-error: true
+        working-directory: private-repo/app
+        run: node --experimental-strip-types --test src/platform/login-device-layout.spec.ts
+      - name: android-adaptive-shell-contract
+        continue-on-error: true
+        working-directory: private-repo/app
+        run: node --experimental-strip-types --test src/platform/android-adaptive-shell-contract.spec.ts
+      - name: server-probe-login-entry
+        continue-on-error: true
+        working-directory: private-repo/app
+        run: node --experimental-strip-types --test src/platform/server-probe-login-entry.spec.ts
+      - name: action-overlay
+        continue-on-error: true
+        working-directory: private-repo/app
+        run: node --experimental-strip-types --test src/platform/action-overlay.spec.ts
+      - name: student-placement-overlay
+        continue-on-error: true
+        working-directory: private-repo/app
+        run: node --experimental-strip-types --test src/platform/student-placement-overlay.spec.ts
+      - name: room-detail-overlay
+        continue-on-error: true
+        working-directory: private-repo/app
+        run: node --experimental-strip-types --test src/platform/room-detail-overlay.spec.ts
+      - name: student-workbench-overlay
+        continue-on-error: true
+        working-directory: private-repo/app
+        run: node --experimental-strip-types --test src/platform/student-workbench-overlay.spec.ts
+      - name: room-workbench-overlay
+        continue-on-error: true
+        working-directory: private-repo/app
+        run: node --experimental-strip-types --test src/platform/room-workbench-overlay.spec.ts
+      - name: mobile-overlay-flow
+        continue-on-error: true
+        working-directory: private-repo/app
+        run: node --experimental-strip-types --test src/platform/mobile-overlay-flow.spec.ts
+      - name: issue-overlay-flow
+        continue-on-error: true
+        working-directory: private-repo/app
+        run: node --experimental-strip-types --test src/platform/issue-overlay-flow.spec.ts
+      - name: checkin-bed-workflow
+        continue-on-error: true
+        working-directory: private-repo/app
+        run: node --experimental-strip-types --test src/platform/checkin-bed-workflow.spec.ts
+      - name: dorm-staff-bed-verification
+        continue-on-error: true
+        working-directory: private-repo/app
+        run: node --experimental-strip-types --test src/platform/dorm-staff-bed-verification.spec.ts
+      - name: mobile-notice
+        continue-on-error: true
+        working-directory: private-repo/app
+        run: node --experimental-strip-types --test src/platform/mobile-notice.spec.ts
+      - name: mobile-transient-notice-layout
+        continue-on-error: true
+        working-directory: private-repo/app
+        run: node --experimental-strip-types --test src/platform/mobile-transient-notice-layout.spec.ts
+      - name: mobile-notice-audit
+        continue-on-error: true
+        working-directory: private-repo/app
+        run: node --experimental-strip-types --test src/platform/mobile-notice-audit.spec.ts
+      - name: login-emblem-layout
+        continue-on-error: true
+        working-directory: private-repo/app
+        run: node --experimental-strip-types --test src/platform/login-emblem-layout.spec.ts
