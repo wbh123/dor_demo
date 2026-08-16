@@ -21,7 +21,7 @@ jobs:
   verify-private-ref:
     name: Verify private integration ref
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 40
     steps:
       - name: Resolve private branch name
         id: target
@@ -65,7 +65,9 @@ jobs:
         with:
           node-version: '22'
           cache: npm
-          cache-dependency-path: private-repo/frontend/package-lock.json
+          cache-dependency-path: |
+            private-repo/frontend/package-lock.json
+            private-repo/app/package-lock.json
 
       - name: Verify private contracts
         working-directory: private-repo
@@ -91,3 +93,15 @@ jobs:
         run: |
           set -euo pipefail
           bash scripts/ci/run_frontend.sh
+
+      - name: Verify private mobile app
+        working-directory: private-repo/app
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci
+          npm run generate:api
+          git diff --exit-code -- src/api/schema.d.ts
+          npm test
+          npm run typecheck
+          npm run build
