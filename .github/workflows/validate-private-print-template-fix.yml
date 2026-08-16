@@ -1,0 +1,194 @@
+name: Validate repaired private print template branch
+
+on:
+  push:
+    branches:
+      - 'ci/validate-private-main-print-template-20260816'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  PRIVATE_REPO: wbh123/Wust-Dormitory-Select
+  PRIVATE_SHA: a8dd4e1186454685bad854a1704e71c5c818cc24
+
+jobs:
+  feature-build:
+    name: Print-template backend and admin build
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          repository: ${{ env.PRIVATE_REPO }}
+          ref: ${{ env.PRIVATE_SHA }}
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Compile backend and run print-template validator tests
+        working-directory: private-repo
+        run: |
+          mvn -f backend-java/pom.xml --batch-mode --no-transfer-progress -pl server -am \
+            -Dtest=PrintTemplateLayoutValidatorTest -Dsurefire.failIfNoSpecifiedTests=false test
+          mvn -f backend-java/pom.xml --batch-mode --no-transfer-progress package -DskipTests
+      - name: Build admin frontend and template contract
+        working-directory: private-repo/frontend
+        run: |
+          npm install --no-audit --no-fund
+          node --experimental-strip-types --test src/views/admin/admin-mobile-print-template.spec.ts
+          npm run build
+
+  database:
+    name: MySQL 8.4 Flyway V54 runtime
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_DATABASE: wust_dormitory
+          MYSQL_USER: wust_dormitory
+          MYSQL_PASSWORD: RuntimeTestPassword2026
+          MYSQL_ROOT_PASSWORD: RuntimeRootPassword2026
+          TZ: Asia/Shanghai
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -pRuntimeRootPassword2026"
+          --health-interval=10s --health-timeout=5s --health-retries=12
+      redis:
+        image: redis:7.4-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping" --health-interval=5s --health-timeout=3s --health-retries=12
+    env:
+      WUST_DORMITORY_DB_HOST: 127.0.0.1
+      WUST_DORMITORY_DB_PORT: '3306'
+      WUST_DORMITORY_DB_NAME: wust_dormitory
+      WUST_DORMITORY_DB_USER: wust_dormitory
+      WUST_DORMITORY_DB_PASSWORD: RuntimeTestPassword2026
+      WUST_DORMITORY_REDIS_HOST: 127.0.0.1
+      WUST_DORMITORY_REDIS_PORT: '6379'
+      WUST_DORMITORY_REDIS_PASSWORD: ''
+      WUST_DORMITORY_FLYWAY_LOCATIONS: classpath:db/migration,filesystem:backend-java/server/src/test/resources/db/dev-migration
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          repository: ${{ env.PRIVATE_REPO }}
+          ref: ${{ env.PRIVATE_SHA }}
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Build service
+        working-directory: private-repo
+        run: mvn -f backend-java/pom.xml --batch-mode --no-transfer-progress package -DskipTests
+      - name: Start service and expose concise failure diagnostics
+        working-directory: private-repo
+        shell: bash
+        run: |
+          java -jar backend-java/starter/target/Service.jar > /tmp/service.log 2>&1 &
+          pid=$!
+          for attempt in $(seq 1 75); do
+            if curl --fail --silent http://127.0.0.1:8080/actuator/health > /tmp/health.json; then
+              cat /tmp/health.json
+              exit 0
+            fi
+            if ! kill -0 "$pid" 2>/dev/null; then
+              echo '=== service exited before health became ready ==='
+              grep -E 'ERROR|Exception|Caused by:|Flyway|Migration|SQL State|Message' /tmp/service.log | tail -120 || true
+              tail -80 /tmp/service.log
+              exit 1
+            fi
+            sleep 2
+          done
+          echo '=== service health timeout ==='
+          grep -E 'ERROR|Exception|Caused by:|Flyway|Migration|SQL State|Message' /tmp/service.log | tail -120 || true
+          tail -80 /tmp/service.log
+          exit 1
+      - name: Assert V54 schema
+        run: |
+          python -m pip install --disable-pip-version-check pymysql
+          python - <<'PY'
+          import pymysql
+          c = pymysql.connect(host='127.0.0.1', port=3306, user='wust_dormitory', password='RuntimeTestPassword2026', database='wust_dormitory')
+          with c.cursor() as cur:
+              cur.execute("SELECT MAX(CAST(version AS UNSIGNED)) FROM flyway_schema_history WHERE success=1")
+              assert int(cur.fetchone()[0]) >= 54
+              for table in ('mobile_print_template','mobile_print_template_revision','mobile_print_template_asset'):
+                  cur.execute(f"SHOW TABLES LIKE '{table}'")
+                  assert cur.fetchone() is not None, table
+              cur.execute("SELECT enabled_in_program,school_controllable,school_default_enabled FROM feature_catalog WHERE feature_code='P3_MOBILE_PRINT_TEMPLATE_MANAGE'")
+              assert cur.fetchone() == (1,0,1)
+          c.close()
+          PY
+
+  generator:
+    name: Navicat V54 generation
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          repository: ${{ env.PRIVATE_REPO }}
+          ref: ${{ env.PRIVATE_SHA }}
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install --disable-pip-version-check pyyaml
+      - name: Run parser and reset-generator regression suite
+        working-directory: private-repo
+        run: |
+          python scripts/db/test_feature_catalog_upsert_parser.py
+          python scripts/db/generate_navicat_sql.py --scenario clean --skip-redis
+          python scripts/db/generate_navicat_sql.py --scenario clean --check
+          python scripts/db/test_generate_navicat_latest_database.py
+          grep -q 'V54__add_mobile_print_templates.sql' backend-java/docs/sql/navicat/generated/00_一键重置数据库.sql
+          grep -q 'P3_MOBILE_PRINT_TEMPLATE_MANAGE' backend-java/docs/sql/navicat/generated/00_一键重置数据库.sql
+
+  mobile-android:
+    name: Mobile full tests and Android assembleDebug
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          repository: ${{ env.PRIVATE_REPO }}
+          ref: ${{ env.PRIVATE_SHA }}
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Test, typecheck and build Android app
+        working-directory: private-repo/app
+        run: |
+          npm install --no-audit --no-fund
+          npm run version:check
+          npm test
+          npm run typecheck
+          npm run android:build:debug
+          test -f android/app/build/outputs/apk/debug/app-debug.apk
