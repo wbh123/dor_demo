@@ -1,0 +1,72 @@
+name: Private Mobile Diagnostic CI
+
+on:
+  push:
+    branches:
+      - 'private-compat/feat/mobile-student-visual-bed-selection-20260816'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: private-mobile-diagnostic-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  diagnose-mobile:
+    name: Diagnose private mobile app
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Resolve private branch name
+        id: target
+        shell: bash
+        run: |
+          set -euo pipefail
+          candidate="${GITHUB_REF_NAME}"
+          private_ref="${candidate#private-compat/}"
+          echo "private_ref=$private_ref" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout private integration branch
+        uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: ${{ steps.target.outputs.private_ref }}
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: false
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: private-repo/app/package-lock.json
+
+      - name: Synchronize mobile lockfile
+        working-directory: private-repo/app
+        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+
+      - name: Install mobile dependencies
+        working-directory: private-repo/app
+        run: npm ci
+
+      - name: Generate mobile API types
+        working-directory: private-repo/app
+        run: npm run generate:api
+
+      - name: Verify generated API has no drift
+        working-directory: private-repo
+        run: git diff --exit-code -- app/src/api/schema.d.ts
+
+      - name: Run mobile tests
+        working-directory: private-repo/app
+        run: npm test
+
+      - name: Run mobile typecheck
+        working-directory: private-repo/app
+        run: npm run typecheck
+
+      - name: Build mobile web bundle
+        working-directory: private-repo/app
+        run: npm run build
