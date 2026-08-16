@@ -9,9 +9,9 @@ permissions:
   contents: read
 
 jobs:
-  candidate-tests:
+  candidate-specs:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
         with:
@@ -28,13 +28,25 @@ jobs:
           cache-dependency-path: private-repo/app/package-lock.json
       - working-directory: private-repo/app
         run: npm ci
-      - name: Run candidate APP tests
+      - name: Run candidate APP specs one by one
         working-directory: private-repo/app
-        run: npm test
+        shell: bash
+        run: |
+          set -uo pipefail
+          failures=0
+          while IFS= read -r spec; do
+            [[ -z "$spec" ]] && continue
+            if ! node --experimental-strip-types --test "$spec"; then
+              echo "::error file=$spec::Candidate standalone APP spec failed"
+              failures=$((failures + 1))
+            fi
+          done < <(node -e "const p=require('./package.json'); for (const x of p.scripts.test.split(/\\s+/)) if (x.endsWith('.ts')) console.log(x)")
+          echo "candidate_failed_spec_count=$failures" >> "$GITHUB_STEP_SUMMARY"
+          test "$failures" -eq 0
 
-  baseline-tests:
+  baseline-specs:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
         with:
@@ -51,9 +63,21 @@ jobs:
           cache-dependency-path: private-repo/app/package-lock.json
       - working-directory: private-repo/app
         run: npm ci
-      - name: Run main baseline APP tests
+      - name: Run main APP specs one by one
         working-directory: private-repo/app
-        run: npm test
+        shell: bash
+        run: |
+          set -uo pipefail
+          failures=0
+          while IFS= read -r spec; do
+            [[ -z "$spec" ]] && continue
+            if ! node --experimental-strip-types --test "$spec"; then
+              echo "::error file=$spec::Main standalone APP spec failed"
+              failures=$((failures + 1))
+            fi
+          done < <(node -e "const p=require('./package.json'); for (const x of p.scripts.test.split(/\\s+/)) if (x.endsWith('.ts')) console.log(x)")
+          echo "baseline_failed_spec_count=$failures" >> "$GITHUB_STEP_SUMMARY"
+          test "$failures" -eq 0
 
   candidate-build:
     runs-on: ubuntu-latest
