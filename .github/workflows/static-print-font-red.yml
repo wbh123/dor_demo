@@ -1,0 +1,42 @@
+name: Static print font RED
+
+on:
+  push:
+    branches:
+      - diagnostics/materialize-static-print-fonts-20260816
+
+permissions:
+  contents: read
+
+jobs:
+  red:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: fix/pdf-preview-font-weight-parity-20260816
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: false
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: private-repo/backend-java/pom.xml
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: private-repo/frontend/package-lock.json
+      - name: Backend static font contract (expected RED before implementation)
+        working-directory: private-repo/backend-java
+        run: mvn -B -ntp -pl server -am -Dtest=PrintFontRegistryTest -Dsurefire.failIfNoSpecifiedTests=false test
+      - name: Frontend static font contract
+        working-directory: private-repo/frontend
+        run: node --experimental-strip-types --test src/views/admin/admin-print-font-contract.spec.ts
+      - name: Mobile static font contract
+        working-directory: private-repo/app
+        run: node --experimental-strip-types --test src/platform/print-recipe-contract.spec.ts
