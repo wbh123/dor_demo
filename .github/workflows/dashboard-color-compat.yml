@@ -11,7 +11,7 @@ permissions:
 jobs:
   dashboard-color-contract:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     steps:
       - name: Checkout private branch
         uses: actions/checkout@v5
@@ -26,6 +26,22 @@ jobs:
         with:
           node-version: '22'
 
+      - name: Install frontend dependencies
+        working-directory: private-repo/frontend
+        run: npm ci
+
       - name: Run dashboard color contract
         working-directory: private-repo/frontend
         run: node --experimental-strip-types --test src/views/admin/admin-dashboard-color-contract.spec.ts
+
+      - name: Run frontend tests
+        working-directory: private-repo/frontend
+        run: npm test
+
+      - name: Run frontend typecheck
+        working-directory: private-repo/frontend
+        run: npm run typecheck
+
+      - name: Run frontend production build
+        working-directory: private-repo/frontend
+        run: npm run build
