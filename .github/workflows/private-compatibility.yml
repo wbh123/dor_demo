@@ -154,7 +154,7 @@ jobs:
           set -euo pipefail
           mvn -B -ntp clean verify
 
-      - name: Verify Flyway V54 against MySQL 8.4
+      - name: Verify Flyway V54 and V55 against MySQL 8.4
         working-directory: private-repo
         shell: bash
         run: |
@@ -180,6 +180,8 @@ jobs:
               password='RuntimeTestPassword2026', database='wust_dormitory', charset='utf8mb4')
           with connection.cursor() as cursor:
               cursor.execute("SELECT COUNT(*) FROM flyway_schema_history WHERE version='54' AND success=1")
+              assert cursor.fetchone()[0] == 1
+              cursor.execute("SELECT COUNT(*) FROM flyway_schema_history WHERE version='55' AND success=1")
               assert cursor.fetchone()[0] == 1
               cursor.execute("SELECT enabled_in_program, school_controllable, category_code FROM feature_catalog WHERE feature_code='P3_MOBILE_ADMIN_ACCESS'")
               assert cursor.fetchone() == (1, 0, 'MOBILE')
