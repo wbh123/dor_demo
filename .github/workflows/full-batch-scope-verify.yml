@@ -1,0 +1,32 @@
+name: Full batch scope verify
+
+on:
+  push:
+    branches:
+      - diagnostics/batch-scope-pagination-20260816
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: fix/batch-scope-server-pagination-20260816
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: false
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: System contracts
+        working-directory: private-repo
+        run: python scripts/ci/validate_system_contracts.py
+      - name: Backend full verify
+        working-directory: private-repo/backend-java
+        run: mvn -B -ntp clean verify
