@@ -8,23 +8,191 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: private-compat-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   verify-private-ref:
-    name: Verify current private main modularization scanner
+    name: Verify private ref end-to-end
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v5
+      - name: Resolve private branch name
+        id: target
+        shell: bash
+        run: |
+          set -euo pipefail
+          candidate="$GITHUB_REF_NAME"
+          private_ref="${candidate#private-compat/}"
+          if [[ -z "$private_ref" || "$private_ref" == "$candidate" ]]; then
+            echo "Invalid compatibility branch name" >&2
+            exit 1
+          fi
+          if [[ ! "$private_ref" =~ ^[A-Za-z0-9._/-]+$ ]]; then
+            echo "Unsupported private ref characters" >&2
+            exit 1
+          fi
+          echo "private_ref=$private_ref" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout private ref
+        uses: actions/checkout@v5
         with:
           repository: wbh123/Wust-Dormitory-Select
-          ref: main
+          ref: ${{ steps.target.outputs.private_ref }}
           token: ${{ secrets.PRIVATE_CI }}
           path: private-repo
           persist-credentials: false
           fetch-depth: 0
+
       - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
-      - name: Run current modularization scanner
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: private-repo/backend-java/pom.xml
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            private-repo/frontend/package-lock.json
+            private-repo/app/package-lock.json
+
+      - name: Verify permission and persistence contracts
         working-directory: private-repo
-        run: python scripts/ci/test_backend_modularization_boundaries.py
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/ci/test_runtime_error_data_correctness_batch.py
+          python scripts/subscription/test_feature_authorization_closure.py
+          python scripts/subscription/test_feature_code_references.py
+          python scripts/subscription/test_feature_catalog_runtime_alignment.py
+          python scripts/subscription/test_mobile_feature_authorization.py
+          python scripts/subscription/test_platform_feature_gui.py
+          python scripts/ci/test_subscription_mybatis.py
+          python scripts/ci/test_backend_layering.py
+          python scripts/ci/test_no_embedded_sql.py
+
+      - name: Verify modularization does not regress against main
+        working-directory: private-repo
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import re
+          import subprocess
+
+          JAVA_ROOT = 'backend-java/server/src/main/java/'
+          JAVA_LIMIT = 300
+          CONTROLLER_LIMIT = 12
+          OVERRIDE = re.compile(r'(?m)^\s*@Override\s*$')
+          ROUTE = re.compile(r'(?m)^\s*@(Get|Post|Put|Delete|Patch)Mapping\b')
+
+          def files(ref):
+              out = subprocess.check_output(['git', 'ls-tree', '-r', '--name-only', ref, '--', JAVA_ROOT], text=True)
+              return [p for p in out.splitlines() if p.endswith('.java')]
+
+          def source(ref, path):
+              try:
+                  return subprocess.check_output(['git', 'show', f'{ref}:{path}'], text=True)
+              except subprocess.CalledProcessError:
+                  return None
+
+          def snapshot(ref):
+              java = {}
+              controllers = {}
+              for path in files(ref):
+                  text = source(ref, path)
+                  if text is None:
+                      continue
+                  java[path] = len(text.splitlines())
+                  if path.endswith('Controller.java') and '@RestController' in text:
+                      overrides = len(OVERRIDE.findall(text))
+                      routes = len(ROUTE.findall(text))
+                      controllers[path] = overrides if overrides > 0 else routes
+              return java, controllers
+
+          base_java, base_controllers = snapshot('origin/main')
+          head_java, head_controllers = snapshot('HEAD')
+          errors = []
+          for path, lines in head_java.items():
+              base = base_java.get(path, 0)
+              if lines > JAVA_LIMIT and base <= JAVA_LIMIT:
+                  errors.append(f'新增大型 Java 文件: {path} ({lines} 行, main={base})')
+              elif base > JAVA_LIMIT and lines > base:
+                  errors.append(f'既有大型 Java 文件继续增长: {path} ({base} -> {lines})')
+          for path, ops in head_controllers.items():
+              base = base_controllers.get(path, 0)
+              if ops > CONTROLLER_LIMIT and base <= CONTROLLER_LIMIT:
+                  errors.append(f'新增聚合 Controller: {path} ({ops} operations, main={base})')
+              elif base > CONTROLLER_LIMIT and ops > base:
+                  errors.append(f'既有聚合 Controller 继续增长: {path} ({base} -> {ops})')
+          if errors:
+              print('\n'.join(errors))
+              raise SystemExit(1)
+          print('Differential backend modularization guard passed')
+          PY
+
+      - name: Verify private Java modules
+        working-directory: private-repo/backend-java
+        shell: bash
+        run: |
+          set -euo pipefail
+          mvn -B -ntp clean verify
+
+      - name: Verify private frontend
+        working-directory: private-repo
+        shell: bash
+        env:
+          VITE_INSTITUTION_NAME: Example University
+          VITE_CAMPUS_NAME: Example Campus
+        run: |
+          set -euo pipefail
+          bash scripts/ci/run_frontend.sh
+
+      - name: Install private mobile dependencies
+        working-directory: private-repo/app
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+          npm ci
+
+      - name: Verify mobile OpenAPI drift
+        working-directory: private-repo/app
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run generate:api
+          git diff --exit-code -- src/api/schema.d.ts
+
+      - name: Verify mobile tests with per-file isolation
+        working-directory: private-repo/app
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t test_files < <(node -e "const p=require('./package.json'); for (const f of (p.scripts.test.match(/src\\/[^ ]+\\.spec\\.ts/g) || [])) console.log(f)")
+          if [[ ${#test_files[@]} -eq 0 ]]; then
+            echo "No mobile tests resolved from package.json" >&2
+            exit 1
+          fi
+          echo "Running ${#test_files[@]} mobile contract files with process isolation"
+          for test_file in "${test_files[@]}"; do
+            echo "::group::$test_file"
+            node --experimental-strip-types --test "$test_file"
+            echo "::endgroup::"
+          done
+
+      - name: Verify mobile typecheck
+        working-directory: private-repo/app
+        run: npm run typecheck
+
+      - name: Verify mobile production build
+        working-directory: private-repo/app
+        run: npm run build
