@@ -69,13 +69,20 @@ jobs:
             private-repo/frontend/package-lock.json
             private-repo/app/package-lock.json
 
-      - name: Verify private contracts except historical modularization baseline
+      - name: Verify permission and persistence contracts
         working-directory: private-repo
         shell: bash
         run: |
           set -euo pipefail
           python scripts/ci/test_runtime_error_data_correctness_batch.py
-          grep -v 'test_backend_modularization_boundaries.py' scripts/ci/run_contracts.sh | bash
+          python scripts/subscription/test_feature_authorization_closure.py
+          python scripts/subscription/test_feature_code_references.py
+          python scripts/subscription/test_feature_catalog_runtime_alignment.py
+          python scripts/subscription/test_mobile_feature_authorization.py
+          python scripts/subscription/test_platform_feature_gui.py
+          python scripts/ci/test_subscription_mybatis.py
+          python scripts/ci/test_backend_layering.py
+          python scripts/ci/test_no_embedded_sql.py
 
       - name: Verify modularization does not regress against main
         working-directory: private-repo
@@ -109,8 +116,7 @@ jobs:
                   text = source(ref, path)
                   if text is None:
                       continue
-                  lines = len(text.splitlines())
-                  java[path] = lines
+                  java[path] = len(text.splitlines())
                   if path.endswith('Controller.java') and '@RestController' in text:
                       overrides = len(OVERRIDE.findall(text))
                       routes = len(ROUTE.findall(text))
