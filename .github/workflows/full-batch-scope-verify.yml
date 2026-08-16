@@ -24,9 +24,9 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
-      - name: System contracts
+      - name: Batch preflight SQL contract
         working-directory: private-repo
-        run: python scripts/ci/validate_system_contracts.py
+        run: python scripts/ci/test_batch_scope_preflight_sql.py
       - name: Backend full verify
         working-directory: private-repo/backend-java
         run: mvn -B -ntp clean verify
