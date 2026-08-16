@@ -1,0 +1,36 @@
+name: Private Feature Authorization Sync Main
+
+on:
+  push:
+    branches:
+      - 'private-compat/fix/feature-authorization-abc-catalog-20260816'
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout private repair branch
+        uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: fix/feature-authorization-abc-catalog-20260816
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: true
+          fetch-depth: 0
+      - name: Merge latest main without overwriting parallel changes
+        working-directory: private-repo
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "9643001db7375dfb2cec9886e24f90ceb6854fba"
+          git fetch origin main
+          git config user.name "Wust Dormitory CI"
+          git config user.email "actions@users.noreply.github.com"
+          git merge --no-edit origin/main
+          git diff --check origin/main...HEAD
+          git push origin HEAD:refs/heads/fix/feature-authorization-abc-catalog-20260816
