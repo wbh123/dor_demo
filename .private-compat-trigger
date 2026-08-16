@@ -1,4 +1,4 @@
 private_repo=wbh123/Wust-Dormitory-Select
 private_ref=refactor/mobile-feature-permission-gates-20260815
-private_head=d78c2fa7876b1bc788d41203562ca6e4382ee431
-purpose=final-mobile-authorization-print-template-convergence
+private_head=0ef108dd050f54c5904b699fbf2252e91d35bb84
+purpose=final-v54-v55-mobile-authorization-validation
