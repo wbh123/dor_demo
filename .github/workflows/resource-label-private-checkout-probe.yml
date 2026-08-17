@@ -1,0 +1,32 @@
+name: Resource Label Private Checkout Probe
+
+on:
+  push:
+    branches:
+      - 'test/resource-label-lifecycle-*'
+    paths:
+      - '.github/workflows/resource-label-private-checkout-probe.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout private merged revision
+        uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: b6e9995412ebebc7899a39d9bff15e0a33678fa4
+          token: ${{ github.token }}
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Verify merged feature files without printing source
+        run: |
+          test "$(git rev-parse HEAD)" = "b6e9995412ebebc7899a39d9bff15e0a33678fa4"
+          test -f backend-java/server/src/main/resources/db/migration/V60__add_resource_label_replacement_lifecycle.sql
+          test -f backend-java/server/src/main/java/com/wust/dormitory/label/ResourceLabelService.java
+          test -f app/version.json
+          echo "private merged revision is readable by this runner"
