@@ -58,6 +58,9 @@ def main() -> int:
     assert "SELECT *" not in mapper_xml.upper()
     assert " LIMIT " in mapper_xml.upper(), "diagnostic sample queries must be bounded"
     assert "rule_template_id AS ruleTemplateId" in mapper_xml
+    assert 'id="pendingParticipantCount"' in mapper_xml
+    assert "ra.batch_id = e.batch_id" in mapper_xml
+    assert "ra.assignment_status = 'ACTIVE'" in mapper_xml
 
     batch = read("backend-java/server/src/main/java/com/wust/dormitory/readiness/BatchReadinessChecker.java")
     for token in (
@@ -70,8 +73,11 @@ def main() -> int:
         "preview(batchId)",
         "MatchingSchemeService",
         "policyForBatch(batchId)",
+        "pendingParticipantCount(batchId)",
+        "pendingParticipantCount > capacity",
+        'evidence.put("pendingParticipantCount", pendingParticipantCount)',
     ):
-        assert token in batch, f"batch readiness missing existing validator reuse: {token}"
+        assert token in batch, f"batch readiness missing existing validator/capacity reuse: {token}"
     for forbidden in ("acquire(batchId)", "changeStatus(", "rebuild(batchId)"):
         assert forbidden not in batch, f"batch readiness must remain read-only: {forbidden}"
 
