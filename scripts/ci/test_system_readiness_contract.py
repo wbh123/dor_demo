@@ -71,6 +71,19 @@ def main() -> int:
     assert "ra.batch_id = e.batch_id" in mapper_xml
     assert "ra.assignment_status = 'ACTIVE'" in mapper_xml
     assert "AS activeResidents" in mapper_xml
+    assert "AS invalidStudents" in mapper_xml
+    assert "COUNT(DISTINCT CASE WHEN" in mapper_xml
+
+    student = read("backend-java/server/src/main/java/com/wust/dormitory/readiness/StudentReadinessChecker.java")
+    assert 'number(data, "invalidStudents")' in student
+    assert '"invalidStudents", invalidStudents' in student
+    student_test = read("backend-java/server/src/test/java/com/wust/dormitory/readiness/StudentReadinessCheckerTest.java")
+    assert "overlappingDataIssuesCountEachStudentOnlyOnce" in student_test
+    student_mysql_test = read(
+        "backend-java/server/src/test/java/com/wust/dormitory/mapper/SystemReadinessStudentMapperMySqlIntegrationTest.java"
+    )
+    assert 'DockerImageName.parse("mysql:8.4")' in student_mysql_test
+    assert 'number(summary, "invalidStudents")' in student_mysql_test
 
     resource = read("backend-java/server/src/main/java/com/wust/dormitory/readiness/ResourceReadinessChecker.java")
     for token in (
