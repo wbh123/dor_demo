@@ -21,6 +21,11 @@ public class StudentReadinessChecker implements ReadinessChecker {
     }
 
     @Override
+    public boolean critical() {
+        return true;
+    }
+
+    @Override
     public List<ReadinessCheckResult> check(ReadinessContext context) {
         Map<String, Object> data = mapper.studentSummary();
         long total = number(data, "totalStudents");
