@@ -56,6 +56,17 @@ jobs:
         working-directory: private-repo/app
         run: npm run build
 
+      - name: Run resource label batch service tests
+        working-directory: private-repo
+        run: >-
+          mvn -f backend-java/pom.xml -B -ntp -pl server -am
+          -Dtest=ResourceLabelBatchServiceTest
+          -Dsurefire.failIfNoSpecifiedTests=false test
+
       - name: Compile backend server modules
         working-directory: private-repo
         run: mvn -f backend-java/pom.xml -B -ntp -pl server -am -DskipTests compile
+
+      - name: Build Android Debug APK
+        working-directory: private-repo/app
+        run: npm run android:build:debug
