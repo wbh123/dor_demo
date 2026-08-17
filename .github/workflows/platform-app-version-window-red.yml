@@ -1,0 +1,34 @@
+name: Platform APP Version Window RED
+
+on:
+  push:
+    branches:
+      - verify/platform-app-version-window-red-20260817
+
+permissions:
+  contents: read
+
+jobs:
+  red-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout private candidate
+        uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: fix/platform-app-version-window-responsiveness-20260817
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: private-repo/frontend/package-lock.json
+      - name: Install frontend dependencies
+        working-directory: private-repo/frontend
+        run: npm ci
+      - name: Verify regression test is red before implementation
+        working-directory: private-repo/frontend
+        run: node --experimental-strip-types --test src/platform/appVersions.spec.ts
