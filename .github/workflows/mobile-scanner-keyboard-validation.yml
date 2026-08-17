@@ -3,7 +3,7 @@ name: Mobile Scanner Keyboard Validation
 on:
   push:
     branches:
-      - 'private-compat/fix/mobile-scanner-keyboard-confirm-20260817'
+      - 'private-compat/fix/mobile-scanner-keyboard-confirm-20260817-v3'
 
 permissions:
   contents: read
