@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.wust.dormitory.readiness.mapper.SystemReadinessMapper">
+    <select id="databaseProbe" resultType="int">
+        SELECT 1
+    </select>
+
+    <select id="databaseVersion" resultType="string">
+        SELECT VERSION()
+    </select>
+
+    <select id="resourceSummary" resultType="map">
+        SELECT
+            (SELECT COUNT(*) FROM campus) AS campuses,
+            (SELECT COUNT(*) FROM dormitory_building) AS buildings,
+            (SELECT COUNT(*) FROM room) AS rooms,
+            (SELECT COUNT(*) FROM bed WHERE operational_status = 'ENABLED') AS validBeds,
+            (SELECT COUNT(*) FROM room_assignment WHERE assignment_status = 'ACTIVE' AND bed_id IS NOT NULL) AS occupiedBeds,
+            (SELECT COUNT(*) FROM room r
+             WHERE NOT EXISTS (SELECT 1 FROM bed b WHERE b.room_id = r.id AND b.operational_status != 'RETIRED')) AS roomsWithoutBeds,
+            (SELECT COUNT(*) FROM room r
+             WHERE r.operational_status = 'ENABLED'
+               AND NOT EXISTS (SELECT 1 FROM bed b WHERE b.room_id = r.id AND b.operational_status = 'ENABLED')) AS enabledRoomsWithoutBeds,
+            (SELECT COUNT(*) FROM room r
+             WHERE r.capacity != (SELECT COUNT(*) FROM bed b WHERE b.room_id = r.id AND b.operational_status = 'ENABLED')) AS capacityMismatchRooms,
+            (SELECT COUNT(*) FROM dormitory_floor f
+             LEFT JOIN dormitory_building db ON db.id = f.building_id
+             WHERE db.id IS NULL) +
+            (SELECT COUNT(*) FROM room r
+             LEFT JOIN dormitory_floor f ON f.id = r.floor_id
+             WHERE f.id IS NULL) AS invalidRelations
+    </select>
+
+    <select id="studentSummary" resultType="map">
+        SELECT
+            COUNT(*) AS totalStudents,
+            SUM(CASE WHEN COALESCE(u.account_status, 'PENDING') != 'DISABLED' THEN 1 ELSE 0 END) AS enabledStudents,
+            SUM(CASE WHEN u.id IS NULL OR COALESCE(u.account_status, 'PENDING') != 'ACTIVE' THEN 1 ELSE 0 END) AS unactivatedStudents,
+            SUM(CASE WHEN s.student_number IS NULL OR TRIM(s.student_number) = ''
+                       OR s.student_name IS NULL OR TRIM(s.student_name) = ''
+                       OR s.grade_year IS NULL THEN 1 ELSE 0 END) AS missingCriticalFields,
+            SUM(CASE WHEN s.major_id IS NULL OR m.id IS NULL OR m.enabled = 0 THEN 1 ELSE 0 END) AS missingMajorMapping,
+            SUM(CASE WHEN s.degree_level NOT IN ('专科','本科','硕士','博士','本硕连读','本博连读')
+                       OR s.degree_level IS NULL THEN 1 ELSE 0 END) AS invalidDegreeLevel,
+            SUM(CASE WHEN s.gender NOT IN ('M','F') OR s.gender IS NULL THEN 1 ELSE 0 END) AS invalidGender
+        FROM student s
+        LEFT JOIN major m ON m.id = s.major_id
+        LEFT JOIN app_user u ON u.student_id = s.id
+    </select>
+
+    <select id="studentIssueSamples" resultType="map">
+        SELECT s.student_number AS studentNumber
+        FROM student s
+        LEFT JOIN major m ON m.id = s.major_id
+        WHERE s.student_number IS NULL OR TRIM(s.student_number) = ''
+           OR s.student_name IS NULL OR TRIM(s.student_name) = ''
+           OR s.grade_year IS NULL
+           OR s.major_id IS NULL OR m.id IS NULL OR m.enabled = 0
+           OR s.degree_level IS NULL
+           OR s.degree_level NOT IN ('专科','本科','硕士','博士','本硕连读','本博连读')
+           OR s.gender IS NULL OR s.gender NOT IN ('M','F')
+        ORDER BY s.id
+        LIMIT #{limit}
+    </select>
+
+    <select id="activeBatches" resultType="map">
+        SELECT id,
+               batch_name AS batchName,
+               batch_status AS batchStatus
+        FROM selection_batch
+        WHERE batch_status IN ('PUBLISHED', 'OPEN', 'PAUSED')
+        ORDER BY start_at, id
+        LIMIT 20
+    </select>
+
+    <select id="participantCount" resultType="long">
+        SELECT COUNT(*)
+        FROM batch_student_eligibility
+        WHERE batch_id = #{batchId}
+          AND eligibility_status = 'ELIGIBLE'
+    </select>
+</mapper>
