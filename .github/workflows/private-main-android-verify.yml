@@ -1,0 +1,42 @@
+name: Private Main Android Verify
+
+on:
+  push:
+    branches:
+      - 'private-compat/main'
+
+permissions:
+  contents: read
+
+jobs:
+  android-debug:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout private main
+        uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: main
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: false
+          fetch-depth: 1
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: private-repo/app/package-lock.json
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Install dependencies
+        working-directory: private-repo/app
+        run: npm ci --no-audit --no-fund
+      - name: Android Debug build
+        working-directory: private-repo/app
+        run: npm run android:build:debug
+      - name: Verify APK
+        working-directory: private-repo/app
+        run: test -s android/app/build/outputs/apk/debug/app-debug.apk
