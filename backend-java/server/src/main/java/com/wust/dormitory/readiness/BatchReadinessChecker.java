@@ -79,7 +79,7 @@ public class BatchReadinessChecker implements ReadinessChecker {
                 ? CheckAttempt.failed("RULE_TEMPLATE_NOT_BOUND")
                 : attempt(() -> batchRuleTemplateService.resolveForBatch(ruleTemplateId));
         CheckAttempt matchingAttempt = attempt(() -> matchingSchemeService.policyForBatch(batchId));
-        CheckAttempt selectionModeAttempt = attempt(() -> selectionModeGuard.requireBedModeForPublish(batchId));
+        CheckAttempt selectionModeAttempt = attempt(() -> selectionModeGuard.requireModeAvailableForExistingBatch(batchId));
 
         Map<String, Object> preview = Map.of();
         CheckAttempt preflightAttempt;
