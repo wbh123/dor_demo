@@ -33,8 +33,9 @@ public class ResourceReadinessChecker implements ReadinessChecker {
         long buildings = number(data, "buildings");
         long rooms = number(data, "rooms");
         long beds = number(data, "validBeds");
-        long occupied = number(data, "occupiedBeds");
-        long remaining = Math.max(0, beds - occupied);
+        long confirmedBeds = number(data, "occupiedBeds");
+        long activeResidents = number(data, "activeResidents");
+        long unconfirmedBeds = Math.max(0, activeResidents - confirmedBeds);
         long noBeds = number(data, "roomsWithoutBeds");
         long zeroEnabled = number(data, "enabledRoomsWithoutBeds");
         long mismatch = number(data, "capacityMismatchRooms");
@@ -64,10 +65,24 @@ public class ResourceReadinessChecker implements ReadinessChecker {
                         : "发现 " + issueCategoryCount + " 类宿舍资源完整性异常；同一房间可能同时命中多个类别。",
                 integrityEvidence,
                 issueCategoryCount == 0 ? null : "前往宿舍资源管理按异常类别逐项修正", "/admin/dormitories", context.checkedAt()));
-        results.add(ReadinessCheckResult.of("BED_CAPACITY", category(), "当前可用床位容量", ReadinessSeverity.INFO,
-                false, "INFO", "当前可用床位 " + beds + " 个，正式占用 " + occupied + " 个，剩余 " + remaining + " 个。",
-                Map.of("availableBeds", beds, "occupiedBeds", occupied, "remainingBeds", remaining),
-                null, "/admin/residencies", context.checkedAt()));
+
+        results.add(ReadinessCheckResult.of(
+                "BED_CAPACITY",
+                category(),
+                "当前床位与在住概况",
+                ReadinessSeverity.INFO,
+                false,
+                "INFO",
+                "当前启用床位记录 " + beds + " 个；正式在住 " + activeResidents + " 人，其中已确认床位 "
+                        + confirmedBeds + " 人、未确认床位 " + unconfirmedBeds + " 人。实际活动可分配容量以批次预检为准。",
+                Map.of(
+                        "enabledBeds", beds,
+                        "activeResidents", activeResidents,
+                        "confirmedBedAssignments", confirmedBeds,
+                        "unconfirmedBedAssignments", unconfirmedBeds),
+                null,
+                "/admin/residencies",
+                context.checkedAt()));
         return results;
     }
 

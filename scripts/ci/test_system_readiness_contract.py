@@ -61,6 +61,29 @@ def main() -> int:
     assert 'id="pendingParticipantCount"' in mapper_xml
     assert "ra.batch_id = e.batch_id" in mapper_xml
     assert "ra.assignment_status = 'ACTIVE'" in mapper_xml
+    assert "AS activeResidents" in mapper_xml
+
+    resource = read("backend-java/server/src/main/java/com/wust/dormitory/readiness/ResourceReadinessChecker.java")
+    for token in (
+        'number(data, "activeResidents")',
+        '"confirmedBedAssignments"',
+        '"unconfirmedBedAssignments"',
+        "实际活动可分配容量以批次预检为准",
+    ):
+        assert token in resource, f"resource readiness capacity info missing {token}"
+    assert '"remainingBeds"' not in resource, "room-mode readiness must not invent a remaining-bed total"
+
+    resource_test = read(
+        "backend-java/server/src/test/java/com/wust/dormitory/readiness/ResourceReadinessCheckerTest.java"
+    )
+    assert "capacityInfoSeparatesResidentsFromConfirmedBedsInsteadOfInventingRemainingBeds" in resource_test
+    assert 'containsKey("remainingBeds")' in resource_test
+
+    resource_mysql_test = read(
+        "backend-java/server/src/test/java/com/wust/dormitory/mapper/SystemReadinessResourceMapperMySqlIntegrationTest.java"
+    )
+    assert "activeResidents" in resource_mysql_test
+    assert "INSERT INTO room_assignment VALUES (50,100,NULL,'ACTIVE')" in resource_mysql_test
 
     batch = read("backend-java/server/src/main/java/com/wust/dormitory/readiness/BatchReadinessChecker.java")
     for token in (
