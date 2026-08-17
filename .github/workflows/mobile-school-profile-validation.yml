@@ -42,35 +42,107 @@ jobs:
 
       - name: Verify school profile freshness
         working-directory: app
-        run: npm run school-profile:check
+        shell: bash
+        run: |
+          set +e
+          npm run school-profile:check 2>&1 | tee /tmp/school-profile-freshness.log
+          status=${PIPESTATUS[0]}
+          echo "FRESHNESS_STATUS=${status}" >> "$GITHUB_ENV"
+          exit 0
 
       - name: Run school profile and HarmonyOS targeted tests
         working-directory: app
-        run: >-
-          node --experimental-strip-types --test
-          src/platform/school-profile-generation.spec.ts
-          src/platform/school-profile-runtime.spec.ts
-          src/platform/android-school-splash-contract.spec.ts
-          src/platform/native-appearance-contract.spec.ts
-          src/platform/appearance-runtime.spec.ts
-          src/platform/tablet-dark-mode-contract.spec.ts
-          src/platform/login-emblem-layout.spec.ts
-          src/platform/startup-splash-motion.spec.ts
-          src/platform/native-runtime.spec.ts
-          src/platform/system-dark-mode.spec.ts
+        shell: bash
+        run: |
+          set +e
+          node --experimental-strip-types --test \
+            src/platform/school-profile-generation.spec.ts \
+            src/platform/school-profile-runtime.spec.ts \
+            src/platform/android-school-splash-contract.spec.ts \
+            src/platform/native-appearance-contract.spec.ts \
+            src/platform/appearance-runtime.spec.ts \
+            src/platform/tablet-dark-mode-contract.spec.ts \
+            src/platform/login-emblem-layout.spec.ts \
+            src/platform/startup-splash-motion.spec.ts \
+            src/platform/native-runtime.spec.ts \
+            src/platform/system-dark-mode.spec.ts \
+            2>&1 | tee /tmp/targeted-tests.log
+          status=${PIPESTATUS[0]}
+          echo "TARGETED_STATUS=${status}" >> "$GITHUB_ENV"
+          exit 0
 
       - name: Run full mobile tests
         working-directory: app
-        run: npm test
+        shell: bash
+        run: |
+          set +e
+          npm test 2>&1 | tee /tmp/full-mobile-tests.log
+          status=${PIPESTATUS[0]}
+          echo "FULL_TEST_STATUS=${status}" >> "$GITHUB_ENV"
+          exit 0
 
       - name: Run mobile typecheck
         working-directory: app
-        run: npm run typecheck
+        shell: bash
+        run: |
+          set +e
+          npm run typecheck 2>&1 | tee /tmp/typecheck.log
+          status=${PIPESTATUS[0]}
+          echo "TYPECHECK_STATUS=${status}" >> "$GITHUB_ENV"
+          exit 0
 
       - name: Build mobile production bundle
         working-directory: app
-        run: npm run build
+        shell: bash
+        run: |
+          set +e
+          npm run build 2>&1 | tee /tmp/production-build.log
+          status=${PIPESTATUS[0]}
+          echo "BUILD_STATUS=${status}" >> "$GITHUB_ENV"
+          exit 0
 
       - name: Build Android debug APK
         working-directory: app
-        run: npm run android:build:debug
+        shell: bash
+        run: |
+          set +e
+          npm run android:build:debug 2>&1 | tee /tmp/android-debug-build.log
+          status=${PIPESTATUS[0]}
+          echo "ANDROID_STATUS=${status}" >> "$GITHUB_ENV"
+          exit 0
+
+      - name: Upload mobile validation logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobile-school-profile-validation-logs
+          path: |
+            /tmp/school-profile-freshness.log
+            /tmp/targeted-tests.log
+            /tmp/full-mobile-tests.log
+            /tmp/typecheck.log
+            /tmp/production-build.log
+            /tmp/android-debug-build.log
+          if-no-files-found: warn
+
+      - name: Preserve validation result
+        if: always()
+        shell: bash
+        run: |
+          echo "freshness=${FRESHNESS_STATUS:-missing}"
+          echo "targeted=${TARGETED_STATUS:-missing}"
+          echo "full-tests=${FULL_TEST_STATUS:-missing}"
+          echo "typecheck=${TYPECHECK_STATUS:-missing}"
+          echo "build=${BUILD_STATUS:-missing}"
+          echo "android=${ANDROID_STATUS:-missing}"
+          for code in \
+            "${FRESHNESS_STATUS:-1}" \
+            "${TARGETED_STATUS:-1}" \
+            "${FULL_TEST_STATUS:-1}" \
+            "${TYPECHECK_STATUS:-1}" \
+            "${BUILD_STATUS:-1}" \
+            "${ANDROID_STATUS:-1}"; do
+            if [[ "$code" != "0" ]]; then
+              exit 1
+            fi
+          done
