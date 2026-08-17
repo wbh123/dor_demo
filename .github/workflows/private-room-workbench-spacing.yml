@@ -1,0 +1,38 @@
+name: Private Room Workbench Spacing CI
+
+on:
+  push:
+    branches:
+      - 'private-compat/fix/mobile-room-workbench-default-spacing-20260817'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout private spacing branch
+        uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: fix/mobile-room-workbench-default-spacing-20260817
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: false
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: private-repo/app/package-lock.json
+
+      - name: Install APP dependencies
+        working-directory: private-repo/app
+        run: npm install --no-audit --no-fund
+
+      - name: Run room workbench spacing regression
+        working-directory: private-repo/app
+        run: node --test src/platform/room-workbench-layout.spec.ts
