@@ -42,7 +42,7 @@ jobs:
         shell: bash
         run: |
           set +e
-          node --import tsx --test src/platform/mobile-label-tools-navigation.spec.ts > /tmp/print-entry-test.log 2>&1
+          node --experimental-strip-types --test src/platform/mobile-label-tools-navigation.spec.ts > /tmp/print-entry-test.log 2>&1
           status=$?
           cat /tmp/print-entry-test.log
           if [[ $status -ne 0 ]]; then
