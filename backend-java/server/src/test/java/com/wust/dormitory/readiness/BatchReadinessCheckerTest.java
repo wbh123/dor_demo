@@ -5,6 +5,7 @@ import com.wust.dormitory.admin.BatchScopeService;
 import com.wust.dormitory.matching.MatchingSchemeService;
 import com.wust.dormitory.readiness.mapper.SystemReadinessMapper;
 import com.wust.dormitory.residency.BatchRoomLockService;
+import com.wust.dormitory.selection.BatchSelectionModeGuard;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
@@ -15,6 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -31,14 +33,9 @@ class BatchReadinessCheckerTest {
     @Test
     void noActiveBatchIsInformational() {
         SystemReadinessMapper mapper = mock(SystemReadinessMapper.class);
-        BatchScopeService scope = mock(BatchScopeService.class);
-        BatchRuleTemplateService rules = mock(BatchRuleTemplateService.class);
-        BatchRoomLockService preflight = mock(BatchRoomLockService.class);
-        MatchingSchemeService matching = mock(MatchingSchemeService.class);
         when(mapper.activeBatches()).thenReturn(List.of());
 
-        List<ReadinessCheckResult> results = new BatchReadinessChecker(mapper, scope, rules, preflight, matching)
-                .check(CONTEXT);
+        List<ReadinessCheckResult> results = checker(mapper).check(CONTEXT);
 
         assertEquals(1, results.size());
         assertEquals(ReadinessSeverity.INFO, results.getFirst().severity());
@@ -51,6 +48,7 @@ class BatchReadinessCheckerTest {
         BatchRuleTemplateService rules = mock(BatchRuleTemplateService.class);
         BatchRoomLockService preflight = mock(BatchRoomLockService.class);
         MatchingSchemeService matching = mock(MatchingSchemeService.class);
+        BatchSelectionModeGuard modeGuard = mock(BatchSelectionModeGuard.class);
         when(mapper.activeBatches()).thenReturn(List.of(activeBatch(42L, "2026 新生第一批", "PUBLISHED", 9L)));
         when(mapper.participantCount(42L)).thenReturn(500L);
         when(mapper.pendingParticipantCount(42L)).thenReturn(500L);
@@ -60,7 +58,7 @@ class BatchReadinessCheckerTest {
                 "publishable", true,
                 "studentConflictCount", 0));
 
-        ReadinessCheckResult result = new BatchReadinessChecker(mapper, scope, rules, preflight, matching)
+        ReadinessCheckResult result = new BatchReadinessChecker(mapper, scope, rules, preflight, matching, modeGuard)
                 .check(CONTEXT).getFirst();
 
         assertTrue(result.blocking());
@@ -68,19 +66,45 @@ class BatchReadinessCheckerTest {
         assertEquals(Boolean.TRUE, result.evidence().get("capacityShortage"));
         assertEquals(Boolean.TRUE, result.evidence().get("scopeReady"));
         assertEquals(Boolean.TRUE, result.evidence().get("ruleRevisionValid"));
+        assertEquals(Boolean.TRUE, result.evidence().get("selectionModeAvailable"));
         verify(scope).requireReady(42L);
         verify(rules).resolveForBatch(9L);
         verify(preflight).preview(42L);
         verify(matching).policyForBatch(42L);
+        verify(modeGuard).requireBedModeForPublish(42L);
     }
 
     @Test
-    void openBatchUsesOnlyStillUnassignedParticipantsForRemainingCapacity() {
+    void blocksWhenExistingSelectionModeEntitlementIsUnavailable() {
         SystemReadinessMapper mapper = mock(SystemReadinessMapper.class);
         BatchScopeService scope = mock(BatchScopeService.class);
         BatchRuleTemplateService rules = mock(BatchRuleTemplateService.class);
         BatchRoomLockService preflight = mock(BatchRoomLockService.class);
         MatchingSchemeService matching = mock(MatchingSchemeService.class);
+        BatchSelectionModeGuard modeGuard = mock(BatchSelectionModeGuard.class);
+        when(mapper.activeBatches()).thenReturn(List.of(activeBatch(45L, "床位模式批次", "PUBLISHED", 9L)));
+        when(mapper.participantCount(45L)).thenReturn(20L);
+        when(mapper.pendingParticipantCount(45L)).thenReturn(20L);
+        when(preflight.preview(45L)).thenReturn(Map.of(
+                "roomCount", 5,
+                "availableCapacity", 20,
+                "publishable", true,
+                "studentConflictCount", 0));
+        doThrow(new IllegalStateException("bed mode feature revoked"))
+                .when(modeGuard).requireBedModeForPublish(45L);
+
+        ReadinessCheckResult result = new BatchReadinessChecker(mapper, scope, rules, preflight, matching, modeGuard)
+                .check(CONTEXT).getFirst();
+
+        assertTrue(result.blocking());
+        assertEquals(Boolean.FALSE, result.evidence().get("selectionModeAvailable"));
+        assertEquals("IllegalStateException", result.evidence().get("selectionModeCheckError"));
+    }
+
+    @Test
+    void openBatchUsesOnlyStillUnassignedParticipantsForRemainingCapacity() {
+        SystemReadinessMapper mapper = mock(SystemReadinessMapper.class);
+        BatchRoomLockService preflight = mock(BatchRoomLockService.class);
         when(mapper.activeBatches()).thenReturn(List.of(activeBatch(44L, "开放中批次", "OPEN", 9L)));
         when(mapper.participantCount(44L)).thenReturn(500L);
         when(mapper.pendingParticipantCount(44L)).thenReturn(400L);
@@ -90,8 +114,7 @@ class BatchReadinessCheckerTest {
                 "publishable", true,
                 "studentConflictCount", 0));
 
-        ReadinessCheckResult result = new BatchReadinessChecker(mapper, scope, rules, preflight, matching)
-                .check(CONTEXT).getFirst();
+        ReadinessCheckResult result = checker(mapper, preflight).check(CONTEXT).getFirst();
 
         assertFalse(result.blocking());
         assertEquals(ReadinessSeverity.PASS, result.severity());
@@ -103,10 +126,8 @@ class BatchReadinessCheckerTest {
     @Test
     void missingBoundRuleRevisionBlocksWithoutDefaultFallback() {
         SystemReadinessMapper mapper = mock(SystemReadinessMapper.class);
-        BatchScopeService scope = mock(BatchScopeService.class);
         BatchRuleTemplateService rules = mock(BatchRuleTemplateService.class);
         BatchRoomLockService preflight = mock(BatchRoomLockService.class);
-        MatchingSchemeService matching = mock(MatchingSchemeService.class);
         when(mapper.activeBatches()).thenReturn(List.of(activeBatch(43L, "缺规则批次", "PUBLISHED", null)));
         when(mapper.participantCount(43L)).thenReturn(10L);
         when(mapper.pendingParticipantCount(43L)).thenReturn(10L);
@@ -116,7 +137,9 @@ class BatchReadinessCheckerTest {
                 "publishable", true,
                 "studentConflictCount", 0));
 
-        ReadinessCheckResult result = new BatchReadinessChecker(mapper, scope, rules, preflight, matching)
+        ReadinessCheckResult result = new BatchReadinessChecker(
+                mapper, mock(BatchScopeService.class), rules, preflight,
+                mock(MatchingSchemeService.class), mock(BatchSelectionModeGuard.class))
                 .check(CONTEXT).getFirst();
 
         assertTrue(result.blocking());
@@ -128,10 +151,7 @@ class BatchReadinessCheckerTest {
     @Test
     void blocksWhenExistingPublishPreflightRejectsBatch() {
         SystemReadinessMapper mapper = mock(SystemReadinessMapper.class);
-        BatchScopeService scope = mock(BatchScopeService.class);
-        BatchRuleTemplateService rules = mock(BatchRuleTemplateService.class);
         BatchRoomLockService preflight = mock(BatchRoomLockService.class);
-        MatchingSchemeService matching = mock(MatchingSchemeService.class);
         when(mapper.activeBatches()).thenReturn(List.of(activeBatch(7L, "冲突批次", "PAUSED", 2L)));
         when(mapper.participantCount(7L)).thenReturn(100L);
         when(mapper.pendingParticipantCount(7L)).thenReturn(100L);
@@ -141,12 +161,25 @@ class BatchReadinessCheckerTest {
                 "publishable", false,
                 "studentConflictCount", 3));
 
-        ReadinessCheckResult result = new BatchReadinessChecker(mapper, scope, rules, preflight, matching)
-                .check(CONTEXT).getFirst();
+        ReadinessCheckResult result = checker(mapper, preflight).check(CONTEXT).getFirst();
 
         assertTrue(result.blocking());
         assertEquals(Boolean.FALSE, result.evidence().get("publishable"));
         assertEquals(3L, result.evidence().get("studentConflictCount"));
+    }
+
+    private BatchReadinessChecker checker(SystemReadinessMapper mapper) {
+        return checker(mapper, mock(BatchRoomLockService.class));
+    }
+
+    private BatchReadinessChecker checker(SystemReadinessMapper mapper, BatchRoomLockService preflight) {
+        return new BatchReadinessChecker(
+                mapper,
+                mock(BatchScopeService.class),
+                mock(BatchRuleTemplateService.class),
+                preflight,
+                mock(MatchingSchemeService.class),
+                mock(BatchSelectionModeGuard.class));
     }
 
     private Map<String, Object> activeBatch(long id, String name, String status, Long ruleTemplateId) {
