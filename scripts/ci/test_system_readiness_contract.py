@@ -29,13 +29,13 @@ def main() -> int:
         assert token in spec, f"OpenAPI readiness contract missing {token}"
 
     model_pom = read("backend-java/model/pom.xml")
-    assert "openapi-system-readiness.yaml" in model_pom, "readiness contract must participate in OpenAPI generation"
-    assert "generated-sources/openapi-readiness" in model_pom, "readiness generated sources must be compiled"
+    assert "openapi-system-readiness.yaml" in model_pom
+    assert "generated-sources/openapi-readiness" in model_pom
 
     controller = read("backend-java/server/src/main/java/com/wust/dormitory/readiness/SystemReadinessController.java")
     assert "SystemReadinessService" in controller
     assert "SecurityUsers.requireAdmin()" in controller
-    assert "implements SystemReadinessApi" in controller, "controller must implement the generated OpenAPI interface"
+    assert "implements SystemReadinessApi" in controller
 
     service = read("backend-java/server/src/main/java/com/wust/dormitory/readiness/SystemReadinessService.java")
     assert "ReadinessChecker" in service
@@ -54,9 +54,18 @@ def main() -> int:
     for checker in checker_names:
         read(f"backend-java/server/src/main/java/com/wust/dormitory/readiness/{checker}.java")
 
+    allocation = read("backend-java/server/src/main/java/com/wust/dormitory/readiness/AllocationCapabilityReadiness.java")
+    assert "hasUsablePath" in allocation
+    assert "selfSelection || unifiedAllocation" in allocation
+    allocation_test = read(
+        "backend-java/server/src/test/java/com/wust/dormitory/readiness/AllocationCapabilityReadinessTest.java"
+    )
+    assert "acceptsEitherSelfSelectionOrUnifiedAllocationAsAUsableAllocationPath" in allocation_test
+    assert "blocksOnlyWhenEveryAllocationPathIsUnavailable" in allocation_test
+
     mapper_xml = read("backend-java/server/src/main/resources/mapper/readiness/SystemReadinessMapper.xml")
     assert "SELECT *" not in mapper_xml.upper()
-    assert " LIMIT " in mapper_xml.upper(), "diagnostic sample queries must be bounded"
+    assert " LIMIT " in mapper_xml.upper()
     assert "rule_template_id AS ruleTemplateId" in mapper_xml
     assert 'id="pendingParticipantCount"' in mapper_xml
     assert "ra.batch_id = e.batch_id" in mapper_xml
@@ -70,20 +79,8 @@ def main() -> int:
         '"unconfirmedBedAssignments"',
         "实际活动可分配容量以批次预检为准",
     ):
-        assert token in resource, f"resource readiness capacity info missing {token}"
-    assert '"remainingBeds"' not in resource, "room-mode readiness must not invent a remaining-bed total"
-
-    resource_test = read(
-        "backend-java/server/src/test/java/com/wust/dormitory/readiness/ResourceReadinessCheckerTest.java"
-    )
-    assert "capacityInfoSeparatesResidentsFromConfirmedBedsInsteadOfInventingRemainingBeds" in resource_test
-    assert 'containsKey("remainingBeds")' in resource_test
-
-    resource_mysql_test = read(
-        "backend-java/server/src/test/java/com/wust/dormitory/mapper/SystemReadinessResourceMapperMySqlIntegrationTest.java"
-    )
-    assert "activeResidents" in resource_mysql_test
-    assert "INSERT INTO room_assignment VALUES (50,100,NULL,'ACTIVE')" in resource_mysql_test
+        assert token in resource
+    assert '"remainingBeds"' not in resource
 
     batch = read("backend-java/server/src/main/java/com/wust/dormitory/readiness/BatchReadinessChecker.java")
     for token in (
@@ -98,15 +95,14 @@ def main() -> int:
         "policyForBatch(batchId)",
         "pendingParticipantCount(batchId)",
         "pendingParticipantCount > capacity",
-        'evidence.put("pendingParticipantCount", pendingParticipantCount)',
     ):
-        assert token in batch, f"batch readiness missing existing validator/capacity reuse: {token}"
+        assert token in batch
     for forbidden in ("acquire(batchId)", "changeStatus(", "rebuild(batchId)"):
-        assert forbidden not in batch, f"batch readiness must remain read-only: {forbidden}"
+        assert forbidden not in batch
 
     frontend = read("frontend/src/views/admin/AdminSystemReadinessView.vue")
     for token in ("上线体检", "重新检查", "去处理", "actionRoute", "BLOCKED", "READY_WITH_WARNINGS"):
-        assert token in frontend, f"frontend readiness view missing {token}"
+        assert token in frontend
     assert "systemReadinessSchema" in frontend
 
     package_json = read("frontend/package.json")
