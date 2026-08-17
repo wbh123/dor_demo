@@ -25,6 +25,6 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: '22'
-      - name: Reproduce strict scanner keyboard overlap contract
+      - name: Verify scanner keyboard-safe confirmation contract
         working-directory: private-repo/app
         run: node --experimental-strip-types --test src/platform/native-scanner-keyboard-contract.spec.ts
