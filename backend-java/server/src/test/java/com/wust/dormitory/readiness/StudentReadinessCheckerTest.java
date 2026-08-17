@@ -74,7 +74,8 @@ class StudentReadinessCheckerTest {
                 "missingMajorMapping", 1L,
                 "invalidDegreeLevel", 1L,
                 "invalidGender", 1L));
-        when(mapper.studentIssueSamples(10)).thenReturn(List.of("202600000001"));
+        when(mapper.studentIssueSamples(10)).thenReturn(List.of(Map.of(
+                "studentNumber", "202600000001")));
 
         ReadinessCheckResult quality = new StudentReadinessChecker(mapper).check(CONTEXT).getFirst();
 
