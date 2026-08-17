@@ -5,6 +5,7 @@ import com.wust.dormitory.admin.BatchScopeService;
 import com.wust.dormitory.matching.MatchingSchemeService;
 import com.wust.dormitory.readiness.mapper.SystemReadinessMapper;
 import com.wust.dormitory.residency.BatchRoomLockService;
+import com.wust.dormitory.selection.BatchSelectionModeGuard;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -19,18 +20,21 @@ public class BatchReadinessChecker implements ReadinessChecker {
     private final BatchRuleTemplateService batchRuleTemplateService;
     private final BatchRoomLockService batchRoomLockService;
     private final MatchingSchemeService matchingSchemeService;
+    private final BatchSelectionModeGuard selectionModeGuard;
 
     public BatchReadinessChecker(
             SystemReadinessMapper mapper,
             BatchScopeService batchScopeService,
             BatchRuleTemplateService batchRuleTemplateService,
             BatchRoomLockService batchRoomLockService,
-            MatchingSchemeService matchingSchemeService) {
+            MatchingSchemeService matchingSchemeService,
+            BatchSelectionModeGuard selectionModeGuard) {
         this.mapper = mapper;
         this.batchScopeService = batchScopeService;
         this.batchRuleTemplateService = batchRuleTemplateService;
         this.batchRoomLockService = batchRoomLockService;
         this.matchingSchemeService = matchingSchemeService;
+        this.selectionModeGuard = selectionModeGuard;
     }
 
     @Override
@@ -75,6 +79,7 @@ public class BatchReadinessChecker implements ReadinessChecker {
                 ? CheckAttempt.failed("RULE_TEMPLATE_NOT_BOUND")
                 : attempt(() -> batchRuleTemplateService.resolveForBatch(ruleTemplateId));
         CheckAttempt matchingAttempt = attempt(() -> matchingSchemeService.policyForBatch(batchId));
+        CheckAttempt selectionModeAttempt = attempt(() -> selectionModeGuard.requireBedModeForPublish(batchId));
 
         Map<String, Object> preview = Map.of();
         CheckAttempt preflightAttempt;
@@ -93,6 +98,7 @@ public class BatchReadinessChecker implements ReadinessChecker {
         boolean blocked = !scopeAttempt.success()
                 || !ruleAttempt.success()
                 || !matchingAttempt.success()
+                || !selectionModeAttempt.success()
                 || !publishable
                 || capacityShortage;
 
@@ -113,10 +119,12 @@ public class BatchReadinessChecker implements ReadinessChecker {
             evidence.put("ruleTemplateId", ruleTemplateId);
         }
         evidence.put("matchingSchemeValid", matchingAttempt.success());
+        evidence.put("selectionModeAvailable", selectionModeAttempt.success());
         evidence.put("publishable", publishable);
         putFailure(evidence, "scopeCheckError", scopeAttempt);
         putFailure(evidence, "ruleCheckError", ruleAttempt);
         putFailure(evidence, "matchingCheckError", matchingAttempt);
+        putFailure(evidence, "selectionModeCheckError", selectionModeAttempt);
         putFailure(evidence, "publishPrecheckError", preflightAttempt);
 
         return ReadinessCheckResult.of(
@@ -128,7 +136,7 @@ public class BatchReadinessChecker implements ReadinessChecker {
                 blocked ? "FAILED" : "PASSED",
                 blocked ? "批次“" + name + "”当前不满足开放条件。" : "批次“" + name + "”通过只读发布预检。",
                 evidence,
-                blocked ? "前往批次管理修正范围、规则修订、容量、匹配方案或冲突后重新检查" : null,
+                blocked ? "前往批次管理修正范围、规则修订、选择模式授权、容量、匹配方案或冲突后重新检查" : null,
                 "/admin/batches",
                 context.checkedAt());
     }
