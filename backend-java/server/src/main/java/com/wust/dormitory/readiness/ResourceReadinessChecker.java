@@ -87,15 +87,15 @@ public class ResourceReadinessChecker implements ReadinessChecker {
                 ReadinessSeverity.INFO,
                 false,
                 "INFO",
-                "当前可用物理床位 " + capacity.availableBeds() + " 个；正式在住占用 " + capacity.occupiedBeds()
-                        + " 人；剩余资源容量 " + capacity.remainingBeds() + " 人。其中已确认床位 "
-                        + capacity.confirmedBedAssignments() + " 人、未确认床位 " + capacity.unconfirmedBedAssignments()
+                "当前可用物理床位 " + capacity.availableBeds() + " 个；正式在住 " + capacity.activeResidents()
+                        + " 人；已占用具体床位 " + capacity.occupiedBeds() + " 个；剩余资源容量 "
+                        + capacity.remainingBeds() + " 人；未确认具体床位 " + capacity.unconfirmedBedAssignments()
                         + " 人。实际活动可分配容量仍以批次预检为准。",
                 Map.of(
                         "availableBeds", capacity.availableBeds(),
+                        "activeResidents", capacity.activeResidents(),
                         "occupiedBeds", capacity.occupiedBeds(),
                         "remainingBeds", capacity.remainingBeds(),
-                        "confirmedBedAssignments", capacity.confirmedBedAssignments(),
                         "unconfirmedBedAssignments", capacity.unconfirmedBedAssignments(),
                         "enabledBedRecords", enabledBedRecords),
                 null,
@@ -120,13 +120,13 @@ public class ResourceReadinessChecker implements ReadinessChecker {
     }
 
     private CapacitySummary capacitySummary(List<RoomOccupancySnapshotRow> snapshots) {
-        long availableBeds = 0;
-        long occupiedBeds = 0;
+        long activeResidents = 0;
         long unconfirmedBedAssignments = 0;
+        long availableBeds = 0;
         long remainingBeds = 0;
         long overCapacityRooms = 0;
         for (RoomOccupancySnapshotRow snapshot : snapshots) {
-            occupiedBeds += snapshot.activeResidents();
+            activeResidents += snapshot.activeResidents();
             unconfirmedBedAssignments += snapshot.unknownBeds();
             if (snapshot.activeResidents() > snapshot.capacity()) {
                 overCapacityRooms++;
@@ -136,12 +136,12 @@ public class ResourceReadinessChecker implements ReadinessChecker {
                 remainingBeds += Math.min(snapshot.availableBeds(), snapshot.remainingCapacity());
             }
         }
-        long confirmedBedAssignments = Math.max(0, occupiedBeds - unconfirmedBedAssignments);
+        long occupiedBeds = Math.max(0, activeResidents - unconfirmedBedAssignments);
         return new CapacitySummary(
                 availableBeds,
+                activeResidents,
                 occupiedBeds,
                 remainingBeds,
-                confirmedBedAssignments,
                 unconfirmedBedAssignments,
                 overCapacityRooms);
     }
@@ -161,9 +161,9 @@ public class ResourceReadinessChecker implements ReadinessChecker {
 
     private record CapacitySummary(
             long availableBeds,
+            long activeResidents,
             long occupiedBeds,
             long remainingBeds,
-            long confirmedBedAssignments,
             long unconfirmedBedAssignments,
             long overCapacityRooms) {
     }
