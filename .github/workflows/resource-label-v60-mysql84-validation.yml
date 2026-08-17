@@ -44,4 +44,4 @@ jobs:
       - name: Install validation dependency
         run: python -m pip install --disable-pip-version-check pymysql==1.1.1
       - name: Validate V60 lifecycle on MySQL 8.4
-        run: python validation/resource-label/test_v60_mysql84.py
+        run: python validation/resource-label/run_v60_mysql84.py
