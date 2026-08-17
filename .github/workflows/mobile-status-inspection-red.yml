@@ -1,4 +1,4 @@
-name: Mobile Status Inspection RED
+name: Mobile Status Inspection Verification
 
 on:
   push:
@@ -9,9 +9,9 @@ permissions:
   contents: read
 
 jobs:
-  red-contract:
+  verify-mobile:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     steps:
       - name: Checkout private candidate
         uses: actions/checkout@v5
@@ -29,6 +29,9 @@ jobs:
       - name: Install mobile dependencies
         working-directory: private-repo/app
         run: npm ci
-      - name: Verify regression tests are red before implementation
+      - name: Run full mobile tests
         working-directory: private-repo/app
-        run: node --experimental-strip-types --test src/platform/mobile-dashboard-color-contract.spec.ts src/platform/inspection-navigation.spec.ts
+        run: npm test
+      - name: Build mobile web bundle
+        working-directory: private-repo/app
+        run: npm run build
