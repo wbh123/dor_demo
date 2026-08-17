@@ -1,1 +1,1 @@
-resource-label-print-entry-full-validation
+resource-label-print-entry-full-validation-diagnostics
