@@ -2,9 +2,11 @@ package com.wust.dormitory.security;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class AuthorizationDecisionTest {
 
@@ -98,12 +100,17 @@ class AuthorizationDecisionTest {
                 "客户端满足岗位授权约束",
                 "AUTHORIZATION_PROFILE",
                 null);
+        List<AuthorizationDecisionStep> mutable = new ArrayList<>();
+        mutable.add(step);
 
         AuthorizationDecision decision = new AuthorizationDecision(
                 AuthorizationDecisionStatus.ALLOWED,
                 "ALLOWED",
-                List.of(step));
+                mutable);
+        mutable.clear();
 
-        assertThat(decision.steps()).isUnmodifiable();
+        assertThat(decision.steps()).containsExactly(step);
+        assertThatThrownBy(() -> decision.steps().add(step))
+                .isInstanceOf(UnsupportedOperationException.class);
     }
 }
