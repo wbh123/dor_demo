@@ -71,18 +71,18 @@ class BatchReadinessCheckerTest {
         verify(rules).resolveForBatch(9L);
         verify(preflight).preview(42L);
         verify(matching).policyForBatch(42L);
-        verify(modeGuard).requireBedModeForPublish(42L);
+        verify(modeGuard).requireModeAvailableForExistingBatch(42L);
     }
 
     @Test
-    void blocksWhenExistingSelectionModeEntitlementIsUnavailable() {
+    void blocksWhenExistingBatchContinuationEntitlementIsUnavailable() {
         SystemReadinessMapper mapper = mock(SystemReadinessMapper.class);
         BatchScopeService scope = mock(BatchScopeService.class);
         BatchRuleTemplateService rules = mock(BatchRuleTemplateService.class);
         BatchRoomLockService preflight = mock(BatchRoomLockService.class);
         MatchingSchemeService matching = mock(MatchingSchemeService.class);
         BatchSelectionModeGuard modeGuard = mock(BatchSelectionModeGuard.class);
-        when(mapper.activeBatches()).thenReturn(List.of(activeBatch(45L, "床位模式批次", "PUBLISHED", 9L)));
+        when(mapper.activeBatches()).thenReturn(List.of(activeBatch(45L, "床位模式批次", "OPEN", 9L)));
         when(mapper.participantCount(45L)).thenReturn(20L);
         when(mapper.pendingParticipantCount(45L)).thenReturn(20L);
         when(preflight.preview(45L)).thenReturn(Map.of(
@@ -90,8 +90,8 @@ class BatchReadinessCheckerTest {
                 "availableCapacity", 20,
                 "publishable", true,
                 "studentConflictCount", 0));
-        doThrow(new IllegalStateException("bed mode feature revoked"))
-                .when(modeGuard).requireBedModeForPublish(45L);
+        doThrow(new IllegalStateException("batch entitlement snapshot unavailable"))
+                .when(modeGuard).requireModeAvailableForExistingBatch(45L);
 
         ReadinessCheckResult result = new BatchReadinessChecker(mapper, scope, rules, preflight, matching, modeGuard)
                 .check(CONTEXT).getFirst();
