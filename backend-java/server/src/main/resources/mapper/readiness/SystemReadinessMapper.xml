@@ -82,4 +82,18 @@
         WHERE batch_id = #{batchId}
           AND eligibility_status = 'ELIGIBLE'
     </select>
+
+    <select id="pendingParticipantCount" resultType="long">
+        SELECT COUNT(*)
+        FROM batch_student_eligibility e
+        WHERE e.batch_id = #{batchId}
+          AND e.eligibility_status = 'ELIGIBLE'
+          AND NOT EXISTS (
+              SELECT 1
+              FROM room_assignment ra
+              WHERE ra.batch_id = e.batch_id
+                AND ra.student_id = e.student_id
+                AND ra.assignment_status = 'ACTIVE'
+          )
+    </select>
 </mapper>

@@ -68,6 +68,7 @@ public class BatchReadinessChecker implements ReadinessChecker {
         String status = String.valueOf(batch.get("batchStatus"));
         Long ruleTemplateId = nullableLong(batch.get("ruleTemplateId"));
         long participantCount = mapper.participantCount(batchId);
+        long pendingParticipantCount = mapper.pendingParticipantCount(batchId);
 
         CheckAttempt scopeAttempt = attempt(() -> batchScopeService.requireReady(batchId));
         CheckAttempt ruleAttempt = ruleTemplateId == null
@@ -88,7 +89,7 @@ public class BatchReadinessChecker implements ReadinessChecker {
         long capacity = number(preview.get("availableCapacity"));
         long studentConflictCount = number(preview.get("studentConflictCount"));
         boolean publishable = preflightAttempt.success() && Boolean.TRUE.equals(preview.get("publishable"));
-        boolean capacityShortage = participantCount > capacity;
+        boolean capacityShortage = pendingParticipantCount > capacity;
         boolean blocked = !scopeAttempt.success()
                 || !ruleAttempt.success()
                 || !matchingAttempt.success()
@@ -100,6 +101,7 @@ public class BatchReadinessChecker implements ReadinessChecker {
         evidence.put("batchName", name);
         evidence.put("batchStatus", status);
         evidence.put("participantCount", participantCount);
+        evidence.put("pendingParticipantCount", pendingParticipantCount);
         evidence.put("openRoomCount", roomCount);
         evidence.put("availableCapacity", capacity);
         evidence.put("capacityShortage", capacityShortage);

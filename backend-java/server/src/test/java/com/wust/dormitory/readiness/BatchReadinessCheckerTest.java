@@ -11,7 +11,9 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -20,6 +22,11 @@ import static org.mockito.Mockito.when;
 
 class BatchReadinessCheckerTest {
     private static final ReadinessContext CONTEXT = new ReadinessContext(Instant.parse("2026-08-17T05:00:00Z"));
+
+    @Test
+    void exposesPendingParticipantCountForRemainingCapacityChecks() {
+        assertDoesNotThrow(() -> SystemReadinessMapper.class.getDeclaredMethod("pendingParticipantCount", long.class));
+    }
 
     @Test
     void noActiveBatchIsInformational() {
@@ -38,7 +45,7 @@ class BatchReadinessCheckerTest {
     }
 
     @Test
-    void blocksWhenParticipantsExceedOpenCapacityAndReusesExistingValidators() {
+    void blocksWhenPendingParticipantsExceedRemainingCapacityAndReusesExistingValidators() {
         SystemReadinessMapper mapper = mock(SystemReadinessMapper.class);
         BatchScopeService scope = mock(BatchScopeService.class);
         BatchRuleTemplateService rules = mock(BatchRuleTemplateService.class);
@@ -46,6 +53,7 @@ class BatchReadinessCheckerTest {
         MatchingSchemeService matching = mock(MatchingSchemeService.class);
         when(mapper.activeBatches()).thenReturn(List.of(activeBatch(42L, "2026 新生第一批", "PUBLISHED", 9L)));
         when(mapper.participantCount(42L)).thenReturn(500L);
+        when(mapper.pendingParticipantCount(42L)).thenReturn(500L);
         when(preflight.preview(42L)).thenReturn(Map.of(
                 "roomCount", 80,
                 "availableCapacity", 480,
@@ -67,6 +75,32 @@ class BatchReadinessCheckerTest {
     }
 
     @Test
+    void openBatchUsesOnlyStillUnassignedParticipantsForRemainingCapacity() {
+        SystemReadinessMapper mapper = mock(SystemReadinessMapper.class);
+        BatchScopeService scope = mock(BatchScopeService.class);
+        BatchRuleTemplateService rules = mock(BatchRuleTemplateService.class);
+        BatchRoomLockService preflight = mock(BatchRoomLockService.class);
+        MatchingSchemeService matching = mock(MatchingSchemeService.class);
+        when(mapper.activeBatches()).thenReturn(List.of(activeBatch(44L, "开放中批次", "OPEN", 9L)));
+        when(mapper.participantCount(44L)).thenReturn(500L);
+        when(mapper.pendingParticipantCount(44L)).thenReturn(400L);
+        when(preflight.preview(44L)).thenReturn(Map.of(
+                "roomCount", 80,
+                "availableCapacity", 400,
+                "publishable", true,
+                "studentConflictCount", 0));
+
+        ReadinessCheckResult result = new BatchReadinessChecker(mapper, scope, rules, preflight, matching)
+                .check(CONTEXT).getFirst();
+
+        assertFalse(result.blocking());
+        assertEquals(ReadinessSeverity.PASS, result.severity());
+        assertEquals(500L, result.evidence().get("participantCount"));
+        assertEquals(400L, result.evidence().get("pendingParticipantCount"));
+        assertEquals(Boolean.FALSE, result.evidence().get("capacityShortage"));
+    }
+
+    @Test
     void missingBoundRuleRevisionBlocksWithoutDefaultFallback() {
         SystemReadinessMapper mapper = mock(SystemReadinessMapper.class);
         BatchScopeService scope = mock(BatchScopeService.class);
@@ -75,6 +109,7 @@ class BatchReadinessCheckerTest {
         MatchingSchemeService matching = mock(MatchingSchemeService.class);
         when(mapper.activeBatches()).thenReturn(List.of(activeBatch(43L, "缺规则批次", "PUBLISHED", null)));
         when(mapper.participantCount(43L)).thenReturn(10L);
+        when(mapper.pendingParticipantCount(43L)).thenReturn(10L);
         when(preflight.preview(43L)).thenReturn(Map.of(
                 "roomCount", 4,
                 "availableCapacity", 20,
@@ -99,6 +134,7 @@ class BatchReadinessCheckerTest {
         MatchingSchemeService matching = mock(MatchingSchemeService.class);
         when(mapper.activeBatches()).thenReturn(List.of(activeBatch(7L, "冲突批次", "PAUSED", 2L)));
         when(mapper.participantCount(7L)).thenReturn(100L);
+        when(mapper.pendingParticipantCount(7L)).thenReturn(100L);
         when(preflight.preview(7L)).thenReturn(Map.of(
                 "roomCount", 20,
                 "availableCapacity", 120,
