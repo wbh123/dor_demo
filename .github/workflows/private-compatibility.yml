@@ -53,4 +53,4 @@ jobs:
 
       - name: Run force update gate contract
         working-directory: private-repo/app
-        run: node --test --import tsx src/platform/app-update-gate.spec.ts
+        run: node --experimental-strip-types --test src/platform/app-update-gate.spec.ts
