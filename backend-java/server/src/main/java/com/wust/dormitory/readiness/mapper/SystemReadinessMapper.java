@@ -14,6 +14,8 @@ public interface SystemReadinessMapper {
 
     Map<String, Object> resourceSummary();
 
+    List<Long> resourceRoomIds();
+
     Map<String, Object> studentSummary();
 
     List<Map<String, Object>> studentIssueSamples(@Param("limit") int limit);
