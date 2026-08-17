@@ -89,6 +89,16 @@ public class BatchSelectionModeGuard {
         }
     }
 
+    public void requireModeAvailableForExistingBatch(long batchId) {
+        String mode = mode(batchId);
+        if (BED.equals(mode)) {
+            featureAccessService.require(
+                    FeatureCodes.P2_BED_SELECTION_MODE,
+                    AccessMode.CONTINUE_EXISTING_BATCH,
+                    batchId);
+        }
+    }
+
     private BusinessException mismatch(String message) {
         return new BusinessException(
                 "BATCH_SELECTION_MODE_MISMATCH",
