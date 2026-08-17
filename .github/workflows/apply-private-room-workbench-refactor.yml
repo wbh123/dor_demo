@@ -1,0 +1,90 @@
+name: Apply Private Room Workbench Refactor
+
+on:
+  push:
+    branches:
+      - 'private-compat/fix/mobile-room-workbench-default-spacing-20260817'
+
+jobs:
+  apply:
+    if: startsWith(github.event.head_commit.message, 'ci: apply private room workbench refactor')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout private branch with write token
+        uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: fix/mobile-room-workbench-default-spacing-20260817
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: true
+          fetch-depth: 0
+
+      - name: Refactor room workbench layout and cascade selection
+        working-directory: private-repo
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('app/src/views/RoomWorkbenchEntryView.vue')
+          text = path.read_text()
+
+          def replace_once(old: str, new: str):
+              global text
+              if old not in text:
+                  raise SystemExit(f'expected source fragment not found: {old[:120]!r}')
+              text = text.replace(old, new, 1)
+
+          replace_once(
+              "type RoomWorkbenchSegment = 'priority' | 'all'\n",
+              "type RoomWorkbenchSegment = 'priority' | 'all'\ntype SelectFieldHandle = { openPicker: () => void }\n",
+          )
+          replace_once(
+              "const roomScrollRef = ref<HTMLElement | null>(null)\n",
+              "const roomScrollRef = ref<HTMLElement | null>(null)\nconst buildingFieldRef = ref<SelectFieldHandle | null>(null)\nconst floorFieldRef = ref<SelectFieldHandle | null>(null)\n",
+          )
+          replace_once(
+              "function draftCampusChanged() {\n  draftBuildingId.value = draftBuildings.value[0]?.id\n  draftFloorNumber.value = floorsFromRooms(roomOptions.value, draftBuildingId.value)[0]\n  draftRoomKeyword.value = ''\n}\n",
+              "function draftCampusChanged() {\n  draftBuildingId.value = undefined\n  draftFloorNumber.value = undefined\n  draftRoomKeyword.value = ''\n}\n",
+          )
+          replace_once(
+              "function draftBuildingChanged() {\n  draftFloorNumber.value = draftFloors.value[0]\n  draftRoomKeyword.value = ''\n}\n",
+              "function draftBuildingChanged() {\n  draftFloorNumber.value = undefined\n  draftRoomKeyword.value = ''\n}\n",
+          )
+          replace_once(
+              "function draftFloorChanged() {\n  draftRoomKeyword.value = ''\n}\n",
+              "function draftFloorChanged() {\n  draftRoomKeyword.value = ''\n}\n\nfunction openBuildingPicker() {\n  buildingFieldRef.value?.openPicker()\n}\n\nfunction openFloorPicker() {\n  floorFieldRef.value?.openPicker()\n}\n",
+          )
+          replace_once(
+              '<AppSelectField v-model="draftCampusModel" label="校区" picker-title="选择校区" :options="campusPickerOptions" :loading="loadingDirectory" :disabled="!campuses.length" />',
+              '<AppSelectField v-model="draftCampusModel" label="校区" picker-title="选择校区" :options="campusPickerOptions" :loading="loadingDirectory" :disabled="!campuses.length" @selected="openBuildingPicker" />',
+          )
+          replace_once(
+              '<AppSelectField v-model="draftBuildingModel" label="楼栋" picker-title="选择楼栋" :options="buildingPickerOptions" :disabled="draftCampusId == null || !draftBuildings.length" />',
+              '<AppSelectField ref="buildingFieldRef" v-model="draftBuildingModel" label="楼栋" picker-title="选择楼栋" :options="buildingPickerOptions" :disabled="draftCampusId == null || !draftBuildings.length" @selected="openFloorPicker" />',
+          )
+          replace_once(
+              '<AppSelectField v-model="draftFloorModel" label="楼层" picker-title="选择楼层" :options="floorPickerOptions" :disabled="draftBuildingId == null || !draftFloors.length" />',
+              '<AppSelectField ref="floorFieldRef" v-model="draftFloorModel" label="楼层" picker-title="选择楼层" :options="floorPickerOptions" :disabled="draftBuildingId == null || !draftFloors.length" />',
+          )
+          replace_once('overscroll-behavior:none;padding-bottom:0!important}.room-workbench-shell', 'overscroll-behavior:none}.room-workbench-shell')
+          replace_once('min-height:0;overflow:hidden;padding-top:8px}.location-toolbar', 'min-height:0;overflow:hidden}.location-toolbar')
+          replace_once(
+              ':global(.phone-shell.has-global-header) .workbench-viewport-page{position:static;width:auto;height:calc(100dvh - 46px - var(--safe-top) - 62px - var(--safe-bottom))!important;min-height:0!important;padding:6px 12px 0!important;overflow:hidden;overscroll-behavior:none}',
+              ':global(.phone-shell.has-global-header) .workbench-viewport-page{height:calc(100dvh - 46px - var(--safe-top))!important;min-height:0!important;overflow:hidden;overscroll-behavior:none}',
+          )
+
+          path.write_text(text)
+          PY
+
+          git diff --check
+          git diff -- app/src/views/RoomWorkbenchEntryView.vue
+
+      - name: Commit and push private refactor
+        working-directory: private-repo
+        run: |
+          git config user.name 'OpenAI'
+          git config user.email 'noreply@openai.com'
+          git add app/src/views/RoomWorkbenchEntryView.vue
+          git commit -m 'refactor(app): restore room workbench default spacing and cascade selection'
+          git push origin HEAD:fix/mobile-room-workbench-default-spacing-20260817
