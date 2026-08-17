@@ -59,23 +59,34 @@ class ResourceReadinessCheckerTest {
     }
 
     @Test
-    void passesHealthyResourcesAndReportsCapacity() {
+    void capacityInfoSeparatesResidentsFromConfirmedBedsInsteadOfInventingRemainingBeds() {
         SystemReadinessMapper mapper = mock(SystemReadinessMapper.class);
-        when(mapper.resourceSummary()).thenReturn(Map.of(
-                "campuses", 2L,
-                "buildings", 8L,
-                "rooms", 120L,
-                "validBeds", 600L,
-                "occupiedBeds", 180L,
-                "roomsWithoutBeds", 0L,
-                "enabledRoomsWithoutBeds", 0L,
-                "capacityMismatchRooms", 0L,
-                "invalidRelations", 0L));
+        when(mapper.resourceSummary()).thenReturn(Map.ofEntries(
+                Map.entry("campuses", 2L),
+                Map.entry("buildings", 8L),
+                Map.entry("rooms", 120L),
+                Map.entry("validBeds", 600L),
+                Map.entry("occupiedBeds", 180L),
+                Map.entry("activeResidents", 200L),
+                Map.entry("unconfirmedResidents", 20L),
+                Map.entry("roomsWithoutBeds", 0L),
+                Map.entry("enabledRoomsWithoutBeds", 0L),
+                Map.entry("capacityMismatchRooms", 0L),
+                Map.entry("invalidRelations", 0L)));
 
         List<ReadinessCheckResult> results = new ResourceReadinessChecker(mapper).check(CONTEXT);
 
         assertFalse(results.stream().anyMatch(ReadinessCheckResult::blocking));
-        ReadinessCheckResult capacity = results.stream().filter(item -> item.code().equals("BED_CAPACITY")).findFirst().orElseThrow();
-        assertTrue(capacity.summary().contains("剩余 420 个"));
+        ReadinessCheckResult capacity = results.stream()
+                .filter(item -> item.code().equals("BED_CAPACITY"))
+                .findFirst().orElseThrow();
+        assertTrue(capacity.summary().contains("正式在住 200 人"));
+        assertTrue(capacity.summary().contains("已确认床位 180 人"));
+        assertTrue(capacity.summary().contains("未确认床位 20 人"));
+        assertEquals(600L, capacity.evidence().get("enabledBeds"));
+        assertEquals(200L, capacity.evidence().get("activeResidents"));
+        assertEquals(180L, capacity.evidence().get("confirmedBedAssignments"));
+        assertEquals(20L, capacity.evidence().get("unconfirmedBedAssignments"));
+        assertFalse(capacity.evidence().containsKey("remainingBeds"));
     }
 }
