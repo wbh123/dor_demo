@@ -1,0 +1,42 @@
+name: Private Mobile Fast Contract
+
+on:
+  push:
+    branches:
+      - 'private-compat/**'
+
+permissions:
+  contents: read
+
+jobs:
+  mobile-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Resolve private branch
+        id: target
+        shell: bash
+        run: |
+          set -euo pipefail
+          candidate="$GITHUB_REF_NAME"
+          private_ref="${candidate#private-compat/}"
+          echo "private_ref=$private_ref" >> "$GITHUB_OUTPUT"
+      - name: Checkout private ref
+        uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: ${{ steps.target.outputs.private_ref }}
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: private-repo/app/package-lock.json
+      - name: Install dependencies
+        working-directory: private-repo/app
+        run: npm ci --no-audit --no-fund
+      - name: Run print-entry contract
+        working-directory: private-repo/app
+        run: node --import tsx --test src/platform/mobile-label-tools-navigation.spec.ts
