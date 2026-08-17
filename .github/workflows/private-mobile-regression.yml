@@ -1,0 +1,64 @@
+name: Private Mobile Regression CI
+
+on:
+  push:
+    branches:
+      - 'private-mobile/fix-app-student-workbench-overlay-dark-20260817'
+
+permissions:
+  contents: read
+
+jobs:
+  verify-private-mobile:
+    name: Verify private mobile APP
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout private APP branch
+        uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: fix/app-student-workbench-overlay-dark-20260817
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: false
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: private-repo/app/package-lock.json
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Install APP dependencies
+        working-directory: private-repo/app
+        run: npm ci
+
+      - name: Verify APP version sources
+        working-directory: private-repo/app
+        run: npm run version:check
+
+      - name: Run APP tests
+        working-directory: private-repo/app
+        run: npm test
+
+      - name: Typecheck APP
+        working-directory: private-repo/app
+        run: npm run typecheck
+
+      - name: Build APP
+        working-directory: private-repo/app
+        run: npm run build
+
+      - name: Sync Android project
+        working-directory: private-repo/app
+        run: npx cap sync android
+
+      - name: Build Android debug APK
+        working-directory: private-repo/app/android
+        run: ./gradlew assembleDebug
