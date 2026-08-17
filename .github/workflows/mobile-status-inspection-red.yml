@@ -11,7 +11,7 @@ permissions:
 jobs:
   verify-mobile:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - name: Checkout private candidate
         uses: actions/checkout@v5
@@ -25,6 +25,26 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: '22'
+          cache: npm
+          cache-dependency-path: private-repo/app/package-lock.json
+      - name: Install mobile dependencies
+        working-directory: private-repo/app
+        run: npm ci
+      - name: Fetch latest private main
+        working-directory: private-repo
+        run: git fetch --no-tags origin main:refs/remotes/origin/main
+      - name: Check mobile version source consistency
+        working-directory: private-repo/app
+        run: node scripts/check-version-sync.mjs
+      - name: Require mobile version bump
+        working-directory: private-repo/app
+        run: node scripts/check-version-bump.mjs origin/main
       - name: Verify tablet viewport regressions after fix
         working-directory: private-repo/app
         run: node --experimental-strip-types --test src/platform/account-identity-menu.spec.ts src/platform/tablet-responsive-layout.spec.ts
+      - name: Run full mobile tests
+        working-directory: private-repo/app
+        run: npm test
+      - name: Build mobile web bundle
+        working-directory: private-repo/app
+        run: npm run build
