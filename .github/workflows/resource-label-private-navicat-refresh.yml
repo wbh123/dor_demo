@@ -1,0 +1,62 @@
+name: Resource Label Private Navicat Refresh
+
+on:
+  push:
+    branches:
+      - 'test/resource-label-lifecycle-*'
+    paths:
+      - '.github/workflows/resource-label-private-navicat-refresh.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout private resource-label hotfix
+        uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: fix/resource-label-mobile-contracts-20260817
+          token: ${{ secrets.PRIVATE_CI }}
+          persist-credentials: true
+          fetch-depth: 1
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Record committed-output freshness before generation
+        id: before
+        shell: bash
+        run: |
+          set +e
+          python scripts/db/generate_navicat_sql.py --scenario realistic --check
+          status=$?
+          set -e
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+      - name: Generate realistic Navicat SQL with the official generator
+        run: python scripts/db/generate_navicat_sql.py --scenario realistic --skip-redis
+      - name: Verify generated output
+        run: |
+          python scripts/db/generate_navicat_sql.py --scenario realistic --check
+          git diff --name-only
+          unexpected=$(git diff --name-only | grep -v '^backend-java/docs/sql/navicat/generated/00_一键重置数据库.sql$' || true)
+          test -z "$unexpected"
+      - name: Commit generated SQL back to private hotfix branch when stale
+        if: steps.before.outputs.status != '0'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add backend-java/docs/sql/navicat/generated/00_一键重置数据库.sql
+          git diff --cached --quiet && exit 0
+          git commit -m 'chore: regenerate Navicat SQL through V60'
+          git push origin HEAD:fix/resource-label-mobile-contracts-20260817
+      - name: Confirm final committed generation state
+        shell: bash
+        run: |
+          python scripts/db/generate_navicat_sql.py --scenario realistic --check
+          grep -n 'V60__add_resource_label_replacement_lifecycle.sql' backend-java/docs/sql/navicat/generated/00_一键重置数据库.sql
+          grep -n 'CREATE TABLE resource_label_replacement' backend-java/docs/sql/navicat/generated/00_一键重置数据库.sql
