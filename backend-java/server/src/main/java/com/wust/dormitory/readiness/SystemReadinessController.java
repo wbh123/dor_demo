@@ -5,8 +5,7 @@ import com.wust.dormitory.security.SecurityUsers;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.time.ZoneOffset;
-import java.util.List;
+import java.util.Date;
 
 @RestController
 public class SystemReadinessController implements SystemReadinessApi {
@@ -27,7 +26,7 @@ public class SystemReadinessController implements SystemReadinessApi {
                 new com.wust.dormitory.model.readiness.dto.SystemReadinessReport();
         dto.setOverallStatus(com.wust.dormitory.model.readiness.dto.SystemReadinessReport.OverallStatusEnum
                 .fromValue(report.overallStatus().name()));
-        dto.setCheckedAt(report.checkedAt().atOffset(ZoneOffset.UTC));
+        dto.setCheckedAt(Date.from(report.checkedAt()));
         dto.setSummary(toApi(report.summary()));
         dto.setCategories(report.categories());
         dto.setChecks(report.checks().stream().map(this::toApi).toList());
@@ -60,7 +59,7 @@ public class SystemReadinessController implements SystemReadinessApi {
         dto.setEvidence(result.evidence());
         dto.setSuggestedAction(result.suggestedAction());
         dto.setActionRoute(result.actionRoute());
-        dto.setCheckedAt(result.checkedAt().atOffset(ZoneOffset.UTC));
+        dto.setCheckedAt(Date.from(result.checkedAt()));
         return dto;
     }
 }
