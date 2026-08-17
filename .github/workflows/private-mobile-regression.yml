@@ -20,7 +20,7 @@ jobs:
           ref: agent/mobile-label-reprint-scan-workbench-regressions
           token: ${{ secrets.PRIVATE_CI }}
           path: private-repo
-          persist-credentials: false
+          persist-credentials: true
           fetch-depth: 0
 
       - uses: actions/setup-node@v6
@@ -36,13 +36,21 @@ jobs:
           cache: maven
           cache-dependency-path: private-repo/backend-java/pom.xml
 
+      - name: Fetch private main for version guard
+        working-directory: private-repo
+        run: git fetch --no-tags origin main:refs/remotes/origin/main
+
       - name: Install APP dependencies
         working-directory: private-repo/app
         run: npm install --no-audit --no-fund
 
-      - name: Verify APP version
+      - name: Verify APP version source consistency
         working-directory: private-repo/app
-        run: npm run version:check
+        run: node scripts/check-version-sync.mjs
+
+      - name: Verify APP version bump from main
+        working-directory: private-repo/app
+        run: node scripts/check-version-bump.mjs origin/main
 
       - name: Run APP regression tests
         working-directory: private-repo/app
