@@ -17,6 +17,7 @@
             (SELECT COUNT(*) FROM dormitory_building) AS buildings,
             (SELECT COUNT(*) FROM room) AS rooms,
             (SELECT COUNT(*) FROM bed WHERE operational_status = 'ENABLED') AS validBeds,
+            (SELECT COUNT(*) FROM room_assignment WHERE assignment_status = 'ACTIVE') AS activeResidents,
             (SELECT COUNT(*) FROM room_assignment WHERE assignment_status = 'ACTIVE' AND bed_id IS NOT NULL) AS occupiedBeds,
             (SELECT COUNT(*) FROM room r
              WHERE NOT EXISTS (SELECT 1 FROM bed b WHERE b.room_id = r.id AND b.operational_status != 'RETIRED')) AS roomsWithoutBeds,
