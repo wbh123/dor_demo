@@ -1,0 +1,72 @@
+name: Mobile School Profile Validation
+
+on:
+  push:
+    branches:
+      - private-compat/feat/mobile-school-profile-splash-harmony-dark-20260817-v3
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Checkout private school-profile branch
+        uses: actions/checkout@v4
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: feat/mobile-school-profile-splash-harmony-dark-20260817-v3
+          token: ${{ secrets.WUST_DORMITORY_SELECT_PAT }}
+          fetch-depth: 0
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Install mobile dependencies
+        working-directory: app
+        run: npm ci
+
+      - name: Verify school profile freshness
+        working-directory: app
+        run: npm run school-profile:check
+
+      - name: Run school profile and HarmonyOS targeted tests
+        working-directory: app
+        run: >-
+          node --experimental-strip-types --test
+          src/platform/school-profile-generation.spec.ts
+          src/platform/school-profile-runtime.spec.ts
+          src/platform/android-school-splash-contract.spec.ts
+          src/platform/native-appearance-contract.spec.ts
+          src/platform/appearance-runtime.spec.ts
+          src/platform/tablet-dark-mode-contract.spec.ts
+          src/platform/login-emblem-layout.spec.ts
+          src/platform/startup-splash-motion.spec.ts
+          src/platform/native-runtime.spec.ts
+          src/platform/system-dark-mode.spec.ts
+
+      - name: Run full mobile tests
+        working-directory: app
+        run: npm test
+
+      - name: Run mobile typecheck
+        working-directory: app
+        run: npm run typecheck
+
+      - name: Build mobile production bundle
+        working-directory: app
+        run: npm run build
+
+      - name: Build Android debug APK
+        working-directory: app
+        run: npm run android:build:debug
