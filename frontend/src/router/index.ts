@@ -36,6 +36,7 @@ const router = createRouter({
         { path: 'admin/room-change', name: 'admin-room-change', component: () => import('../views/admin/AdminRoomChangeView.vue'), meta: { role: 'ADMIN' } },
         { path: 'admin/waitlist', name: 'admin-waitlist', component: () => import('../views/admin/AdminWaitlistView.vue'), meta: { role: 'ADMIN' } },
         { path: 'admin/operations', name: 'admin-operations', component: () => import('../views/admin/AdminOperationsView.vue'), meta: { role: 'ADMIN' } },
+        { path: 'admin/system-readiness', name: 'admin-system-readiness', component: () => import('../views/admin/AdminSystemReadinessView.vue'), meta: { role: 'ADMIN' } },
         { path: 'admin/anomalies', name: 'admin-anomalies', component: () => import('../views/admin/AdminAnomalyWorkbenchView.vue'), meta: { role: 'ADMIN' } },
         { path: 'admin/settings/site', name: 'admin-site-settings', component: () => import('../views/admin/AdminSiteSettingsView.vue'), meta: { role: 'ADMIN' } },
         { path: 'admin/settings/features', name: 'admin-feature-settings', component: () => import('../views/admin/AdminFeatureSettingsView.vue'), meta: { role: 'ADMIN' } },
