@@ -1,4 +1,4 @@
 private-ref=main
-validated-head=21934caefc9df5a0b52bb91dc7f66f1376fe339e
-purpose=mobile admin P0 post-merge validation after MyBatis fix
-triggered-at=2026-08-13T09:00:00+08:00
+validated-head=0eab0e9a49913b9b3d314056ef09568b382be2cd
+purpose=mobile dashboard PC color parity post-merge validation
+triggered-at=2026-08-17T10:18:00+08:00
