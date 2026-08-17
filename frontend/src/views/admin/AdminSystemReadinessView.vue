@@ -25,7 +25,8 @@ const overallText = computed(() => {
   if (!report.value) return '尚未检查'
   if (report.value.overallStatus === 'READY') return '可以上线'
   if (report.value.overallStatus === 'READY_WITH_WARNINGS') return '可以运行，但存在风险'
-  return '存在阻断问题，禁止开放'
+  if (report.value.overallStatus === 'BLOCKED') return '存在阻断问题，禁止开放'
+  return '状态未知'
 })
 
 const groupedChecks = computed(() => {
@@ -91,7 +92,8 @@ onMounted(runCheck)
         <h3>{{ overallText }}</h3>
         <p v-if="report.overallStatus === 'READY'">没有发现阻断问题或显著风险，可以进入单校试点。</p>
         <p v-else-if="report.overallStatus === 'READY_WITH_WARNINGS'">核心条件已具备，但建议在开放前处理下方风险项。</p>
-        <p v-else>存在必须先处理的问题；体检中心不会自动修改任何业务数据。</p>
+        <p v-else-if="report.overallStatus === 'BLOCKED'">存在必须先处理的问题；体检中心不会自动修改任何业务数据。</p>
+        <p v-else>当前返回了未识别的体检状态，请刷新后重试。</p>
       </div>
       <div class="readiness-summary">
         <strong>{{ report.summary.blocking }}</strong><span>阻断</span>
