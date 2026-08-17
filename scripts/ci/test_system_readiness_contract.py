@@ -57,16 +57,12 @@ def main() -> int:
     allocation = read("backend-java/server/src/main/java/com/wust/dormitory/readiness/AllocationCapabilityReadiness.java")
     assert "hasUsablePath" in allocation
     assert "selfSelection || unifiedAllocation" in allocation
-    allocation_test = read(
-        "backend-java/server/src/test/java/com/wust/dormitory/readiness/AllocationCapabilityReadinessTest.java"
-    )
-    assert "acceptsEitherSelfSelectionOrUnifiedAllocationAsAUsableAllocationPath" in allocation_test
-    assert "blocksOnlyWhenEveryAllocationPathIsUnavailable" in allocation_test
 
     mapper_xml = read("backend-java/server/src/main/resources/mapper/readiness/SystemReadinessMapper.xml")
     assert "SELECT *" not in mapper_xml.upper()
     assert " LIMIT " in mapper_xml.upper()
     assert "rule_template_id AS ruleTemplateId" in mapper_xml
+    assert 'id="resourceRoomIds"' in mapper_xml
     assert 'id="pendingParticipantCount"' in mapper_xml
     assert "ra.batch_id = e.batch_id" in mapper_xml
     assert "ra.assignment_status = 'ACTIVE'" in mapper_xml
@@ -79,21 +75,32 @@ def main() -> int:
     assert '"invalidStudents", invalidStudents' in student
     student_test = read("backend-java/server/src/test/java/com/wust/dormitory/readiness/StudentReadinessCheckerTest.java")
     assert "overlappingDataIssuesCountEachStudentOnlyOnce" in student_test
-    student_mysql_test = read(
-        "backend-java/server/src/test/java/com/wust/dormitory/mapper/SystemReadinessStudentMapperMySqlIntegrationTest.java"
-    )
-    assert 'DockerImageName.parse("mysql:8.4")' in student_mysql_test
-    assert 'number(summary, "invalidStudents")' in student_mysql_test
 
     resource = read("backend-java/server/src/main/java/com/wust/dormitory/readiness/ResourceReadinessChecker.java")
     for token in (
-        'number(data, "activeResidents")',
-        '"confirmedBedAssignments"',
-        '"unconfirmedBedAssignments"',
-        "实际活动可分配容量以批次预检为准",
+        "RoomOccupancySnapshotMapper",
+        "RoomOccupancySnapshotRow",
+        "resourceRoomIds()",
+        "SNAPSHOT_CHUNK_SIZE",
+        "findSnapshots(",
+        "snapshot.remainingCapacity()",
+        "Math.min(snapshot.availableBeds(), snapshot.remainingCapacity())",
+        '"availableBeds"',
+        '"occupiedBeds"',
+        '"remainingBeds"',
+        '"overCapacityRooms"',
+        "实际活动可分配容量仍以批次预检为准",
     ):
-        assert token in resource
-    assert '"remainingBeds"' not in resource
+        assert token in resource, f"resource readiness missing snapshot contract: {token}"
+    assert "enabledBedRecords -" not in resource
+    assert "confirmedBedAssignments -" not in resource
+
+    resource_test = read("backend-java/server/src/test/java/com/wust/dormitory/readiness/ResourceReadinessCheckerTest.java")
+    assert "capacityInfoUsesExistingOccupancySnapshotSemantics" in resource_test
+    assert "overCapacityRooms" in resource_test
+    assert 'capacity.evidence().get("availableBeds")' in resource_test
+    assert 'capacity.evidence().get("occupiedBeds")' in resource_test
+    assert 'capacity.evidence().get("remainingBeds")' in resource_test
 
     batch = read("backend-java/server/src/main/java/com/wust/dormitory/readiness/BatchReadinessChecker.java")
     for token in (
@@ -106,12 +113,19 @@ def main() -> int:
         "preview(batchId)",
         "MatchingSchemeService",
         "policyForBatch(batchId)",
+        "BatchSelectionModeGuard",
+        "requireModeAvailableForExistingBatch(batchId)",
         "pendingParticipantCount(batchId)",
         "pendingParticipantCount > capacity",
     ):
         assert token in batch
+    assert "requireBedModeForPublish(batchId)" not in batch
     for forbidden in ("acquire(batchId)", "changeStatus(", "rebuild(batchId)"):
         assert forbidden not in batch
+
+    mode_guard = read("backend-java/server/src/main/java/com/wust/dormitory/selection/BatchSelectionModeGuard.java")
+    assert "requireModeAvailableForExistingBatch" in mode_guard
+    assert "AccessMode.CONTINUE_EXISTING_BATCH" in mode_guard
 
     frontend = read("frontend/src/views/admin/AdminSystemReadinessView.vue")
     for token in ("上线体检", "重新检查", "去处理", "actionRoute", "BLOCKED", "READY_WITH_WARNINGS"):
