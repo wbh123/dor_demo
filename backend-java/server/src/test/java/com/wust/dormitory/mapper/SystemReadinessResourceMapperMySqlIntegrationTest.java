@@ -54,7 +54,7 @@ class SystemReadinessResourceMapperMySqlIntegrationTest {
     }
 
     @Test
-    void maintenanceBedCountsTowardPhysicalRoomCapacity() throws Exception {
+    void maintenanceBedCountsTowardPhysicalCapacityAndRoomModeResidentIsNotLost() throws Exception {
         String jdbcUrl = jdbcUrl();
         awaitDatabase(jdbcUrl);
         createFixture(jdbcUrl);
@@ -62,6 +62,8 @@ class SystemReadinessResourceMapperMySqlIntegrationTest {
         try (SqlSession session = sessionFactory(jdbcUrl).openSession()) {
             Map<String, Object> summary = session.getMapper(SystemReadinessMapper.class).resourceSummary();
             assertEquals(1L, number(summary, "validBeds"));
+            assertEquals(1L, number(summary, "activeResidents"));
+            assertEquals(0L, number(summary, "occupiedBeds"));
             assertEquals(0L, number(summary, "capacityMismatchRooms"));
         }
     }
@@ -100,6 +102,7 @@ class SystemReadinessResourceMapperMySqlIntegrationTest {
             statement.execute("INSERT INTO dormitory_floor VALUES (20,10)");
             statement.execute("INSERT INTO room VALUES (30,20,'ENABLED',2)");
             statement.execute("INSERT INTO bed VALUES (40,30,'ENABLED'),(41,30,'MAINTENANCE')");
+            statement.execute("INSERT INTO room_assignment VALUES (50,100,NULL,'ACTIVE')");
         }
     }
 
