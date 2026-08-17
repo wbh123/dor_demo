@@ -39,6 +39,15 @@
             COUNT(*) AS totalStudents,
             SUM(CASE WHEN COALESCE(u.account_status, 'PENDING') != 'DISABLED' THEN 1 ELSE 0 END) AS enabledStudents,
             SUM(CASE WHEN u.id IS NULL OR COALESCE(u.account_status, 'PENDING') != 'ACTIVE' THEN 1 ELSE 0 END) AS unactivatedStudents,
+            COUNT(DISTINCT CASE WHEN
+                    s.student_number IS NULL OR TRIM(s.student_number) = ''
+                    OR s.student_name IS NULL OR TRIM(s.student_name) = ''
+                    OR s.grade_year IS NULL
+                    OR s.major_id IS NULL OR m.id IS NULL OR m.enabled = 0
+                    OR s.degree_level IS NULL
+                    OR s.degree_level NOT IN ('专科','本科','硕士','博士','本硕连读','本博连读')
+                    OR s.gender IS NULL OR s.gender NOT IN ('M','F')
+                THEN s.id END) AS invalidStudents,
             SUM(CASE WHEN s.student_number IS NULL OR TRIM(s.student_number) = ''
                        OR s.student_name IS NULL OR TRIM(s.student_name) = ''
                        OR s.grade_year IS NULL THEN 1 ELSE 0 END) AS missingCriticalFields,
