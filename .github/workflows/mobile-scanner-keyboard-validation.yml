@@ -1,0 +1,74 @@
+name: Mobile Scanner Keyboard Validation
+
+on:
+  push:
+    branches:
+      - 'private-compat/fix/mobile-scanner-keyboard-confirm-20260817'
+
+permissions:
+  contents: read
+
+jobs:
+  verify-mobile:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Resolve private branch
+        id: target
+        shell: bash
+        run: |
+          set -euo pipefail
+          candidate="$GITHUB_REF_NAME"
+          private_ref="${candidate#private-compat/}"
+          test "$private_ref" != "$candidate"
+          echo "private_ref=$private_ref" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout private branch
+        uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: ${{ steps.target.outputs.private_ref }}
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          fetch-depth: 0
+          persist-credentials: true
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: private-repo/app/package-lock.json
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Install mobile dependencies
+        working-directory: private-repo/app
+        run: npm ci
+
+      - name: Verify version governance
+        working-directory: private-repo/app
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin main:refs/remotes/origin/main
+          node scripts/check-version-sync.mjs
+          node scripts/check-version-bump.mjs origin/main
+
+      - name: Verify scanner keyboard regression
+        working-directory: private-repo/app
+        run: node --experimental-strip-types --test src/platform/native-scanner-keyboard-contract.spec.ts src/platform/native-scanner-contract.spec.ts
+
+      - name: Run mobile test suite
+        working-directory: private-repo/app
+        run: npm test
+
+      - name: Build mobile web bundle
+        working-directory: private-repo/app
+        run: npm run build
+
+      - name: Process Android debug manifest
+        working-directory: private-repo/app/android
+        run: ./gradlew :app:processDebugMainManifest
