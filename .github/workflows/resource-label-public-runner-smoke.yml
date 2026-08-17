@@ -1,0 +1,27 @@
+name: Resource Label Public Runner Smoke
+
+on:
+  push:
+    branches:
+      - 'test/resource-label-lifecycle-*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Show runner
+        run: |
+          uname -a
+          docker info
+          python --version
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Show Java
+        run: java -version
