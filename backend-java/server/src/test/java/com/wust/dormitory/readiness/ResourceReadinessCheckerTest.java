@@ -7,6 +7,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
@@ -32,6 +33,29 @@ class ResourceReadinessCheckerTest {
         List<ReadinessCheckResult> results = new ResourceReadinessChecker(mapper).check(CONTEXT);
 
         assertTrue(results.stream().anyMatch(item -> item.code().equals("RESOURCE_BASELINE") && item.blocking()));
+    }
+
+    @Test
+    void overlappingRoomAnomaliesAreReportedByCategory() {
+        SystemReadinessMapper mapper = mock(SystemReadinessMapper.class);
+        when(mapper.resourceSummary()).thenReturn(Map.of(
+                "campuses", 1L,
+                "buildings", 1L,
+                "rooms", 10L,
+                "validBeds", 20L,
+                "occupiedBeds", 5L,
+                "roomsWithoutBeds", 1L,
+                "enabledRoomsWithoutBeds", 1L,
+                "capacityMismatchRooms", 1L,
+                "invalidRelations", 0L));
+
+        ReadinessCheckResult integrity = new ResourceReadinessChecker(mapper).check(CONTEXT).stream()
+                .filter(item -> item.code().equals("RESOURCE_INTEGRITY"))
+                .findFirst().orElseThrow();
+
+        assertTrue(integrity.blocking());
+        assertEquals(3, integrity.evidence().get("issueCategoryCount"));
+        assertTrue(integrity.summary().contains("3 类"));
     }
 
     @Test

@@ -4,6 +4,7 @@ import com.wust.dormitory.readiness.mapper.SystemReadinessMapper;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -43,23 +44,39 @@ public class ResourceReadinessChecker implements ReadinessChecker {
         results.add(ReadinessCheckResult.of("RESOURCE_BASELINE", category(), "宿舍资源基础数据",
                 empty ? ReadinessSeverity.ERROR : ReadinessSeverity.PASS, empty,
                 empty ? "FAILED" : "PASSED",
-                empty ? "校区、楼栋、房间或有效床位存在空数据，暂不适合开放。" : "宿舍资源基础数据已就绪。",
+                empty ? "校区、楼栋、房间或当前可用床位存在空数据，暂不适合开放。" : "宿舍资源基础数据已就绪。",
                 Map.of("campuses", campuses, "buildings", buildings, "rooms", rooms, "validBeds", beds),
-                empty ? "补全校区、楼栋、房间和床位数据" : null, "/admin/dormitories", context.checkedAt()));
-        long integrityIssues = noBeds + zeroEnabled + mismatch + invalidRelations;
+                empty ? "补全基础资源或恢复至少一个可用床位" : null, "/admin/dormitories", context.checkedAt()));
+
+        int issueCategoryCount = positiveCount(noBeds, zeroEnabled, mismatch, invalidRelations);
+        Map<String, Object> integrityEvidence = new LinkedHashMap<>();
+        integrityEvidence.put("issueCategoryCount", issueCategoryCount);
+        integrityEvidence.put("roomsWithoutBeds", noBeds);
+        integrityEvidence.put("enabledRoomsWithoutBeds", zeroEnabled);
+        integrityEvidence.put("capacityMismatchRooms", mismatch);
+        integrityEvidence.put("invalidRelations", invalidRelations);
         results.add(ReadinessCheckResult.of("RESOURCE_INTEGRITY", category(), "宿舍资源完整性",
-                integrityIssues == 0 ? ReadinessSeverity.PASS : ReadinessSeverity.ERROR,
-                integrityIssues > 0,
-                integrityIssues == 0 ? "PASSED" : "FAILED",
-                integrityIssues == 0 ? "未发现房间容量、床位和层级关联异常。" : "发现 " + integrityIssues + " 项宿舍资源完整性异常。",
-                Map.of("roomsWithoutBeds", noBeds, "enabledRoomsWithoutBeds", zeroEnabled,
-                        "capacityMismatchRooms", mismatch, "invalidRelations", invalidRelations),
-                integrityIssues == 0 ? null : "前往宿舍资源管理修正异常房间", "/admin/dormitories", context.checkedAt()));
-        results.add(ReadinessCheckResult.of("BED_CAPACITY", category(), "当前床位容量", ReadinessSeverity.INFO,
-                false, "INFO", "当前有效床位 " + beds + " 个，正式占用 " + occupied + " 个，剩余 " + remaining + " 个。",
+                issueCategoryCount == 0 ? ReadinessSeverity.PASS : ReadinessSeverity.ERROR,
+                issueCategoryCount > 0,
+                issueCategoryCount == 0 ? "PASSED" : "FAILED",
+                issueCategoryCount == 0
+                        ? "未发现房间容量、床位和层级关联异常。"
+                        : "发现 " + issueCategoryCount + " 类宿舍资源完整性异常；同一房间可能同时命中多个类别。",
+                integrityEvidence,
+                issueCategoryCount == 0 ? null : "前往宿舍资源管理按异常类别逐项修正", "/admin/dormitories", context.checkedAt()));
+        results.add(ReadinessCheckResult.of("BED_CAPACITY", category(), "当前可用床位容量", ReadinessSeverity.INFO,
+                false, "INFO", "当前可用床位 " + beds + " 个，正式占用 " + occupied + " 个，剩余 " + remaining + " 个。",
                 Map.of("availableBeds", beds, "occupiedBeds", occupied, "remainingBeds", remaining),
                 null, "/admin/residencies", context.checkedAt()));
         return results;
+    }
+
+    private int positiveCount(long... values) {
+        int count = 0;
+        for (long value : values) {
+            if (value > 0) count++;
+        }
+        return count;
     }
 
     private long number(Map<String, Object> data, String key) {

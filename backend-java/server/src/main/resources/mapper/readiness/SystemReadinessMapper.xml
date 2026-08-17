@@ -24,7 +24,7 @@
              WHERE r.operational_status = 'ENABLED'
                AND NOT EXISTS (SELECT 1 FROM bed b WHERE b.room_id = r.id AND b.operational_status = 'ENABLED')) AS enabledRoomsWithoutBeds,
             (SELECT COUNT(*) FROM room r
-             WHERE r.capacity != (SELECT COUNT(*) FROM bed b WHERE b.room_id = r.id AND b.operational_status = 'ENABLED')) AS capacityMismatchRooms,
+             WHERE r.capacity != (SELECT COUNT(*) FROM bed b WHERE b.room_id = r.id AND b.operational_status != 'RETIRED')) AS capacityMismatchRooms,
             (SELECT COUNT(*) FROM dormitory_floor f
              LEFT JOIN dormitory_building db ON db.id = f.building_id
              WHERE db.id IS NULL) +
