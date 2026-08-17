@@ -20,7 +20,8 @@ jobs:
           ref: fix/mobile-dashboard-status-colors-inspection-tab-20260817
           token: ${{ secrets.PRIVATE_CI }}
           path: private-repo
-          persist-credentials: false
+          fetch-depth: 0
+          persist-credentials: true
       - uses: actions/setup-node@v6
         with:
           node-version: '22'
@@ -29,6 +30,15 @@ jobs:
       - name: Install mobile dependencies
         working-directory: private-repo/app
         run: npm ci
+      - name: Fetch latest private main
+        working-directory: private-repo
+        run: git fetch --no-tags origin main:refs/remotes/origin/main
+      - name: Check mobile version source consistency
+        working-directory: private-repo/app
+        run: node scripts/check-version-sync.mjs
+      - name: Require mobile version bump
+        working-directory: private-repo/app
+        run: node scripts/check-version-bump.mjs origin/main
       - name: Run full mobile tests
         working-directory: private-repo/app
         run: npm test
