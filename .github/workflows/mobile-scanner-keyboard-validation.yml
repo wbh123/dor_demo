@@ -69,6 +69,10 @@ jobs:
         working-directory: private-repo/app
         run: npm run build
 
+      - name: Sync Capacitor Android project
+        working-directory: private-repo/app
+        run: npx cap sync android
+
       - name: Process Android debug manifest
         working-directory: private-repo/app/android
         run: ./gradlew :app:processDebugMainManifest
