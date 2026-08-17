@@ -12,6 +12,11 @@ public class AuthorizationReadinessChecker implements ReadinessChecker {
     }
 
     @Override
+    public boolean critical() {
+        return true;
+    }
+
+    @Override
     public List<ReadinessCheckResult> check(ReadinessContext context) {
         return List.of(ReadinessCheckResult.info(
                 "AUTHORIZATION_PRIVATE_PROJECTION", category(), "权限与授权准备",
