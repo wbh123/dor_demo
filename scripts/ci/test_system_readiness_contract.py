@@ -28,9 +28,14 @@ def main() -> int:
     ):
         assert token in spec, f"OpenAPI readiness contract missing {token}"
 
+    model_pom = read("backend-java/model/pom.xml")
+    assert "openapi-system-readiness.yaml" in model_pom, "readiness contract must participate in OpenAPI generation"
+    assert "generated-sources/openapi-readiness" in model_pom, "readiness generated sources must be compiled"
+
     controller = read("backend-java/server/src/main/java/com/wust/dormitory/readiness/SystemReadinessController.java")
     assert "SystemReadinessService" in controller
     assert "SecurityUsers.requireAdmin()" in controller
+    assert "implements SystemReadinessApi" in controller, "controller must implement the generated OpenAPI interface"
 
     service = read("backend-java/server/src/main/java/com/wust/dormitory/readiness/SystemReadinessService.java")
     assert "ReadinessChecker" in service
