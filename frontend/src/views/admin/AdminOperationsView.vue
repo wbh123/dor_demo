@@ -23,7 +23,10 @@ const {
   <div class="content-column">
     <header class="page-title split-title">
       <div><span class="eyebrow">{{ subtitle('运营分析', 'OPERATIONS') }}</span><h2>运营与健康</h2><p>集中查看床位利用率、未选学生、人工调整和统一分配公平性。</p></div>
-      <button class="button secondary" :disabled="loading" @click="load">刷新</button>
+      <div class="operations-actions">
+        <RouterLink class="button ghost" to="/admin/system-readiness">上线体检</RouterLink>
+        <button class="button secondary" :disabled="loading" @click="load">刷新</button>
+      </div>
     </header>
     <p v-if="loading" class="panel empty-state">正在加载运营与健康数据…</p>
     <p v-else-if="error" class="alert error">{{ error }}</p>
@@ -43,3 +46,7 @@ const {
     </template>
   </div>
 </template>
+
+<style scoped>
+.operations-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+</style>
