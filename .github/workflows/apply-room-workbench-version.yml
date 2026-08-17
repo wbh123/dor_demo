@@ -1,0 +1,49 @@
+name: Apply Room Workbench Version
+
+on:
+  push:
+    branches:
+      - 'private-apply/mobile-room-workbench-version-1.5.22'
+
+permissions:
+  contents: read
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout private target branch
+        uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: fix/mobile-room-workbench-default-spacing-20260817
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: true
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+
+      - name: Synchronize APP release version
+        working-directory: private-repo/app
+        shell: bash
+        run: |
+          npm version 1.5.22 --no-git-tag-version
+          node - <<'NODE'
+          const fs = require('fs')
+          fs.writeFileSync('version.json', JSON.stringify({ versionName: '1.5.22', versionCode: 42 }, null, 2) + '\n')
+          NODE
+          node scripts/check-version-sync.mjs
+
+      - name: Commit and push
+        working-directory: private-repo
+        shell: bash
+        run: |
+          git config user.name 'OpenAI'
+          git config user.email 'noreply@openai.com'
+          git add app/version.json app/package.json app/package-lock.json
+          git commit -m 'chore(app): bump version to 1.5.22'
+          git push origin HEAD:fix/mobile-room-workbench-default-spacing-20260817
