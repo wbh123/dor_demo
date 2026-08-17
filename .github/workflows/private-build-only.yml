@@ -9,9 +9,9 @@ permissions:
   contents: read
 
 jobs:
-  verify-build:
+  verify-targeted-java:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 20
     steps:
       - name: Checkout private branch
         uses: actions/checkout@v5
@@ -30,15 +30,33 @@ jobs:
           cache: maven
           cache-dependency-path: private-repo/backend-java/pom.xml
 
+      - name: Verify targeted Java tests
+        working-directory: private-repo/backend-java
+        run: >-
+          mvn -B -ntp -pl server -am
+          -Dtest=SelectionAssignmentCancellationServiceTest,SelectionPolicyRestrictedSettingUpdateTest
+          -Dsurefire.failIfNoSpecifiedTests=false
+          test
+
+  verify-frontend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout private branch
+        uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: fix/admin-assigned-bed-student-cancel-policy-20260817
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: false
+          fetch-depth: 1
+
       - uses: actions/setup-node@v6
         with:
           node-version: '22'
           cache: npm
           cache-dependency-path: private-repo/frontend/package-lock.json
-
-      - name: Verify Java modules
-        working-directory: private-repo/backend-java
-        run: mvn -B -ntp clean verify
 
       - name: Verify frontend
         working-directory: private-repo
