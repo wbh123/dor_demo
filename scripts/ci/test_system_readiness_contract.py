@@ -57,10 +57,32 @@ def main() -> int:
     mapper_xml = read("backend-java/server/src/main/resources/mapper/readiness/SystemReadinessMapper.xml")
     assert "SELECT *" not in mapper_xml.upper()
     assert " LIMIT " in mapper_xml.upper(), "diagnostic sample queries must be bounded"
+    assert "rule_template_id AS ruleTemplateId" in mapper_xml
+
+    batch = read("backend-java/server/src/main/java/com/wust/dormitory/readiness/BatchReadinessChecker.java")
+    for token in (
+        "BatchScopeService",
+        "requireReady(batchId)",
+        "BatchRuleTemplateService",
+        "resolveForBatch(ruleTemplateId)",
+        "RULE_TEMPLATE_NOT_BOUND",
+        "BatchRoomLockService",
+        "preview(batchId)",
+        "MatchingSchemeService",
+        "policyForBatch(batchId)",
+    ):
+        assert token in batch, f"batch readiness missing existing validator reuse: {token}"
+    for forbidden in ("acquire(batchId)", "changeStatus(", "rebuild(batchId)"):
+        assert forbidden not in batch, f"batch readiness must remain read-only: {forbidden}"
 
     frontend = read("frontend/src/views/admin/AdminSystemReadinessView.vue")
     for token in ("上线体检", "重新检查", "去处理", "actionRoute", "BLOCKED", "READY_WITH_WARNINGS"):
         assert token in frontend, f"frontend readiness view missing {token}"
+    assert "systemReadinessSchema" in frontend
+
+    package_json = read("frontend/package.json")
+    assert "openapi-system-readiness.yaml" in package_json
+    assert "systemReadinessSchema.d.ts" in package_json
 
     router = read("frontend/src/router/index.ts")
     assert "admin/system-readiness" in router
