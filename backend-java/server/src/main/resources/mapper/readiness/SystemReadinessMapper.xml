@@ -34,6 +34,10 @@
              WHERE f.id IS NULL) AS invalidRelations
     </select>
 
+    <select id="resourceRoomIds" resultType="long">
+        SELECT id FROM room ORDER BY id
+    </select>
+
     <select id="studentSummary" resultType="map">
         SELECT
             COUNT(*) AS totalStudents,
