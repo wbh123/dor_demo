@@ -1,0 +1,55 @@
+name: Diagnose Room Workbench Android
+
+on:
+  push:
+    branches:
+      - 'private-diagnose/mobile-room-workbench-android-final'
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout private target branch
+        uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: fix/mobile-room-workbench-default-spacing-20260817
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: false
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: private-repo/app/package-lock.json
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install APP dependencies
+        working-directory: private-repo/app
+        run: npm install --no-audit --no-fund
+
+      - name: Run Android Debug build and print concise failure tail
+        working-directory: private-repo/app
+        shell: bash
+        run: |
+          set +e
+          npm run android:build:debug > /tmp/android-build.log 2>&1
+          status=$?
+          echo '===== android build tail ====='
+          tail -n 220 /tmp/android-build.log
+          echo '===== environment ====='
+          java -version 2>&1 || true
+          node --version
+          npm --version
+          echo "exit_status=$status"
+          exit "$status"
