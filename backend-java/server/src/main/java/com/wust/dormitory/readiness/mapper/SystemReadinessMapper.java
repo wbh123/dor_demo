@@ -21,4 +21,6 @@ public interface SystemReadinessMapper {
     List<Map<String, Object>> activeBatches();
 
     long participantCount(@Param("batchId") long batchId);
+
+    long pendingParticipantCount(@Param("batchId") long batchId);
 }
