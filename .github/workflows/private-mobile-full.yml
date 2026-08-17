@@ -1,0 +1,59 @@
+name: Private Mobile Full Validation
+
+on:
+  push:
+    branches:
+      - 'private-compat/**'
+
+permissions:
+  contents: read
+
+jobs:
+  mobile-full:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Resolve private branch
+        id: target
+        shell: bash
+        run: |
+          set -euo pipefail
+          candidate="$GITHUB_REF_NAME"
+          private_ref="${candidate#private-compat/}"
+          echo "private_ref=$private_ref" >> "$GITHUB_OUTPUT"
+      - name: Checkout private ref
+        uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: ${{ steps.target.outputs.private_ref }}
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: false
+          fetch-depth: 1
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: private-repo/app/package-lock.json
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Install dependencies
+        working-directory: private-repo/app
+        run: npm ci --no-audit --no-fund
+      - name: Run all mobile tests
+        working-directory: private-repo/app
+        run: npm test
+      - name: Typecheck
+        working-directory: private-repo/app
+        run: npm run typecheck
+      - name: Production build
+        working-directory: private-repo/app
+        run: npm run build
+      - name: Android Debug build
+        working-directory: private-repo/app
+        run: npm run android:build:debug
+      - name: Verify APK
+        working-directory: private-repo/app
+        run: test -s android/app/build/outputs/apk/debug/app-debug.apk
