@@ -11,7 +11,7 @@ permissions:
 jobs:
   verify-mobile:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     steps:
       - name: Checkout private candidate
         uses: actions/checkout@v5
@@ -20,10 +20,31 @@ jobs:
           ref: fix/mobile-label-history-menu-safe-area-20260817
           token: ${{ secrets.PRIVATE_CI }}
           path: private-repo
-          persist-credentials: false
+          fetch-depth: 0
+          persist-credentials: true
       - uses: actions/setup-node@v6
         with:
           node-version: '22'
+          cache: npm
+          cache-dependency-path: private-repo/app/package-lock.json
+      - name: Install mobile dependencies
+        working-directory: private-repo/app
+        run: npm ci
+      - name: Fetch latest private main
+        working-directory: private-repo
+        run: git fetch --no-tags origin main:refs/remotes/origin/main
+      - name: Check mobile version source consistency
+        working-directory: private-repo/app
+        run: node scripts/check-version-sync.mjs
+      - name: Require mobile version bump
+        working-directory: private-repo/app
+        run: node scripts/check-version-bump.mjs origin/main
       - name: Run historical label menu regression
         working-directory: private-repo/app
         run: node --experimental-strip-types --test src/platform/resource-label-batch-history-menu-layout.spec.ts
+      - name: Run full mobile tests
+        working-directory: private-repo/app
+        run: npm test
+      - name: Build mobile web bundle
+        working-directory: private-repo/app
+        run: npm run build
