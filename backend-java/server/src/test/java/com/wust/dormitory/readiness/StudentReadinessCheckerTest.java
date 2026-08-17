@@ -10,7 +10,6 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 class StudentReadinessCheckerTest {
@@ -35,6 +34,5 @@ class StudentReadinessCheckerTest {
                 .findFirst().orElseThrow();
         assertEquals(ReadinessSeverity.WARNING, activation.severity());
         assertFalse(activation.blocking());
-        verifyNoInteractions();
     }
 }
