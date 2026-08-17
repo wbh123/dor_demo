@@ -9,6 +9,7 @@ local-ci-logs/
 
 # 自动生成的前端接口类型（启动和构建时由最新OpenAPI重新生成）
 frontend/src/api/schema.d.ts
+frontend/src/api/systemReadinessSchema.d.ts
 
 # Docker 持久化数据
 data/
