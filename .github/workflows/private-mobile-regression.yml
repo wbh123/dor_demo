@@ -1,0 +1,61 @@
+name: Private Mobile Regression CI
+
+on:
+  push:
+    branches:
+      - 'private-compat/agent/mobile-label-reprint-scan-workbench-regressions'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout private regression branch
+        uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: agent/mobile-label-reprint-scan-workbench-regressions
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: false
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: private-repo/app/package-lock.json
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: private-repo/backend-java/pom.xml
+
+      - name: Install APP dependencies
+        working-directory: private-repo/app
+        run: npm install --no-audit --no-fund
+
+      - name: Verify APP version
+        working-directory: private-repo/app
+        run: npm run version:check
+
+      - name: Run APP regression tests
+        working-directory: private-repo/app
+        run: npm test
+
+      - name: Typecheck APP
+        working-directory: private-repo/app
+        run: npm run typecheck
+
+      - name: Build APP
+        working-directory: private-repo/app
+        run: npm run build
+
+      - name: Compile backend server modules
+        working-directory: private-repo
+        run: mvn -f backend-java/pom.xml -B -ntp -pl server -am -DskipTests compile
