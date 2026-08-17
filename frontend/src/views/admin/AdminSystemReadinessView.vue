@@ -2,31 +2,10 @@
 import { computed, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { api } from '../../api/client'
+import type { components } from '../../api/systemReadinessSchema'
 
-type OverallStatus = 'READY' | 'READY_WITH_WARNINGS' | 'BLOCKED'
-type Severity = 'PASS' | 'INFO' | 'WARNING' | 'ERROR'
-
-type ReadinessCheck = {
-  code: string
-  category: string
-  title: string
-  severity: Severity
-  blocking: boolean
-  status: string
-  summary: string
-  evidence: Record<string, unknown>
-  suggestedAction?: string | null
-  actionRoute?: string | null
-  checkedAt: string
-}
-
-type ReadinessReport = {
-  overallStatus: OverallStatus
-  checkedAt: string
-  summary: { total: number; passed: number; info: number; warnings: number; errors: number; blocking: number }
-  categories: string[]
-  checks: ReadinessCheck[]
-}
+type ReadinessReport = components['schemas']['SystemReadinessReport']
+type ReadinessCheck = components['schemas']['ReadinessCheckResult']
 
 const categoryLabels: Record<string, string> = {
   INFRASTRUCTURE: '基础设施',
