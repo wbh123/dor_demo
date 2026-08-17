@@ -68,7 +68,8 @@
     <select id="activeBatches" resultType="map">
         SELECT id,
                batch_name AS batchName,
-               batch_status AS batchStatus
+               batch_status AS batchStatus,
+               rule_template_id AS ruleTemplateId
         FROM selection_batch
         WHERE batch_status IN ('PUBLISHED', 'OPEN', 'PAUSED')
         ORDER BY start_at, id
