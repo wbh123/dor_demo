@@ -51,7 +51,27 @@ jobs:
           status=$?
           cat /tmp/mobile-tests.log
           if [[ $status -ne 0 ]]; then
-            summary=$(tail -c 12000 /tmp/mobile-tests.log | tr '\n' ' ' | sed 's/%/%25/g; s/\r/%0D/g; s/\n/%0A/g')
+            python - <<'PY' >/tmp/mobile-failures.log
+          from pathlib import Path
+          lines = Path('/tmp/mobile-tests.log').read_text(errors='replace').splitlines()
+          hits = [i for i, line in enumerate(lines) if line.startswith('not ok ') or line.startswith('# Subtest:') and i + 1 < len(lines) and lines[i + 1].startswith('not ok ')]
+          emitted = set()
+          for i in hits:
+              start = max(0, i - 3)
+              end = min(len(lines), i + 35)
+              key = (start, end)
+              if key in emitted:
+                  continue
+              emitted.add(key)
+              print('\n'.join(lines[start:end]))
+              print('\n---\n')
+          if not hits:
+              for line in lines:
+                  if 'failureType' in line or "error:" in line or '# fail ' in line:
+                      print(line)
+          PY
+            cat /tmp/mobile-failures.log
+            summary=$(tail -c 12000 /tmp/mobile-failures.log | tr '\n' ' ' | sed 's/%/%25/g; s/\r/%0D/g; s/\n/%0A/g')
             echo "::error title=Full mobile tests failed::$summary"
             exit "$status"
           fi
