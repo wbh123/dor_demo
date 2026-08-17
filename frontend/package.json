@@ -7,6 +7,7 @@
     "generate:api": "openapi-typescript ../backend-java/model/src/main/resources/openapi-interface.yaml -o src/api/schema.d.ts && openapi-typescript ../backend-java/model/src/main/resources/admin/openapi-system-readiness.yaml -o src/api/systemReadinessSchema.d.ts",
     "predev": "npm run generate:api",
     "dev": "vite",
+    "test": "node --test tests/admin-system-readiness.test.mjs",
     "typecheck": "vue-tsc -b",
     "build": "npm run generate:api && vue-tsc -b && vite build",
     "preview": "vite preview"
