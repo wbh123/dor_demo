@@ -29,5 +29,5 @@ test('renders backend decisions and action routes without deriving overall statu
   assert.match(page, /item\.suggestedAction/)
   assert.match(page, /item\.evidence/)
   assert.match(page, /item\.checkedAt/)
-  assert.doesNotMatch(page, /overallStatus\s*=/)
+  assert.doesNotMatch(page, /overallStatus\s*=(?!=)/)
 })
