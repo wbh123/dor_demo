@@ -39,4 +39,14 @@ jobs:
         run: npm ci --no-audit --no-fund
       - name: Run print-entry contract
         working-directory: private-repo/app
-        run: node --import tsx --test src/platform/mobile-label-tools-navigation.spec.ts
+        shell: bash
+        run: |
+          set +e
+          node --import tsx --test src/platform/mobile-label-tools-navigation.spec.ts > /tmp/print-entry-test.log 2>&1
+          status=$?
+          cat /tmp/print-entry-test.log
+          if [[ $status -ne 0 ]]; then
+            summary=$(tail -c 6000 /tmp/print-entry-test.log | tr '\n' ' ' | sed 's/%/%25/g; s/\r/%0D/g; s/\n/%0A/g')
+            echo "::error title=Print-entry contract failed::$summary"
+            exit "$status"
+          fi
