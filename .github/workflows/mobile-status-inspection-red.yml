@@ -25,6 +25,6 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: '22'
-      - name: Run tablet viewport regressions
+      - name: Verify tablet viewport regressions after fix
         working-directory: private-repo/app
         run: node --experimental-strip-types --test src/platform/account-identity-menu.spec.ts src/platform/tablet-responsive-layout.spec.ts
