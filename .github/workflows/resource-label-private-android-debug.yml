@@ -1,0 +1,49 @@
+name: Resource Label Private Android Debug
+
+on:
+  push:
+    branches:
+      - 'test/resource-label-lifecycle-*'
+    paths:
+      - '.github/workflows/resource-label-private-android-debug.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  android-debug:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout private resource-label hotfix
+        uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: fix/resource-label-mobile-contracts-20260817
+          token: ${{ secrets.PRIVATE_CI }}
+          persist-credentials: false
+          fetch-depth: 1
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Install mobile dependencies
+        working-directory: app
+        run: npm ci
+      - name: Run mobile tests
+        working-directory: app
+        run: npm test
+      - name: Verify mobile typecheck
+        working-directory: app
+        run: npm run typecheck
+      - name: Build Android Debug APK
+        working-directory: app
+        run: npm run android:build:debug
+      - name: Verify APK exists
+        run: test -s app/android/app/build/outputs/apk/debug/app-debug.apk
