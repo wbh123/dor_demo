@@ -26,15 +26,17 @@ public class StudentReadinessChecker implements ReadinessChecker {
         long total = number(data, "totalStudents");
         long enabled = number(data, "enabledStudents");
         long unactivated = number(data, "unactivatedStudents");
+        long invalidStudents = number(data, "invalidStudents");
         long missingCritical = number(data, "missingCriticalFields");
         long mapping = number(data, "missingMajorMapping");
         long degree = number(data, "invalidDegreeLevel");
         long gender = number(data, "invalidGender");
-        long invalid = missingCritical + mapping + degree + gender;
-        List<Map<String, Object>> samples = invalid == 0 ? List.of() : mapper.studentIssueSamples(SAMPLE_LIMIT);
+        List<Map<String, Object>> samples = invalidStudents == 0
+                ? List.of()
+                : mapper.studentIssueSamples(SAMPLE_LIMIT);
 
         boolean noStudents = total == 0;
-        boolean invalidData = invalid > 0;
+        boolean invalidData = invalidStudents > 0;
         boolean blocked = noStudents || invalidData;
         String summary;
         String action;
@@ -42,7 +44,7 @@ public class StudentReadinessChecker implements ReadinessChecker {
             summary = "当前没有任何学生数据，无法开展单校选寝试点。";
             action = "先导入并核验本次试点学生数据";
         } else if (invalidData) {
-            summary = "有 " + invalid + " 项学生基础数据异常需要处理。";
+            summary = "有 " + invalidStudents + " 名学生存在基础数据异常需要处理。";
             action = "修正学生基础字段、专业映射、培养层次或性别数据";
         } else {
             summary = "参与住宿分配所需的学生基础字段正常。";
@@ -53,9 +55,15 @@ public class StudentReadinessChecker implements ReadinessChecker {
                 blocked ? ReadinessSeverity.ERROR : ReadinessSeverity.PASS,
                 blocked, blocked ? "FAILED" : "PASSED",
                 summary,
-                Map.of("totalStudents", total, "enabledStudents", enabled,
-                        "missingCriticalFields", missingCritical, "missingMajorMapping", mapping,
-                        "invalidDegreeLevel", degree, "invalidGender", gender, "sampleStudentNumbers", samples),
+                Map.of(
+                        "totalStudents", total,
+                        "enabledStudents", enabled,
+                        "invalidStudents", invalidStudents,
+                        "missingCriticalFields", missingCritical,
+                        "missingMajorMapping", mapping,
+                        "invalidDegreeLevel", degree,
+                        "invalidGender", gender,
+                        "sampleStudentNumbers", samples),
                 action, "/admin/data", context.checkedAt());
         ReadinessCheckResult activation = unactivated == 0
                 ? ReadinessCheckResult.of("STUDENT_ACTIVATION", category(), "学生账号激活", ReadinessSeverity.PASS,
