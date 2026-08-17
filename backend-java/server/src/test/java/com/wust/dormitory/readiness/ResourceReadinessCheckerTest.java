@@ -99,12 +99,13 @@ class ResourceReadinessCheckerTest {
                 .filter(item -> item.code().equals("BED_CAPACITY"))
                 .findFirst().orElseThrow();
         assertEquals(6L, capacity.evidence().get("availableBeds"));
-        assertEquals(3L, capacity.evidence().get("occupiedBeds"));
+        assertEquals(3L, capacity.evidence().get("activeResidents"));
+        assertEquals(1L, capacity.evidence().get("occupiedBeds"));
         assertEquals(4L, capacity.evidence().get("remainingBeds"));
-        assertEquals(1L, capacity.evidence().get("confirmedBedAssignments"));
         assertEquals(2L, capacity.evidence().get("unconfirmedBedAssignments"));
         assertTrue(capacity.summary().contains("当前可用物理床位 6 个"));
-        assertTrue(capacity.summary().contains("正式在住占用 3 人"));
+        assertTrue(capacity.summary().contains("正式在住 3 人"));
+        assertTrue(capacity.summary().contains("已占用具体床位 1 个"));
         assertTrue(capacity.summary().contains("剩余资源容量 4 人"));
     }
 
