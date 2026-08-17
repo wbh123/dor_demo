@@ -17,7 +17,6 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
 
-
     <dependencies>
         <dependency>
             <groupId>org.springframework</groupId>
@@ -95,6 +94,34 @@
                             </configOptions>
                         </configuration>
                     </execution>
+                    <execution>
+                        <id>generate-readiness-contract</id>
+                        <goals>
+                            <goal>generate</goal>
+                        </goals>
+                        <configuration>
+                            <inputSpec>${project.basedir}/src/main/resources/admin/openapi-system-readiness.yaml</inputSpec>
+                            <output>${project.build.directory}/generated-sources/openapi-readiness</output>
+                            <generatorName>spring</generatorName>
+                            <invokerPackage>com.wust.dormitory.model.readiness.invoker</invokerPackage>
+                            <apiPackage>com.wust.dormitory.model.readiness.api</apiPackage>
+                            <modelPackage>com.wust.dormitory.model.readiness.dto</modelPackage>
+                            <generateApis>true</generateApis>
+                            <generateModels>true</generateModels>
+                            <skipIfSpecIsUnchanged>true</skipIfSpecIsUnchanged>
+                            <configOptions>
+                                <useJakartaEe>true</useJakartaEe>
+                                <dateLibrary>java17</dateLibrary>
+                                <interfaceOnly>true</interfaceOnly>
+                                <useTags>true</useTags>
+                                <hideGenerationTimestamp>true</hideGenerationTimestamp>
+                                <requestMappingMode>none</requestMappingMode>
+                                <skipDefaultInterface>true</skipDefaultInterface>
+                                <serializationLibrary>jackson</serializationLibrary>
+                                <openApiNullable>false</openApiNullable>
+                            </configOptions>
+                        </configuration>
+                    </execution>
                 </executions>
             </plugin>
             <plugin>
@@ -110,6 +137,7 @@
                         <configuration>
                             <sources>
                                 <source>target/generated-sources/openapi/src/main/java</source>
+                                <source>target/generated-sources/openapi-readiness/src/main/java</source>
                             </sources>
                         </configuration>
                     </execution>
