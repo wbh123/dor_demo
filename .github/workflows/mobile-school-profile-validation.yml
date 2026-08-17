@@ -6,28 +6,32 @@ on:
       - private-compat/feat/mobile-school-profile-splash-harmony-dark-20260817-v3
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   validate:
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
       - name: Checkout private school-profile branch
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: wbh123/Wust-Dormitory-Select
           ref: feat/mobile-school-profile-splash-harmony-dark-20260817-v3
-          token: ${{ secrets.WUST_DORMITORY_SELECT_PAT }}
+          token: ${{ secrets.PRIVATE_CI }}
+          persist-credentials: false
           fetch-depth: 0
 
       - name: Set up Node 22
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: '22'
           cache: npm
           cache-dependency-path: app/package-lock.json
 
       - name: Set up Java 21
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '21'
