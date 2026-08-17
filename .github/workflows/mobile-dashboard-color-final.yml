@@ -1,0 +1,47 @@
+name: Mobile Dashboard Color Final
+
+on:
+  push:
+    branches:
+      - 'verify/mobile-dashboard-color-final-20260817'
+
+permissions:
+  contents: read
+
+jobs:
+  verify-mobile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout private candidate
+        uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: fix/mobile-dashboard-pc-color-parity-20260817
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: private-repo/app/package-lock.json
+      - name: Install mobile dependencies
+        working-directory: private-repo/app
+        run: npm ci
+      - name: Verify version
+        working-directory: private-repo/app
+        run: npm run version:check
+      - name: Verify Dashboard color contract
+        working-directory: private-repo/app
+        run: node --experimental-strip-types --test src/platform/mobile-dashboard-color-contract.spec.ts
+      - name: Verify full mobile tests
+        working-directory: private-repo/app
+        run: npm test
+      - name: Verify TypeScript
+        working-directory: private-repo/app
+        run: npm run typecheck
+      - name: Verify production build
+        working-directory: private-repo/app
+        run: npm run build
