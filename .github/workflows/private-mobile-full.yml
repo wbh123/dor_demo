@@ -44,7 +44,17 @@ jobs:
         run: npm ci --no-audit --no-fund
       - name: Run all mobile tests
         working-directory: private-repo/app
-        run: npm test
+        shell: bash
+        run: |
+          set +e
+          npm test > /tmp/mobile-tests.log 2>&1
+          status=$?
+          cat /tmp/mobile-tests.log
+          if [[ $status -ne 0 ]]; then
+            summary=$(tail -c 12000 /tmp/mobile-tests.log | tr '\n' ' ' | sed 's/%/%25/g; s/\r/%0D/g; s/\n/%0A/g')
+            echo "::error title=Full mobile tests failed::$summary"
+            exit "$status"
+          fi
       - name: Typecheck
         working-directory: private-repo/app
         run: npm run typecheck
