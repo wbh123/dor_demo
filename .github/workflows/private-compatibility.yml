@@ -7,6 +7,8 @@ on:
 
 permissions:
   contents: read
+  issues: write
+  pull-requests: write
 
 concurrency:
   group: private-compat-${{ github.ref }}
@@ -36,6 +38,7 @@ jobs:
           echo "private_ref=$private_ref" >> "$GITHUB_OUTPUT"
 
       - name: Checkout private ref
+        id: checkout_private
         uses: actions/checkout@v5
         with:
           repository: wbh123/Wust-Dormitory-Select
@@ -45,11 +48,19 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
 
+      - name: Capture private head
+        id: private_head
+        working-directory: private-repo
+        shell: bash
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
       - uses: actions/setup-python@v6
+        id: setup_python
         with:
           python-version: '3.12'
 
       - uses: actions/setup-java@v5
+        id: setup_java
         with:
           distribution: temurin
           java-version: '21'
@@ -57,6 +68,7 @@ jobs:
           cache-dependency-path: private-repo/backend-java/pom.xml
 
       - uses: actions/setup-node@v6
+        id: setup_node
         with:
           node-version: '22'
           cache: npm
@@ -65,6 +77,7 @@ jobs:
             private-repo/app/package-lock.json
 
       - name: Verify permission and persistence contracts
+        id: contracts
         working-directory: private-repo
         shell: bash
         run: |
@@ -78,8 +91,10 @@ jobs:
           python scripts/ci/test_subscription_mybatis.py
           python scripts/ci/test_backend_layering.py
           python scripts/ci/test_no_embedded_sql.py
+          bash scripts/ci/run_contracts.sh
 
       - name: Verify modularization does not regress against main
+        id: modularization
         working-directory: private-repo
         shell: bash
         run: |
@@ -140,6 +155,7 @@ jobs:
           PY
 
       - name: Verify private Java modules
+        id: java_verify
         working-directory: private-repo/backend-java
         shell: bash
         run: |
@@ -147,6 +163,7 @@ jobs:
           mvn -B -ntp clean verify
 
       - name: Verify private frontend
+        id: frontend_verify
         working-directory: private-repo
         shell: bash
         env:
@@ -157,6 +174,7 @@ jobs:
           bash scripts/ci/run_frontend.sh
 
       - name: Install private mobile dependencies
+        id: mobile_install
         working-directory: private-repo/app
         shell: bash
         run: |
@@ -165,6 +183,7 @@ jobs:
           npm ci
 
       - name: Verify mobile OpenAPI drift
+        id: mobile_openapi
         working-directory: private-repo/app
         shell: bash
         run: |
@@ -173,6 +192,7 @@ jobs:
           git diff --exit-code -- src/api/schema.d.ts
 
       - name: Verify mobile tests with per-file isolation
+        id: mobile_tests
         working-directory: private-repo/app
         shell: bash
         run: |
@@ -190,9 +210,51 @@ jobs:
           done
 
       - name: Verify mobile typecheck
+        id: mobile_typecheck
         working-directory: private-repo/app
         run: npm run typecheck
 
       - name: Verify mobile production build
+        id: mobile_build
         working-directory: private-repo/app
         run: npm run build
+
+      - name: Report validation outcome
+        if: always()
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PRIVATE_HEAD: ${{ steps.private_head.outputs.sha }}
+          CHECKOUT_PRIVATE: ${{ steps.checkout_private.outcome }}
+          CONTRACTS: ${{ steps.contracts.outcome }}
+          MODULARIZATION: ${{ steps.modularization.outcome }}
+          JAVA_VERIFY: ${{ steps.java_verify.outcome }}
+          FRONTEND_VERIFY: ${{ steps.frontend_verify.outcome }}
+          MOBILE_INSTALL: ${{ steps.mobile_install.outcome }}
+          MOBILE_OPENAPI: ${{ steps.mobile_openapi.outcome }}
+          MOBILE_TESTS: ${{ steps.mobile_tests.outcome }}
+          MOBILE_TYPECHECK: ${{ steps.mobile_typecheck.outcome }}
+          MOBILE_BUILD: ${{ steps.mobile_build.outcome }}
+        run: |
+          set -euo pipefail
+          body=$(cat <<EOF
+          <!-- private-main-large-response-validation -->
+          Private main compatibility validation finished.
+
+          - private ref: main
+          - private head: ${PRIVATE_HEAD:-unresolved}
+          - private checkout: ${CHECKOUT_PRIVATE:-unknown}
+          - contracts: ${CONTRACTS:-unknown}
+          - modularization guard: ${MODULARIZATION:-unknown}
+          - Java 21 Maven clean verify: ${JAVA_VERIFY:-unknown}
+          - Web frontend CI: ${FRONTEND_VERIFY:-unknown}
+          - mobile dependency install: ${MOBILE_INSTALL:-unknown}
+          - mobile OpenAPI drift: ${MOBILE_OPENAPI:-unknown}
+          - mobile tests: ${MOBILE_TESTS:-unknown}
+          - mobile typecheck: ${MOBILE_TYPECHECK:-unknown}
+          - mobile production build: ${MOBILE_BUILD:-unknown}
+          - overall job status: ${{ job.status }}
+          - harness commit: ${{ github.sha }}
+          EOF
+          )
+          gh pr comment 229 --repo "$GITHUB_REPOSITORY" --body "$body"
