@@ -1,0 +1,2 @@
+Private Compatibility trigger for private branch perf/selection-room-profile-bootstrap-lease-20260810.
+Expected RED: PreparedRoomProfileCache does not exist yet and 1000-user diagnostic byte measurement still defaults to enabled.
