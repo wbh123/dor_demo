@@ -1,4 +1,5 @@
 private-ref=main
-validated-head=0eab0e9a49913b9b3d314056ef09568b382be2cd
-purpose=mobile dashboard PC color parity post-merge validation
-triggered-at=2026-08-17T10:18:00+08:00
+expected-main-head=439ce51d50dffc679dc301372fa340b7bf966e0e
+purpose=post-merge large-response optimization validation for PRs 495 501 502 505 506
+checks=contracts,maven-clean-verify,frontend,mobile-openapi,mobile-tests,mobile-typecheck,mobile-build
+triggered-at=2026-08-18T13:15:00+08:00
