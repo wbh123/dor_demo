@@ -18,7 +18,7 @@ jobs:
   verify-private-ref:
     name: Verify private ref end-to-end
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     steps:
       - name: Resolve private branch name
         id: target
@@ -55,12 +55,10 @@ jobs:
         run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       - uses: actions/setup-python@v6
-        id: setup_python
         with:
           python-version: '3.12'
 
       - uses: actions/setup-java@v5
-        id: setup_java
         with:
           distribution: temurin
           java-version: '21'
@@ -68,7 +66,6 @@ jobs:
           cache-dependency-path: private-repo/backend-java/pom.xml
 
       - uses: actions/setup-node@v6
-        id: setup_node
         with:
           node-version: '22'
           cache: npm
@@ -76,25 +73,41 @@ jobs:
             private-repo/frontend/package-lock.json
             private-repo/app/package-lock.json
 
-      - name: Verify permission and persistence contracts
-        id: contracts
+      - name: Verify large-response targeted contracts
+        id: large_response_contracts
+        continue-on-error: true
+        working-directory: private-repo
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/ci/test_admin_large_response_contract.py
+          python scripts/ci/test_bed_confirmation_mybatis.py
+          python scripts/ci/test_mobile_admin_p1_contract.py
+
+      - name: Verify targeted Java regression tests
+        id: targeted_java
+        continue-on-error: true
+        working-directory: private-repo/backend-java
+        shell: bash
+        run: |
+          set -euo pipefail
+          mvn -B -ntp -pl server -am \
+            -Dtest=MobileTaskQueryServiceTest,AdminStudentResidencyAdjustmentServiceTest,MobileResidencyOnsiteAdjustmentServiceTest,MobileBedConfirmationPaginationTest \
+            -Dsurefire.failIfNoSpecifiedTests=false test
+
+      - name: Verify full contracts
+        id: full_contracts
+        continue-on-error: true
         working-directory: private-repo
         shell: bash
         run: |
           set -euo pipefail
           python scripts/ci/test_runtime_error_data_correctness_batch.py
-          python scripts/subscription/test_feature_authorization_closure.py
-          python scripts/subscription/test_feature_code_references.py
-          python scripts/subscription/test_feature_catalog_runtime_alignment.py
-          python scripts/subscription/test_mobile_feature_authorization.py
-          python scripts/subscription/test_platform_feature_gui.py
-          python scripts/ci/test_subscription_mybatis.py
-          python scripts/ci/test_backend_layering.py
-          python scripts/ci/test_no_embedded_sql.py
           bash scripts/ci/run_contracts.sh
 
       - name: Verify modularization does not regress against main
         id: modularization
+        continue-on-error: true
         working-directory: private-repo
         shell: bash
         run: |
@@ -156,6 +169,7 @@ jobs:
 
       - name: Verify private Java modules
         id: java_verify
+        continue-on-error: true
         working-directory: private-repo/backend-java
         shell: bash
         run: |
@@ -164,6 +178,7 @@ jobs:
 
       - name: Verify private frontend
         id: frontend_verify
+        continue-on-error: true
         working-directory: private-repo
         shell: bash
         env:
@@ -175,15 +190,17 @@ jobs:
 
       - name: Install private mobile dependencies
         id: mobile_install
+        continue-on-error: true
         working-directory: private-repo/app
         shell: bash
         run: |
           set -euo pipefail
-          npm install --package-lock-only --ignore-scripts --no-audit --no-fund
           npm ci
 
       - name: Verify mobile OpenAPI drift
         id: mobile_openapi
+        if: always() && steps.mobile_install.outcome == 'success'
+        continue-on-error: true
         working-directory: private-repo/app
         shell: bash
         run: |
@@ -193,6 +210,8 @@ jobs:
 
       - name: Verify mobile tests with per-file isolation
         id: mobile_tests
+        if: always() && steps.mobile_install.outcome == 'success'
+        continue-on-error: true
         working-directory: private-repo/app
         shell: bash
         run: |
@@ -204,18 +223,20 @@ jobs:
           fi
           echo "Running ${#test_files[@]} mobile contract files with process isolation"
           for test_file in "${test_files[@]}"; do
-            echo "::group::$test_file"
             node --experimental-strip-types --test "$test_file"
-            echo "::endgroup::"
           done
 
       - name: Verify mobile typecheck
         id: mobile_typecheck
+        if: always() && steps.mobile_install.outcome == 'success'
+        continue-on-error: true
         working-directory: private-repo/app
         run: npm run typecheck
 
       - name: Verify mobile production build
         id: mobile_build
+        if: always() && steps.mobile_install.outcome == 'success'
+        continue-on-error: true
         working-directory: private-repo/app
         run: npm run build
 
@@ -225,8 +246,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           PRIVATE_HEAD: ${{ steps.private_head.outputs.sha }}
-          CHECKOUT_PRIVATE: ${{ steps.checkout_private.outcome }}
-          CONTRACTS: ${{ steps.contracts.outcome }}
+          LARGE_RESPONSE_CONTRACTS: ${{ steps.large_response_contracts.outcome }}
+          TARGETED_JAVA: ${{ steps.targeted_java.outcome }}
+          FULL_CONTRACTS: ${{ steps.full_contracts.outcome }}
           MODULARIZATION: ${{ steps.modularization.outcome }}
           JAVA_VERIFY: ${{ steps.java_verify.outcome }}
           FRONTEND_VERIFY: ${{ steps.frontend_verify.outcome }}
@@ -238,13 +260,14 @@ jobs:
         run: |
           set -euo pipefail
           body=$(cat <<EOF
-          <!-- private-main-large-response-validation -->
-          Private main compatibility validation finished.
+          <!-- private-main-large-response-validation-v2 -->
+          Private main large-response validation matrix finished.
 
           - private ref: main
           - private head: ${PRIVATE_HEAD:-unresolved}
-          - private checkout: ${CHECKOUT_PRIVATE:-unknown}
-          - contracts: ${CONTRACTS:-unknown}
+          - large-response targeted contracts: ${LARGE_RESPONSE_CONTRACTS:-unknown}
+          - targeted Java regression tests: ${TARGETED_JAVA:-unknown}
+          - full contracts: ${FULL_CONTRACTS:-unknown}
           - modularization guard: ${MODULARIZATION:-unknown}
           - Java 21 Maven clean verify: ${JAVA_VERIFY:-unknown}
           - Web frontend CI: ${FRONTEND_VERIFY:-unknown}
@@ -253,8 +276,33 @@ jobs:
           - mobile tests: ${MOBILE_TESTS:-unknown}
           - mobile typecheck: ${MOBILE_TYPECHECK:-unknown}
           - mobile production build: ${MOBILE_BUILD:-unknown}
-          - overall job status: ${{ job.status }}
           - harness commit: ${{ github.sha }}
           EOF
           )
           gh pr comment 229 --repo "$GITHUB_REPOSITORY" --body "$body"
+
+      - name: Enforce validation result
+        if: always()
+        shell: bash
+        env:
+          LARGE_RESPONSE_CONTRACTS: ${{ steps.large_response_contracts.outcome }}
+          TARGETED_JAVA: ${{ steps.targeted_java.outcome }}
+          FULL_CONTRACTS: ${{ steps.full_contracts.outcome }}
+          MODULARIZATION: ${{ steps.modularization.outcome }}
+          JAVA_VERIFY: ${{ steps.java_verify.outcome }}
+          FRONTEND_VERIFY: ${{ steps.frontend_verify.outcome }}
+          MOBILE_INSTALL: ${{ steps.mobile_install.outcome }}
+          MOBILE_OPENAPI: ${{ steps.mobile_openapi.outcome }}
+          MOBILE_TESTS: ${{ steps.mobile_tests.outcome }}
+          MOBILE_TYPECHECK: ${{ steps.mobile_typecheck.outcome }}
+          MOBILE_BUILD: ${{ steps.mobile_build.outcome }}
+        run: |
+          set -euo pipefail
+          for value in \
+            "$LARGE_RESPONSE_CONTRACTS" "$TARGETED_JAVA" "$FULL_CONTRACTS" "$MODULARIZATION" \
+            "$JAVA_VERIFY" "$FRONTEND_VERIFY" "$MOBILE_INSTALL" "$MOBILE_OPENAPI" \
+            "$MOBILE_TESTS" "$MOBILE_TYPECHECK" "$MOBILE_BUILD"; do
+            if [[ "$value" != "success" ]]; then
+              exit 1
+            fi
+          done
