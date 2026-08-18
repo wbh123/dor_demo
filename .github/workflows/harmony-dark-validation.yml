@@ -15,7 +15,7 @@ permissions:
 jobs:
   validate:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 35
     steps:
       - name: Checkout private branch
         uses: actions/checkout@v5
@@ -40,3 +40,15 @@ jobs:
       - name: Run HarmonyOS appearance contract
         working-directory: app
         run: node --experimental-strip-types --test src/platform/native-appearance-contract.spec.ts
+      - name: Run full mobile tests
+        working-directory: app
+        run: npm test
+      - name: Run mobile typecheck
+        working-directory: app
+        run: npm run typecheck
+      - name: Build production bundle
+        working-directory: app
+        run: npm run build
+      - name: Build Android debug APK
+        working-directory: app
+        run: npm run android:build:debug
