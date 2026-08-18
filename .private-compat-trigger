@@ -1,0 +1,5 @@
+Private compatibility trigger
+
+Validated private branch: verify/selection-room-profile-latest-main-20260810
+Purpose: validate all latest-main compatibility fixes plus selection performance integration, Java 21 Maven and frontend.
+Nonce: 2026-08-10-selection-room-profile-verify-latest-main-8
