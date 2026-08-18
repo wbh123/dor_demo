@@ -1,0 +1,147 @@
+name: Private Large Response Targeted CI
+
+on:
+  push:
+    branches:
+      - 'large-response/**'
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  targeted:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout private main
+        id: checkout_private
+        uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: main
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Capture private head
+        id: private_head
+        working-directory: private-repo
+        shell: bash
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: private-repo/backend-java/pom.xml
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            private-repo/frontend/package-lock.json
+            private-repo/app/package-lock.json
+
+      - name: Large-response contracts
+        id: contracts
+        continue-on-error: true
+        working-directory: private-repo
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/ci/test_admin_large_response_contract.py
+          python scripts/ci/test_bed_confirmation_mybatis.py
+          python scripts/ci/test_mobile_admin_p1_contract.py
+
+      - name: Targeted Java tests
+        id: java
+        continue-on-error: true
+        working-directory: private-repo/backend-java
+        shell: bash
+        run: |
+          set -euo pipefail
+          mvn -B -ntp -pl server -am \
+            -Dtest=MobileTaskQueryServiceTest,AdminStudentResidencyAdjustmentServiceTest,MobileResidencyOnsiteAdjustmentServiceTest,MobileBedConfirmationPaginationTest \
+            -Dsurefire.failIfNoSpecifiedTests=false test
+
+      - name: Frontend residency selector regression
+        id: frontend_selector
+        continue-on-error: true
+        working-directory: private-repo/frontend
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci
+          node --experimental-strip-types --test src/features/residency/useResidencyAdjustmentSelector.spec.ts
+
+      - name: Mobile onsite/task regression
+        id: mobile_onsite
+        continue-on-error: true
+        working-directory: private-repo/app
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci
+          node --experimental-strip-types --test src/platform/mobile-onsite-task-label-closure.spec.ts
+
+      - name: Mobile OpenAPI drift
+        id: mobile_openapi
+        continue-on-error: true
+        working-directory: private-repo/app
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run generate:api
+          git diff --exit-code -- src/api/schema.d.ts
+
+      - name: Report targeted outcome
+        if: always()
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PRIVATE_HEAD: ${{ steps.private_head.outputs.sha }}
+          CONTRACTS: ${{ steps.contracts.outcome }}
+          JAVA: ${{ steps.java.outcome }}
+          FRONTEND_SELECTOR: ${{ steps.frontend_selector.outcome }}
+          MOBILE_ONSITE: ${{ steps.mobile_onsite.outcome }}
+          MOBILE_OPENAPI: ${{ steps.mobile_openapi.outcome }}
+        run: |
+          set -euo pipefail
+          body=$(cat <<EOF
+          <!-- private-main-large-response-targeted -->
+          Targeted large-response validation finished.
+
+          - private head: ${PRIVATE_HEAD:-unresolved}
+          - large-response contracts: ${CONTRACTS:-unknown}
+          - targeted Java tests: ${JAVA:-unknown}
+          - frontend residency selector regression: ${FRONTEND_SELECTOR:-unknown}
+          - mobile onsite/task regression: ${MOBILE_ONSITE:-unknown}
+          - mobile OpenAPI drift: ${MOBILE_OPENAPI:-unknown}
+          - harness commit: ${{ github.sha }}
+          EOF
+          )
+          gh pr comment 229 --repo "$GITHUB_REPOSITORY" --body "$body"
+
+      - name: Enforce targeted result
+        if: always()
+        shell: bash
+        env:
+          CONTRACTS: ${{ steps.contracts.outcome }}
+          JAVA: ${{ steps.java.outcome }}
+          FRONTEND_SELECTOR: ${{ steps.frontend_selector.outcome }}
+          MOBILE_ONSITE: ${{ steps.mobile_onsite.outcome }}
+          MOBILE_OPENAPI: ${{ steps.mobile_openapi.outcome }}
+        run: |
+          set -euo pipefail
+          for value in "$CONTRACTS" "$JAVA" "$FRONTEND_SELECTOR" "$MOBILE_ONSITE" "$MOBILE_OPENAPI"; do
+            [[ "$value" == "success" ]] || exit 1
+          done
