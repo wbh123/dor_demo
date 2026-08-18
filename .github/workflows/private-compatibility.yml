@@ -79,8 +79,18 @@ jobs:
         working-directory: private-repo/backend-java
         shell: bash
         run: |
-          set -euo pipefail
-          mvn -B -ntp clean verify
+          set -uo pipefail
+          mvn -B -ntp clean verify 2>&1 | tee /tmp/private-maven.log
+          mvn_status=${PIPESTATUS[0]}
+          if [[ "$mvn_status" -ne 0 ]]; then
+            echo "::group::Maven failure summary"
+            grep -E '^\[ERROR\]|BUILD FAILURE|COMPILATION ERROR|Tests run:|Failures:|Errors:|Caused by:' /tmp/private-maven.log | tail -n 400 || true
+            echo "::endgroup::"
+            echo "::group::Surefire/Failsafe failure reports"
+            find . -type f \( -path '*/target/surefire-reports/*.txt' -o -path '*/target/failsafe-reports/*.txt' \) -print -exec tail -n 240 {} \; || true
+            echo "::endgroup::"
+          fi
+          exit "$mvn_status"
 
       - name: Verify private frontend
         working-directory: private-repo
