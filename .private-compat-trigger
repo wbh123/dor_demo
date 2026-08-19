@@ -1,0 +1,5 @@
+private-ref=phase9-compat-main-20260820
+expected-private-main=83106bdb362fb3e4d7a980d04c0cd941bfdfd68f
+purpose=Phase 9 post-merge runtime validation through dor_demo Private Compatibility CI
+checks=contracts,maven-clean-verify,frontend
+triggered-at=2026-08-20T00:59:00+08:00
