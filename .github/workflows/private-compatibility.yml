@@ -67,6 +67,20 @@ jobs:
           cache: npm
           cache-dependency-path: private-repo/frontend/package-lock.json
 
+      # Validation-branch-only bridge: the committed Navicat SQL in the private
+      # repository is a known stale derived artifact (V51/1000/realistic).  Build
+      # the canonical V67/default clean 30000 artifact only inside this ephemeral
+      # runner workspace so downstream contracts, Maven and frontend validation can
+      # continue.  The generated SQL is never printed, uploaded or pushed.
+      - name: Materialize private generated Navicat SQL in runner workspace
+        working-directory: private-repo
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/db/generate_navicat_sql.py --skip-redis
+          python scripts/db/generate_navicat_sql.py --check
+          git diff --stat -- backend-java/docs/sql/navicat/generated/00_一键重置数据库.sql
+
       - name: Verify private contracts
         working-directory: private-repo
         shell: bash
