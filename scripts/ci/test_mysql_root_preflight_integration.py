@@ -21,12 +21,13 @@ WUST_DORMITORY_NGINX_IMAGE=nginx:1.28-alpine
 
 
 class MysqlRootPreflightIntegrationTest(unittest.TestCase):
-    def run_prepare(self, filename: str) -> tuple[subprocess.CompletedProcess[str], Path]:
+    def run_prepare(self, filename: str) -> tuple[subprocess.CompletedProcess[str], Path, Path]:
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
         root = Path(temporary.name)
         env_file = root / filename
         env_file.write_text(ENV_CONTENT, encoding="utf-8")
+        env_file.chmod(0o644)
         bin_dir = root / "bin"
         bin_dir.mkdir()
         fake = bin_dir / "docker"
@@ -44,19 +45,21 @@ exit 0
         env = os.environ.copy()
         env["PATH"] = f"{bin_dir}:{env['PATH']}"
         result = subprocess.run(["bash", str(PREPARE), str(env_file)], text=True, capture_output=True, check=False, env=env)
-        return result, root
+        return result, root, env_file
 
-    def test_real_env_runs_guard_and_persists_hash_state(self) -> None:
-        result, root = self.run_prepare(".env")
+    def test_real_env_runs_guard_persists_hash_and_is_mode_0600(self) -> None:
+        result, root, env_file = self.run_prepare(".env")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         state = root / "data/deploy/mysql-root-state.env"
         self.assertTrue(state.exists())
         self.assertIn("MYSQL_ROOT_PASSWORD_SHA256=", state.read_text(encoding="utf-8"))
+        self.assertEqual(stat.S_IMODE(env_file.stat().st_mode), 0o600)
 
-    def test_example_env_skips_database_state_guard(self) -> None:
-        result, root = self.run_prepare(".env.example")
+    def test_example_env_skips_database_state_guard_and_keeps_template_mode(self) -> None:
+        result, root, env_file = self.run_prepare(".env.example")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertFalse((root / "data/deploy/mysql-root-state.env").exists())
+        self.assertEqual(stat.S_IMODE(env_file.stat().st_mode), 0o644)
 
 
 if __name__ == "__main__":
