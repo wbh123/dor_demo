@@ -136,6 +136,7 @@ restore_host_apt_sources() {
 
 cleanup_host_apt() {
   local status=$?
+  trap - EXIT
   restore_host_apt_sources || true
   exit "${status}"
 }
@@ -152,13 +153,13 @@ fi
 if (( need_prerequisites == 1 )); then
   echo "安装宿主机基础依赖（ca-certificates/curl/git/coreutils/login）。"
   configure_mainland_host_apt
-  if ! (run_root apt-get update && run_root apt-get install -y --no-install-recommends ca-certificates curl git coreutils login); then
+  if run_root apt-get update && run_root apt-get install -y --no-install-recommends ca-certificates curl git coreutils login; then
+    restore_host_apt_sources
+  else
     echo "宿主机 APT 国内镜像不可用，恢复原 APT 配置并重试。" >&2
     restore_host_apt_sources
     run_root apt-get update
     run_root apt-get install -y --no-install-recommends ca-certificates curl git coreutils login
-  else
-    restore_host_apt_sources
   fi
 fi
 
