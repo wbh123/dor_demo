@@ -43,7 +43,7 @@ jobs:
         run: python3 scripts/ci/test_build_env_hash_plan.py
       - name: Validate deferred APP build after skip-app
         run: python3 scripts/ci/test_app_build_pending.py
-      - name: Validate per-service runtime env restart planning
+      - name: Validate split persistent server and init env planning
         run: python3 scripts/ci/test_runtime_env_service_plan.py
       - name: Validate MySQL root credential guard
         run: python3 scripts/ci/test_mysql_root_guard.py
