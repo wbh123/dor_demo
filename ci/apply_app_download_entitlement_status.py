@@ -37,9 +37,3 @@ if 'schoolAdminEditable' in payload:
 
 PATH.write_text(text, encoding='utf-8')
 print('read-only school theme entitlement status applied')
-
-# The repository-wide SQL gate also exposes two post-baseline embedded-SQL debts on current main.
-# Apply the narrow MyBatis migration in the same candidate workspace so the final full gate validates both.
-cleanup = Path(__file__).with_name('apply_mybatis_sql_gate_cleanup.py')
-namespace = {'__name__': '__main__'}
-exec(compile(cleanup.read_text(encoding='utf-8'), str(cleanup), 'exec'), namespace)
