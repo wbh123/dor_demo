@@ -45,6 +45,8 @@ jobs:
         run: python3 scripts/ci/test_app_build_pending.py
       - name: Validate per-service runtime env restart planning
         run: python3 scripts/ci/test_runtime_env_service_plan.py
+      - name: Validate MySQL root credential guard
+        run: python3 scripts/ci/test_mysql_root_guard.py
       - name: Validate mainland container image mirror tags and fallback
         run: python3 scripts/ci/test_container_image_mirrors.py
       - name: Validate source and release runtime image preflight modes
