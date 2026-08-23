@@ -96,6 +96,10 @@ jobs:
           fi
           echo "java_regression=$java_regression" >> "$result"
 
+          python private-repo/scripts/ci/test_site_metadata_openapi_contract.py > /tmp/openapi-contract.log 2>&1
+          openapi_contract=$?
+          echo "openapi_contract=$openapi_contract" >> "$result"
+
           cd private-repo/frontend
           npm ci --no-audit --no-fund > /tmp/npm-ci.log 2>&1
           npm_ci=$?
@@ -117,7 +121,7 @@ jobs:
           echo "frontend_build=$frontend_build" >> "$result"
 
           overall=0
-          for code in "$java_compile" "$java_regression" "$npm_ci" "$frontend_test" "$frontend_build"; do
+          for code in "$java_compile" "$java_regression" "$openapi_contract" "$npm_ci" "$frontend_test" "$frontend_build"; do
             if [[ "$code" -ne 0 ]]; then overall=1; fi
           done
           echo "overall=$overall" >> "$result"
@@ -126,6 +130,7 @@ jobs:
             for pair in \
               "java_compile:/tmp/java-compile.log:$java_compile" \
               "java_regression:/tmp/java-regression.log:$java_regression" \
+              "openapi_contract:/tmp/openapi-contract.log:$openapi_contract" \
               "npm_ci:/tmp/npm-ci.log:$npm_ci" \
               "frontend_test:/tmp/frontend-test.log:$frontend_test" \
               "frontend_build:/tmp/frontend-build.log:$frontend_build"; do
@@ -134,7 +139,7 @@ jobs:
                 {
                   echo
                   echo "===== ${label} failure tail ====="
-                  tail -n 120 "$logfile"
+                  tail -n 140 "$logfile"
                 } >> "$result"
               fi
             done
