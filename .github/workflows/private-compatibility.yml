@@ -94,6 +94,8 @@ jobs:
             IFS=: read -r label log code <<< "$pair"
             if [[ $code -ne 0 && -f "$log" ]]; then echo "===== $label failure tail =====" >> "$result"; tail -n 180 "$log" >> "$result"; fi
           done
+          echo "===== validation summary ====="
+          cat "$result"
           if [[ $overall -eq 0 ]]; then
             cd private-repo
             git config user.name github-actions[bot]
