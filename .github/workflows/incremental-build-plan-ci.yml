@@ -41,6 +41,8 @@ jobs:
         run: python3 scripts/ci/test_build_env_hash_plan.py
       - name: Validate deferred APP build after skip-app
         run: python3 scripts/ci/test_app_build_pending.py
+      - name: Validate per-service runtime env restart planning
+        run: python3 scripts/ci/test_runtime_env_service_plan.py
       - name: Validate mainland container image mirror tags and fallback
         run: python3 scripts/ci/test_container_image_mirrors.py
       - name: Validate source and release runtime image preflight modes
