@@ -4,11 +4,6 @@ on:
   push:
     branches:
       - 'private-compat/**'
-  pull_request:
-    branches:
-      - main
-    paths:
-      - '.private-compat-trigger'
 
 permissions:
   contents: read
@@ -21,16 +16,15 @@ jobs:
   verify-private-ref:
     name: Verify private integration ref
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 35
     steps:
       - name: Resolve private branch name
         id: target
         shell: bash
         run: |
           set -euo pipefail
-          candidate="${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}"
-          private_ref="${candidate#private-compat/}"
-          if [[ -z "$private_ref" || "$private_ref" == "$candidate" ]]; then
+          private_ref="${GITHUB_REF_NAME#private-compat/}"
+          if [[ -z "$private_ref" || "$private_ref" == "$GITHUB_REF_NAME" ]]; then
             echo "Invalid compatibility branch name" >&2
             exit 1
           fi
@@ -40,13 +34,6 @@ jobs:
           fi
           echo "private_ref=$private_ref" >> "$GITHUB_OUTPUT"
 
-      - name: Checkout CI helper branch
-        uses: actions/checkout@v5
-        with:
-          ref: ${{ github.head_ref || github.ref_name }}
-          path: ci-tools
-          persist-credentials: false
-
       - name: Checkout private integration branch
         uses: actions/checkout@v5
         with:
@@ -54,31 +41,8 @@ jobs:
           ref: ${{ steps.target.outputs.private_ref }}
           token: ${{ secrets.PRIVATE_CI }}
           path: private-repo
-          persist-credentials: true
+          persist-credentials: false
           fetch-depth: 0
-
-      - name: Apply requested fixes to private branch
-        shell: bash
-        run: |
-          set -euo pipefail
-          python - <<'PY'
-          from pathlib import Path
-          p = Path('ci-tools/ci/apply_admin_requested_fixes.py')
-          text = p.read_text(encoding='utf-8')
-          start = text.index("# 4. Import attempts:")
-          tail = text.index("p = 'frontend/src/components/admin/ImportWorkflowModal.vue'", start)
-          fixed = '''# 4. Import attempts: generated per-click key, explicit keys retain transport retry semantics.\np = 'backend-java/server/src/main/java/com/wust/dormitory/importworkflow/ImportWorkflowService.java'\nreplace(p, \'\'\'    private String normalizeIdempotencyKey(String supplied, String type, String digest) {\n        String trimmed = supplied == null ? "" : supplied.trim();\n        if (!trimmed.isBlank()) return trimmed;\n        if ("ROOM".equals(type)) {\n            String policy = importPolicyService.roomAutoCreateBuildingEnabled() ? "AUTO_BUILDING_ON" : "AUTO_BUILDING_OFF";\n            return type + ':' + digest + ':' + policy;\n        }\n        return type + ':' + digest;\n    }\'\'\',\n\'\'\'    private String normalizeIdempotencyKey(String supplied, String type, String digest) {\n        String trimmed = supplied == null ? "" : supplied.trim();\n        if (!trimmed.isBlank()) return trimmed;\n        return "attempt:" + type + ':' + UUID.randomUUID();\n    }\'\'\')\n\n'''
-          p.write_text(text[:start] + fixed + text[tail:], encoding='utf-8')
-          PY
-          python ci-tools/ci/apply_admin_requested_fixes.py
-          cd private-repo
-          if ! git diff --quiet; then
-            git config user.name github-actions[bot]
-            git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-            git add -A
-            git commit -m "fix: complete admin scope branding import and scroll changes"
-            git push origin HEAD:${{ steps.target.outputs.private_ref }}
-          fi
 
       - uses: actions/setup-java@v5
         with:
@@ -93,7 +57,12 @@ jobs:
           cache: npm
           cache-dependency-path: private-repo/frontend/package-lock.json
 
-      - name: Run focused Java regression tests
+      - name: Compile Java production and test sources
+        working-directory: private-repo
+        shell: bash
+        run: mvn -f backend-java/pom.xml -B -ntp -pl server -am -DskipTests package
+
+      - name: Run requested Java regressions
         working-directory: private-repo
         shell: bash
         run: >-
@@ -101,11 +70,14 @@ jobs:
           -Dtest=AdminNoScopeGrantRegressionTest,WelcomeBrandDefaultsRegressionTest,ImportAttemptHistoryRegressionTest
           -Dsurefire.failIfNoSpecifiedTests=false test
 
-      - name: Run focused frontend regression tests
+      - name: Install frontend dependencies
         working-directory: private-repo/frontend
-        shell: bash
-        run: |
-          set -euo pipefail
-          npm ci --no-audit --no-fund
-          npm run generate:api
-          node --experimental-strip-types --test src/views/admin/requested-admin-fixes.spec.ts
+        run: npm ci --no-audit --no-fund
+
+      - name: Run frontend regression suite
+        working-directory: private-repo/frontend
+        run: npm test
+
+      - name: Typecheck and build frontend
+        working-directory: private-repo/frontend
+        run: npm run build
