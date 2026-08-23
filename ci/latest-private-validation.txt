@@ -1,6 +1,6 @@
 private_ref=fix/admin-scopes-branding-import-scroll-20260823
-private_sha=691c3991d71a80ea322265d7ad5973d756e7a29a
-validated_at=2026-08-23T10:28:16Z
+private_sha=3a977faf8f9c6aedd91421cb38913f882775789f
+validated_at=2026-08-23T10:33:29Z
 java_compile=0
 java_regression=1
 npm_ci=0
@@ -9,16 +9,6 @@ frontend_build=2
 overall=1
 
 ===== java_regression failure tail =====
-[INFO] Changes detected - recompiling the module! :source
-[INFO] Compiling 179 source files with javac [debug target 21] to target/classes
-[INFO] 
-[INFO] --- resources:3.4.0:testResources (default-testResources) @ model ---
-[INFO] skip non existing resourceDirectory /home/runner/work/dor_demo/dor_demo/private-repo/backend-java/model/src/test/resources
-[INFO] 
-[INFO] --- compiler:3.11.0:testCompile (default-testCompile) @ model ---
-[INFO] No sources to compile
-[INFO] 
-[INFO] --- surefire:3.0.0-M9:test (default-test) @ model ---
 [INFO] No tests to run.
 [INFO] 
 [INFO] ---------------------< com.wust.dormitory:server >----------------------
@@ -78,12 +68,19 @@ WARNING: A Java agent has been loaded dynamically (/home/runner/.m2/repository/n
 WARNING: If a serviceability tool is in use, please run with -XX:+EnableDynamicAgentLoading to hide this warning
 WARNING: If a serviceability tool is not in use, please run with -Djdk.instrument.traceUsage for more information
 WARNING: Dynamic loading of agents will be disallowed by default in a future release
-[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.06 s - in com.wust.dormitory.importworkflow.ImportAttemptHistoryRegressionTest
+[ERROR] Tests run: 3, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 1.133 s <<< FAILURE! - in com.wust.dormitory.importworkflow.ImportAttemptHistoryRegressionTest
+[ERROR] com.wust.dormitory.importworkflow.ImportAttemptHistoryRegressionTest.roomUploadCapturesThePolicyUsedWhenTheTaskWasCreated  Time elapsed: 0.024 s  <<< FAILURE!
+org.opentest4j.AssertionFailedError: 
+
+expected: {"roomAutoCreateBuilding"=true}
+ but was: null
+	at com.wust.dormitory.importworkflow.ImportAttemptHistoryRegressionTest.roomUploadCapturesThePolicyUsedWhenTheTaskWasCreated(ImportAttemptHistoryRegressionTest.java:68)
+
 [INFO] Running com.wust.dormitory.accountadmin.AdminNoScopeGrantRegressionTest
-[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.306 s - in com.wust.dormitory.accountadmin.AdminNoScopeGrantRegressionTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.313 s - in com.wust.dormitory.accountadmin.AdminNoScopeGrantRegressionTest
 [INFO] Running com.wust.dormitory.admin.SiteMetadataAssetServiceRegressionTest
-[ERROR] Tests run: 1, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 0.298 s <<< FAILURE! - in com.wust.dormitory.admin.SiteMetadataAssetServiceRegressionTest
-[ERROR] com.wust.dormitory.admin.SiteMetadataAssetServiceRegressionTest.publicUrlIncludesStoredDigestSoReplacingAssetInvalidatesCaches  Time elapsed: 0.294 s  <<< FAILURE!
+[ERROR] Tests run: 1, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 0.28 s <<< FAILURE! - in com.wust.dormitory.admin.SiteMetadataAssetServiceRegressionTest
+[ERROR] com.wust.dormitory.admin.SiteMetadataAssetServiceRegressionTest.publicUrlIncludesStoredDigestSoReplacingAssetInvalidatesCaches  Time elapsed: 0.278 s  <<< FAILURE!
 org.opentest4j.AssertionFailedError: expected: </api/v1/public/site-assets/SQUARE_LOGO?v=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef> but was: </api/v1/public/site-assets/SQUARE_LOGO>
 	at org.junit.jupiter.api.AssertionFailureBuilder.build(AssertionFailureBuilder.java:158)
 	at org.junit.jupiter.api.AssertionFailureBuilder.buildAndThrow(AssertionFailureBuilder.java:139)
@@ -94,26 +91,29 @@ org.opentest4j.AssertionFailedError: expected: </api/v1/public/site-assets/SQUAR
 	at com.wust.dormitory.admin.SiteMetadataAssetServiceRegressionTest.publicUrlIncludesStoredDigestSoReplacingAssetInvalidatesCaches(SiteMetadataAssetServiceRegressionTest.java:38)
 
 [INFO] Running com.wust.dormitory.admin.WelcomeBrandDefaultsRegressionTest
-[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.148 s - in com.wust.dormitory.admin.WelcomeBrandDefaultsRegressionTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.142 s - in com.wust.dormitory.admin.WelcomeBrandDefaultsRegressionTest
 [INFO] 
 [INFO] Results:
 [INFO] 
 [ERROR] Failures: 
 [ERROR]   SiteMetadataAssetServiceRegressionTest.publicUrlIncludesStoredDigestSoReplacingAssetInvalidatesCaches:38 expected: </api/v1/public/site-assets/SQUARE_LOGO?v=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef> but was: </api/v1/public/site-assets/SQUARE_LOGO>
+[ERROR]   ImportAttemptHistoryRegressionTest.roomUploadCapturesThePolicyUsedWhenTheTaskWasCreated:68 
+expected: {"roomAutoCreateBuilding"=true}
+ but was: null
 [INFO] 
-[ERROR] Tests run: 6, Failures: 1, Errors: 0, Skipped: 0
+[ERROR] Tests run: 7, Failures: 2, Errors: 0, Skipped: 0
 [INFO] 
 [INFO] ------------------------------------------------------------------------
 [INFO] Reactor Summary for Wust Dormitory Select Server 1.0.0-SNAPSHOT:
 [INFO] 
 [INFO] Wust Dormitory Select Server ....................... SUCCESS [  0.002 s]
-[INFO] model .............................................. SUCCESS [  9.271 s]
-[INFO] server ............................................. FAILURE [ 21.077 s]
+[INFO] model .............................................. SUCCESS [  9.024 s]
+[INFO] server ............................................. FAILURE [ 18.977 s]
 [INFO] ------------------------------------------------------------------------
 [INFO] BUILD FAILURE
 [INFO] ------------------------------------------------------------------------
-[INFO] Total time:  30.662 s
-[INFO] Finished at: 2026-08-23T10:29:38Z
+[INFO] Total time:  28.334 s
+[INFO] Finished at: 2026-08-23T10:34:52Z
 [INFO] ------------------------------------------------------------------------
 [ERROR] Failed to execute goal org.apache.maven.plugins:maven-surefire-plugin:3.0.0-M9:test (default-test) on project server: There are test failures.
 [ERROR] 
@@ -131,104 +131,104 @@ org.opentest4j.AssertionFailedError: expected: </api/v1/public/site-assets/SQUAR
 [ERROR]   mvn <args> -rf :server
 
 ===== frontend_test failure tail =====
+      try {
+        const response = await api.post<ObjectSuccessResponse>(`/api/v1/admin/import-tasks/${selected.value.taskId}/commit`)
+        const task = (response.data.data ?? {}) as DataObject
+        selected.value = task
+        message.value = '正式导入已进入后台队列，可以关闭窗口等待完成。'
+        if (isImportTaskActive(task.status)) beginPolling(String(task.taskId))
+      } catch (cause) {
+        error.value = translateError(cause)
+      } finally {
+        loading.value = false
+      }
+    }
     
-        <section class="panel policy-panel">
-          <div class="section-head">
-            <div><span class="eyebrow">宿舍导入策略</span><h3>不存在的楼栋</h3></div>
-            <span class="status-chip">{{ importSettings.roomAutoCreateBuilding ? '允许自动创建' : '必须提前创建' }}</span>
-          </div>
-          <div class="policy-row">
-            <label class="policy-toggle">
-              <input v-model="importSettings.roomAutoCreateBuilding" type="checkbox" />
-              <span><strong>允许宿舍导入自动创建不存在的楼栋</strong><small>关闭时，后台预检遇到未知楼栋会记录错误；开启后，正式提交时才自动创建楼栋，预检本身不会写正式业务数据。</small></span>
-            </label>
-            <button class="button secondary" :disabled="savingSettings" @click="saveImportSettings">{{ savingSettings ? '保存中…' : '保存策略' }}</button>
-          </div>
-          <p class="policy-note">安全规则：默认关闭；校区仍必须提前存在且启用。正式提交会再次读取当前策略，因此管理员可以在提交前关闭自动创建。</p>
-        </section>
+    async function exportErrors() {
+      if (!selected.value?.taskId) return
+      try {
+        const response = await api.get(`/api/v1/admin/import-tasks/${selected.value.taskId}/errors.csv`, { responseType: 'blob' })
+        const url = URL.createObjectURL(response.data as Blob)
+        const anchor = document.createElement('a')
+        anchor.href = url
+        anchor.download = `${props.importType === 'STUDENT' ? '学生' : '宿舍'}导入错误报告.csv`
+        anchor.click()
+        URL.revokeObjectURL(url)
+      } catch (cause) {
+        error.value = translateError(cause)
+      }
+    }
     
-        <section class="panel preview-panel">
-          <div class="section-head">
-            <div><span class="eyebrow">创建任务</span><h3>上传文件</h3></div>
-          </div>
-          <form class="preview-form" @submit.prevent="preview">
-            <label><span>数据类型</span><select v-model="form.importType" class="input"><option value="STUDENT">学生数据</option><option value="ROOM">宿舍数据</option></select></label>
-            <label><span>导入文件</span><input class="input" type="file" accept=".csv,.xls,.xlsx" required @change="chooseFile" /></label>
-            <button class="button primary" :disabled="loading">{{ loading ? '上传中…' : '上传并创建后台预检' }}</button>
+    function statusLabel(value: unknown) {
+      return ({
+        PREVIEW_QUEUED: '等待预检', PREVIEWING: '正在预检', PREVIEWED: '预检完成', PREVIEW_FAILED: '预检失败',
+        COMMIT_QUEUED: '等待导入', COMMITTING: '正在导入', COMMITTED: '导入完成', COMMIT_FAILED: '导入失败',
+        ROLLBACK_QUEUED: '等待回滚', ROLLING_BACK: '正在回滚', ROLLED_BACK: '已回滚', ROLLBACK_FAILED: '回滚失败',
+      } as Record<string, string>)[String(value ?? '')] ?? String(value ?? '-')
+    }
+    </script>
+    
+    <template>
+      <div v-if="open" class="modal-overlay import-workflow-overlay" @click.self="close">
+        <section class="modal-card import-workflow-dialog" role="dialog" aria-modal="true" aria-labelledby="import-workflow-title">
+          <header class="section-head split-title compact-section-head">
+            <div><span class="eyebrow">批量导入</span><h3 id="import-workflow-title">{{ title }}</h3><p>上传后由后台完成预检和正式导入，关闭页面不会中断任务。</p></div>
+            <button class="button ghost small" type="button" :disabled="loading || savingPolicy" @click="close">关闭</button>
+          </header>
+    
+          <p v-if="error" class="alert error">{{ error }}</p>
+          <p v-if="message" class="alert success">{{ message }}</p>
+    
+          <section v-if="importType === 'ROOM'" class="room-import-policy">
+            <div>
+              <strong>不存在的楼栋</strong>
+              <small>默认禁止自动创建。关闭时请先在“宿舍资源”创建楼栋；开启后，预检只验证，正式提交时才自动创建。</small>
+            </div>
+            <label class="policy-switch"><input v-model="roomAutoCreateBuilding" type="checkbox" /><span>{{ roomAutoCreateBuilding ? '允许自动创建' : '必须提前创建' }}</span></label>
+            <button class="button secondary small" type="button" :disabled="savingPolicy || loading" @click="saveRoomImportPolicy">{{ savingPolicy ? '保存中…' : '保存策略' }}</button>
+          </section>
+    
+          <form class="import-workflow-form" @submit.prevent="preview">
+            <label><span>选择 Excel 或 CSV 文件</span><input ref="fileInput" class="input" type="file" accept=".csv,.xls,.xlsx" required @change="chooseFile" /></label>
+            <button class="button primary" :disabled="!file || loading">{{ loading ? '上传中…' : '上传并创建预检任务' }}</button>
           </form>
-        </section>
     
-        <section class="workspace-grid">
-          <article class="panel task-list">
-            <div class="section-head"><div><span class="eyebrow">任务历史</span><h3>学生 / 宿舍导入</h3></div><span>{{ tasks.length }} 项</span></div>
-            <div class="task-history-scroll">
-              <button v-for="task in tasks" :key="String(task.taskId)" class="task-row" :class="{ active: selected?.taskId === task.taskId }" @click="selectTask(task)">
-                <span><strong>{{ task.fileName }}</strong><small>{{ task.importType === 'STUDENT' ? '学生' : '宿舍' }} · {{ statusLabel(task.status) }}</small><small>{{ task.createdAt || task.created_at || '时间未记录' }}</small></span>
-                <em>{{ Number(task.processedRows ?? 0) }}/{{ Number(task.totalRows ?? 0) }}</em>
-              </button>
-              <p v-if="!tasks.length" class="empty-state">暂无导入任务</p>
+          <section v-if="selected" class="import-preview-result">
+            <div class="task-status-line">
+              <span class="status-chip">{{ statusLabel(selected.status) }}</span>
+              <span v-if="selected.taskId" class="task-id">任务 {{ selected.taskId }}</span>
             </div>
-          </article>
-    
-          <article class="panel detail-panel">
-            <div class="detail-scroll">
-              <template v-if="selected">
-                <div class="section-head"><div><span class="eyebrow">任务详情</span><h3>{{ selected.fileName }}</h3></div><span class="status-chip">{{ statusLabel(selected.status) }}</span></div>
-                <div v-if="active || Number(selected.totalRows ?? 0) > 0" class="progress-card">
-                  <div class="progress-head"><strong>{{ selected.currentStage || statusLabel(selected.status) }}</strong><span>{{ progress.toFixed(1) }}%</span></div>
-                  <div class="progress-track"><i :style="{ width: `${progress}%` }"></i></div>
-                  <small>已处理 {{ Number(selected.processedRows ?? 0) }} / {{ Number(selected.totalRows ?? 0) }} 行</small>
-                </div>
-                <p v-if="selected.failureMessage" class="alert error">{{ selected.failureMessage }}</p>
-                <p v-if="selected.policySnapshot || selected.policy_snapshot" class="policy-note">创建任务时策略：{{ selected.policySnapshot || selected.policy_snapshot }}</p>
-                <div class="metric-grid"><div><span>总行数</span><strong>{{ selected.totalRows ?? 0 }}</strong></div><div><span>有效行</span><strong>{{ selected.validRows ?? 0 }}</strong></div><div><span>错误行</span><strong>{{ selected.invalidRows ?? 0 }}</strong></div><div><span>业务变更</span><strong>{{ selected.mutationCount ?? 0 }}</strong></div></div>
-                <div class="action-row"><button class="button primary" :disabled="!canCommit || loading" @click="requestTaskAction('COMMIT')">确认后台导入</button><button class="button secondary" :disabled="!canRollback || loading" @click="requestTaskAction('ROLLBACK')">后台回滚</button><button class="button secondary" :disabled="Number(selected.invalidRows ?? 0) === 0" @click="exportErrors">导出完整错误报告</button></div>
-                <div v-if="fieldErrors.length" class="error-page-block">
-                  <div class="table-wrap error-table-wrap"><table><thead><tr><th>行号</th><th>字段</th><th>原值</th><th>错误原因</th></tr></thead><tbody><tr v-for="item in pagedFieldErrors" :key="`${item.row}-${item.field}-${item.message}`"><td>{{ item.row }}</td><td>{{ item.field }}</td><td>{{ item.value || '-' }}</td><td>{{ item.message }}</td></tr></tbody></table></div>
-                  <div class="pagination-row">
-                    <span>当前显示 {{ errorRangeStart }}-{{ errorRangeEnd }} / {{ fieldErrors.length }} 条已加载错误</span>
-                    <div class="pagination-actions">
-                      <button class="button ghost small" type="button" :disabled="errorPage <= 1" @click="previousErrorPage">上一页</button>
-                      <strong>第 {{ errorPage }} / {{ errorPageCount }} 页</strong>
-                      <button class="button ghost small" type="button" :disabled="errorPage >= errorPageCount" @click="nextErrorPage">下一页</button>
-                    </div>
-                  </div>
-                </div>
-                <p v-if="Number(selected.invalidRows ?? 0) > fieldErrors.length" class="more-errors">页面只加载前 100 条错误，请导出完整错误报告查看全部问题。</p>
-                <p v-if="!fieldErrors.length && selected.status === 'PREVIEWED'" class="empty-state good">没有字段错误，可以正式提交</p>
-              </template>
-              <p v-else class="empty-state">选择任务查看状态和预检结果</p>
+            <div v-if="active || Number(selected.totalRows ?? 0) > 0" class="progress-card">
+              <div class="progress-head"><strong>{{ selected.currentStage || statusLabel(selected.status) }}</strong><span>{{ progress.toFixed(1) }}%</span></div>
+              <div class="progress-track"><i :style="{ width: `${progress}%` }"></i></div>
+              <small>已处理 {{ Number(selected.processedRows ?? 0) }} / {{ Number(selected.totalRows ?? 0) }} 行</small>
             </div>
-          </article>
+            <div class="metric-grid">
+              <article><span>文件</span><strong>{{ selected.fileName }}</strong></article>
+              <article><span>总行数</span><strong>{{ selected.totalRows ?? 0 }}</strong></article>
+              <article><span>可导入</span><strong>{{ selected.validRows ?? 0 }}</strong></article>
+              <article><span>错误行</span><strong>{{ selected.invalidRows ?? 0 }}</strong></article>
+            </div>
+            <div v-if="fieldErrors.length" class="table-wrap error-table">
+              <table><thead><tr><th>行号</th><th>字段</th><th>填写值</th><th>问题</th></tr></thead><tbody><tr v-for="item in fieldErrors.slice(0, 20)" :key="`${item.row}-${item.field}`"><td>{{ item.row }}</td><td>{{ item.field }}</td><td>{{ item.value || '-' }}</td><td>{{ item.message }}</td></tr></tbody></table>
+              <p v-if="Number(selected.invalidRows ?? 0) > fieldErrors.length" class="more-errors">这里只显示部分问题，请下载完整错误报告。</p>
+            </div>
+            <div class="button-row import-actions">
+              <button class="button ghost" type="button" :disabled="Number(selected.invalidRows ?? 0) === 0" @click="exportErrors">下载错误报告</button>
+              <button class="button primary" type="button" :disabled="!canCommit || loading" @click="commitTask">确认导入 {{ selected.validRows ?? 0 }} 条</button>
+            </div>
+          </section>
         </section>
-    
-        <AppConfirmDialog
-          v-if="selected"
-          :open="Boolean(confirmAction)"
-          :title="confirmTitle"
-          :description="confirmDescription"
-          :variant="confirmAction === 'ROLLBACK' ? 'danger' : 'warning'"
-          :confirm-text="confirmAction === 'ROLLBACK' ? '确认后台回滚' : '确认并进入后台队列'"
-          :busy="loading"
-          @close="closeTaskConfirmation"
-          @confirm="confirmTaskAction"
-        >
-          <p class="confirm-file">{{ selected.fileName }}</p>
-          <div class="confirm-summary">
-            <span>任务类型<strong>{{ selected.importType === 'STUDENT' ? '学生导入' : '宿舍导入' }}</strong></span>
-            <span>有效数据<strong>{{ Number(selected.validRows ?? 0) }} 行</strong></span>
-          </div>
-        </AppConfirmDialog>
       </div>
     </template>
     
     <style scoped>
-    .preview-panel,.detail-panel,.task-list,.policy-panel{display:grid;gap:16px}.preview-form{display:grid;grid-template-columns:150px minmax(220px,1fr) auto;gap:10px;align-items:end}.preview-form label{display:grid;gap:6px}.policy-row{display:flex;align-items:flex-start;justify-content:space-between;gap:18px}.policy-toggle{display:flex;align-items:flex-start;gap:10px;min-width:0;cursor:pointer}.policy-toggle input{margin-top:4px}.policy-toggle span{display:grid;gap:5px}.policy-toggle small,.policy-note,.progress-card small,.more-errors{color:var(--muted);line-height:1.6}.policy-note{margin:0;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--soft);font-size:13px}.workspace-grid{display:grid;grid-template-columns:minmax(260px,.75fr) minmax(0,1.6fr);gap:14px;height:640px;min-height:640px;max-height:640px;align-items:stretch}.task-list,.detail-panel{min-height:0;height:100%;overflow:hidden}.task-list{grid-template-rows:auto minmax(0,1fr)}.task-history-scroll{min-height:0;overflow:auto;display:grid;align-content:start;gap:8px;padding-right:4px}.detail-panel{display:block}.detail-scroll{height:100%;min-height:0;overflow:auto;display:grid;align-content:start;gap:16px;padding-right:4px}.task-row{display:flex;justify-content:space-between;gap:10px;text-align:left;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--surface);cursor:pointer}.task-row.active{border-color:var(--primary);background:var(--soft)}.task-row span{display:grid;gap:4px;min-width:0}.task-row strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.task-row small{color:var(--muted)}.task-row em{font-style:normal;color:var(--muted);white-space:nowrap}.progress-card{display:grid;gap:8px;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:var(--soft)}.progress-head{display:flex;justify-content:space-between;gap:12px}.progress-track{height:8px;overflow:hidden;border-radius:999px;background:var(--line)}.progress-track i{display:block;height:100%;border-radius:inherit;background:var(--primary);transition:width .25s ease}.metric-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}.metric-grid div{padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--soft)}.metric-grid span{display:block;color:var(--muted);font-size:12px}.metric-grid strong{display:block;margin-top:5px}.action-row{display:flex;gap:8px;flex-wrap:wrap}.status-chip{padding:5px 9px;border-radius:999px;background:var(--soft)}.empty-state{padding:22px;text-align:center;color:var(--muted)}.empty-state.good{color:#16734f}.alert.success{background:#eafaf2;color:#16734f}.more-errors{margin:0;font-size:13px}.error-page-block{display:grid;gap:10px}.error-table-wrap{overflow:auto}.pagination-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-top:2px;color:var(--muted);font-size:13px}.pagination-actions{display:flex;align-items:center;gap:8px}.pagination-actions strong{color:var(--text);white-space:nowrap}.confirm-file{margin:0;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--soft);word-break:break-all;color:var(--muted);line-height:1.65}.confirm-summary{display:grid;grid-template-columns:1fr 1fr;gap:10px}.confirm-summary span{display:grid;gap:5px;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--soft);color:var(--muted);font-size:12px}.confirm-summary strong{color:var(--text);font-size:15px}@media(max-width:1000px){.preview-form{grid-template-columns:1fr 1fr}.workspace-grid{grid-template-columns:1fr;height:auto;min-height:0;max-height:none}.task-list{height:360px}.detail-panel{height:620px}.metric-grid{grid-template-columns:repeat(2,1fr)}.policy-row{align-items:stretch;flex-direction:column}}@media(max-width:640px){.preview-form,.metric-grid,.confirm-summary{grid-template-columns:1fr}.detail-panel{height:560px}.pagination-row{align-items:flex-start;flex-direction:column}.pagination-actions{width:100%;justify-content:space-between}}
+    .import-workflow-overlay{z-index:1320;padding:24px;background:rgba(9,23,48,.76);backdrop-filter:blur(6px)}.import-workflow-dialog{width:min(940px,calc(100vw - 48px));max-height:calc(100vh - 48px);padding:24px;overflow:auto;border-radius:24px;background:var(--panel,#fff)}.compact-section-head{margin-bottom:14px}.room-import-policy{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:14px;margin-bottom:14px;padding:12px 14px;border:1px solid var(--line);border-radius:14px;background:var(--soft)}.room-import-policy>div{display:grid;gap:4px}.room-import-policy small{color:var(--muted);line-height:1.5}.policy-switch{display:flex;align-items:center;gap:7px;white-space:nowrap;cursor:pointer}.import-workflow-form{display:grid;grid-template-columns:minmax(260px,1fr) auto;gap:10px;align-items:end}.import-workflow-form label{display:grid;gap:6px}.import-preview-result{display:grid;gap:14px;margin-top:18px;padding-top:18px;border-top:1px solid var(--line)}.task-status-line{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.task-id{color:var(--muted);font-size:12px;word-break:break-all}.progress-card{display:grid;gap:8px;padding:12px 14px;border:1px solid var(--line);border-radius:13px;background:var(--soft)}.progress-head{display:flex;justify-content:space-between;gap:12px}.progress-card small{color:var(--muted)}.progress-track{height:8px;overflow:hidden;border-radius:999px;background:var(--line)}.progress-track i{display:block;height:100%;border-radius:inherit;background:var(--primary);transition:width .25s ease}.metric-grid{display:grid;grid-template-columns:2fr repeat(3,1fr);gap:10px}.metric-grid article{min-width:0;padding:12px;border:1px solid var(--line);border-radius:13px;background:var(--soft)}.metric-grid span{display:block;color:var(--muted);font-size:12px}.metric-grid strong{display:block;margin-top:5px;overflow:hidden;text-overflow:ellipsis}.error-table{max-height:300px}.more-errors{margin:8px 0 0;color:var(--muted);font-size:13px}.import-actions{justify-content:flex-end}.status-chip{padding:5px 9px;border-radius:999px;background:var(--soft)}@media(max-width:780px){.import-workflow-form,.metric-grid,.room-import-policy{grid-template-columns:1fr}.import-workflow-overlay{padding:10px}.import-workflow-dialog{width:calc(100vw - 20px);max-height:calc(100vh - 20px);padding:18px}}
     </style>
     
   operator: 'match'
   stack: |-
-    TestContext.<anonymous> (file:///home/runner/work/dor_demo/dor_demo/private-repo/frontend/src/views/admin/requested-admin-fixes.spec.ts:50:10)
+    TestContext.<anonymous> (file:///home/runner/work/dor_demo/dor_demo/private-repo/frontend/src/views/admin/requested-admin-fixes.spec.ts:49:10)
     Test.runInAsyncScope (node:async_hooks:214:14)
     Test.run (node:internal/test_runner/test:1047:25)
     Test.processPendingSubtests (node:internal/test_runner/test:744:18)
@@ -239,7 +239,7 @@ org.opentest4j.AssertionFailedError: expected: </api/v1/public/site-assets/SQUAR
 # Subtest: student table hidden action menu cannot create vertical scroll blank space
 ok 88 - student table hidden action menu cannot create vertical scroll blank space
   ---
-  duration_ms: 0.362478
+  duration_ms: 0.254595
   type: 'test'
   ...
 1..88
@@ -250,7 +250,7 @@ ok 88 - student table hidden action menu cannot create vertical scroll blank spa
 # cancelled 0
 # skipped 0
 # todo 0
-# duration_ms 1168.80654
+# duration_ms 1152.160257
 
 ===== frontend_build failure tail =====
 
@@ -268,9 +268,9 @@ ok 88 - student table hidden action menu cannot create vertical scroll blank spa
 > openapi-typescript ../backend-java/model/src/main/resources/openapi-interface.yaml -o src/api/schema.d.ts && openapi-typescript ../backend-java/model/src/main/resources/admin/openapi-system-readiness.yaml -o src/api/systemReadinessSchema.d.ts
 
 ✨ openapi-typescript 7.13.0
-🚀 ../backend-java/model/src/main/resources/openapi-interface.yaml → src/api/schema.d.ts [343.4ms]
+🚀 ../backend-java/model/src/main/resources/openapi-interface.yaml → src/api/schema.d.ts [376.4ms]
 ✨ openapi-typescript 7.13.0
-🚀 ../backend-java/model/src/main/resources/admin/openapi-system-readiness.yaml → src/api/systemReadinessSchema.d.ts [32.7ms]
+🚀 ../backend-java/model/src/main/resources/admin/openapi-system-readiness.yaml → src/api/systemReadinessSchema.d.ts [33.1ms]
 src/account/DefaultProfileScopeSelector.vue(49,61): error TS2345: Argument of type 'ScopeType' is not assignable to parameter of type '"CAMPUS" | "BUILDING" | "FLOOR" | "ROOM" | "MAJOR"'.
   Type '"SCHOOL"' is not assignable to type '"CAMPUS" | "BUILDING" | "FLOOR" | "ROOM" | "MAJOR"'.
 src/components/admin/ImportWorkflowModal.vue(2,37): error TS6133: 'reactive' is declared but its value is never read.
