@@ -48,7 +48,7 @@ Ran 2 tests in 0.001s
 OK
 ..
 ----------------------------------------------------------------------
-Ran 2 tests in 0.065s
+Ran 2 tests in 0.066s
 
 OK
 Runtime error and data correctness private migration contract passed
@@ -70,17 +70,100 @@ test_student_category_and_gender_are_immutable_after_creation (__main__.StudentI
 test_system_admin_theme_permission_is_entitlement_driven_not_a_duplicate_site_toggle (__main__.StudentIdentityRandomReselectRegressionTest.test_system_admin_theme_permission_is_entitlement_driven_not_a_duplicate_site_toggle) ... ok
 
 ----------------------------------------------------------------------
-Ran 8 tests in 0.005s
+Ran 8 tests in 0.004s
 
 OK
 test_cancel_reselection_resets_redis_projection_and_refreshes_room_profile (__main__.StudentReselectionRuntimeResetContractTest.test_cancel_reselection_resets_redis_projection_and_refreshes_room_profile) ... ok
 
 ----------------------------------------------------------------------
-Ran 1 test in 0.000s
+Ran 1 test in 0.001s
 
 OK
-Traceback (most recent call last):
-  File "/home/runner/work/dor_demo/dor_demo/private-repo/scripts/ci/test_preference_policy_operation_contract.py", line 53, in <module>
-    assert token in admin_view, f'admin preference policy copy missing: {token}'
-           ^^^^^^^^^^^^^^^^^^^
-AssertionError: admin preference policy copy missing: 原有学校设置会保留
+personal preference policy operation contract passed
+Room-change modes, exchange beds, roommate cards, theme authorization and admin-home contract passed
+后端分层门禁通过：检查 103 个 Controller，未发现 JDBC、Redis 或业务 Mapper 直连。
+Java 内嵌 SQL 门禁通过：当前 72 个指纹均来自固定基线 ccbd5a7d95b6，基线共 503 个指纹。
+SQL performance governance contract: OK
+Team category guard MyBatis contract: OK
+Batch creation MyBatis contract: OK
+Student welcome and system setting MyBatis contract: OK
+Student profile MyBatis contract: OK
+Assignment query/export pagination and MyBatis contract: OK
+Admin large-response pagination/lazy-loading contract: OK
+Authentication MyBatis contract: OK
+Platform authentication MyBatis contract: OK
+Platform audit MyBatis contract: OK
+Subscription and plan MyBatis persistence contracts: OK
+Student room recommendation Redis/MyBatis boundary contract: OK
+后端模块化基线不匹配：
+- 大型Java文件继续增长：backend-java/server/src/main/java/com/wust/dormitory/accountadmin/AccountAdminGrantService.java（当前 310，基线 309）
+- 新增或未登记的大型Java文件：backend-java/server/src/main/java/com/wust/dormitory/admin/AdminStudentResidencyAdjustmentService.java（当前 359 行）
+- 新增或未登记的大型Java文件：backend-java/server/src/main/java/com/wust/dormitory/admin/SiteMetadataService.java（当前 310 行）
+- 新增或未登记的大型Java文件：backend-java/server/src/main/java/com/wust/dormitory/admin/StreamingSpreadsheetReader.java（当前 361 行）
+- 大型Java文件继续增长：backend-java/server/src/main/java/com/wust/dormitory/backup/BackupRecoveryConsoleService.java（当前 751，基线 711）
+- 大型Java文件继续增长：backend-java/server/src/main/java/com/wust/dormitory/backup/PythonBackupRecoveryCliGateway.java（当前 359，基线 341）
+- 大型Java文件继续增长：backend-java/server/src/main/java/com/wust/dormitory/importworkflow/ImportMutationService.java（当前 365，基线 323）
+- 新增或未登记的大型Java文件：backend-java/server/src/main/java/com/wust/dormitory/importworkflow/ImportTaskWorker.java（当前 394 行）
+- 大型Java文件继续增长：backend-java/server/src/main/java/com/wust/dormitory/importworkflow/ImportWorkflowService.java（当前 512，基线 324）
+- 新增或未登记的大型Java文件：backend-java/server/src/main/java/com/wust/dormitory/importworkflow/InMemoryImportTaskRepository.java（当前 357 行）
+- 大型Java文件继续增长：backend-java/server/src/main/java/com/wust/dormitory/importworkflow/JdbcImportTaskRepository.java（当前 509，基线 394）
+- 新增或未登记的大型Java文件：backend-java/server/src/main/java/com/wust/dormitory/inspection/AdminInspectionController.java（当前 307 行）
+- 新增或未登记的大型Java文件：backend-java/server/src/main/java/com/wust/dormitory/mobile/MobileAppReleaseManagementService.java（当前 312 行）
+- 新增或未登记的大型Java文件：backend-java/server/src/main/java/com/wust/dormitory/mobile/MobileBedConfirmationFacade.java（当前 302 行）
+- 新增或未登记的大型Java文件：backend-java/server/src/main/java/com/wust/dormitory/notification/NotificationDispatchService.java（当前 353 行）
+- 新增或未登记的大型Java文件：backend-java/server/src/main/java/com/wust/dormitory/residency/AdminBedSwapService.java（当前 348 行）
+- 新增或未登记的大型Java文件：backend-java/server/src/main/java/com/wust/dormitory/roomexchange/RoomExchangeService.java（当前 329 行）
+- 大型Java文件继续增长：backend-java/server/src/main/java/com/wust/dormitory/selection/runtime/RedisSelectionRuntimeRepository.java（当前 330，基线 317）
+- 聚合Controller operation继续增长：backend-java/server/src/main/java/com/wust/dormitory/accountadmin/AccountAdminController.java（当前 15，基线 13）
+
+BASELINE_CANDIDATE=
+{
+  "java_line_limit": 300,
+  "controller_operation_limit": 12,
+  "large_java_files": {
+    "backend-java/server/src/main/java/com/wust/dormitory/accountadmin/AccountAdminGrantService.java": 310,
+    "backend-java/server/src/main/java/com/wust/dormitory/admin/AdminSpreadsheetController.java": 347,
+    "backend-java/server/src/main/java/com/wust/dormitory/admin/AdminStudentResidencyAdjustmentService.java": 359,
+    "backend-java/server/src/main/java/com/wust/dormitory/admin/DormStaffWebController.java": 420,
+    "backend-java/server/src/main/java/com/wust/dormitory/admin/ResidencyDelegationManagementService.java": 305,
+    "backend-java/server/src/main/java/com/wust/dormitory/admin/RoomImportMutationService.java": 309,
+    "backend-java/server/src/main/java/com/wust/dormitory/admin/RoomManagementService.java": 364,
+    "backend-java/server/src/main/java/com/wust/dormitory/admin/SiteMetadataService.java": 310,
+    "backend-java/server/src/main/java/com/wust/dormitory/admin/SpreadsheetSupport.java": 582,
+    "backend-java/server/src/main/java/com/wust/dormitory/admin/StreamingSpreadsheetReader.java": 361,
+    "backend-java/server/src/main/java/com/wust/dormitory/admin/StudentAdminService.java": 308,
+    "backend-java/server/src/main/java/com/wust/dormitory/backup/BackupRecoveryConsoleService.java": 751,
+    "backend-java/server/src/main/java/com/wust/dormitory/backup/PythonBackupRecoveryCliGateway.java": 359,
+    "backend-java/server/src/main/java/com/wust/dormitory/importworkflow/ImportMutationService.java": 365,
+    "backend-java/server/src/main/java/com/wust/dormitory/importworkflow/ImportTaskWorker.java": 394,
+    "backend-java/server/src/main/java/com/wust/dormitory/importworkflow/ImportWorkflowService.java": 512,
+    "backend-java/server/src/main/java/com/wust/dormitory/importworkflow/InMemoryImportTaskRepository.java": 357,
+    "backend-java/server/src/main/java/com/wust/dormitory/importworkflow/JdbcImportTaskRepository.java": 509,
+    "backend-java/server/src/main/java/com/wust/dormitory/inspection/AdminInspectionController.java": 307,
+    "backend-java/server/src/main/java/com/wust/dormitory/inspection/AdminInspectionService.java": 378,
+    "backend-java/server/src/main/java/com/wust/dormitory/inspection/InspectionRoomService.java": 446,
+    "backend-java/server/src/main/java/com/wust/dormitory/inspection/InspectionScheduleService.java": 536,
+    "backend-java/server/src/main/java/com/wust/dormitory/inspection/MobileInspectionService.java": 334,
+    "backend-java/server/src/main/java/com/wust/dormitory/label/ResourceLabelBatchService.java": 401,
+    "backend-java/server/src/main/java/com/wust/dormitory/label/ResourceLabelService.java": 977,
+    "backend-java/server/src/main/java/com/wust/dormitory/mobile/MobileAppReleaseManagementService.java": 312,
+    "backend-java/server/src/main/java/com/wust/dormitory/mobile/MobileBedConfirmationFacade.java": 302,
+    "backend-java/server/src/main/java/com/wust/dormitory/mobile/MobileResidencyFacade.java": 378,
+    "backend-java/server/src/main/java/com/wust/dormitory/notification/NotificationDispatchService.java": 353,
+    "backend-java/server/src/main/java/com/wust/dormitory/residency/AdminBedSwapService.java": 348,
+    "backend-java/server/src/main/java/com/wust/dormitory/residency/ResidencyService.java": 339,
+    "backend-java/server/src/main/java/com/wust/dormitory/residency/RoomSelectionService.java": 321,
+    "backend-java/server/src/main/java/com/wust/dormitory/roomexchange/RoomExchangeService.java": 329,
+    "backend-java/server/src/main/java/com/wust/dormitory/security/AdminAuthorizationService.java": 431,
+    "backend-java/server/src/main/java/com/wust/dormitory/security/AuthorizationDiagnosticsService.java": 903,
+    "backend-java/server/src/main/java/com/wust/dormitory/security/ResidencyDelegationService.java": 354,
+    "backend-java/server/src/main/java/com/wust/dormitory/selection/runtime/RedisSelectionRuntimeRepository.java": 330
+  },
+  "large_controllers": {
+    "backend-java/server/src/main/java/com/wust/dormitory/accountadmin/AccountAdminController.java": 15,
+    "backend-java/server/src/main/java/com/wust/dormitory/admin/DormStaffWebController.java": 27,
+    "backend-java/server/src/main/java/com/wust/dormitory/inspection/AdminInspectionController.java": 20,
+    "backend-java/server/src/main/java/com/wust/dormitory/label/ResourceLabelController.java": 14,
+    "backend-java/server/src/main/java/com/wust/dormitory/platform/PlatformBackupRecoveryController.java": 15
+  }
+}
