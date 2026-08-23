@@ -49,6 +49,8 @@ jobs:
         run: python3 scripts/ci/test_mysql_root_guard.py
       - name: Validate MySQL root guard preflight integration
         run: python3 scripts/ci/test_mysql_root_preflight_integration.py
+      - name: Validate deployment env ports and identifiers
+        run: python3 scripts/ci/test_deployment_env_preflight.py
       - name: Validate mainland container image mirror tags and fallback
         run: python3 scripts/ci/test_container_image_mirrors.py
       - name: Validate source and release runtime image preflight modes
