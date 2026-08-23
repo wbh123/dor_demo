@@ -1,48 +1,9 @@
 private_ref=feat/app-download-ui-unification-20260823
-private_head=30b0e905c4880347600f6daca225b292203b8823
+private_head=25ed6644f94d56d249dc1e1268585dc80ef09a20
 npm_ci=0
 frontend_test=1
-===== frontend_test failure tail =====
-      .filter((value) => Number.isFinite(value)))]
-      .sort((left, right) => left - right))
-    const roomCascadeOptions = computed(() => roomOptions.value.filter((room) => (
-      (!selectedCampusId.value || String(room.campus_id) === selectedCampusId.value)
-      && (!selectedBuildingId.value || String(room.building_id) === selectedBuildingId.value)
-      && (!selectedFloorNumber.value || String(room.floor_number) === selectedFloorNumber.value)
-    )))
-    const selectedId = computed(() => {
-      if (subjectType.value === 'STUDENT') return selectedStudentId.value
-      if (subjectType.value === 'ROOM') return selectedRoomId.value
-      return selectedBedId.value
-    })
-    
-    watch(subjectType, async () => {
-      error.value = ''
-      activeType.value = null
-      activeId.value = 0
-      if (subjectType.value === 'STUDENT' && studentOptions.value.length === 0) await loadStudentOptions()
-      if ((subjectType.value === 'ROOM' || subjectType.value === 'BED') && roomOptions.value.length === 0) await loadRoomOptions()
-    })
-    
-    watch(selectedCampusId, () => { selectedBuildingId.value = ''; selectedFloorNumber.value = ''; selectedRoomId.value = 0; resetBeds() })
-    watch(selectedBuildingId, () => { selectedFloorNumber.value = ''; selectedRoomId.value = 0; resetBeds() })
-    watch(selectedFloorNumber, () => { selectedRoomId.value = 0; resetBeds() })
-    watch(selectedRoomId, async (roomId) => {
-      resetBeds()
-      if (subjectType.value === 'BED' && roomId) await loadBedOptions()
-    })
-    
-    function uniqueOptions(rows: DataObject[], idKey: string, labelKey: string) {
-      const seen = new Map<string, string>()
-      for (const row of rows) {
-        const id = String(row[idKey] ?? '')
-        if (id && !seen.has(id)) seen.set(id, String(row[labelKey] ?? id))
-      }
-      return [...seen.entries()].map(([id, label]) => ({ id, label }))
-    }
-    
-    function resetBeds() {
-      bedOptions.value = []
+java_qr_test=1
+===== frontend failure tail =====
       selectedBedId.value = 0
     }
     
@@ -146,7 +107,7 @@ frontend_test=1
     
   operator: 'doesNotMatch'
   stack: |-
-    TestContext.<anonymous> (file:///home/runner/work/dor_demo/dor_demo/private-repo/frontend/src/views/admin/requested-admin-fixes.spec.ts:112:10)
+    TestContext.<anonymous> (file:///home/runner/work/dor_demo/dor_demo/private-repo/frontend/src/views/admin/requested-admin-fixes.spec.ts:113:10)
     Test.runInAsyncScope (node:async_hooks:214:14)
     Test.run (node:internal/test_runner/test:1047:25)
     Test.processPendingSubtests (node:internal/test_runner/test:744:18)
@@ -157,9 +118,130 @@ frontend_test=1
 1..93
 # tests 93
 # suites 0
-# pass 88
-# fail 5
+# pass 87
+# fail 6
 # cancelled 0
 # skipped 0
 # todo 0
-# duration_ms 1218.62495
+# duration_ms 1161.627224
+===== java failure tail =====
+[INFO] Processing operation getSystemReadiness
+[INFO] 'host' (OAS 2.0) or 'servers' (OAS 3.0) not defined in the spec. Default to [http://localhost] for server URL [http://localhost/]
+[INFO] 'host' (OAS 2.0) or 'servers' (OAS 3.0) not defined in the spec. Default to [http://localhost] for server URL [http://localhost/]
+[INFO] 'host' (OAS 2.0) or 'servers' (OAS 3.0) not defined in the spec. Default to [http://localhost] for server URL [http://localhost/]
+[INFO] writing file /home/runner/work/dor_demo/dor_demo/private-repo/backend-java/model/target/generated-sources/openapi-readiness/src/main/java/com/wust/dormitory/model/readiness/dto/ReadinessCheckResult.java
+[INFO] writing file /home/runner/work/dor_demo/dor_demo/private-repo/backend-java/model/target/generated-sources/openapi-readiness/src/main/java/com/wust/dormitory/model/readiness/dto/SystemReadinessReport.java
+[INFO] writing file /home/runner/work/dor_demo/dor_demo/private-repo/backend-java/model/target/generated-sources/openapi-readiness/src/main/java/com/wust/dormitory/model/readiness/dto/SystemReadinessSummary.java
+[INFO] 'host' (OAS 2.0) or 'servers' (OAS 3.0) not defined in the spec. Default to [http://localhost] for server URL [http://localhost/]
+[INFO] writing file /home/runner/work/dor_demo/dor_demo/private-repo/backend-java/model/target/generated-sources/openapi-readiness/src/main/java/com/wust/dormitory/model/readiness/api/SystemReadinessApi.java
+[INFO] Skipping generation of Webhooks.
+[INFO] 'host' (OAS 2.0) or 'servers' (OAS 3.0) not defined in the spec. Default to [http://localhost] for server URL [http://localhost/]
+[INFO] writing file /home/runner/work/dor_demo/dor_demo/private-repo/backend-java/model/target/generated-sources/openapi-readiness/pom.xml
+[INFO] writing file /home/runner/work/dor_demo/dor_demo/private-repo/backend-java/model/target/generated-sources/openapi-readiness/README.md
+[INFO] writing file /home/runner/work/dor_demo/dor_demo/private-repo/backend-java/model/target/generated-sources/openapi-readiness/src/main/java/com/wust/dormitory/model/readiness/api/ApiUtil.java
+[INFO] writing file /home/runner/work/dor_demo/dor_demo/private-repo/backend-java/model/target/generated-sources/openapi-readiness/.openapi-generator-ignore
+[INFO] writing file /home/runner/work/dor_demo/dor_demo/private-repo/backend-java/model/target/generated-sources/openapi-readiness/.openapi-generator/VERSION
+[INFO] writing file /home/runner/work/dor_demo/dor_demo/private-repo/backend-java/model/target/generated-sources/openapi-readiness/.openapi-generator/FILES
+################################################################################
+# Thanks for using OpenAPI Generator.                                          #
+# Please consider donation to help us maintain this project 🙏                 #
+# https://opencollective.com/openapi_generator/donate                          #
+################################################################################
+[INFO] 
+[INFO] --- build-helper:3.3.0:add-source (add-openapi-source) @ model ---
+[INFO] Source directory: /home/runner/work/dor_demo/dor_demo/private-repo/backend-java/model/target/generated-sources/openapi/src/main/java added.
+[INFO] Source directory: /home/runner/work/dor_demo/dor_demo/private-repo/backend-java/model/target/generated-sources/openapi-readiness/src/main/java added.
+[INFO] 
+[INFO] --- resources:3.4.0:resources (default-resources) @ model ---
+[INFO] Copying 54 resources from src/main/resources to target/classes
+[INFO] 
+[INFO] --- compiler:3.11.0:compile (default-compile) @ model ---
+[INFO] Changes detected - recompiling the module! :source
+[INFO] Compiling 180 source files with javac [debug target 21] to target/classes
+[INFO] 
+[INFO] --- resources:3.4.0:testResources (default-testResources) @ model ---
+[INFO] skip non existing resourceDirectory /home/runner/work/dor_demo/dor_demo/private-repo/backend-java/model/src/test/resources
+[INFO] 
+[INFO] --- compiler:3.11.0:testCompile (default-testCompile) @ model ---
+[INFO] No sources to compile
+[INFO] 
+[INFO] --- surefire:3.0.0-M9:test (default-test) @ model ---
+[INFO] No tests to run.
+[INFO] 
+[INFO] ---------------------< com.wust.dormitory:server >----------------------
+[INFO] Building server 1.0.0-SNAPSHOT                                     [3/3]
+[INFO]   from server/pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- build-helper:3.3.0:add-source (add-source) @ server ---
+[INFO] Source directory: /home/runner/work/dor_demo/dor_demo/private-repo/backend-java/server/target/generated-sources/mybatis-generator added.
+[INFO] 
+[INFO] --- resources:3.4.0:resources (default-resources) @ server ---
+[INFO] Copying 207 resources from src/main/resources to target/classes
+[INFO] 
+[INFO] --- compiler:3.11.0:compile (default-compile) @ server ---
+[INFO] Changes detected - recompiling the module! :dependency
+[INFO] Compiling 673 source files with javac [debug target 21] to target/classes
+[INFO] Annotation processing is enabled because one or more processors were found
+  on the class path. A future release of javac may disable annotation processing
+  unless at least one processor is specified by name (-processor), or a search
+  path is specified (--processor-path, --processor-module-path), or annotation
+  processing is enabled explicitly (-proc:only, -proc:full).
+  Use -Xlint:-options to suppress this message.
+  Use -proc:none to disable annotation processing.
+[INFO] /home/runner/work/dor_demo/dor_demo/private-repo/backend-java/server/src/main/java/com/wust/dormitory/common/error/GlobalExceptionHandler.java: Some input files use or override a deprecated API.
+[INFO] /home/runner/work/dor_demo/dor_demo/private-repo/backend-java/server/src/main/java/com/wust/dormitory/common/error/GlobalExceptionHandler.java: Recompile with -Xlint:deprecation for details.
+[INFO] /home/runner/work/dor_demo/dor_demo/private-repo/backend-java/server/src/main/java/com/wust/dormitory/realtime/RealtimeController.java: /home/runner/work/dor_demo/dor_demo/private-repo/backend-java/server/src/main/java/com/wust/dormitory/realtime/RealtimeController.java uses unchecked or unsafe operations.
+[INFO] /home/runner/work/dor_demo/dor_demo/private-repo/backend-java/server/src/main/java/com/wust/dormitory/realtime/RealtimeController.java: Recompile with -Xlint:unchecked for details.
+[INFO] 
+[INFO] --- resources:3.4.0:testResources (default-testResources) @ server ---
+[INFO] Copying 8 resources from src/test/resources to target/test-classes
+[INFO] 
+[INFO] --- compiler:3.11.0:testCompile (default-testCompile) @ server ---
+[INFO] Changes detected - recompiling the module! :dependency
+[INFO] Compiling 319 source files with javac [debug target 21] to target/test-classes
+[INFO] Annotation processing is enabled because one or more processors were found
+  on the class path. A future release of javac may disable annotation processing
+  unless at least one processor is specified by name (-processor), or a search
+  path is specified (--processor-path, --processor-module-path), or annotation
+  processing is enabled explicitly (-proc:only, -proc:full).
+  Use -Xlint:-options to suppress this message.
+  Use -proc:none to disable annotation processing.
+[INFO] /home/runner/work/dor_demo/dor_demo/private-repo/backend-java/server/src/test/java/com/wust/dormitory/common/error/GlobalExceptionHandlerUploadLimitTest.java: /home/runner/work/dor_demo/dor_demo/private-repo/backend-java/server/src/test/java/com/wust/dormitory/common/error/GlobalExceptionHandlerUploadLimitTest.java uses or overrides a deprecated API.
+[INFO] /home/runner/work/dor_demo/dor_demo/private-repo/backend-java/server/src/test/java/com/wust/dormitory/common/error/GlobalExceptionHandlerUploadLimitTest.java: Recompile with -Xlint:deprecation for details.
+[INFO] /home/runner/work/dor_demo/dor_demo/private-repo/backend-java/server/src/test/java/com/wust/dormitory/admin/RoomManagementQueryServiceTest.java: Some input files use unchecked or unsafe operations.
+[INFO] /home/runner/work/dor_demo/dor_demo/private-repo/backend-java/server/src/test/java/com/wust/dormitory/admin/RoomManagementQueryServiceTest.java: Recompile with -Xlint:unchecked for details.
+[INFO] -------------------------------------------------------------
+[ERROR] COMPILATION ERROR : 
+[INFO] -------------------------------------------------------------
+[ERROR] /home/runner/work/dor_demo/dor_demo/private-repo/backend-java/server/src/test/java/com/wust/dormitory/mobile/MobileAppVersionControllerTest.java:[35,34] cannot find symbol
+  symbol:   method getDownloadQr(org.springframework.mock.web.MockHttpServletRequest)
+  location: variable controller of type com.wust.dormitory.mobile.MobileAppVersionController
+[INFO] 1 error
+[INFO] -------------------------------------------------------------
+[INFO] ------------------------------------------------------------------------
+[INFO] Reactor Summary for Wust Dormitory Select Server 1.0.0-SNAPSHOT:
+[INFO] 
+[INFO] Wust Dormitory Select Server ....................... SUCCESS [  0.002 s]
+[INFO] model .............................................. SUCCESS [ 33.174 s]
+[INFO] server ............................................. FAILURE [ 28.313 s]
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD FAILURE
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  01:08 min
+[INFO] Finished at: 2026-08-23T12:48:54Z
+[INFO] ------------------------------------------------------------------------
+[ERROR] Failed to execute goal org.apache.maven.plugins:maven-compiler-plugin:3.11.0:testCompile (default-testCompile) on project server: Compilation failure
+[ERROR] /home/runner/work/dor_demo/dor_demo/private-repo/backend-java/server/src/test/java/com/wust/dormitory/mobile/MobileAppVersionControllerTest.java:[35,34] cannot find symbol
+[ERROR]   symbol:   method getDownloadQr(org.springframework.mock.web.MockHttpServletRequest)
+[ERROR]   location: variable controller of type com.wust.dormitory.mobile.MobileAppVersionController
+[ERROR] -> [Help 1]
+[ERROR] 
+[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+[ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[ERROR] 
+[ERROR] For more information about the errors and possible solutions, please read the following articles:
+[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException
+[ERROR] 
+[ERROR] After correcting the problems, you can resume the build with the command
+[ERROR]   mvn <args> -rf :server
