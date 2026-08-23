@@ -27,8 +27,12 @@ jobs:
           python-version: '3.12'
       - name: Validate incremental build classification
         run: python3 scripts/ci/test_incremental_build_plan.py
+      - name: Validate tracked build cleanup safety
+        run: python3 scripts/ci/test_build_worktree_cleanup.py
       - name: Validate shell syntax
-        run: bash -n scripts/ci/incremental_build_plan.sh
+        run: |
+          bash -n scripts/ci/incremental_build_plan.sh
+          bash -n scripts/ci/cleanup_build_worktree.sh
       - name: Validate Nginx dynamic Docker DNS syntax
         run: python3 scripts/ci/test_proxy_dynamic_dns.py
       - name: Validate Java 21 backend runtime packages and privilege drop
