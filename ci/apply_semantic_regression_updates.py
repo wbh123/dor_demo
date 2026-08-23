@@ -12,6 +12,35 @@ def patch(path: str, old: str, new: str) -> None:
         raise RuntimeError(f'{path}: expected marker not found')
     target.write_text(text, encoding='utf-8')
 
+# Create-account input must distinguish "no decision supplied" (null) from
+# "explicitly no data permission" (empty list). Grant commands keep their
+# existing empty-list normalization because the decision has already been made.
+patch(
+    'backend-java/server/src/main/java/com/wust/dormitory/accountadmin/AccountAdminService.java',
+    '''    public record CreateAccountCommand(
+            String username, String displayName, String initialPassword,
+            String accountDomain, String baseRole, String staffNo,
+            String contactPhone, String contactEmail, Long templateVersionId,
+            String profileName, String clientScope, LocalDateTime validFrom,
+            LocalDateTime validUntil, List<ScopeCommand> scopes) {
+        public CreateAccountCommand {
+            clientScope = clientScope == null || clientScope.isBlank() ? "BOTH" : clientScope;
+            scopes = scopes == null ? List.of() : List.copyOf(scopes);
+        }
+    }''',
+    '''    public record CreateAccountCommand(
+            String username, String displayName, String initialPassword,
+            String accountDomain, String baseRole, String staffNo,
+            String contactPhone, String contactEmail, Long templateVersionId,
+            String profileName, String clientScope, LocalDateTime validFrom,
+            LocalDateTime validUntil, List<ScopeCommand> scopes) {
+        public CreateAccountCommand {
+            clientScope = clientScope == null || clientScope.isBlank() ? "BOTH" : clientScope;
+            scopes = scopes == null ? null : List.copyOf(scopes);
+        }
+    }''',
+)
+
 patch(
     'backend-java/server/src/test/java/com/wust/dormitory/accountadmin/AccountAdminAccountServiceTest.java',
     '''    void dormStaffCreationRequiresInitialScope() {\n''',
