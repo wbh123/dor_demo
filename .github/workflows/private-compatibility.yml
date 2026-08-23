@@ -87,7 +87,7 @@ jobs:
 
           if [[ $java_compile -eq 0 ]]; then
             mvn -f private-repo/backend-java/pom.xml -B -ntp -pl server -am \
-              -Dtest=AdminNoScopeGrantRegressionTest,WelcomeBrandDefaultsRegressionTest,ImportAttemptHistoryRegressionTest \
+              -Dtest=AdminNoScopeGrantRegressionTest,WelcomeBrandDefaultsRegressionTest,ImportAttemptHistoryRegressionTest,SiteMetadataAssetServiceRegressionTest \
               -Dsurefire.failIfNoSpecifiedTests=false test > /tmp/java-regression.log 2>&1
             java_regression=$?
           else
