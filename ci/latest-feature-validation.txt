@@ -1,5 +1,5 @@
 private_ref=feat/app-download-ui-unification-20260823
-private_before=c19d0232e116d6776abebda4ab095fc2bcb74ec3
+private_before=602870816ab34d3b0fdc0d8ccfa4f281a13ad6e9
 modularity_baseline_sync=0
 patch=0
 contracts=1
@@ -14,12 +14,12 @@ overall=1
 ===== contracts failure tail =====
 ....
 ----------------------------------------------------------------------
-Ran 4 tests in 0.001s
+Ran 4 tests in 0.002s
 
 OK
 .........
 ----------------------------------------------------------------------
-Ran 9 tests in 0.002s
+Ran 9 tests in 0.003s
 
 OK
 .
@@ -34,12 +34,12 @@ Ran 6 tests in 0.001s
 OK
 ...
 ----------------------------------------------------------------------
-Ran 3 tests in 0.000s
+Ran 3 tests in 0.001s
 
 OK
 ......
 ----------------------------------------------------------------------
-Ran 6 tests in 0.001s
+Ran 6 tests in 0.002s
 
 OK
 ..
@@ -49,7 +49,7 @@ Ran 2 tests in 0.001s
 OK
 ..
 ----------------------------------------------------------------------
-Ran 2 tests in 0.051s
+Ran 2 tests in 0.066s
 
 OK
 Runtime error and data correctness private migration contract passed
@@ -71,7 +71,7 @@ test_student_category_and_gender_are_immutable_after_creation (__main__.StudentI
 test_system_admin_theme_permission_is_entitlement_driven_not_a_duplicate_site_toggle (__main__.StudentIdentityRandomReselectRegressionTest.test_system_admin_theme_permission_is_entitlement_driven_not_a_duplicate_site_toggle) ... ok
 
 ----------------------------------------------------------------------
-Ran 8 tests in 0.003s
+Ran 8 tests in 0.004s
 
 OK
 test_cancel_reselection_resets_redis_projection_and_refreshes_room_profile (__main__.StudentReselectionRuntimeResetContractTest.test_cancel_reselection_resets_redis_projection_and_refreshes_room_profile) ... ok
@@ -107,7 +107,67 @@ spreadsheet support componentization: OK
 system setting normalization componentization: OK
 MyBatis-Plus foundation contract passed
 Admin room catalog MyBatis contract passed
+Admin major and building catalog MyBatis contract passed
+Admin student query MyBatis contract passed
+Student admin detailed MyBatis mapping/performance contract: OK
+Room occupancy snapshot MyBatis performance contract: OK
+Residency snapshot read-model contract: OK
+Reference data Redis cache contract: OK
+Reference data Redis cache V2 contract: OK
+Notification dispatch and template MyBatis contracts: OK
+bed confirmation MyBatis contract: OK
+room management MyBatis contract: OK
+import mutation MyBatis contract: OK
+residency service MyBatis contract: OK
+room change MyBatis contract: OK
+room exchange MyBatis and batching contract: OK
+Batch copy MyBatis componentization contract: OK
+verified team invitation MyBatis contract: OK
+entitlement admin MyBatis performance contract: OK
+batch and historical analytics MyBatis performance contract: OK
+matching scheme MyBatis and Redis cache contract: OK
+Student selection bootstrap contract: OK
+Room selection bootstrap contract: OK
+Bed selection hot-path contract: OK
+.......
+----------------------------------------------------------------------
+Ran 7 tests in 0.002s
+
+OK
+Selection candidate summary and vector performance contract: OK
+Selection entitlement cache and load-fixture contract: OK
+Selection load backend health probe/restart contract: OK
+Selection diagnostic timing contract: OK
+Selection bootstrap diagnostic timing contract: OK
+Selection Redis connection strategy contract: OK (shared default, pooled A/B preserved)
+Selection availability hot-read contract: OK (READY-prewarmed static/Hold snapshots + non-blocking stale followers)
+Selection availability version hot-read contract: OK
+Entitlement runtime cache non-blocking refresh contract: OK
+Selection server concurrency config contract: OK
+Auth token hot-read contract: OK
+SSE async security contract: OK (request SecurityContext restored; committed SSE response not rewritten)
+Selection catalog prewarm contract: OK (version lifecycle + distinct-segment prewarm + lazy fallback)
+Selection StudentContext hot-read contract: OK (prewarm + 500ms version probe + versioned catalog cache key)
+Selection active-team hot-read contract: OK (personal bulk snapshot + explicit team authoritative query)
+Selection load runtime diagnostics contract: OK (1000-user local default, 2000-user legacy preserved)
+Selection load low-disturbance and server concurrency contract: OK
+...........
+----------------------------------------------------------------------
+Ran 11 tests in 0.059s
+
+OK
+Selection SSE load fixture contract: OK (batch-wide per-student subscription)
+Selection Redis runtime contract: OK
+F............
+======================================================================
+FAIL: test_authenticated_hot_path_refreshes_token_in_one_redis_command (__main__.DistributedSelectionArchitectureTest.test_authenticated_hot_path_refreshes_token_in_one_redis_command)
+----------------------------------------------------------------------
 Traceback (most recent call last):
-  File "/home/runner/work/dor_demo/dor_demo/private-repo/scripts/ci/test_admin_major_building_mybatis.py", line 45, in <module>
-    raise AssertionError("专业和楼栋目录必须使用确定排序，专业编码必须作为专业目录最终稳定排序键")
-AssertionError: 专业和楼栋目录必须使用确定排序，专业编码必须作为专业目录最终稳定排序键
+  File "/home/runner/work/dor_demo/dor_demo/private-repo/scripts/ci/test_distributed_selection_architecture.py", line 56, in test_authenticated_hot_path_refreshes_token_in_one_redis_command
+    self.assertNotIn('redisTemplate.expire(', resolve)
+AssertionError: 'redisTemplate.expire(' unexpectedly found in '(String token) {\n        if (token == null || token.isBlank()) {\n            return Optional.empty();\n        }\n        Optional<CurrentUser> cached = localCache.get(token);\n        if (cached.isPresent()) {\n            return cached;\n        }\n        String key = PREFIX + token;\n        String value = redisTemplate.opsForValue().getAndExpire(key, TOKEN_TTL);\n        if (value == null) {\n            return Optional.empty();\n        }\n        try {\n            DecodedToken decoded = decode(value);\n            bindSessionMapping(token, decoded.sessionId());\n            localCache.put(token, decoded.user());\n            return Optional.of(decoded.user());\n        } catch (JsonProcessingException exception) {\n            redisTemplate.delete(key);\n            invalidateLocalAndPeers(token);\n            return Optional.empty();\n        }\n    }\n\n    public Optional<String> sessionId(String token) {\n        if (token == null || token.isBlank()) {\n            return Optional.empty();\n        }\n        String mapped = redisTemplate.opsForValue().getAndExpire(TOKEN_SESSION_PREFIX + token, TOKEN_TTL);\n        if (mapped != null && !mapped.isBlank()) {\n            redisTemplate.expire(SESSION_TOKEN_PREFIX + mapped, TOKEN_TTL);\n            return Optional.of(mapped);\n        }\n        String value = redisTemplate.opsForValue().getAndExpire(PREFIX + token, TOKEN_TTL);\n        if (value == null) {\n            return Optional.empty();\n        }\n        try {\n            DecodedToken decoded = decode(value);\n            bindSessionMapping(token, decoded.sessionId());\n            return Optional.ofNullable(decoded.sessionId());\n        } catch (JsonProcessingException exception) {\n            return Optional.empty();\n        }\n    }\n\n    public boolean revokeSession(String sessionId) {\n        if (sessionId == null || sessionId.isBlank()) {\n            return false;\n        }\n        String token = redisTemplate.opsForValue().get(SESSION_TOKEN_PREFIX + sessionId);\n        if (token == null || token.isBlank()) {\n            token = findTokenBySessionId(sessionId);\n        }\n        if (token == null || token.isBlank()) {\n            redisTemplate.delete(SESSION_TOKEN_PREFIX + sessionId);\n            return false;\n        }\n        revoke(token);\n        return true;\n    }\n\n    '
+
+----------------------------------------------------------------------
+Ran 13 tests in 0.004s
+
+FAILED (failures=1)
