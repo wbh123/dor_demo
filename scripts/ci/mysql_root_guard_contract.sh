@@ -27,13 +27,23 @@ load_state_value() {
   sed -n "s/^${key}=//p" "${state_file}" | tail -n 1
 }
 
+persist_hash() {
+  local hash="$1" temporary
+  mkdir -p "$(dirname "${state_file}")"
+  temporary="${state_file}.tmp.$$"
+  umask 077
+  printf 'MYSQL_ROOT_PASSWORD_SHA256=%s\n' "${hash}" > "${temporary}"
+  mv "${temporary}" "${state_file}"
+  printf 'CURRENT_MYSQL_ROOT_PASSWORD_SHA256=%s\n' "${hash}"
+}
+
 current_password="$(read_env_value WUST_DORMITORY_DB_ROOT_PASSWORD)"
 [[ -n "${current_password}" ]] || { echo "MySQL root password is empty" >&2; exit 1; }
 current_hash="$(printf '%s' "${current_password}" | sha256sum | awk '{print $1}')"
 previous_hash="$(load_state_value MYSQL_ROOT_PASSWORD_SHA256)"
 
 if [[ -n "${previous_hash}" && "${previous_hash}" == "${current_hash}" ]]; then
-  printf 'CURRENT_MYSQL_ROOT_PASSWORD_SHA256=%s\n' "${current_hash}"
+  persist_hash "${current_hash}"
   exit 0
 fi
 
@@ -51,13 +61,13 @@ if (( container_exists == 1 )); then
   container_password="$(docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "${container_name}" \
     | sed -n 's/^MYSQL_ROOT_PASSWORD=//p' | tail -n 1)"
   if [[ "${container_password}" == "${current_password}" ]]; then
-    printf 'CURRENT_MYSQL_ROOT_PASSWORD_SHA256=%s\n' "${current_hash}"
+    persist_hash "${current_hash}"
     exit 0
   fi
   if docker exec -e "MYSQL_PWD=${current_password}" "${container_name}" \
       mysql --protocol=TCP --host 127.0.0.1 --port 3306 --user root --batch --skip-column-names -e 'SELECT 1' \
       >/dev/null 2>&1; then
-    printf 'CURRENT_MYSQL_ROOT_PASSWORD_SHA256=%s\n' "${current_hash}"
+    persist_hash "${current_hash}"
     exit 0
   fi
   echo "MySQL root password changed, but the running database does not accept the new credential." >&2
@@ -69,4 +79,4 @@ if (( data_nonempty == 1 )); then
   exit 1
 fi
 
-printf 'CURRENT_MYSQL_ROOT_PASSWORD_SHA256=%s\n' "${current_hash}"
+persist_hash "${current_hash}"
