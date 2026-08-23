@@ -83,6 +83,40 @@ class IncrementalBuildPlanTest(unittest.TestCase):
         self.assertEqual(plan["BACKEND_COMPILE"], 0)
         self.assertEqual(plan["BACKEND_RUNTIME"], 1)
 
+    def test_gradle_prepare_helper_rebuilds_only_app(self) -> None:
+        plan = self.plan_for("scripts/deploy/prepare-gradle-distribution.sh")
+        self.assertEqual(plan["APP_BUILD"], 1)
+        self.assertEqual(plan["BACKEND_COMPILE"], 0)
+        self.assertEqual(plan["BACKEND_RUNTIME"], 0)
+        self.assertEqual(plan["FRONTEND_BUILD"], 0)
+        self.assertEqual(plan["TOOLCHAIN_REBUILD"], 0)
+
+    def test_build_app_helper_rebuilds_only_app(self) -> None:
+        plan = self.plan_for("scripts/deploy/build-app.sh")
+        self.assertEqual(plan["APP_BUILD"], 1)
+        self.assertEqual(plan["BACKEND_RUNTIME"], 0)
+        self.assertEqual(plan["FRONTEND_BUILD"], 0)
+
+    def test_build_frontend_helper_rebuilds_only_frontend(self) -> None:
+        plan = self.plan_for("scripts/deploy/build-frontend.sh")
+        self.assertEqual(plan["FRONTEND_BUILD"], 1)
+        self.assertEqual(plan["APP_BUILD"], 0)
+        self.assertEqual(plan["BACKEND_RUNTIME"], 0)
+
+    def test_build_backend_helper_recompiles_backend(self) -> None:
+        plan = self.plan_for("scripts/deploy/build-backend.sh")
+        self.assertEqual(plan["BACKEND_COMPILE"], 1)
+        self.assertEqual(plan["BACKEND_RUNTIME"], 1)
+        self.assertEqual(plan["FRONTEND_BUILD"], 0)
+        self.assertEqual(plan["APP_BUILD"], 0)
+
+    def test_toolchain_helper_rebuilds_toolchain_only(self) -> None:
+        plan = self.plan_for("scripts/deploy/toolchain.sh")
+        self.assertEqual(plan["TOOLCHAIN_REBUILD"], 1)
+        self.assertEqual(plan["BACKEND_COMPILE"], 0)
+        self.assertEqual(plan["BACKEND_RUNTIME"], 0)
+        self.assertEqual(plan["APP_BUILD"], 0)
+
     def test_same_commit_is_noop(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             repo = Path(temporary)
