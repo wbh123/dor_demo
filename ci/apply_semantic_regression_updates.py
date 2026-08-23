@@ -1,4 +1,5 @@
 from pathlib import Path
+import subprocess
 
 ROOT = Path('private-repo')
 
@@ -74,16 +75,14 @@ patch(
     '''        assertThat(login.get("imageUrl")).isEqualTo("");''',
 )
 
-# Remove accidentally tracked interpreter caches and prevent future test/generator
-# runs from re-adding Python bytecode at any nesting depth.
-cache_dir = ROOT / 'scripts/db/baseline/__pycache__'
-if cache_dir.exists():
-    for artifact in cache_dir.glob('*.pyc'):
-        artifact.unlink()
-    try:
-        cache_dir.rmdir()
-    except OSError:
-        pass
+# Remove accidentally tracked interpreter caches from the Git index. Keep any
+# files in the worktree: once untracked, the generic ignore rules below prevent
+# Python/test runs from re-adding them before the final commit.
+subprocess.run(
+    ['git', '-C', str(ROOT), 'rm', '--cached', '-r', '--ignore-unmatch',
+     'scripts/db/baseline/__pycache__'],
+    check=True,
+)
 
 gitignore = ROOT / '.gitignore'
 gitignore_text = gitignore.read_text(encoding='utf-8')
@@ -91,4 +90,4 @@ ignore_block = '\n# Python interpreter caches\n**/__pycache__/\n*.py[cod]\n'
 if '**/__pycache__/' not in gitignore_text or '*.py[cod]' not in gitignore_text:
     gitignore.write_text(gitignore_text.rstrip() + ignore_block, encoding='utf-8')
 
-print('semantic regression tests aligned; generated Python bytecode cleaned')
+print('semantic regression tests aligned; generated Python bytecode removed from Git index')
