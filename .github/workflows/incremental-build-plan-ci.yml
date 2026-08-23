@@ -37,6 +37,8 @@ jobs:
           bash -n scripts/ci/prepare_runtime_images_contract.sh
       - name: Validate source archive and Git modes
         run: python3 scripts/ci/test_source_archive_mode.py
+      - name: Validate Vite build-time env hash tracking
+        run: python3 scripts/ci/test_build_env_hash_plan.py
       - name: Validate mainland container image mirror tags and fallback
         run: python3 scripts/ci/test_container_image_mirrors.py
       - name: Validate source and release runtime image preflight modes
