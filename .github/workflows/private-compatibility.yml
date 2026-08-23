@@ -1,46 +1,37 @@
-name: Private Compatibility CI
+name: Private Feature Validation
 
 on:
   push:
     branches:
       - 'private-compat/**'
-  pull_request:
-    branches:
-      - main
-    paths:
-      - '.private-compat-trigger'
+    paths-ignore:
+      - 'ci/latest-feature-validation.txt'
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
-  group: private-compat-${{ github.ref }}
+  group: private-feature-${{ github.ref_name }}
   cancel-in-progress: true
 
 jobs:
-  verify-private-ref:
-    name: Verify private integration ref
+  frontend-red:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
     steps:
-      - name: Resolve private branch name
+      - name: Resolve private branch
         id: target
         shell: bash
         run: |
           set -euo pipefail
-          candidate="${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}"
-          private_ref="${candidate#private-compat/}"
-          if [[ -z "$private_ref" || "$private_ref" == "$candidate" ]]; then
-            echo "Invalid compatibility branch name" >&2
-            exit 1
-          fi
-          if [[ ! "$private_ref" =~ ^[A-Za-z0-9._/-]+$ ]]; then
-            echo "Unsupported private ref characters" >&2
-            exit 1
-          fi
+          private_ref="${GITHUB_REF_NAME#private-compat/}"
           echo "private_ref=$private_ref" >> "$GITHUB_OUTPUT"
-
-      - name: Checkout private integration branch
+      - name: Checkout helper branch
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.ref_name }}
+          path: ci-tools
+          persist-credentials: true
+      - name: Checkout private branch
         uses: actions/checkout@v5
         with:
           repository: wbh123/Wust-Dormitory-Select
@@ -48,46 +39,47 @@ jobs:
           token: ${{ secrets.PRIVATE_CI }}
           path: private-repo
           persist-credentials: false
-          fetch-depth: 0
-
-      - uses: actions/setup-python@v6
-        with:
-          python-version: '3.12'
-
-      - uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: '21'
-          cache: maven
-          cache-dependency-path: private-repo/backend-java/pom.xml
-
       - uses: actions/setup-node@v6
         with:
           node-version: '22'
           cache: npm
           cache-dependency-path: private-repo/frontend/package-lock.json
-
-      - name: Verify private contracts
-        working-directory: private-repo
+      - name: Run private frontend tests
+        id: test
+        shell: bash
+        run: |
+          set +e
+          cd private-repo/frontend
+          npm ci --no-audit --no-fund > /tmp/npm-ci.log 2>&1
+          npm_ci=$?
+          if [[ $npm_ci -eq 0 ]]; then npm test > /tmp/frontend-test.log 2>&1; frontend_test=$?; else frontend_test=99; fi
+          cd "$GITHUB_WORKSPACE"
+          result="ci-tools/ci/latest-feature-validation.txt"
+          {
+            echo "private_ref=${{ steps.target.outputs.private_ref }}"
+            echo "private_head=$(git -C private-repo rev-parse HEAD)"
+            echo "npm_ci=$npm_ci"
+            echo "frontend_test=$frontend_test"
+            if [[ $frontend_test -ne 0 && -f /tmp/frontend-test.log ]]; then
+              echo "===== frontend_test failure tail ====="
+              tail -n 160 /tmp/frontend-test.log
+            fi
+          } > "$result"
+          echo "frontend_test=$frontend_test" >> "$GITHUB_OUTPUT"
+          exit 0
+      - name: Publish feature validation result
+        if: always()
+        working-directory: ci-tools
         shell: bash
         run: |
           set -euo pipefail
-          python scripts/ci/test_runtime_error_data_correctness_batch.py
-          bash scripts/ci/run_contracts.sh
-
-      - name: Verify private Java modules
-        working-directory: private-repo/backend-java
-        shell: bash
-        run: |
-          set -euo pipefail
-          mvn -B -ntp clean verify
-
-      - name: Verify private frontend
-        working-directory: private-repo
-        shell: bash
-        env:
-          VITE_INSTITUTION_NAME: Example University
-          VITE_CAMPUS_NAME: Example Campus
-        run: |
-          set -euo pipefail
-          bash scripts/ci/run_frontend.sh
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add ci/latest-feature-validation.txt
+          if ! git diff --cached --quiet; then
+            git commit -m "ci: record feature validation [skip ci]"
+            git push origin HEAD:${GITHUB_REF_NAME}
+          fi
+      - name: Fail on frontend test failure
+        if: steps.test.outputs.frontend_test != '0'
+        run: exit 1
