@@ -73,11 +73,16 @@ for old, new in [
     print_view = print_view.replace(old, new)
 write(print_path, print_view)
 
-# Keep the existing authorization wording required by the site-theme governance contract.
+# Keep the existing authorization wording required by the site-theme governance contracts.
 replace_required(
     'frontend/src/views/platform/PlatformSiteMetadataView.vue',
     '由授权中心或套餐功能决定。',
     '由授权中心或套餐设置决定。',
+)
+replace_required(
+    'frontend/src/views/platform/PlatformSiteMetadataView.vue',
+    '学校管理员是否可以修改学校主题，由授权中心或套餐设置决定。',
+    '是否允许学校管理员修改学校主题，由授权中心或套餐设置决定。',
 )
 
 print('app download UI followups applied')
