@@ -41,6 +41,8 @@ jobs:
         run: python3 scripts/ci/test_runtime_image_preflight.py
       - name: Validate APT and PyPI mainland mirror fallback
         run: python3 scripts/ci/test_dependency_mirrors.py
+      - name: Validate Gradle distribution mainland mirror fallback
+        run: python3 scripts/ci/test_gradle_distribution_mirror.py
       - name: Validate Nginx dynamic Docker DNS syntax
         run: python3 scripts/ci/test_proxy_dynamic_dns.py
       - name: Validate Java 21 backend runtime packages and privilege drop
