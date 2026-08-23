@@ -1,0 +1,31 @@
+name: Incremental Build Plan CI
+
+on:
+  push:
+    branches:
+      - '**'
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: incremental-build-plan-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  incremental-plan:
+    name: Incremental build and restart plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Validate incremental build classification
+        run: python3 scripts/ci/test_incremental_build_plan.py
+      - name: Validate shell syntax
+        run: bash -n scripts/ci/incremental_build_plan.sh
