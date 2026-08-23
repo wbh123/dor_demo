@@ -18,6 +18,9 @@ escaped_backup_password="${WUST_DORMITORY_BACKUP_DB_PASSWORD//\'/\'\'}"
 export MYSQL_PWD="${MYSQL_ROOT_PASSWORD}"
 
 mysql --protocol=TCP --host "${MYSQL_HOST}" --port 3306 --user root <<SQL
+CREATE DATABASE IF NOT EXISTS \`${MYSQL_DATABASE}\`
+  CHARACTER SET utf8mb4
+  COLLATE utf8mb4_0900_ai_ci;
 CREATE USER IF NOT EXISTS '${WUST_DORMITORY_DB_USER}'@'%' IDENTIFIED BY '${escaped_app_password}';
 ALTER USER '${WUST_DORMITORY_DB_USER}'@'%' IDENTIFIED BY '${escaped_app_password}';
 GRANT ALL PRIVILEGES ON \`${MYSQL_DATABASE}\`.* TO '${WUST_DORMITORY_DB_USER}'@'%';
