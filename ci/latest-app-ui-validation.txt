@@ -1,4 +1,4 @@
-private_before=d5145511fd56bd2f67e17472e0360d7ac348c16e
+private_before=5d2b2a42fe447ee2d9c371f9e5dfafafc74ff067
 patch=0
 npm_ci=0
 frontend_test=1
@@ -8,152 +8,166 @@ contracts=1
 diff_check=0
 overall=1
 ===== frontend failure tail =====
-  ...
-# Subtest: visual editor converts font points to millimeters with the same physical formula as Android print
-ok 67 - visual editor converts font points to millimeters with the same physical formula as Android print
-  ---
-  duration_ms: 0.883632
-  type: 'test'
-  ...
-# Subtest: visual editor is isolated in a full-screen overlay and preserves canvas width
-ok 68 - visual editor is isolated in a full-screen overlay and preserves canvas width
-  ---
-  duration_ms: 4.814991
-  type: 'test'
-  ...
-# Subtest: revision history stays on management page instead of element properties
-ok 69 - revision history stays on management page instead of element properties
-  ---
-  duration_ms: 0.62575
-  type: 'test'
-  ...
-# Subtest: element properties use compact grouped controls
-ok 70 - element properties use compact grouped controls
-  ---
-  duration_ms: 0.400168
-  type: 'test'
-  ...
-# Subtest: floor and room units are appended exactly once and can be hidden per element
-ok 71 - floor and room units are appended exactly once and can be hidden per element
-  ---
-  duration_ms: 0.794726
-  type: 'test'
-  ...
-# Subtest: template API preserves semantic Chinese suffixes while allowing explicit override
-ok 72 - template API preserves semantic Chinese suffixes while allowing explicit override
-  ---
-  duration_ms: 0.463647
-  type: 'test'
-  ...
-# Subtest: database migration makes custom print templates platform-controlled
-ok 73 - database migration makes custom print templates platform-controlled
-  ---
-  duration_ms: 0.582209
-  type: 'test'
-  ...
-# Subtest: QR code drag uses live element geometry instead of stale canonical preview coordinates
-ok 74 - QR code drag uses live element geometry instead of stale canonical preview coordinates
-  ---
-  duration_ms: 0.776683
-  type: 'test'
-  ...
-# Subtest: QR code canvas renders a cached single path instead of rebuilding hundreds of rect nodes while dragging
-ok 75 - QR code canvas renders a cached single path instead of rebuilding hundreds of rect nodes while dragging
-  ---
-  duration_ms: 0.514752
-  type: 'test'
-  ...
-# Subtest: QR code size controls keep square geometry when width or height changes
-ok 76 - QR code size controls keep square geometry when width or height changes
-  ---
-  duration_ms: 0.394036
-  type: 'test'
-  ...
-# Subtest: admin editor loads the exact same pinned static Regular and Bold Noto Sans SC resources as backend/mobile
-ok 77 - admin editor loads the exact same pinned static Regular and Bold Noto Sans SC resources as backend/mobile
-  ---
-  duration_ms: 1.803622
-  type: 'test'
-  ...
-# Subtest: font loader rejects SPA fallback or corrupted bytes before FontFace sees them
-ok 78 - font loader rejects SPA fallback or corrupted bytes before FontFace sees them
-  ---
-  duration_ms: 0.466332
-  type: 'test'
-  ...
-# Subtest: editor registers distinct 400 and 700 FontFace bytes instead of cloning a variable font
-ok 79 - editor registers distinct 400 and 700 FontFace bytes instead of cloning a variable font
-  ---
-  duration_ms: 0.590544
-  type: 'test'
-  ...
-# Subtest: canonical font loading and automatic preview are single-flight to avoid starving API requests
-ok 80 - canonical font loading and automatic preview are single-flight to avoid starving API requests
-  ---
-  duration_ms: 0.600012
-  type: 'test'
-  ...
-# Subtest: nginx never rewrites missing font files to index.html
-ok 81 - nginx never rewrites missing font files to index.html
-  ---
-  duration_ms: 0.531082
-  type: 'test'
-  ...
-# Subtest: residency list uses server pagination and renders only returned rows
-ok 82 - residency list uses server pagination and renders only returned rows
-  ---
-  duration_ms: 6.546581
-  type: 'test'
-  ...
-# Subtest: bed confirmation room list uses server pagination for its bounded room review list
-ok 83 - bed confirmation room list uses server pagination for its bounded room review list
-  ---
-  duration_ms: 0.271347
-  type: 'test'
-  ...
-# Subtest: default role provisioning supports no-access and hierarchical concrete scope selection
-ok 84 - default role provisioning supports no-access and hierarchical concrete scope selection
-  ---
-  duration_ms: 1.585474
-  type: 'test'
-  ...
-# Subtest: student welcome exposes a display switch and studentName token
-ok 85 - student welcome exposes a display switch and studentName token
-  ---
-  duration_ms: 0.313426
-  type: 'test'
-  ...
-# Subtest: platform site images are uploaded rather than edited as URLs
-ok 86 - platform site images are uploaded rather than edited as URLs
-  ---
-  duration_ms: 0.423231
-  type: 'test'
-  ...
-# Subtest: import upload attempts reuse a key only for transport retry and rotate it after success
-ok 87 - import upload attempts reuse a key only for transport retry and rotate it after success
-  ---
-  duration_ms: 0.478736
-  type: 'test'
-  ...
-# Subtest: student table hidden action menu cannot create vertical scroll blank space
-ok 88 - student table hidden action menu cannot create vertical scroll blank space
-  ---
-  duration_ms: 0.323615
-  type: 'test'
-  ...
-# Subtest: public app download page is memorable, mobile friendly and exposes direct-download QR
-not ok 89 - public app download page is memorable, mobile friendly and exposes direct-download QR
-  ---
-  duration_ms: 1.2673
-  type: 'test'
-  location: '/home/runner/work/dor_demo/dor_demo/private-repo/frontend/src/views/admin/requested-admin-fixes.spec.ts:63:1'
-  failureType: 'testCodeFailure'
-  error: "ENOENT: no such file or directory, open '/home/runner/work/dor_demo/dor_demo/private-repo/frontend/backend-java/server/src/main/java/com/wust/dormitory/mobile/MobileAppVersionController.java'"
-  code: 'ENOENT'
+      '    }\n' +
+      '\n' +
+      '    static List<String> allowedRequestHeaders(boolean includeClientType) {\n' +
+      '        java.util.ArrayList<String> headers = new java.util.ArrayList<>(List.of(\n' +
+      '                "Authorization", "Content-Type", "X-Request-Id", "Last-Event-ID"));\n' +
+      '        for (String header : AUTH_CLIENT_CONTEXT_HEADERS) {\n' +
+      '            if (includeClientType || !"X-Client-Type".equals(header)) {\n' +
+      '                headers.add(header);\n' +
+      '            }\n' +
+      '        }\n' +
+      '        return List.copyOf(headers);\n' +
+      '    }\n' +
+      '\n' +
+      '    static List<String> parseOriginPatterns(String value) {\n' +
+      '        List<String> configured = Arrays.stream(String.valueOf(value).split(","))\n' +
+      '                .map(String::trim)\n' +
+      '                .filter(item -> !item.isEmpty())\n' +
+      '                .distinct()\n' +
+      '                .toList();\n' +
+      '        return configured.isEmpty() ? LOCAL_ORIGIN_PATTERNS : configured;\n' +
+      '    }\n' +
+      '}\n'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+  actual: |-
+    package com.wust.dormitory.security;
+    
+    import com.fasterxml.jackson.databind.ObjectMapper;
+    import com.wust.dormitory.common.response.ResponseFactory;
+    import jakarta.servlet.http.HttpServletResponse;
+    import org.springframework.beans.factory.annotation.Value;
+    import org.springframework.context.annotation.Bean;
+    import org.springframework.context.annotation.Configuration;
+    import org.springframework.http.MediaType;
+    import org.springframework.security.config.Customizer;
+    import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+    import org.springframework.security.config.http.SessionCreationPolicy;
+    import org.springframework.security.crypto.factory.PasswordEncoderFactories;
+    import org.springframework.security.crypto.password.PasswordEncoder;
+    import org.springframework.security.web.SecurityFilterChain;
+    import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+    import org.springframework.security.web.context.RequestAttributeSecurityContextRepository;
+    import org.springframework.security.web.context.SecurityContextRepository;
+    import org.springframework.web.cors.CorsConfiguration;
+    import org.springframework.web.cors.CorsConfigurationSource;
+    import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+    
+    import java.util.Arrays;
+    import java.util.List;
+    
+    @Configuration
+    public class SecurityConfig {
+        private static final List<String> LOCAL_ORIGIN_PATTERNS =
+                List.of("http://localhost:*", "http://127.0.0.1:*");
+    
+        static final List<String> AUTH_CLIENT_CONTEXT_HEADERS = List.of(
+                "X-Client-Type",
+                "X-Client-Instance-Id",
+                "X-App-Version",
+                "X-App-Build",
+                "X-Device-Form-Factor",
+                "X-Device-Manufacturer",
+                "X-Device-Model",
+                "X-OS-Name",
+                "X-OS-Version",
+                "X-Browser-Name",
+                "X-Browser-Version");
+    
+        @Bean
+        SecurityFilterChain securityFilterChain(
+                HttpSecurity http,
+                BearerTokenFilter tokenFilter,
+                AdminDomainIsolationFilter adminDomainIsolationFilter,
+                ObjectMapper objectMapper,
+                SecurityContextRepository securityContextRepository) throws Exception {
+            http.csrf(csrf -> csrf.disable())
+                    .cors(Customizer.withDefaults())
+                    .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                    .securityContext(securityContext -> securityContext.securityContextRepository(securityContextRepository))
+                    .authorizeHttpRequests(authorize -> authorize
+                            .requestMatchers(
+                                    "/api/v1/auth/login",
+                                    "/api/v1/auth/activate",
+                                    "/api/v1/platform/login",
+                                    "/api/v1/public/site-config",
+                                    "/api/v1/mobile/app-version",
+                                    "/actuator/health"
+                            ).permitAll()
+                            .requestMatchers("/api/v1/platform/**").hasRole("SYSTEM_ADMIN")
+                            .requestMatchers("/api/v1/account-admin/**", "/api/v1/admin/**").hasRole("ADMIN")
+                            .requestMatchers("/api/v1/student/**", "/api/v1/realtime/**").hasRole("STUDENT")
+                            .anyRequest().authenticated())
+                    .exceptionHandling(exceptions -> exceptions
+                            .authenticationEntryPoint((request, response, exception) -> {
+                                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                                response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+                                objectMapper.writeValue(response.getOutputStream(),
+                                        ResponseFactory.error("UNAUTHORIZED", "请先登录"));
+                            })
+                            .accessDeniedHandler((request, response, exception) -> {
+                                response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                                response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+                                objectMapper.writeValue(response.getOutputStream(),
+                                        ResponseFactory.error("FORBIDDEN", "无权执行该操作"));
+                            }))
+                    .addFilterBefore(tokenFilter, UsernamePasswordAuthenticationFilter.class)
+                    .addFilterAfter(adminDomainIsolationFilter, BearerTokenFilter.class);
+            return http.build();
+        }
+    
+        @Bean
+        SecurityContextRepository securityContextRepository() {
+            return new RequestAttributeSecurityContextRepository();
+        }
+    
+        @Bean
+        PasswordEncoder passwordEncoder() {
+            return PasswordEncoderFactories.createDelegatingPasswordEncoder();
+        }
+    
+        @Bean
+        CorsConfigurationSource corsConfigurationSource(
+                @Value("${WUST_DORMITORY_CORS_ALLOWED_ORIGIN_PATTERNS:}") String configuredOriginPatterns) {
+            CorsConfiguration configuration = new CorsConfiguration();
+            configuration.setAllowedOriginPatterns(parseOriginPatterns(configuredOriginPatterns));
+            configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
+            configuration.setAllowedHeaders(allowedRequestHeaders(true));
+            configuration.setExposedHeaders(List.of("X-Request-Id"));
+            configuration.setAllowCredentials(true);
+            UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+            source.registerCorsConfiguration("/**", configuration);
+            return source;
+        }
+    
+        static List<String> allowedRequestHeaders(boolean includeClientType) {
+            java.util.ArrayList<String> headers = new java.util.ArrayList<>(List.of(
+                    "Authorization", "Content-Type", "X-Request-Id", "Last-Event-ID"));
+            for (String header : AUTH_CLIENT_CONTEXT_HEADERS) {
+                if (includeClientType || !"X-Client-Type".equals(header)) {
+                    headers.add(header);
+                }
+            }
+            return List.copyOf(headers);
+        }
+    
+        static List<String> parseOriginPatterns(String value) {
+            List<String> configured = Arrays.stream(String.valueOf(value).split(","))
+                    .map(String::trim)
+                    .filter(item -> !item.isEmpty())
+                    .distinct()
+                    .toList();
+            return configured.isEmpty() ? LOCAL_ORIGIN_PATTERNS : configured;
+        }
+    }
+    
+  operator: 'match'
   stack: |-
-    readFileSync (node:fs:440:20)
-    read (file:///home/runner/work/dor_demo/dor_demo/private-repo/frontend/src/views/admin/requested-admin-fixes.spec.ts:10:36)
-    TestContext.<anonymous> (file:///home/runner/work/dor_demo/dor_demo/private-repo/frontend/src/views/admin/requested-admin-fixes.spec.ts:67:22)
+    TestContext.<anonymous> (file:///home/runner/work/dor_demo/dor_demo/private-repo/frontend/src/views/admin/requested-admin-fixes.spec.ts:77:10)
     Test.runInAsyncScope (node:async_hooks:214:14)
     Test.run (node:internal/test_runner/test:1047:25)
     Test.processPendingSubtests (node:internal/test_runner/test:744:18)
@@ -162,52 +176,38 @@ not ok 89 - public app download page is memorable, mobile friendly and exposes d
     async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
   ...
 # Subtest: welcome token is the real student name and save action is in the card header
-not ok 90 - welcome token is the real student name and save action is in the card header
+ok 90 - welcome token is the real student name and save action is in the card header
   ---
-  duration_ms: 0.370583
+  duration_ms: 0.671608
   type: 'test'
-  location: '/home/runner/work/dor_demo/dor_demo/private-repo/frontend/src/views/admin/requested-admin-fixes.spec.ts:78:1'
-  failureType: 'testCodeFailure'
-  error: "ENOENT: no such file or directory, open '/home/runner/work/dor_demo/dor_demo/private-repo/frontend/backend-java/server/src/main/java/com/wust/dormitory/auth/StudentWelcomeService.java'"
-  code: 'ENOENT'
-  stack: |-
-    readFileSync (node:fs:440:20)
-    read (file:///home/runner/work/dor_demo/dor_demo/private-repo/frontend/src/views/admin/requested-admin-fixes.spec.ts:10:36)
-    TestContext.<anonymous> (file:///home/runner/work/dor_demo/dor_demo/private-repo/frontend/src/views/admin/requested-admin-fixes.spec.ts:80:19)
-    Test.runInAsyncScope (node:async_hooks:214:14)
-    Test.run (node:internal/test_runner/test:1047:25)
-    Test.processPendingSubtests (node:internal/test_runner/test:744:18)
-    Test.postRun (node:internal/test_runner/test:1173:19)
-    Test.run (node:internal/test_runner/test:1101:12)
-    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
   ...
 # Subtest: business boolean settings use the shared system switch language
 ok 91 - business boolean settings use the shared system switch language
   ---
-  duration_ms: 0.904011
+  duration_ms: 0.884843
   type: 'test'
   ...
 # Subtest: all business file and image upload surfaces use one upload field component
 ok 92 - all business file and image upload surfaces use one upload field component
   ---
-  duration_ms: 0.821245
+  duration_ms: 0.979523
   type: 'test'
   ...
 # Subtest: object operation history displays business names instead of database primary keys
 ok 93 - object operation history displays business names instead of database primary keys
   ---
-  duration_ms: 0.490267
+  duration_ms: 0.699116
   type: 'test'
   ...
 1..93
 # tests 93
 # suites 0
-# pass 91
-# fail 2
+# pass 92
+# fail 1
 # cancelled 0
 # skipped 0
 # todo 0
-# duration_ms 1212.107185
+# duration_ms 1299.733986
 ===== build failure tail =====
 
 > wust-dormitory-select-frontend@1.0.0 build
@@ -224,9 +224,9 @@ ok 93 - object operation history displays business names instead of database pri
 > openapi-typescript ../backend-java/model/src/main/resources/openapi-interface.yaml -o src/api/schema.d.ts && openapi-typescript ../backend-java/model/src/main/resources/admin/openapi-system-readiness.yaml -o src/api/systemReadinessSchema.d.ts
 
 ✨ openapi-typescript 7.13.0
-🚀 ../backend-java/model/src/main/resources/openapi-interface.yaml → src/api/schema.d.ts [377ms]
+🚀 ../backend-java/model/src/main/resources/openapi-interface.yaml → src/api/schema.d.ts [364.8ms]
 ✨ openapi-typescript 7.13.0
-🚀 ../backend-java/model/src/main/resources/admin/openapi-system-readiness.yaml → src/api/systemReadinessSchema.d.ts [33.6ms]
+🚀 ../backend-java/model/src/main/resources/admin/openapi-system-readiness.yaml → src/api/systemReadinessSchema.d.ts [31.6ms]
 src/views/admin/AdminDashboardView.vue(177,230): error TS2322: Type '{ token: string; label: string; example: string; }[]' is not assignable to type 'Record<string, string>'.
   Index signature for type 'string' is missing in type '{ token: string; label: string; example: string; }[]'.
 src/views/admin/AdminDashboardView.vue(178,269): error TS2322: Type '{ token: string; label: string; example: string; }[]' is not assignable to type 'Record<string, string>'.
@@ -265,7 +265,7 @@ Ran 3 tests in 0.001s
 OK
 ......
 ----------------------------------------------------------------------
-Ran 6 tests in 0.002s
+Ran 6 tests in 0.001s
 
 OK
 ..
@@ -275,7 +275,7 @@ Ran 2 tests in 0.001s
 OK
 ..
 ----------------------------------------------------------------------
-Ran 2 tests in 0.067s
+Ran 2 tests in 0.065s
 
 OK
 Runtime error and data correctness private migration contract passed
