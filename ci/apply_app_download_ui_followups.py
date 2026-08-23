@@ -69,7 +69,7 @@ for old, new in [
     ("assetInput.value.value = ''", 'assetInput.value.clear()'),
     ("imageInput.value.value = ''", 'imageInput.value.clear()'),
     ('imageInput?.click()', 'imageInput?.open()'),
-    ('assetInput?.click()', 'assetInput.value?.open()'),
+    ('assetInput?.click()', 'assetInput?.open()'),
 ]:
     print_view = print_view.replace(old, new)
 write(print_path, print_view)
