@@ -69,10 +69,19 @@ for old, new in [
     ("assetInput.value.value = ''", 'assetInput.value.clear()'),
     ("imageInput.value.value = ''", 'imageInput.value.clear()'),
     ('imageInput?.click()', 'imageInput?.open()'),
-    ('assetInput?.click()', 'assetInput?.open()'),
+    ('assetInput?.click()', 'assetInput.value?.open()'),
 ]:
     print_view = print_view.replace(old, new)
 write(print_path, print_view)
+
+# When a platform entitlement is revoked, preserve the school's stored value and make that non-destructive behavior explicit.
+preference_path = 'frontend/src/views/admin/AdminPreferencePolicyView.vue'
+preference = read(preference_path)
+preference = preference.replace(
+    "'系统管理员当前未授权；当前实际不生效。'",
+    "'系统管理员当前未授权；原有学校设置会保留，但当前实际不生效。仍可正常保存本页其他策略。'",
+)
+write(preference_path, preference)
 
 # Theme modification permission is entitlement-driven. Keep the page explanatory, but do not expose a duplicate write toggle.
 site_path = 'frontend/src/views/platform/PlatformSiteMetadataView.vue'
