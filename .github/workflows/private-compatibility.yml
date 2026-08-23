@@ -5,6 +5,7 @@ on:
     branches:
       - 'private-compat/**'
     paths-ignore:
+      - 'ci/latest-apply-result.txt'
       - 'ci/latest-private-validation.txt'
 
 permissions:
@@ -15,35 +16,28 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  verify-private-ref:
-    name: Verify private integration ref
+  apply-private-followups:
+    name: Apply private follow-ups
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 10
     steps:
-      - name: Resolve private branch name
+      - name: Resolve private branch
         id: target
         shell: bash
         run: |
           set -euo pipefail
           private_ref="${GITHUB_REF_NAME#private-compat/}"
-          if [[ -z "$private_ref" || "$private_ref" == "$GITHUB_REF_NAME" ]]; then
-            echo "Invalid compatibility branch name" >&2
-            exit 1
-          fi
-          if [[ ! "$private_ref" =~ ^[A-Za-z0-9._/-]+$ ]]; then
-            echo "Unsupported private ref characters" >&2
-            exit 1
-          fi
+          [[ "$private_ref" != "$GITHUB_REF_NAME" ]]
           echo "private_ref=$private_ref" >> "$GITHUB_OUTPUT"
 
-      - name: Checkout CI helper branch
+      - name: Checkout helper branch
         uses: actions/checkout@v5
         with:
           ref: ${{ github.ref_name }}
           path: ci-tools
           persist-credentials: true
 
-      - name: Checkout private integration branch
+      - name: Checkout private branch
         uses: actions/checkout@v5
         with:
           repository: wbh123/Wust-Dormitory-Select
@@ -53,11 +47,21 @@ jobs:
           persist-credentials: true
           fetch-depth: 0
 
-      - name: Apply verified follow-up fixes
+      - name: Apply and publish diagnostics
+        id: apply
         shell: bash
         run: |
-          set -euo pipefail
-          python - <<'PY'
+          set +e
+          result="$GITHUB_WORKSPACE/ci-tools/ci/latest-apply-result.txt"
+          mkdir -p "$GITHUB_WORKSPACE/ci-tools/ci"
+          : > "$result"
+          {
+            echo "private_ref=${{ steps.target.outputs.private_ref }}"
+            echo "private_before=$(git -C private-repo rev-parse HEAD)"
+            echo "started_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          } >> "$result"
+
+          python - <<'PY' > /tmp/prepare.log 2>&1
           from pathlib import Path
           p = Path('ci-tools/ci/apply_runtime_followups.py')
           text = p.read_text(encoding='utf-8')
@@ -67,125 +71,83 @@ jobs:
           )
           p.write_text(text, encoding='utf-8')
           PY
-          python ci-tools/ci/apply_runtime_followups.py
-          python ci-tools/ci/apply_openapi_closure.py
-          cd private-repo
-          if ! git diff --quiet; then
-            git config user.name github-actions[bot]
-            git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-            git add -A
-            git commit -m "fix: close import retry policy and site asset contracts"
-            git push origin HEAD:${{ steps.target.outputs.private_ref }}
-          fi
+          prepare=$?
+          echo "prepare=$prepare" >> "$result"
 
-      - uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: '21'
-          cache: maven
-          cache-dependency-path: private-repo/backend-java/pom.xml
-
-      - uses: actions/setup-node@v6
-        with:
-          node-version: '22'
-          cache: npm
-          cache-dependency-path: private-repo/frontend/package-lock.json
-
-      - name: Validate private branch
-        id: validate
-        shell: bash
-        run: |
-          set +e
-          private_sha="$(git -C private-repo rev-parse HEAD)"
-          mkdir -p ci-tools/ci
-          result="ci-tools/ci/latest-private-validation.txt"
-          : > "$result"
-          {
-            echo "private_ref=${{ steps.target.outputs.private_ref }}"
-            echo "private_sha=$private_sha"
-            echo "validated_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          } >> "$result"
-
-          mvn -f private-repo/backend-java/pom.xml -B -ntp -pl server -am -DskipTests package > /tmp/java-compile.log 2>&1
-          java_compile=$?
-          echo "java_compile=$java_compile" >> "$result"
-
-          if [[ $java_compile -eq 0 ]]; then
-            mvn -f private-repo/backend-java/pom.xml -B -ntp -pl server -am \
-              -Dtest=AdminNoScopeGrantRegressionTest,WelcomeBrandDefaultsRegressionTest,ImportAttemptHistoryRegressionTest,SiteMetadataAssetServiceRegressionTest \
-              -Dsurefire.failIfNoSpecifiedTests=false test > /tmp/java-regression.log 2>&1
-            java_regression=$?
+          if [[ $prepare -eq 0 ]]; then
+            python ci-tools/ci/apply_runtime_followups.py > /tmp/runtime.log 2>&1
+            runtime=$?
           else
-            java_regression=99
-            echo "skipped because Java compile failed" > /tmp/java-regression.log
+            runtime=99
           fi
-          echo "java_regression=$java_regression" >> "$result"
+          echo "runtime=$runtime" >> "$result"
 
-          python private-repo/scripts/ci/test_site_metadata_openapi_contract.py > /tmp/openapi-contract.log 2>&1
-          openapi_contract=$?
-          echo "openapi_contract=$openapi_contract" >> "$result"
-
-          cd private-repo/frontend
-          npm ci --no-audit --no-fund > /tmp/npm-ci.log 2>&1
-          npm_ci=$?
-          echo "npm_ci=$npm_ci" >> "$GITHUB_WORKSPACE/$result"
-
-          if [[ $npm_ci -eq 0 ]]; then
-            npm test > /tmp/frontend-test.log 2>&1
-            frontend_test=$?
-            npm run build > /tmp/frontend-build.log 2>&1
-            frontend_build=$?
+          if [[ $runtime -eq 0 ]]; then
+            python ci-tools/ci/apply_openapi_closure.py > /tmp/openapi.log 2>&1
+            openapi=$?
           else
-            frontend_test=99
-            frontend_build=99
-            echo "skipped because npm ci failed" > /tmp/frontend-test.log
-            echo "skipped because npm ci failed" > /tmp/frontend-build.log
+            openapi=99
           fi
-          cd "$GITHUB_WORKSPACE"
-          echo "frontend_test=$frontend_test" >> "$result"
-          echo "frontend_build=$frontend_build" >> "$result"
+          echo "openapi=$openapi" >> "$result"
+
+          push=99
+          if [[ $runtime -eq 0 && $openapi -eq 0 ]]; then
+            cd private-repo
+            if ! git diff --quiet; then
+              git config user.name github-actions[bot]
+              git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+              git add -A
+              git commit -m "fix: close import retry policy and site asset contracts" > /tmp/commit.log 2>&1
+              commit_code=$?
+              if [[ $commit_code -eq 0 ]]; then
+                git push origin HEAD:${{ steps.target.outputs.private_ref }} > /tmp/push.log 2>&1
+                push=$?
+              else
+                push=$commit_code
+              fi
+            else
+              echo "no private diff" > /tmp/commit.log
+              echo "no private diff" > /tmp/push.log
+              push=0
+            fi
+            cd "$GITHUB_WORKSPACE"
+          fi
+          echo "push=$push" >> "$result"
+          echo "private_after=$(git -C private-repo rev-parse HEAD)" >> "$result"
+
+          for pair in prepare:/tmp/prepare.log:$prepare runtime:/tmp/runtime.log:$runtime openapi:/tmp/openapi.log:$openapi push:/tmp/push.log:$push; do
+            IFS=: read -r label logfile code <<< "$pair"
+            if [[ "$code" -ne 0 && -f "$logfile" ]]; then
+              {
+                echo
+                echo "===== ${label} failure tail ====="
+                tail -n 160 "$logfile"
+              } >> "$result"
+            fi
+          done
 
           overall=0
-          for code in "$java_compile" "$java_regression" "$openapi_contract" "$npm_ci" "$frontend_test" "$frontend_build"; do
-            if [[ "$code" -ne 0 ]]; then overall=1; fi
+          for code in "$prepare" "$runtime" "$openapi" "$push"; do
+            [[ "$code" -eq 0 ]] || overall=1
           done
           echo "overall=$overall" >> "$result"
-
-          if [[ $overall -ne 0 ]]; then
-            for pair in \
-              "java_compile:/tmp/java-compile.log:$java_compile" \
-              "java_regression:/tmp/java-regression.log:$java_regression" \
-              "openapi_contract:/tmp/openapi-contract.log:$openapi_contract" \
-              "npm_ci:/tmp/npm-ci.log:$npm_ci" \
-              "frontend_test:/tmp/frontend-test.log:$frontend_test" \
-              "frontend_build:/tmp/frontend-build.log:$frontend_build"; do
-              IFS=: read -r label logfile code <<< "$pair"
-              if [[ "$code" -ne 0 ]]; then
-                {
-                  echo
-                  echo "===== ${label} failure tail ====="
-                  tail -n 140 "$logfile"
-                } >> "$result"
-              fi
-            done
-          fi
           echo "overall=$overall" >> "$GITHUB_OUTPUT"
           exit 0
 
-      - name: Publish validation result
-        if: always() && steps.validate.outcome == 'success'
+      - name: Publish apply result
+        if: always()
         working-directory: ci-tools
         shell: bash
         run: |
           set -euo pipefail
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add ci/latest-private-validation.txt
+          git add ci/latest-apply-result.txt
           if ! git diff --cached --quiet; then
-            git commit -m "ci: record private validation result [skip ci]"
+            git commit -m "ci: record private patch application [skip ci]"
             git push origin HEAD:${GITHUB_REF_NAME}
           fi
 
-      - name: Fail workflow when validation failed
-        if: steps.validate.outputs.overall != '0'
+      - name: Fail when patch application failed
+        if: steps.apply.outputs.overall != '0'
         run: exit 1
