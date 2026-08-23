@@ -69,6 +69,78 @@ run_user() {
   "$@"
 }
 
+apt_root="${WUST_DORMITORY_APT_ROOT:-/etc/apt}"
+host_apt_backup_root=""
+host_apt_modified=0
+
+backup_host_apt_sources() {
+  [[ "${dry_run}" == "1" ]] && return 0
+  host_apt_backup_root="$(mktemp -d)"
+  if [[ -f "${apt_root}/sources.list" ]]; then
+    cp -a "${apt_root}/sources.list" "${host_apt_backup_root}/sources.list"
+  fi
+  if [[ -d "${apt_root}/sources.list.d" ]]; then
+    cp -a "${apt_root}/sources.list.d" "${host_apt_backup_root}/sources.list.d"
+  fi
+}
+
+configure_mainland_host_apt() {
+  echo "宿主机基础 APT 临时优先使用阿里云镜像。"
+  if [[ "${distro}" == "ubuntu" ]]; then
+    echo "  https://mirrors.aliyun.com/ubuntu"
+  else
+    echo "  https://mirrors.aliyun.com/debian"
+    echo "  https://mirrors.aliyun.com/debian-security"
+  fi
+  [[ "${dry_run}" == "1" ]] && return 0
+
+  backup_host_apt_sources
+  local source
+  while IFS= read -r -d '' source; do
+    run_root sed -i \
+      -e 's#http://archive.ubuntu.com/ubuntu#https://mirrors.aliyun.com/ubuntu#g' \
+      -e 's#https://archive.ubuntu.com/ubuntu#https://mirrors.aliyun.com/ubuntu#g' \
+      -e 's#http://security.ubuntu.com/ubuntu#https://mirrors.aliyun.com/ubuntu#g' \
+      -e 's#https://security.ubuntu.com/ubuntu#https://mirrors.aliyun.com/ubuntu#g' \
+      -e 's#http://deb.debian.org/debian-security#https://mirrors.aliyun.com/debian-security#g' \
+      -e 's#https://deb.debian.org/debian-security#https://mirrors.aliyun.com/debian-security#g' \
+      -e 's#http://security.debian.org/debian-security#https://mirrors.aliyun.com/debian-security#g' \
+      -e 's#https://security.debian.org/debian-security#https://mirrors.aliyun.com/debian-security#g' \
+      -e 's#http://deb.debian.org/debian#https://mirrors.aliyun.com/debian#g' \
+      -e 's#https://deb.debian.org/debian#https://mirrors.aliyun.com/debian#g' \
+      "${source}"
+  done < <(find "${apt_root}" -type f \( -name '*.list' -o -name '*.sources' \) -print0)
+  host_apt_modified=1
+}
+
+restore_host_apt_sources() {
+  if [[ "${dry_run}" == "1" ]]; then
+    echo "恢复宿主机原 APT 配置。"
+    return 0
+  fi
+  (( host_apt_modified == 1 )) || return 0
+  run_root rm -f "${apt_root}/sources.list"
+  run_root rm -rf "${apt_root}/sources.list.d"
+  if [[ -f "${host_apt_backup_root}/sources.list" ]]; then
+    run_root cp -a "${host_apt_backup_root}/sources.list" "${apt_root}/sources.list"
+  fi
+  if [[ -d "${host_apt_backup_root}/sources.list.d" ]]; then
+    run_root cp -a "${host_apt_backup_root}/sources.list.d" "${apt_root}/sources.list.d"
+  else
+    run_root mkdir -p "${apt_root}/sources.list.d"
+  fi
+  host_apt_modified=0
+  rm -rf "${host_apt_backup_root}"
+  host_apt_backup_root=""
+}
+
+cleanup_host_apt() {
+  local status=$?
+  restore_host_apt_sources || true
+  exit "${status}"
+}
+trap cleanup_host_apt EXIT
+
 need_prerequisites=0
 for command_name in curl git sha256sum; do
   command -v "${command_name}" >/dev/null 2>&1 || need_prerequisites=1
@@ -79,8 +151,15 @@ fi
 
 if (( need_prerequisites == 1 )); then
   echo "安装宿主机基础依赖（ca-certificates/curl/git/coreutils/login）。"
-  run_root apt-get update
-  run_root apt-get install -y --no-install-recommends ca-certificates curl git coreutils login
+  configure_mainland_host_apt
+  if ! (run_root apt-get update && run_root apt-get install -y --no-install-recommends ca-certificates curl git coreutils login); then
+    echo "宿主机 APT 国内镜像不可用，恢复原 APT 配置并重试。" >&2
+    restore_host_apt_sources
+    run_root apt-get update
+    run_root apt-get install -y --no-install-recommends ca-certificates curl git coreutils login
+  else
+    restore_host_apt_sources
+  fi
 fi
 
 mirror_repo_base="https://mirrors.aliyun.com/docker-ce/linux/${distro}"
@@ -186,6 +265,8 @@ fi
 
 if [[ "${dry_run}" == "1" ]]; then
   echo "宿主机 bootstrap dry-run 完成。"
+  trap - EXIT
+  restore_host_apt_sources
   exit 0
 fi
 
@@ -194,6 +275,9 @@ docker compose version >/dev/null 2>&1 || "${sudo_prefix[@]}" docker compose ver
   echo "Docker Compose 插件安装后仍不可用" >&2
   exit 1
 }
+
+trap - EXIT
+restore_host_apt_sources
 
 if [[ -n "${continue_script}" ]]; then
   [[ -f "${continue_script}" ]] || { echo "继续执行脚本不存在：${continue_script}" >&2; exit 1; }
