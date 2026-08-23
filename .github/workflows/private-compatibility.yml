@@ -13,6 +13,7 @@ on:
       - '.private-compat-trigger'
       - '.github/workflows/private-compatibility.yml'
       - 'ci/apply_app_download_ui_unification.py'
+      - 'ci/apply_app_download_ui_followups.py'
 
 permissions:
   contents: write
@@ -69,6 +70,9 @@ jobs:
           echo "private_before=$(git -C private-repo rev-parse HEAD)" >> "$result"
 
           python ci-tools/ci/apply_app_download_ui_unification.py >/tmp/patch.log 2>&1; patch=$?
+          if [[ $patch -eq 0 ]]; then
+            python ci-tools/ci/apply_app_download_ui_followups.py >>/tmp/patch.log 2>&1; patch=$?
+          fi
           echo "patch=$patch" >> "$result"
           if [[ $patch -eq 0 ]]; then
             cd private-repo/frontend
