@@ -19,7 +19,7 @@ jobs:
   incremental-plan:
     name: Incremental build and restart plan
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 8
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
@@ -29,3 +29,5 @@ jobs:
         run: python3 scripts/ci/test_incremental_build_plan.py
       - name: Validate shell syntax
         run: bash -n scripts/ci/incremental_build_plan.sh
+      - name: Validate Nginx dynamic Docker DNS syntax
+        run: python3 scripts/ci/test_proxy_dynamic_dns.py
