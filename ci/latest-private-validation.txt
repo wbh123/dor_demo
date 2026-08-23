@@ -1,19 +1,201 @@
 private_ref=fix/admin-scopes-branding-import-scroll-20260823
-private_before=8c6db78414609c5511b24b8f23d5cf05f25d64a4
-started_at=2026-08-23T11:21:22Z
+private_before=a5d7dddd1d7882a4520b14233580ad1d935496bb
+started_at=2026-08-23T11:27:02Z
 patch=0
 npm_ci=0
 deployment_generate=0
 baseline_generate=0
-api_generate=0
-java_test=0
+api_generate=1
+java_test=99
 openapi_contract=0
 deployment_test=0
-frontend_test=0
-frontend_build=0
+frontend_test=99
+frontend_build=99
 deployment_check=0
 db_tests=0
 diff_check=0
-push=0
+push=99
 private_after=a5d7dddd1d7882a4520b14233580ad1d935496bb
-overall=0
+overall=1
+
+===== api_generate failure tail =====
+        "    $ref: 'admin/openapi-admin.yaml#/paths/~1api~1v1~1admin~1batches~1{batchId}~1prepare'\n" +
+        '  /api/v1/admin/batches/{batchId}/status/{targetStatus}:\n' +
+        "    $ref: 'admin/openapi-admin.yaml#/paths/~1api~1v1~1admin~1batches~1{batchId}~1status~1{targetStatus}'\n" +
+        '  /api/v1/admin/batche'... 20760 more characters,
+      position: 1313,
+      line: 30,
+      column: 2,
+      snippet: " 28 |     $ref: 'admin/openapi-site-met ...\n" +
+        ' 29 |   /api/v1/public/site-assets/{slot}:\n' +
+        " 30 |     $ref: 'admin/openapi-site-met ...\n" +
+        ' 31 |   /api/v1/public/site-assets/{slot}:\n' +
+        '--------^\n' +
+        " 32 |     $ref: 'admin/openapi-site-met ...\n" +
+        ' 33 | '
+    }
+  },
+  source: Source {
+    absoluteRef: '/home/runner/work/dor_demo/dor_demo/private-repo/backend-java/model/src/main/resources/openapi-interface.yaml',
+    body: 'openapi: 3.0.3\n' +
+      'info:\n' +
+      '  title: 示例大学学生宿舍智能选择系统接口\n' +
+      '  description: 学生宿舍智能选择、业务管理与系统服务管理接口契约\n' +
+      '  version: 3.6.3\n' +
+      'servers:\n' +
+      '  - url: http://localhost:8080\n' +
+      'paths:\n' +
+      '  /api/v1/auth/login:\n' +
+      "    $ref: 'auth/openapi-auth.yaml#/paths/~1api~1v1~1auth~1login'\n" +
+      '  /api/v1/auth/activate:\n' +
+      "    $ref: 'auth/openapi-auth.yaml#/paths/~1api~1v1~1auth~1activate'\n" +
+      '  /api/v1/auth/logout:\n' +
+      "    $ref: 'auth/openapi-auth.yaml#/paths/~1api~1v1~1auth~1logout'\n" +
+      '  /api/v1/auth/password:\n' +
+      "    $ref: 'auth/openapi-auth.yaml#/paths/~1api~1v1~1auth~1password'\n" +
+      '  /api/v1/auth/me:\n' +
+      "    $ref: 'auth/openapi-auth.yaml#/paths/~1api~1v1~1auth~1me'\n" +
+      '  /api/v1/auth/sessions:\n' +
+      "    $ref: 'auth/openapi-auth-session.yaml#/paths/~1api~1v1~1auth~1sessions'\n" +
+      '  /api/v1/auth/sessions/{sessionId}:\n' +
+      "    $ref: 'auth/openapi-auth-session.yaml#/paths/~1api~1v1~1auth~1sessions~1{sessionId}'\n" +
+      '  /api/v1/auth/sessions/revoke-others:\n' +
+      "    $ref: 'auth/openapi-auth-session.yaml#/paths/~1api~1v1~1auth~1sessions~1revoke-others'\n" +
+      '  /api/v1/auth/welcome/acknowledge:\n' +
+      "    $ref: 'auth/openapi-welcome.yaml#/paths/~1api~1v1~1auth~1welcome~1acknowledge'\n" +
+      '  /api/v1/public/site-config:\n' +
+      "    $ref: 'admin/openapi-site-metadata.yaml#/paths/~1api~1v1~1public~1site-config'\n" +
+      '  /api/v1/public/site-assets/{slot}:\n' +
+      "    $ref: 'admin/openapi-site-metadata.yaml#/paths/~1api~1v1~1public~1site-assets~1{slot}'\n" +
+      '  /api/v1/public/site-assets/{slot}:\n' +
+      "    $ref: 'admin/openapi-site-metadata.yaml#/paths/~1api~1v1~1public~1site-assets~1{slot}'\n" +
+      '\n' +
+      '  /api/v1/account-admin/dashboard:\n' +
+      "    $ref: 'account/openapi-account-admin.yaml#/paths/~1api~1v1~1account-admin~1dashboard'\n" +
+      '  /api/v1/account-admin/accounts:\n' +
+      "    $ref: 'account/openapi-account-admin.yaml#/paths/~1api~1v1~1account-admin~1accounts'\n" +
+      '  /api/v1/account-admin/accounts/export:\n' +
+      "    $ref: 'account/openapi-account-admin.yaml#/paths/~1api~1v1~1account-admin~1accounts~1export'\n" +
+      '  /api/v1/account-admin/accounts/{userId}:\n' +
+      "    $ref: 'account/openapi-account-admin.yaml#/paths/~1api~1v1~1account-admin~1accounts~1{userId}'\n" +
+      '  /api/v1/account-admin/accounts/{userId}/status:\n' +
+      "    $ref: 'account/openapi-account-admin.yaml#/paths/~1api~1v1~1account-admin~1accounts~1{userId}~1status'\n" +
+      '  /api/v1/account-admin/accounts/{userId}/recovery:\n' +
+      "    $ref: 'account/openapi-account-admin.yaml#/paths/~1api~1v1~1account-admin~1accounts~1{userId}~1recovery'\n" +
+      '  /api/v1/account-admin/permissions:\n' +
+      "    $ref: 'account/openapi-account-admin.yaml#/paths/~1api~1v1~1account-admin~1permissions'\n" +
+      '  /api/v1/account-admin/templates:\n' +
+      "    $ref: 'account/openapi-account-admin.yaml#/paths/~1api~1v1~1account-admin~1templates'\n" +
+      '  /api/v1/account-admin/templates/{templateId}/versions:\n' +
+      "    $ref: 'account/openapi-account-admin.yaml#/paths/~1api~1v1~1account-admin~1templates~1{templateId}~1versions'\n" +
+      '  /api/v1/account-admin/accounts/{userId}/profiles:\n' +
+      "    $ref: 'account/openapi-account-admin.yaml#/paths/~1api~1v1~1account-admin~1accounts~1{userId}~1profiles'\n" +
+      '  /api/v1/account-admin/profiles/batch:\n' +
+      "    $ref: 'account/openapi-account-admin.yaml#/paths/~1api~1v1~1account-admin~1profiles~1batch'\n" +
+      '  /api/v1/account-admin/profiles/{profileId}:\n' +
+      "    $ref: 'account/openapi-account-admin.yaml#/paths/~1api~1v1~1account-admin~1profiles~1{profileId}'\n" +
+      '  /api/v1/account-admin/security/login-events/export:\n' +
+      "    $ref: 'account/openapi-account-admin.yaml#/paths/~1api~1v1~1account-admin~1security~1login-events~1export'\n" +
+      '  /api/v1/account-admin/authorization-diagnostics/catalog:\n' +
+      "    $ref: 'admin/openapi-authorization-diagnostics.yaml#/paths/~1api~1v1~1account-admin~1authorization-diagnostics~1catalog'\n" +
+      '  /api/v1/account-admin/authorization-diagnostics/subjects:\n' +
+      "    $ref: 'admin/openapi-authorization-diagnostics.yaml#/paths/~1api~1v1~1account-admin~1authorization-diagnostics~1subjects'\n" +
+      '  /api/v1/account-admin/authorization-diagnostics/evaluate:\n' +
+      "    $ref: 'admin/openapi-authorization-diagnostics.yaml#/paths/~1api~1v1~1account-admin~1authorization-diagnostics~1evaluate'\n" +
+      '\n' +
+      '  /api/v1/admin/dashboard:\n' +
+      "    $ref: 'admin/openapi-admin.yaml#/paths/~1api~1v1~1admin~1dashboard'\n" +
+      '  /api/v1/admin/colleges:\n' +
+      "    $ref: 'admin/openapi-admin.yaml#/paths/~1api~1v1~1admin~1colleges'\n" +
+      '  /api/v1/admin/colleges/{id}:\n' +
+      "    $ref: 'admin/openapi-admin.yaml#/paths/~1api~1v1~1admin~1colleges~1{id}'\n" +
+      '  /api/v1/admin/settings/student-welcome:\n' +
+      "    $ref: 'admin/openapi-system-setting.yaml#/paths/~1api~1v1~1admin~1settings~1student-welcome'\n" +
+      '  /api/v1/admin/settings/login-page:\n' +
+      "    $ref: 'admin/openapi-site-metadata.yaml#/paths/~1api~1v1~1admin~1settings~1login-page'\n" +
+      '  /api/v1/admin/settings/site-assets/{slot}:\n' +
+      "    $ref: 'admin/openapi-site-metadata.yaml#/paths/~1api~1v1~1admin~1settings~1site-assets~1{slot}'\n" +
+      '  /api/v1/admin/settings/site-assets/{slot}:\n' +
+      "    $ref: 'admin/openapi-site-metadata.yaml#/paths/~1api~1v1~1admin~1settings~1site-assets~1{slot}'\n" +
+      '  /api/v1/admin/settings/student-theme:\n' +
+      "    $ref: 'admin/openapi-site-metadata.yaml#/paths/~1api~1v1~1admin~1settings~1student-theme'\n" +
+      '  /api/v1/admin/settings/features:\n' +
+      "    $ref: 'admin/openapi-school-feature-setting.yaml#/paths/~1api~1v1~1admin~1settings~1features'\n" +
+      '  /api/v1/admin/settings/features/{featureCode}:\n' +
+      "    $ref: 'admin/openapi-school-feature-setting.yaml#/paths/~1api~1v1~1admin~1settings~1features~1{featureCode}'\n" +
+      '  /api/v1/admin/majors:\n' +
+      "    $ref: 'admin/openapi-admin.yaml#/paths/~1api~1v1~1admin~1majors'\n" +
+      '  /api/v1/admin/majors/{id}:\n' +
+      "    $ref: 'admin/openapi-admin.yaml#/paths/~1api~1v1~1admin~1majors~1{id}'\n" +
+      '  /api/v1/admin/students:\n' +
+      "    $ref: 'admin/openapi-student-management.yaml#/paths/~1api~1v1~1admin~1students'\n" +
+      '  /api/v1/admin/students/{id}:\n' +
+      "    $ref: 'admin/openapi-student-management.yaml#/paths/~1api~1v1~1admin~1students~1{id}'\n" +
+      '  /api/v1/admin/students/import:\n' +
+      "    $ref: 'admin/openapi-student-management.yaml#/paths/~1api~1v1~1admin~1students~1import'\n" +
+      '  /api/v1/admin/student-catalog:\n' +
+      "    $ref: 'admin/openapi-student-catalog.yaml#/paths/~1api~1v1~1admin~1student-catalog'\n" +
+      '  /api/v1/admin/students/{studentId}/reset-password:\n' +
+      "    $ref: 'admin/openapi-student-account.yaml#/paths/~1api~1v1~1admin~1students~1{studentId}~1reset-password'\n" +
+      '  /api/v1/admin/students/{studentId}/reset-state:\n' +
+      "    $ref: 'admin/openapi-student-account.yaml#/paths/~1api~1v1~1admin~1students~1{studentId}~1reset-state'\n" +
+      '  /api/v1/admin/students/{studentId}/direct-assignment:\n' +
+      "    $ref: 'admin/openapi-residency-transfer.yaml#/paths/~1api~1v1~1admin~1students~1{studentId}~1direct-assignment'\n" +
+      '  /api/v1/admin/batches/{batchId}/students/{studentId}/capacity-preview:\n' +
+      "    $ref: 'admin/openapi-residency-transfer.yaml#/paths/~1api~1v1~1admin~1batches~1{batchId}~1students~1{studentId}~1capacity-preview'\n" +
+      '  /api/v1/admin/batches/{batchId}/students/{studentId}/enroll:\n' +
+      "    $ref: 'admin/openapi-residency-transfer.yaml#/paths/~1api~1v1~1admin~1batches~1{batchId}~1students~1{studentId}~1enroll'\n" +
+      '  /api/v1/admin/residencies:\n' +
+      "    $ref: 'admin/openapi-residency-transfer.yaml#/paths/~1api~1v1~1admin~1residencies'\n" +
+      '  /api/v1/admin/residencies/room-options:\n' +
+      "    $ref: 'admin/openapi-residency-transfer.yaml#/paths/~1api~1v1~1admin~1residencies~1room-options'\n" +
+      '  /api/v1/admin/residencies/{residencyId}/bed:\n' +
+      "    $ref: 'admin/openapi-residency-transfer.yaml#/paths/~1api~1v1~1admin~1residencies~1{residencyId}~1bed'\n" +
+      '  /api/v1/admin/residencies/{residencyId}/end:\n' +
+      "    $ref: 'admin/openapi-residency-transfer.yaml#/paths/~1api~1v1~1admin~1residencies~1{residencyId}~1end'\n" +
+      '  /api/v1/admin/buildings:\n' +
+      "    $ref: 'admin/openapi-admin.yaml#/paths/~1api~1v1~1admin~1buildings'\n" +
+      '  /api/v1/admin/rooms:\n' +
+      "    $ref: 'admin/openapi-admin.yaml#/paths/~1api~1v1~1admin~1rooms'\n" +
+      '  /api/v1/admin/rooms/{roomId}:\n' +
+      "    $ref: 'admin/openapi-room-management.yaml#/paths/~1api~1v1~1admin~1rooms~1{roomId}'\n" +
+      '  /api/v1/admin/rooms/{roomId}/bed-layout:\n' +
+      "    $ref: 'admin/openapi-room-management.yaml#/paths/~1api~1v1~1admin~1rooms~1{roomId}~1bed-layout'\n" +
+      '  /api/v1/admin/matching-weight-schemes:\n' +
+      "    $ref: 'admin/openapi-matching.yaml#/paths/~1api~1v1~1admin~1matching-weight-schemes'\n" +
+      '  /api/v1/admin/matching-weight-schemes/{schemeId}/revisions:\n' +
+      "    $ref: 'admin/openapi-matching.yaml#/paths/~1api~1v1~1admin~1matching-weight-schemes~1{schemeId}~1revisions'\n" +
+      '  /api/v1/admin/batch-rule-templates:\n' +
+      "    $ref: 'admin/openapi-batch-rule-template.yaml#/paths/~1api~1v1~1admin~1batch-rule-templates'\n" +
+      '  /api/v1/admin/batch-rule-templates/{templateId}/revisions:\n' +
+      "    $ref: 'admin/openapi-batch-rule-template.yaml#/paths/~1api~1v1~1admin~1batch-rule-templates~1{templateId}~1revisions'\n" +
+      '  /api/v1/admin/batches:\n' +
+      "    $ref: 'admin/openapi-batch-selection.yaml#/paths/~1api~1v1~1admin~1batches'\n" +
+      '  /api/v1/admin/batches/{batchId}/scope:\n' +
+      "    $ref: 'admin/openapi-batch-selection.yaml#/paths/~1api~1v1~1admin~1batches~1{batchId}~1scope'\n" +
+      '  /api/v1/admin/batches/{batchId}/scope-summary:\n' +
+      "    $ref: 'admin/openapi-batch-selection.yaml#/paths/~1api~1v1~1admin~1batches~1{batchId}~1scope-summary'\n" +
+      '  /api/v1/admin/batches/{batchId}/scope-students:\n' +
+      "    $ref: 'admin/openapi-batch-selection.yaml#/paths/~1api~1v1~1admin~1batches~1{batchId}~1scope-students'\n" +
+      '  /api/v1/admin/batches/{batchId}/scope-student-ids:\n' +
+      "    $ref: 'admin/openapi-batch-selection.yaml#/paths/~1api~1v1~1admin~1batches~1{batchId}~1scope-student-ids'\n" +
+      '  /api/v1/admin/batches/{batchId}/scope-rooms:\n' +
+      "    $ref: 'admin/openapi-batch-selection.yaml#/paths/~1api~1v1~1admin~1batches~1{batchId}~1scope-rooms'\n" +
+      '  /api/v1/admin/batches/{batchId}/scope-room-ids:\n' +
+      "    $ref: 'admin/openapi-batch-selection.yaml#/paths/~1api~1v1~1admin~1batches~1{batchId}~1scope-room-ids'\n" +
+      '  /api/v1/admin/batches/{batchId}/room-preflight:\n' +
+      "    $ref: 'admin/openapi-batch-selection.yaml#/paths/~1api~1v1~1admin~1batches~1{batchId}~1room-preflight'\n" +
+      '  /api/v1/admin/batches/{batchId}/copy:\n' +
+      "    $ref: 'admin/openapi-admin.yaml#/paths/~1api~1v1~1admin~1batches~1{batchId}~1copy'\n" +
+      '  /api/v1/admin/batches/{batchId}/prepare:\n' +
+      "    $ref: 'admin/openapi-admin.yaml#/paths/~1api~1v1~1admin~1batches~1{batchId}~1prepare'\n" +
+      '  /api/v1/admin/batches/{batchId}/status/{targetStatus}:\n' +
+      "    $ref: 'admin/openapi-admin.yaml#/paths/~1api~1v1~1admin~1batches~1{batchId}~1status~1{targetStatus}'\n" +
+      '  /api/v1/admin/batche'... 20760 more characters,
+    mimeType: undefined
+  },
+  line: 31,
+  col: 3
+}
+
+Node.js v22.23.2
