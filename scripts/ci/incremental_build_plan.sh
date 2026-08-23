@@ -10,8 +10,10 @@ FRONTEND_BUILD=0
 APP_BUILD=0
 NGINX_RESTART=0
 MYSQL_RECREATE=0
+MYSQL_INIT_RECREATE=0
 REDIS_RECREATE=0
 MINIO_RECREATE=0
+MINIO_INIT_RECREATE=0
 TOOLCHAIN_REBUILD=0
 
 while IFS= read -r path; do
@@ -53,11 +55,17 @@ while IFS= read -r path; do
     docker/nginx/*)
       NGINX_RESTART=1
       ;;
+    docker/mysql/sync-backup-user.sh)
+      MYSQL_INIT_RECREATE=1
+      ;;
     docker/mysql/*)
       MYSQL_RECREATE=1
       ;;
     docker/redis/*)
       REDIS_RECREATE=1
+      ;;
+    docker/minio/init.sh)
+      MINIO_INIT_RECREATE=1
       ;;
     docker/minio/*)
       MINIO_RECREATE=1
@@ -69,8 +77,10 @@ while IFS= read -r path; do
       BACKEND_RUNTIME=1
       NGINX_RESTART=1
       MYSQL_RECREATE=1
+      MYSQL_INIT_RECREATE=1
       REDIS_RECREATE=1
       MINIO_RECREATE=1
+      MINIO_INIT_RECREATE=1
       ;;
   esac
 done < <(git diff --name-only "${base}" "${head}")
@@ -82,7 +92,9 @@ FRONTEND_BUILD=${FRONTEND_BUILD}
 APP_BUILD=${APP_BUILD}
 NGINX_RESTART=${NGINX_RESTART}
 MYSQL_RECREATE=${MYSQL_RECREATE}
+MYSQL_INIT_RECREATE=${MYSQL_INIT_RECREATE}
 REDIS_RECREATE=${REDIS_RECREATE}
 MINIO_RECREATE=${MINIO_RECREATE}
+MINIO_INIT_RECREATE=${MINIO_INIT_RECREATE}
 TOOLCHAIN_REBUILD=${TOOLCHAIN_REBUILD}
 EOF
