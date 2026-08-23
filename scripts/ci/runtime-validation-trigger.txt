@@ -1,0 +1,1 @@
+Temporary CI trigger for Java 21 backend and Node.js 22 frontend verification on 2026-08-23.
