@@ -13,6 +13,18 @@ java_runtime_image="m.daocloud.io/docker.io/library/eclipse-temurin:21-jre-jammy
 [[ -f "${env_file}" ]] || { echo "missing env file: ${env_file}" >&2; exit 1; }
 [[ -f "${pull_helper}" ]] || { echo "missing pull helper: ${pull_helper}" >&2; exit 1; }
 
+if [[ "$(basename "${env_file}")" != ".env.example" ]]; then
+  if [[ ! -O "${env_file}" ]]; then
+    if command -v sudo >/dev/null 2>&1; then
+      sudo chown "$(id -u):$(id -g)" "${env_file}"
+    else
+      echo "runtime env file is not owned by current user and sudo is unavailable" >&2
+      exit 1
+    fi
+  fi
+  chmod 600 "${env_file}"
+fi
+
 # The production deploy validates the full .env before this preflight. This public contract also
 # supports minimal image-only fixtures, so the guard runs only when the fixture includes the root key.
 if [[ "${skip_mysql_guard}" != "1" && "$(basename "${env_file}")" != ".env.example" ]] \
