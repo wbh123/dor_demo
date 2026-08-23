@@ -16,10 +16,10 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  apply-private-followups:
-    name: Apply private follow-ups
+  verify-private-ref:
+    name: Apply and verify private integration ref
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 40
     steps:
       - name: Resolve private branch
         id: target
@@ -47,12 +47,25 @@ jobs:
           persist-credentials: true
           fetch-depth: 0
 
-      - name: Apply and publish diagnostics
-        id: apply
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: private-repo/backend-java/pom.xml
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: private-repo/frontend/package-lock.json
+
+      - name: Apply, regenerate, verify and push
+        id: verify
         shell: bash
         run: |
           set +e
-          result="$GITHUB_WORKSPACE/ci-tools/ci/latest-apply-result.txt"
+          result="$GITHUB_WORKSPACE/ci-tools/ci/latest-private-validation.txt"
           mkdir -p "$GITHUB_WORKSPACE/ci-tools/ci"
           : > "$result"
           {
@@ -61,47 +74,93 @@ jobs:
             echo "started_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           } >> "$result"
 
-          python - <<'PY' > /tmp/prepare.log 2>&1
-          from pathlib import Path
-          p = Path('ci-tools/ci/apply_runtime_followups.py')
-          text = p.read_text(encoding='utf-8')
-          text = text.replace(
-              "message.value = '文件已上传，后台预检任务已创建。可以关闭窗口，任务会继续执行。' ",
-              "message.value = '文件已上传，后台预检任务已创建。可以关闭窗口，稍后重新查看结果。'"
-          )
-          text = text.replace(
-              "message.value = '文件已上传，后台预检任务已创建。可以关闭窗口，稍后重新查看结果。' ",
-              "message.value = '文件已上传，后台预检任务已创建。可以关闭窗口，稍后重新查看结果。'"
-          )
-          p.write_text(text, encoding='utf-8')
-          PY
-          prepare=$?
-          echo "prepare=$prepare" >> "$result"
+          python ci-tools/ci/apply_private_followups_v2.py > /tmp/patch.log 2>&1
+          patch=$?
+          echo "patch=$patch" >> "$result"
 
-          if [[ $prepare -eq 0 ]]; then
-            python ci-tools/ci/apply_runtime_followups.py > /tmp/runtime.log 2>&1
-            runtime=$?
-          else
-            runtime=99
-          fi
-          echo "runtime=$runtime" >> "$result"
+          cd private-repo/frontend
+          npm ci --no-audit --no-fund > /tmp/npm-ci.log 2>&1
+          npm_ci=$?
+          cd "$GITHUB_WORKSPACE"
+          echo "npm_ci=$npm_ci" >> "$result"
 
-          if [[ $runtime -eq 0 ]]; then
-            python ci-tools/ci/apply_openapi_closure.py > /tmp/openapi.log 2>&1
-            openapi=$?
+          if [[ $patch -eq 0 ]]; then
+            python private-repo/scripts/db/generate_school_deployment_sql.py > /tmp/deployment-generate.log 2>&1
+            deployment_generate=$?
+            python private-repo/scripts/db/generate_baseline_database.py --profile deployment > /tmp/baseline-generate.log 2>&1
+            baseline_generate=$?
           else
-            openapi=99
+            deployment_generate=99
+            baseline_generate=99
           fi
-          echo "openapi=$openapi" >> "$result"
+          echo "deployment_generate=$deployment_generate" >> "$result"
+          echo "baseline_generate=$baseline_generate" >> "$result"
+
+          if [[ $npm_ci -eq 0 && $patch -eq 0 ]]; then
+            cd private-repo/frontend
+            npm run generate:api > /tmp/api-generate.log 2>&1
+            api_generate=$?
+            cd "$GITHUB_WORKSPACE"
+          else
+            api_generate=99
+          fi
+          echo "api_generate=$api_generate" >> "$result"
+
+          if [[ $patch -eq 0 && $api_generate -eq 0 ]]; then
+            mvn -f private-repo/backend-java/pom.xml -B -ntp -pl model,server -am test > /tmp/java-test.log 2>&1
+            java_test=$?
+          else
+            java_test=99
+          fi
+          echo "java_test=$java_test" >> "$result"
+
+          python private-repo/scripts/ci/test_site_metadata_openapi_contract.py > /tmp/openapi-contract.log 2>&1
+          openapi_contract=$?
+          echo "openapi_contract=$openapi_contract" >> "$result"
+
+          python private-repo/scripts/db/test_generate_school_deployment.py > /tmp/deployment-test.log 2>&1
+          deployment_test=$?
+          echo "deployment_test=$deployment_test" >> "$result"
+
+          if [[ $npm_ci -eq 0 && $api_generate -eq 0 ]]; then
+            cd private-repo/frontend
+            npm test > /tmp/frontend-test.log 2>&1
+            frontend_test=$?
+            npm run build > /tmp/frontend-build.log 2>&1
+            frontend_build=$?
+            cd "$GITHUB_WORKSPACE"
+          else
+            frontend_test=99
+            frontend_build=99
+          fi
+          echo "frontend_test=$frontend_test" >> "$result"
+          echo "frontend_build=$frontend_build" >> "$result"
+
+          python private-repo/scripts/db/generate_school_deployment_sql.py --check > /tmp/deployment-check.log 2>&1
+          deployment_check=$?
+          echo "deployment_check=$deployment_check" >> "$result"
+
+          python -m unittest private-repo/scripts/db/test_frozen_schema.py private-repo/scripts/db/test_1000_student_sql.py -v > /tmp/db-tests.log 2>&1
+          db_tests=$?
+          echo "db_tests=$db_tests" >> "$result"
+
+          git -C private-repo diff --check > /tmp/diff-check.log 2>&1
+          diff_check=$?
+          echo "diff_check=$diff_check" >> "$result"
+
+          overall=0
+          for code in "$patch" "$npm_ci" "$deployment_generate" "$baseline_generate" "$api_generate" "$java_test" "$openapi_contract" "$deployment_test" "$frontend_test" "$frontend_build" "$deployment_check" "$db_tests" "$diff_check"; do
+            [[ "$code" -eq 0 ]] || overall=1
+          done
 
           push=99
-          if [[ $runtime -eq 0 && $openapi -eq 0 ]]; then
+          if [[ $overall -eq 0 ]]; then
             cd private-repo
-            if ! git diff --quiet; then
-              git config user.name github-actions[bot]
-              git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-              git add -A
-              git commit -m "fix: close import retry policy and site asset contracts" > /tmp/commit.log 2>&1
+            git config user.name github-actions[bot]
+            git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+            git add -A
+            if ! git diff --cached --quiet; then
+              git commit -m "feat: harden admin configuration workflows" > /tmp/commit.log 2>&1
               commit_code=$?
               if [[ $commit_code -eq 0 ]]; then
                 git push origin HEAD:${{ steps.target.outputs.private_ref }} > /tmp/push.log 2>&1
@@ -117,28 +176,38 @@ jobs:
             cd "$GITHUB_WORKSPACE"
           fi
           echo "push=$push" >> "$result"
+          if [[ $overall -eq 0 && $push -ne 0 ]]; then overall=1; fi
           echo "private_after=$(git -C private-repo rev-parse HEAD)" >> "$result"
+          echo "overall=$overall" >> "$result"
+          echo "overall=$overall" >> "$GITHUB_OUTPUT"
 
-          for pair in prepare:/tmp/prepare.log:$prepare runtime:/tmp/runtime.log:$runtime openapi:/tmp/openapi.log:$openapi push:/tmp/push.log:$push; do
+          for pair in \
+            patch:/tmp/patch.log:$patch \
+            npm_ci:/tmp/npm-ci.log:$npm_ci \
+            deployment_generate:/tmp/deployment-generate.log:$deployment_generate \
+            baseline_generate:/tmp/baseline-generate.log:$baseline_generate \
+            api_generate:/tmp/api-generate.log:$api_generate \
+            java_test:/tmp/java-test.log:$java_test \
+            openapi_contract:/tmp/openapi-contract.log:$openapi_contract \
+            deployment_test:/tmp/deployment-test.log:$deployment_test \
+            frontend_test:/tmp/frontend-test.log:$frontend_test \
+            frontend_build:/tmp/frontend-build.log:$frontend_build \
+            deployment_check:/tmp/deployment-check.log:$deployment_check \
+            db_tests:/tmp/db-tests.log:$db_tests \
+            diff_check:/tmp/diff-check.log:$diff_check \
+            push:/tmp/push.log:$push; do
             IFS=: read -r label logfile code <<< "$pair"
             if [[ "$code" -ne 0 && -f "$logfile" ]]; then
               {
                 echo
                 echo "===== ${label} failure tail ====="
-                tail -n 160 "$logfile"
+                tail -n 180 "$logfile"
               } >> "$result"
             fi
           done
-
-          overall=0
-          for code in "$prepare" "$runtime" "$openapi" "$push"; do
-            [[ "$code" -eq 0 ]] || overall=1
-          done
-          echo "overall=$overall" >> "$result"
-          echo "overall=$overall" >> "$GITHUB_OUTPUT"
           exit 0
 
-      - name: Publish apply result
+      - name: Publish validation result
         if: always()
         working-directory: ci-tools
         shell: bash
@@ -146,12 +215,12 @@ jobs:
           set -euo pipefail
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add ci/latest-apply-result.txt
+          git add ci/latest-private-validation.txt
           if ! git diff --cached --quiet; then
-            git commit -m "ci: record private patch application [skip ci]"
+            git commit -m "ci: record private validation result [skip ci]"
             git push origin HEAD:${GITHUB_REF_NAME}
           fi
 
-      - name: Fail when patch application failed
-        if: steps.apply.outputs.overall != '0'
+      - name: Fail when private validation failed
+        if: steps.verify.outputs.overall != '0'
         run: exit 1
