@@ -53,6 +53,14 @@ class HostBootstrapTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("https://mirrors.aliyun.com/docker-ce/linux/debian", result.stdout)
 
+    def test_host_prerequisite_apt_prefers_aliyun_and_restores_original_on_failure(self) -> None:
+        source = BOOTSTRAP.read_text(encoding="utf-8")
+        self.assertIn("https://mirrors.aliyun.com/ubuntu", source)
+        self.assertIn("https://mirrors.aliyun.com/debian", source)
+        self.assertIn("configure_mainland_host_apt", source)
+        self.assertIn("restore_host_apt_sources", source)
+        self.assertIn("宿主机 APT 国内镜像不可用", source)
+
     def test_official_docker_repository_is_retained_as_fallback(self) -> None:
         source = BOOTSTRAP.read_text(encoding="utf-8")
         self.assertIn("https://download.docker.com/linux/${distro}/gpg", source)
