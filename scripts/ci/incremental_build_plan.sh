@@ -43,10 +43,10 @@ while IFS= read -r path; do
     app/*|config/*|assert/*|scripts/mobile/*|version.json)
       APP_BUILD=1
       ;;
-    scripts/ops/*|backend-java/docs/sql/*|docker/backend/*|.dockerignore)
+    scripts/ops/*|backend-java/docs/sql/*|docker/backend/*)
       BACKEND_RUNTIME=1
       ;;
-    docker/common/*)
+    .dockerignore|docker/common/*)
       BACKEND_RUNTIME=1
       TOOLCHAIN_REBUILD=1
       ;;
