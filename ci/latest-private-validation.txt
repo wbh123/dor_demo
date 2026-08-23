@@ -1,6 +1,6 @@
 private_ref=fix/admin-scopes-branding-import-scroll-20260823
 private_before=8c6db78414609c5511b24b8f23d5cf05f25d64a4
-started_at=2026-08-23T11:04:01Z
+started_at=2026-08-23T11:10:59Z
 patch=0
 npm_ci=0
 deployment_generate=0
@@ -19,78 +19,84 @@ private_after=8c6db78414609c5511b24b8f23d5cf05f25d64a4
 overall=1
 
 ===== java_test failure tail =====
+[INFO] Running com.wust.dormitory.admin.BatchPublishPreflightServiceTest
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.284 s - in com.wust.dormitory.admin.BatchPublishPreflightServiceTest
+[INFO] Running com.wust.dormitory.admin.RoomImportValidatorTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.001 s - in com.wust.dormitory.admin.RoomImportValidatorTest
+[INFO] Running com.wust.dormitory.notification.NotificationTemplateServiceTest
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.077 s - in com.wust.dormitory.notification.NotificationTemplateServiceTest
 [INFO] Running com.wust.dormitory.notification.NotificationServiceTest
-[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.139 s - in com.wust.dormitory.notification.NotificationServiceTest
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.149 s - in com.wust.dormitory.notification.NotificationServiceTest
 [INFO] Running com.wust.dormitory.notification.NotificationDispatchServiceTest
-[INFO] Tests run: 10, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.293 s - in com.wust.dormitory.notification.NotificationDispatchServiceTest
+[INFO] Tests run: 10, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.336 s - in com.wust.dormitory.notification.NotificationDispatchServiceTest
 [INFO] Running com.wust.dormitory.notification.DirectNotificationServiceTest
-[INFO] Tests run: 7, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.081 s - in com.wust.dormitory.notification.DirectNotificationServiceTest
+[INFO] Tests run: 7, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.117 s - in com.wust.dormitory.notification.DirectNotificationServiceTest
 [INFO] Running com.wust.dormitory.notification.NotificationTemplatePersistenceBoundaryTest
-[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.001 s - in com.wust.dormitory.notification.NotificationTemplatePersistenceBoundaryTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.002 s - in com.wust.dormitory.notification.NotificationTemplatePersistenceBoundaryTest
 [INFO] Running com.wust.dormitory.notification.NotificationActionResolverTest
 [INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.003 s - in com.wust.dormitory.notification.NotificationActionResolverTest
 [INFO] Running com.wust.dormitory.residency.BatchCapacityMapperMySqlIntegrationTest
-[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 7.569 s - in com.wust.dormitory.residency.BatchCapacityMapperMySqlIntegrationTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 7.639 s - in com.wust.dormitory.residency.BatchCapacityMapperMySqlIntegrationTest
 [INFO] Running com.wust.dormitory.residency.ResidencyPolicyServiceTest
-[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.14 s - in com.wust.dormitory.residency.ResidencyPolicyServiceTest
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.138 s - in com.wust.dormitory.residency.ResidencyPolicyServiceTest
 [INFO] Running com.wust.dormitory.residency.TeamCategoryGuardTest
-[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.068 s - in com.wust.dormitory.residency.TeamCategoryGuardTest
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.071 s - in com.wust.dormitory.residency.TeamCategoryGuardTest
 [INFO] Running com.wust.dormitory.residency.AdminBedSwapServiceTest
-[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.139 s - in com.wust.dormitory.residency.AdminBedSwapServiceTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.132 s - in com.wust.dormitory.residency.AdminBedSwapServiceTest
 [INFO] Running com.wust.dormitory.residency.ResidencyServiceTest
-[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.002 s - in com.wust.dormitory.residency.ResidencyServiceTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.001 s - in com.wust.dormitory.residency.ResidencyServiceTest
 [INFO] Running com.wust.dormitory.residency.BedSelectionEligibilityGuardTest
 [INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.005 s - in com.wust.dormitory.residency.BedSelectionEligibilityGuardTest
 [INFO] Running com.wust.dormitory.residency.BatchCapacityServiceTest
-[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.075 s - in com.wust.dormitory.residency.BatchCapacityServiceTest
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.094 s - in com.wust.dormitory.residency.BatchCapacityServiceTest
 [INFO] Running com.wust.dormitory.residency.CurrentResidencyQueryServiceTest
 [INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.001 s - in com.wust.dormitory.residency.CurrentResidencyQueryServiceTest
 [INFO] Running com.wust.dormitory.residency.ResidencyMutationServiceTest
 [INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.142 s - in com.wust.dormitory.residency.ResidencyMutationServiceTest
 [INFO] Running com.wust.dormitory.residency.BatchRoomLockServiceStudentConflictTest
-[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.068 s - in com.wust.dormitory.residency.BatchRoomLockServiceStudentConflictTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.067 s - in com.wust.dormitory.residency.BatchRoomLockServiceStudentConflictTest
 [INFO] Running com.wust.dormitory.residency.BedResidencySynchronizationServiceTest
-[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.071 s - in com.wust.dormitory.residency.BedResidencySynchronizationServiceTest
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.081 s - in com.wust.dormitory.residency.BedResidencySynchronizationServiceTest
 [INFO] Running com.wust.dormitory.readiness.BatchReadinessCheckerTest
-[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.071 s - in com.wust.dormitory.readiness.BatchReadinessCheckerTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.077 s - in com.wust.dormitory.readiness.BatchReadinessCheckerTest
 [INFO] Running com.wust.dormitory.readiness.AuthorizationReadinessCheckerTest
 [INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.005 s - in com.wust.dormitory.readiness.AuthorizationReadinessCheckerTest
 [INFO] Running com.wust.dormitory.readiness.ResourceReadinessCheckerTest
 [INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.006 s - in com.wust.dormitory.readiness.ResourceReadinessCheckerTest
 [INFO] Running com.wust.dormitory.readiness.LabelReadinessCheckerTest
-[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.072 s - in com.wust.dormitory.readiness.LabelReadinessCheckerTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.078 s - in com.wust.dormitory.readiness.LabelReadinessCheckerTest
 [INFO] Running com.wust.dormitory.readiness.SystemReadinessServiceTest
-[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.004 s - in com.wust.dormitory.readiness.SystemReadinessServiceTest
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.005 s - in com.wust.dormitory.readiness.SystemReadinessServiceTest
 [INFO] Running com.wust.dormitory.readiness.SystemReadinessFreshMysql84FlywayIntegrationTest
-[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 12.533 s - in com.wust.dormitory.readiness.SystemReadinessFreshMysql84FlywayIntegrationTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 12.065 s - in com.wust.dormitory.readiness.SystemReadinessFreshMysql84FlywayIntegrationTest
 [INFO] Running com.wust.dormitory.readiness.StudentReadinessCheckerTest
-[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.006 s - in com.wust.dormitory.readiness.StudentReadinessCheckerTest
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.008 s - in com.wust.dormitory.readiness.StudentReadinessCheckerTest
 [INFO] Running com.wust.dormitory.readiness.ReadinessCheckerScenariosTest
-[INFO] Tests run: 12, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.383 s - in com.wust.dormitory.readiness.ReadinessCheckerScenariosTest
+[INFO] Tests run: 12, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.366 s - in com.wust.dormitory.readiness.ReadinessCheckerScenariosTest
 [INFO] Running com.wust.dormitory.readiness.InfrastructureReadinessRedis74IntegrationTest
-[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.96 s - in com.wust.dormitory.readiness.InfrastructureReadinessRedis74IntegrationTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 2.23 s - in com.wust.dormitory.readiness.InfrastructureReadinessRedis74IntegrationTest
 [INFO] Running com.wust.dormitory.readiness.ObjectStorageReadinessCheckerTest
-[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.005 s - in com.wust.dormitory.readiness.ObjectStorageReadinessCheckerTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.004 s - in com.wust.dormitory.readiness.ObjectStorageReadinessCheckerTest
 [INFO] Running com.wust.dormitory.readiness.InfrastructureReadinessCheckerTest
 [INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.004 s - in com.wust.dormitory.readiness.InfrastructureReadinessCheckerTest
 [INFO] Running com.wust.dormitory.report.ReportBuilderServiceTest
-[INFO] Tests run: 8, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.092 s - in com.wust.dormitory.report.ReportBuilderServiceTest
+[INFO] Tests run: 8, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.09 s - in com.wust.dormitory.report.ReportBuilderServiceTest
 [INFO] Running com.wust.dormitory.report.ReportBuilderPersistenceBoundaryTest
 [INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.001 s - in com.wust.dormitory.report.ReportBuilderPersistenceBoundaryTest
 [INFO] Running com.wust.dormitory.storage.ObjectStoragePropertiesTest
-[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.005 s - in com.wust.dormitory.storage.ObjectStoragePropertiesTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.004 s - in com.wust.dormitory.storage.ObjectStoragePropertiesTest
 [INFO] Running com.wust.dormitory.storage.MinioObjectStorageStartupCheckTest
-[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.122 s - in com.wust.dormitory.storage.MinioObjectStorageStartupCheckTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.121 s - in com.wust.dormitory.storage.MinioObjectStorageStartupCheckTest
 [INFO] Running com.wust.dormitory.storage.ObjectStorageKeyFactoryTest
 [INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.002 s - in com.wust.dormitory.storage.ObjectStorageKeyFactoryTest
 [INFO] Running com.wust.dormitory.storage.MinioObjectStorageAdapterSpringWiringTest
-[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.228 s - in com.wust.dormitory.storage.MinioObjectStorageAdapterSpringWiringTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.208 s - in com.wust.dormitory.storage.MinioObjectStorageAdapterSpringWiringTest
 [INFO] Running com.wust.dormitory.mobile.MobileConfirmCheckinPerformanceTest
-[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.553 s - in com.wust.dormitory.mobile.MobileConfirmCheckinPerformanceTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.497 s - in com.wust.dormitory.mobile.MobileConfirmCheckinPerformanceTest
 [INFO] Running com.wust.dormitory.mobile.MobileStudentWorkbenchMapperMySqlIntegrationTest
-[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 7.607 s - in com.wust.dormitory.mobile.MobileStudentWorkbenchMapperMySqlIntegrationTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 6.631 s - in com.wust.dormitory.mobile.MobileStudentWorkbenchMapperMySqlIntegrationTest
 [INFO] Running com.wust.dormitory.mobile.MobileResidencyFilterContractTest
-[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.003 s - in com.wust.dormitory.mobile.MobileResidencyFilterContractTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.002 s - in com.wust.dormitory.mobile.MobileResidencyFilterContractTest
 [INFO] Running com.wust.dormitory.mobile.MobileAppReleaseDownloadControllerTest
 [INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.006 s - in com.wust.dormitory.mobile.MobileAppReleaseDownloadControllerTest
 [INFO] Running com.wust.dormitory.mobile.MobileTaskRouteUnificationContractTest
@@ -98,11 +104,11 @@ overall=1
 [INFO] Running com.wust.dormitory.mobile.MobileStudentCheckinReadPerformanceTest
 [INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.001 s - in com.wust.dormitory.mobile.MobileStudentCheckinReadPerformanceTest
 [INFO] Running com.wust.dormitory.mobile.MobileDashboardPerformanceTest
-[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.08 s - in com.wust.dormitory.mobile.MobileDashboardPerformanceTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.073 s - in com.wust.dormitory.mobile.MobileDashboardPerformanceTest
 [INFO] Running com.wust.dormitory.mobile.MobileInspectionControllerTest
-[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.008 s - in com.wust.dormitory.mobile.MobileInspectionControllerTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.006 s - in com.wust.dormitory.mobile.MobileInspectionControllerTest
 [INFO] Running com.wust.dormitory.mobile.MobileBedConfirmationPaginationTest
-[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.082 s - in com.wust.dormitory.mobile.MobileBedConfirmationPaginationTest
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.072 s - in com.wust.dormitory.mobile.MobileBedConfirmationPaginationTest
 [INFO] Running com.wust.dormitory.mobile.MobileCheckinQueryServiceTest
 [INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.002 s - in com.wust.dormitory.mobile.MobileCheckinQueryServiceTest
 [INFO] Running com.wust.dormitory.mobile.MobileRoomOptionsPerformanceTest
@@ -110,80 +116,74 @@ overall=1
 [INFO] Running com.wust.dormitory.mobile.MobileStudentWorkbenchScopeContractTest
 [INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.001 s - in com.wust.dormitory.mobile.MobileStudentWorkbenchScopeContractTest
 [INFO] Running com.wust.dormitory.mobile.MobileTaskQueryServiceTest
-[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.077 s - in com.wust.dormitory.mobile.MobileTaskQueryServiceTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.069 s - in com.wust.dormitory.mobile.MobileTaskQueryServiceTest
 [INFO] Running com.wust.dormitory.mobile.MobileResidencyFacadeTest
-[INFO] Tests run: 7, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.008 s - in com.wust.dormitory.mobile.MobileResidencyFacadeTest
+[INFO] Tests run: 7, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.009 s - in com.wust.dormitory.mobile.MobileResidencyFacadeTest
 [INFO] Running com.wust.dormitory.mobile.MobileBedConfirmationFacadeTest
-[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.007 s - in com.wust.dormitory.mobile.MobileBedConfirmationFacadeTest
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.01 s - in com.wust.dormitory.mobile.MobileBedConfirmationFacadeTest
 [INFO] Running com.wust.dormitory.mobile.MobileBedConfirmationViewMapperTest
 [INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.001 s - in com.wust.dormitory.mobile.MobileBedConfirmationViewMapperTest
 [INFO] Running com.wust.dormitory.mobile.MobileDashboardMapperContractTest
 [INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.001 s - in com.wust.dormitory.mobile.MobileDashboardMapperContractTest
 [INFO] Running com.wust.dormitory.mobile.MobileAppVersionControllerTest
-[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.004 s - in com.wust.dormitory.mobile.MobileAppVersionControllerTest
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.005 s - in com.wust.dormitory.mobile.MobileAppVersionControllerTest
 [INFO] Running com.wust.dormitory.mobile.MobileBedConfirmationDormStaffTest
 [INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.003 s - in com.wust.dormitory.mobile.MobileBedConfirmationDormStaffTest
 [INFO] Running com.wust.dormitory.mobile.MobileStudentCheckinAuthorizationPerformanceTest
-[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.001 s - in com.wust.dormitory.mobile.MobileStudentCheckinAuthorizationPerformanceTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0 s - in com.wust.dormitory.mobile.MobileStudentCheckinAuthorizationPerformanceTest
 [INFO] Running com.wust.dormitory.mobile.MobileWorkspaceP0PerformanceTest
-[INFO] Tests run: 7, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.084 s - in com.wust.dormitory.mobile.MobileWorkspaceP0PerformanceTest
+[INFO] Tests run: 7, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.079 s - in com.wust.dormitory.mobile.MobileWorkspaceP0PerformanceTest
 [INFO] Running com.wust.dormitory.mobile.MobileWorkbenchThreeLevelContractTest
-[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.002 s - in com.wust.dormitory.mobile.MobileWorkbenchThreeLevelContractTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.001 s - in com.wust.dormitory.mobile.MobileWorkbenchThreeLevelContractTest
 [INFO] Running com.wust.dormitory.mobile.MobileWorkspaceP0MySqlIntegrationTest
-[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 7.731 s - in com.wust.dormitory.mobile.MobileWorkspaceP0MySqlIntegrationTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 7.705 s - in com.wust.dormitory.mobile.MobileWorkspaceP0MySqlIntegrationTest
 [INFO] Running com.wust.dormitory.mobile.MobileResidencyOnsiteAdjustmentServiceTest
-[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.007 s - in com.wust.dormitory.mobile.MobileResidencyOnsiteAdjustmentServiceTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.004 s - in com.wust.dormitory.mobile.MobileResidencyOnsiteAdjustmentServiceTest
 [INFO] Running com.wust.dormitory.mobile.MobileSelectionBedVerificationPolicyTest
 [INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.004 s - in com.wust.dormitory.mobile.MobileSelectionBedVerificationPolicyTest
 [INFO] Running com.wust.dormitory.mobile.MobileRoomSelectionBedAuditTest
-[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.002 s - in com.wust.dormitory.mobile.MobileRoomSelectionBedAuditTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.001 s - in com.wust.dormitory.mobile.MobileRoomSelectionBedAuditTest
 [INFO] Running com.wust.dormitory.mobile.MobileBedConfirmationWorklistMapperContractTest
 [INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.001 s - in com.wust.dormitory.mobile.MobileBedConfirmationWorklistMapperContractTest
 [INFO] Running com.wust.dormitory.mobile.MobileAuthServiceTest
-[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.008 s - in com.wust.dormitory.mobile.MobileAuthServiceTest
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.005 s - in com.wust.dormitory.mobile.MobileAuthServiceTest
 [INFO] Running com.wust.dormitory.mobile.MobileWorkspaceControllerTest
-[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.159 s - in com.wust.dormitory.mobile.MobileWorkspaceControllerTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.125 s - in com.wust.dormitory.mobile.MobileWorkspaceControllerTest
 [INFO] Running com.wust.dormitory.mobile.MobileSelectionOnsiteCheckinServiceTest
-[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.026 s - in com.wust.dormitory.mobile.MobileSelectionOnsiteCheckinServiceTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.003 s - in com.wust.dormitory.mobile.MobileSelectionOnsiteCheckinServiceTest
 [INFO] Running com.wust.dormitory.mobile.MobileAppReleaseServiceTest
-[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.005 s - in com.wust.dormitory.mobile.MobileAppReleaseServiceTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.003 s - in com.wust.dormitory.mobile.MobileAppReleaseServiceTest
 [INFO] Running com.wust.dormitory.mobile.MobileAppReleaseObjectStorageContractTest
-[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.077 s - in com.wust.dormitory.mobile.MobileAppReleaseObjectStorageContractTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.069 s - in com.wust.dormitory.mobile.MobileAppReleaseObjectStorageContractTest
 [INFO] Running com.wust.dormitory.mobile.MobileWorkspaceFacadeTest
-[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.008 s - in com.wust.dormitory.mobile.MobileWorkspaceFacadeTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.004 s - in com.wust.dormitory.mobile.MobileWorkspaceFacadeTest
 [INFO] 
 [INFO] Results:
 [INFO] 
 [ERROR] Failures: 
-[ERROR]   AccountAdminAccountServiceTest.dormStaffCreationRequiresInitialScope:86 
+[ERROR]   AccountAdminAccountServiceTest.dormStaffCreationRequiresExplicitScopeDecision:86 
 Expecting actual throwable to be an instance of:
   com.wust.dormitory.common.error.BusinessException
 but was:
   java.lang.NullPointerException: Cannot invoke "java.lang.Number.longValue()" because the return value of "java.util.Map.get(Object)" is null
 	at com.wust.dormitory.accountadmin.AccountAdminAccountService.createBase(AccountAdminAccountService.java:69)
-	at com.wust.dormitory.accountadmin.AccountAdminAccountServiceTest.lambda$dormStaffCreationRequiresInitialScope$2(AccountAdminAccountServiceTest.java:85)
+	at com.wust.dormitory.accountadmin.AccountAdminAccountServiceTest.lambda$dormStaffCreationRequiresExplicitScopeDecision$2(AccountAdminAccountServiceTest.java:85)
 	at org.assertj.core.api.ThrowableAssert.catchThrowable(ThrowableAssert.java:63)
 	...(82 remaining lines not displayed - this can be changed with Assertions.setMaxStackTraceElementsDisplayed)
-[ERROR]   AdminHomeSiteMetadataTest.fallsBackToCurrentDashboardCopyWhenAdminHomeIsNotConfigured:57 
-expected: "宿舍管理运行概览"
- but was: "武汉科技大学"
-[ERROR]   SiteMetadataServiceTest.exposesConfiguredLoginHtmlThroughPublicConfig:96 
-expected: "/assets/new-login.png"
- but was: ""
 [INFO] 
-[ERROR] Tests run: 1016, Failures: 3, Errors: 0, Skipped: 0
+[ERROR] Tests run: 1016, Failures: 1, Errors: 0, Skipped: 0
 [INFO] 
 [INFO] ------------------------------------------------------------------------
 [INFO] Reactor Summary for Wust Dormitory Select Server 1.0.0-SNAPSHOT:
 [INFO] 
 [INFO] Wust Dormitory Select Server ....................... SUCCESS [  0.002 s]
-[INFO] model .............................................. SUCCESS [ 19.570 s]
-[INFO] server ............................................. FAILURE [03:41 min]
+[INFO] model .............................................. SUCCESS [ 21.015 s]
+[INFO] server ............................................. FAILURE [03:36 min]
 [INFO] ------------------------------------------------------------------------
 [INFO] BUILD FAILURE
 [INFO] ------------------------------------------------------------------------
-[INFO] Total time:  04:05 min
-[INFO] Finished at: 2026-08-23T11:08:18Z
+[INFO] Total time:  04:00 min
+[INFO] Finished at: 2026-08-23T11:15:08Z
 [INFO] ------------------------------------------------------------------------
 [ERROR] Failed to execute goal org.apache.maven.plugins:maven-surefire-plugin:3.0.0-M9:test (default-test) on project server: There are test failures.
 [ERROR] 
