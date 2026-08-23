@@ -5,7 +5,6 @@ on:
     branches:
       - 'private-compat/**'
     paths-ignore:
-      - 'ci/latest-apply-result.txt'
       - 'ci/latest-private-validation.txt'
 
 permissions:
@@ -17,7 +16,7 @@ concurrency:
 
 jobs:
   verify-private-ref:
-    name: Apply and verify private integration ref
+    name: Verify private integration ref
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
@@ -44,7 +43,7 @@ jobs:
           ref: ${{ steps.target.outputs.private_ref }}
           token: ${{ secrets.PRIVATE_CI }}
           path: private-repo
-          persist-credentials: true
+          persist-credentials: false
           fetch-depth: 0
 
       - uses: actions/setup-java@v5
@@ -60,21 +59,7 @@ jobs:
           cache: npm
           cache-dependency-path: private-repo/frontend/package-lock.json
 
-      - name: Prepare deterministic patch helper
-        shell: bash
-        run: |
-          set -euo pipefail
-          python - <<'PY'
-          from pathlib import Path
-          path = Path('ci-tools/ci/apply_private_followups_v2.py')
-          text = path.read_text(encoding='utf-8')
-          strict = "    if count != 1:\n        raise RuntimeError(f'{path}: expected one marker, found {count}: {old[:120]!r}')\n"
-          if strict in text:
-              text = text.replace(strict, '', 1)
-          path.write_text(text, encoding='utf-8')
-          PY
-
-      - name: Apply, regenerate, verify and push
+      - name: Verify private branch
         id: verify
         shell: bash
         run: |
@@ -84,17 +69,9 @@ jobs:
           : > "$result"
           {
             echo "private_ref=${{ steps.target.outputs.private_ref }}"
-            echo "private_before=$(git -C private-repo rev-parse HEAD)"
+            echo "private_head=$(git -C private-repo rev-parse HEAD)"
             echo "started_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           } >> "$result"
-
-          python ci-tools/ci/apply_private_followups_v2.py > /tmp/patch.log 2>&1
-          patch=$?
-          if [[ $patch -eq 0 ]]; then
-            python ci-tools/ci/apply_latest_migration_test.py >> /tmp/patch.log 2>&1
-            patch=$?
-          fi
-          echo "patch=$patch" >> "$result"
 
           cd private-repo/frontend
           npm ci --no-audit --no-fund > /tmp/npm-ci.log 2>&1
@@ -102,19 +79,14 @@ jobs:
           cd "$GITHUB_WORKSPACE"
           echo "npm_ci=$npm_ci" >> "$result"
 
-          if [[ $patch -eq 0 ]]; then
-            python private-repo/scripts/db/generate_school_deployment_sql.py > /tmp/deployment-generate.log 2>&1
-            deployment_generate=$?
-            python private-repo/scripts/db/generate_baseline_database.py --profile deployment > /tmp/baseline-generate.log 2>&1
-            baseline_generate=$?
-          else
-            deployment_generate=99
-            baseline_generate=99
-          fi
+          python private-repo/scripts/db/generate_school_deployment_sql.py > /tmp/deployment-generate.log 2>&1
+          deployment_generate=$?
+          python private-repo/scripts/db/generate_baseline_database.py --profile deployment > /tmp/baseline-generate.log 2>&1
+          baseline_generate=$?
           echo "deployment_generate=$deployment_generate" >> "$result"
           echo "baseline_generate=$baseline_generate" >> "$result"
 
-          if [[ $npm_ci -eq 0 && $patch -eq 0 ]]; then
+          if [[ $npm_ci -eq 0 ]]; then
             cd private-repo/frontend
             npm run generate:api > /tmp/api-generate.log 2>&1
             api_generate=$?
@@ -124,7 +96,7 @@ jobs:
           fi
           echo "api_generate=$api_generate" >> "$result"
 
-          if [[ $patch -eq 0 && $api_generate -eq 0 ]]; then
+          if [[ $api_generate -eq 0 ]]; then
             mvn -f private-repo/backend-java/pom.xml -B -ntp -pl model,server -am test > /tmp/java-test.log 2>&1
             java_test=$?
           else
@@ -167,40 +139,13 @@ jobs:
           echo "diff_check=$diff_check" >> "$result"
 
           overall=0
-          for code in "$patch" "$npm_ci" "$deployment_generate" "$baseline_generate" "$api_generate" "$java_test" "$openapi_contract" "$deployment_test" "$frontend_test" "$frontend_build" "$deployment_check" "$db_tests" "$diff_check"; do
+          for code in "$npm_ci" "$deployment_generate" "$baseline_generate" "$api_generate" "$java_test" "$openapi_contract" "$deployment_test" "$frontend_test" "$frontend_build" "$deployment_check" "$db_tests" "$diff_check"; do
             [[ "$code" -eq 0 ]] || overall=1
           done
-
-          push=99
-          if [[ $overall -eq 0 ]]; then
-            cd private-repo
-            git config user.name github-actions[bot]
-            git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-            git add -A
-            if ! git diff --cached --quiet; then
-              git commit -m "feat: harden admin configuration workflows" > /tmp/commit.log 2>&1
-              commit_code=$?
-              if [[ $commit_code -eq 0 ]]; then
-                git push origin HEAD:${{ steps.target.outputs.private_ref }} > /tmp/push.log 2>&1
-                push=$?
-              else
-                push=$commit_code
-              fi
-            else
-              echo "no private diff" > /tmp/commit.log
-              echo "no private diff" > /tmp/push.log
-              push=0
-            fi
-            cd "$GITHUB_WORKSPACE"
-          fi
-          echo "push=$push" >> "$result"
-          if [[ $overall -eq 0 && $push -ne 0 ]]; then overall=1; fi
-          echo "private_after=$(git -C private-repo rev-parse HEAD)" >> "$result"
           echo "overall=$overall" >> "$result"
           echo "overall=$overall" >> "$GITHUB_OUTPUT"
 
           for pair in \
-            patch:/tmp/patch.log:$patch \
             npm_ci:/tmp/npm-ci.log:$npm_ci \
             deployment_generate:/tmp/deployment-generate.log:$deployment_generate \
             baseline_generate:/tmp/baseline-generate.log:$baseline_generate \
@@ -212,8 +157,7 @@ jobs:
             frontend_build:/tmp/frontend-build.log:$frontend_build \
             deployment_check:/tmp/deployment-check.log:$deployment_check \
             db_tests:/tmp/db-tests.log:$db_tests \
-            diff_check:/tmp/diff-check.log:$diff_check \
-            push:/tmp/push.log:$push; do
+            diff_check:/tmp/diff-check.log:$diff_check; do
             IFS=: read -r label logfile code <<< "$pair"
             if [[ "$code" -ne 0 && -f "$logfile" ]]; then
               {
