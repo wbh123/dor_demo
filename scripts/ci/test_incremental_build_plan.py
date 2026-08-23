@@ -125,6 +125,18 @@ class IncrementalBuildPlanTest(unittest.TestCase):
         self.assertEqual(plan["FRONTEND_BUILD"], 0)
         self.assertEqual(plan["APP_BUILD"], 0)
 
+    def test_mysql_account_init_script_change_does_not_restart_mysql(self) -> None:
+        plan = self.plan_for("docker/mysql/sync-backup-user.sh")
+        self.assertEqual(plan["MYSQL_INIT_RECREATE"], 1)
+        self.assertEqual(plan["MYSQL_RECREATE"], 0)
+        self.assertEqual(plan["BACKEND_RUNTIME"], 0)
+
+    def test_minio_init_script_change_does_not_restart_minio(self) -> None:
+        plan = self.plan_for("docker/minio/init.sh")
+        self.assertEqual(plan["MINIO_INIT_RECREATE"], 1)
+        self.assertEqual(plan["MINIO_RECREATE"], 0)
+        self.assertEqual(plan["BACKEND_RUNTIME"], 0)
+
     def test_same_commit_is_noop(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             repo = Path(temporary)
