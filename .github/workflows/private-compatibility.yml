@@ -14,6 +14,7 @@ on:
       - '.github/workflows/private-compatibility.yml'
       - 'ci/apply_app_download_ui_unification.py'
       - 'ci/apply_app_download_ui_followups.py'
+      - 'ci/apply_app_download_entitlement_status.py'
 
 permissions:
   contents: write
@@ -72,6 +73,9 @@ jobs:
           python ci-tools/ci/apply_app_download_ui_unification.py >/tmp/patch.log 2>&1; patch=$?
           if [[ $patch -eq 0 ]]; then
             python ci-tools/ci/apply_app_download_ui_followups.py >>/tmp/patch.log 2>&1; patch=$?
+          fi
+          if [[ $patch -eq 0 ]]; then
+            python ci-tools/ci/apply_app_download_entitlement_status.py >>/tmp/patch.log 2>&1; patch=$?
           fi
           echo "patch=$patch" >> "$result"
           if [[ $patch -eq 0 ]]; then
