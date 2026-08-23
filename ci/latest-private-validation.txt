@@ -1,6 +1,6 @@
 private_ref=fix/admin-scopes-branding-import-scroll-20260823
-private_before=a5d7dddd1d7882a4520b14233580ad1d935496bb
-started_at=2026-08-23T11:32:43Z
+private_before=8f29a4394946780f19a47178f34199ba6f39e3ee
+started_at=2026-08-23T11:41:16Z
 patch=0
 npm_ci=0
 deployment_generate=0
@@ -15,5 +15,5 @@ deployment_check=0
 db_tests=0
 diff_check=0
 push=0
-private_after=8f29a4394946780f19a47178f34199ba6f39e3ee
+private_after=1a2e4efd0d13beff969836088b4453dbca9da563
 overall=0
