@@ -76,7 +76,7 @@ class CleanupTest(unittest.TestCase):
     def test_no_git_clean(self) -> None:
         source = CLEANUP.read_text(encoding="utf-8")
         self.assertNotIn("git clean", source)
-        self.assertIn("git restore", source)
+        self.assertIn(" restore --worktree -- ", source)
 
 
 if __name__ == "__main__":
