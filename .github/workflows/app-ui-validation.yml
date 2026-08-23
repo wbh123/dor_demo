@@ -1,0 +1,93 @@
+name: App UI Private Validation
+
+on:
+  push:
+    branches:
+      - 'private-compat/feat/app-download-ui-unification-20260823'
+    paths-ignore:
+      - 'ci/latest-app-ui-validation.txt'
+
+permissions:
+  contents: write
+
+jobs:
+  apply-test-push:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: private-compat/feat/app-download-ui-unification-20260823
+          path: ci-tools
+          persist-credentials: true
+      - uses: actions/checkout@v5
+        with:
+          repository: wbh123/Wust-Dormitory-Select
+          ref: feat/app-download-ui-unification-20260823
+          token: ${{ secrets.PRIVATE_CI }}
+          path: private-repo
+          persist-credentials: true
+          fetch-depth: 0
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: private-repo/frontend/package-lock.json
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: private-repo/backend-java/pom.xml
+      - name: Apply, test and publish private branch
+        id: verify
+        shell: bash
+        run: |
+          set +e
+          result="$GITHUB_WORKSPACE/ci-tools/ci/latest-app-ui-validation.txt"
+          : > "$result"
+          echo "private_before=$(git -C private-repo rev-parse HEAD)" >> "$result"
+          python ci-tools/ci/apply_app_download_ui_unification.py >/tmp/patch.log 2>&1; patch=$?
+          if [[ $patch -eq 0 ]]; then
+            cd private-repo/frontend
+            npm ci --no-audit --no-fund >/tmp/npm.log 2>&1; npm_ci=$?
+            if [[ $npm_ci -eq 0 ]]; then npm test >/tmp/front.log 2>&1; front=$?; npm run build >/tmp/build.log 2>&1; build=$?; else front=99; build=99; fi
+            cd "$GITHUB_WORKSPACE"
+            mvn -f private-repo/backend-java/pom.xml -B -ntp -pl model,server -am test >/tmp/java.log 2>&1; java=$?
+            (cd private-repo && bash scripts/ci/run_contracts.sh) >/tmp/contracts.log 2>&1; contracts=$?
+            git -C private-repo diff --check >/tmp/diff.log 2>&1; diff=$?
+          else npm_ci=99; front=99; build=99; java=99; contracts=99; diff=99; fi
+          for pair in patch:$patch npm_ci:$npm_ci frontend_test:$front frontend_build:$build java_test:$java contracts:$contracts diff_check:$diff; do echo "$pair" | tr ':' '=' >> "$result"; done
+          overall=0
+          for code in "$patch" "$npm_ci" "$front" "$build" "$java" "$contracts" "$diff"; do [[ $code -eq 0 ]] || overall=1; done
+          echo "overall=$overall" >> "$result"
+          for pair in patch:/tmp/patch.log:$patch frontend:/tmp/front.log:$front build:/tmp/build.log:$build java:/tmp/java.log:$java contracts:/tmp/contracts.log:$contracts diff:/tmp/diff.log:$diff; do
+            IFS=: read -r label log code <<< "$pair"
+            if [[ $code -ne 0 && -f "$log" ]]; then echo "===== $label failure tail =====" >> "$result"; tail -n 200 "$log" >> "$result"; fi
+          done
+          if [[ $overall -eq 0 ]]; then
+            cd private-repo
+            git config user.name github-actions[bot]
+            git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+            git add -A
+            if ! git diff --cached --quiet; then git commit -m "feat: add public app download and unify form controls" && git push origin HEAD:feat/app-download-ui-unification-20260823; fi
+            echo "private_after=$(git rev-parse HEAD)" >> "$result"
+            cd "$GITHUB_WORKSPACE"
+          fi
+          echo "overall=$overall" >> "$GITHUB_OUTPUT"
+          exit 0
+      - name: Publish validation result
+        if: always()
+        working-directory: ci-tools
+        shell: bash
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add ci/latest-app-ui-validation.txt
+          if ! git diff --cached --quiet; then git commit -m "ci: record app ui validation [skip ci]" && git push origin HEAD:private-compat/feat/app-download-ui-unification-20260823; fi
+      - name: Fail if validation failed
+        if: steps.verify.outputs.overall != '0'
+        run: exit 1
