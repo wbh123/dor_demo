@@ -75,3 +75,5 @@ patch(
 )
 
 print('semantic regression tests aligned with requested behavior')
+
+# Exact-head revalidation trigger for private commit a5d7dddd1d7882a4520b14233580ad1d935496bb.
