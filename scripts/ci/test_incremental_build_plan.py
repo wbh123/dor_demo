@@ -117,6 +117,14 @@ class IncrementalBuildPlanTest(unittest.TestCase):
         self.assertEqual(plan["BACKEND_RUNTIME"], 0)
         self.assertEqual(plan["APP_BUILD"], 0)
 
+    def test_dockerignore_rebuilds_all_images_that_share_root_build_context(self) -> None:
+        plan = self.plan_for(".dockerignore")
+        self.assertEqual(plan["BACKEND_RUNTIME"], 1)
+        self.assertEqual(plan["TOOLCHAIN_REBUILD"], 1)
+        self.assertEqual(plan["BACKEND_COMPILE"], 0)
+        self.assertEqual(plan["FRONTEND_BUILD"], 0)
+        self.assertEqual(plan["APP_BUILD"], 0)
+
     def test_same_commit_is_noop(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             repo = Path(temporary)
