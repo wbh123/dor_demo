@@ -67,7 +67,11 @@ jobs:
           text = p.read_text(encoding='utf-8')
           text = text.replace(
               "message.value = '文件已上传，后台预检任务已创建。可以关闭窗口，任务会继续执行。' ",
-              "message.value = '文件已上传，后台预检任务已创建。可以关闭窗口，稍后重新查看结果。' "
+              "message.value = '文件已上传，后台预检任务已创建。可以关闭窗口，稍后重新查看结果。'"
+          )
+          text = text.replace(
+              "message.value = '文件已上传，后台预检任务已创建。可以关闭窗口，稍后重新查看结果。' ",
+              "message.value = '文件已上传，后台预检任务已创建。可以关闭窗口，稍后重新查看结果。'"
           )
           p.write_text(text, encoding='utf-8')
           PY
