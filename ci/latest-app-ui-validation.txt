@@ -178,25 +178,25 @@ overall=1
 # Subtest: welcome token is the real student name and save action is in the card header
 ok 90 - welcome token is the real student name and save action is in the card header
   ---
-  duration_ms: 0.38924
+  duration_ms: 0.476004
   type: 'test'
   ...
 # Subtest: business boolean settings use the shared system switch language
 ok 91 - business boolean settings use the shared system switch language
   ---
-  duration_ms: 0.622468
+  duration_ms: 0.871298
   type: 'test'
   ...
 # Subtest: all business file and image upload surfaces use one upload field component
 ok 92 - all business file and image upload surfaces use one upload field component
   ---
-  duration_ms: 0.928254
+  duration_ms: 1.200431
   type: 'test'
   ...
 # Subtest: object operation history displays business names instead of database primary keys
 ok 93 - object operation history displays business names instead of database primary keys
   ---
-  duration_ms: 0.579304
+  duration_ms: 0.739029
   type: 'test'
   ...
 1..93
@@ -207,7 +207,7 @@ ok 93 - object operation history displays business names instead of database pri
 # cancelled 0
 # skipped 0
 # todo 0
-# duration_ms 903.206055
+# duration_ms 1137.343687
 ===== build failure tail =====
 
 > wust-dormitory-select-frontend@1.0.0 build
@@ -224,9 +224,9 @@ ok 93 - object operation history displays business names instead of database pri
 > openapi-typescript ../backend-java/model/src/main/resources/openapi-interface.yaml -o src/api/schema.d.ts && openapi-typescript ../backend-java/model/src/main/resources/admin/openapi-system-readiness.yaml -o src/api/systemReadinessSchema.d.ts
 
 ✨ openapi-typescript 7.13.0
-🚀 ../backend-java/model/src/main/resources/openapi-interface.yaml → src/api/schema.d.ts [270.3ms]
+🚀 ../backend-java/model/src/main/resources/openapi-interface.yaml → src/api/schema.d.ts [343.2ms]
 ✨ openapi-typescript 7.13.0
-🚀 ../backend-java/model/src/main/resources/admin/openapi-system-readiness.yaml → src/api/systemReadinessSchema.d.ts [24.1ms]
+🚀 ../backend-java/model/src/main/resources/admin/openapi-system-readiness.yaml → src/api/systemReadinessSchema.d.ts [31.2ms]
 src/views/admin/AdminDashboardView.vue(177,230): error TS2322: Type '{ token: string; label: string; example: string; }[]' is not assignable to type 'Record<string, string>'.
   Index signature for type 'string' is missing in type '{ token: string; label: string; example: string; }[]'.
 src/views/admin/AdminDashboardView.vue(178,269): error TS2322: Type '{ token: string; label: string; example: string; }[]' is not assignable to type 'Record<string, string>'.
@@ -240,12 +240,12 @@ src/views/admin/AdminMobilePrintTemplateView.vue(205,936): error TS2339: Propert
 ===== contracts failure tail =====
 ....
 ----------------------------------------------------------------------
-Ran 4 tests in 0.001s
+Ran 4 tests in 0.002s
 
 OK
 .........
 ----------------------------------------------------------------------
-Ran 9 tests in 0.002s
+Ran 9 tests in 0.003s
 
 OK
 .
@@ -260,7 +260,7 @@ Ran 6 tests in 0.001s
 OK
 ...
 ----------------------------------------------------------------------
-Ran 3 tests in 0.000s
+Ran 3 tests in 0.001s
 
 OK
 ......
@@ -275,7 +275,7 @@ Ran 2 tests in 0.001s
 OK
 ..
 ----------------------------------------------------------------------
-Ran 2 tests in 0.049s
+Ran 2 tests in 0.065s
 
 OK
 Runtime error and data correctness private migration contract passed
