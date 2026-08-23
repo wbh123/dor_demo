@@ -53,7 +53,7 @@ jobs:
           persist-credentials: true
           fetch-depth: 0
 
-      - name: Apply verified runtime follow-ups
+      - name: Apply verified follow-up fixes
         shell: bash
         run: |
           set -euo pipefail
@@ -68,12 +68,13 @@ jobs:
           p.write_text(text, encoding='utf-8')
           PY
           python ci-tools/ci/apply_runtime_followups.py
+          python ci-tools/ci/apply_openapi_closure.py
           cd private-repo
           if ! git diff --quiet; then
             git config user.name github-actions[bot]
             git config user.email 41898282+github-actions[bot]@users.noreply.github.com
             git add -A
-            git commit -m "fix: close import retry and policy snapshot gaps"
+            git commit -m "fix: close import retry policy and site asset contracts"
             git push origin HEAD:${{ steps.target.outputs.private_ref }}
           fi
 
