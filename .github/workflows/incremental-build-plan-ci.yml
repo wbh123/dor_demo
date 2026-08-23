@@ -33,3 +33,5 @@ jobs:
         run: python3 scripts/ci/test_proxy_dynamic_dns.py
       - name: Validate Java 21 backend runtime packages and privilege drop
         run: python3 scripts/ci/test_backend_runtime_packages.py
+      - name: Validate Android SDK mainland mirror endpoints
+        run: python3 scripts/ci/test_android_sdk_mirror.py
