@@ -1,5 +1,5 @@
 private_ref=feat/app-download-ui-unification-20260823
-private_before=a7504f53000091d81f4ae17de581d99d977979f2
+private_before=7c957848dc04faf048d8a02063525efa163b317c
 modularity_baseline_sync=0
 patch=0
 contracts=1
@@ -14,12 +14,12 @@ overall=1
 ===== contracts failure tail =====
 ....
 ----------------------------------------------------------------------
-Ran 4 tests in 0.002s
+Ran 4 tests in 0.001s
 
 OK
 .........
 ----------------------------------------------------------------------
-Ran 9 tests in 0.003s
+Ran 9 tests in 0.002s
 
 OK
 .
@@ -34,7 +34,7 @@ Ran 6 tests in 0.001s
 OK
 ...
 ----------------------------------------------------------------------
-Ran 3 tests in 0.001s
+Ran 3 tests in 0.000s
 
 OK
 ......
@@ -49,7 +49,7 @@ Ran 2 tests in 0.001s
 OK
 ..
 ----------------------------------------------------------------------
-Ran 2 tests in 0.067s
+Ran 2 tests in 0.042s
 
 OK
 Runtime error and data correctness private migration contract passed
@@ -71,13 +71,13 @@ test_student_category_and_gender_are_immutable_after_creation (__main__.StudentI
 test_system_admin_theme_permission_is_entitlement_driven_not_a_duplicate_site_toggle (__main__.StudentIdentityRandomReselectRegressionTest.test_system_admin_theme_permission_is_entitlement_driven_not_a_duplicate_site_toggle) ... ok
 
 ----------------------------------------------------------------------
-Ran 8 tests in 0.004s
+Ran 8 tests in 0.003s
 
 OK
 test_cancel_reselection_resets_redis_projection_and_refreshes_room_profile (__main__.StudentReselectionRuntimeResetContractTest.test_cancel_reselection_resets_redis_projection_and_refreshes_room_profile) ... ok
 
 ----------------------------------------------------------------------
-Ran 1 test in 0.001s
+Ran 1 test in 0.000s
 
 OK
 personal preference policy operation contract passed
@@ -153,19 +153,19 @@ Selection load runtime diagnostics contract: OK (1000-user local default, 2000-u
 Selection load low-disturbance and server concurrency contract: OK
 ...........
 ----------------------------------------------------------------------
-Ran 11 tests in 0.052s
+Ran 11 tests in 0.044s
 
 OK
 Selection SSE load fixture contract: OK (batch-wide per-student subscription)
 Selection Redis runtime contract: OK
 .............
 ----------------------------------------------------------------------
-Ran 13 tests in 0.003s
+Ran 13 tests in 0.002s
 
 OK
 .......
 ----------------------------------------------------------------------
-Ran 7 tests in 0.002s
+Ran 7 tests in 0.001s
 
 OK
 Selection Redis recovery/pubsub contract: OK
@@ -184,7 +184,7 @@ Admin batch catalog MyBatis contract passed
 Admin building and room OpenAPI/controller/service contract passed
 Effective room update OpenAPI/controller/service/frontend contract passed
 Site metadata, controlled site assets, student theme and admin student catalog OpenAPI contract passed
-Traceback (most recent call last):
-  File "/home/runner/work/dor_demo/dor_demo/private-repo/scripts/ci/test_admin_home_metadata_startup_dependency.py", line 34, in <module>
-    raise AssertionError(f"学校管理员侧边栏未消费站点元数据：{token}")
-AssertionError: 学校管理员侧边栏未消费站点元数据：/api/v1/public/site-config
+School sidebar branding metadata and startup dependency contract passed
+System contract validation failed:
+- administrator questionnaire-bypass or reselect policy is incomplete
+- batch publication does not validate selected students and rooms before preflight
