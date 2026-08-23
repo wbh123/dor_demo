@@ -1,14 +1,35 @@
 private_ref=fix/admin-scopes-branding-import-scroll-20260823
-private_sha=3a977faf8f9c6aedd91421cb38913f882775789f
-validated_at=2026-08-23T10:33:29Z
+private_sha=f7a51d88298f0cff3da4883ca5c62cb7b8745f49
+validated_at=2026-08-23T10:35:27Z
 java_compile=0
 java_regression=1
+openapi_contract=1
 npm_ci=0
 frontend_test=1
 frontend_build=2
 overall=1
 
 ===== java_regression failure tail =====
+################################################################################
+[INFO] 
+[INFO] --- build-helper:3.3.0:add-source (add-openapi-source) @ model ---
+[INFO] Source directory: /home/runner/work/dor_demo/dor_demo/private-repo/backend-java/model/target/generated-sources/openapi/src/main/java added.
+[INFO] Source directory: /home/runner/work/dor_demo/dor_demo/private-repo/backend-java/model/target/generated-sources/openapi-readiness/src/main/java added.
+[INFO] 
+[INFO] --- resources:3.4.0:resources (default-resources) @ model ---
+[INFO] Copying 54 resources from src/main/resources to target/classes
+[INFO] 
+[INFO] --- compiler:3.11.0:compile (default-compile) @ model ---
+[INFO] Changes detected - recompiling the module! :source
+[INFO] Compiling 179 source files with javac [debug target 21] to target/classes
+[INFO] 
+[INFO] --- resources:3.4.0:testResources (default-testResources) @ model ---
+[INFO] skip non existing resourceDirectory /home/runner/work/dor_demo/dor_demo/private-repo/backend-java/model/src/test/resources
+[INFO] 
+[INFO] --- compiler:3.11.0:testCompile (default-testCompile) @ model ---
+[INFO] No sources to compile
+[INFO] 
+[INFO] --- surefire:3.0.0-M9:test (default-test) @ model ---
 [INFO] No tests to run.
 [INFO] 
 [INFO] ---------------------< com.wust.dormitory:server >----------------------
@@ -68,8 +89,8 @@ WARNING: A Java agent has been loaded dynamically (/home/runner/.m2/repository/n
 WARNING: If a serviceability tool is in use, please run with -XX:+EnableDynamicAgentLoading to hide this warning
 WARNING: If a serviceability tool is not in use, please run with -Djdk.instrument.traceUsage for more information
 WARNING: Dynamic loading of agents will be disallowed by default in a future release
-[ERROR] Tests run: 3, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 1.133 s <<< FAILURE! - in com.wust.dormitory.importworkflow.ImportAttemptHistoryRegressionTest
-[ERROR] com.wust.dormitory.importworkflow.ImportAttemptHistoryRegressionTest.roomUploadCapturesThePolicyUsedWhenTheTaskWasCreated  Time elapsed: 0.024 s  <<< FAILURE!
+[ERROR] Tests run: 3, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 1.076 s <<< FAILURE! - in com.wust.dormitory.importworkflow.ImportAttemptHistoryRegressionTest
+[ERROR] com.wust.dormitory.importworkflow.ImportAttemptHistoryRegressionTest.roomUploadCapturesThePolicyUsedWhenTheTaskWasCreated  Time elapsed: 0.027 s  <<< FAILURE!
 org.opentest4j.AssertionFailedError: 
 
 expected: {"roomAutoCreateBuilding"=true}
@@ -77,10 +98,10 @@ expected: {"roomAutoCreateBuilding"=true}
 	at com.wust.dormitory.importworkflow.ImportAttemptHistoryRegressionTest.roomUploadCapturesThePolicyUsedWhenTheTaskWasCreated(ImportAttemptHistoryRegressionTest.java:68)
 
 [INFO] Running com.wust.dormitory.accountadmin.AdminNoScopeGrantRegressionTest
-[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.313 s - in com.wust.dormitory.accountadmin.AdminNoScopeGrantRegressionTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.303 s - in com.wust.dormitory.accountadmin.AdminNoScopeGrantRegressionTest
 [INFO] Running com.wust.dormitory.admin.SiteMetadataAssetServiceRegressionTest
-[ERROR] Tests run: 1, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 0.28 s <<< FAILURE! - in com.wust.dormitory.admin.SiteMetadataAssetServiceRegressionTest
-[ERROR] com.wust.dormitory.admin.SiteMetadataAssetServiceRegressionTest.publicUrlIncludesStoredDigestSoReplacingAssetInvalidatesCaches  Time elapsed: 0.278 s  <<< FAILURE!
+[ERROR] Tests run: 1, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 0.263 s <<< FAILURE! - in com.wust.dormitory.admin.SiteMetadataAssetServiceRegressionTest
+[ERROR] com.wust.dormitory.admin.SiteMetadataAssetServiceRegressionTest.publicUrlIncludesStoredDigestSoReplacingAssetInvalidatesCaches  Time elapsed: 0.261 s  <<< FAILURE!
 org.opentest4j.AssertionFailedError: expected: </api/v1/public/site-assets/SQUARE_LOGO?v=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef> but was: </api/v1/public/site-assets/SQUARE_LOGO>
 	at org.junit.jupiter.api.AssertionFailureBuilder.build(AssertionFailureBuilder.java:158)
 	at org.junit.jupiter.api.AssertionFailureBuilder.buildAndThrow(AssertionFailureBuilder.java:139)
@@ -91,7 +112,7 @@ org.opentest4j.AssertionFailedError: expected: </api/v1/public/site-assets/SQUAR
 	at com.wust.dormitory.admin.SiteMetadataAssetServiceRegressionTest.publicUrlIncludesStoredDigestSoReplacingAssetInvalidatesCaches(SiteMetadataAssetServiceRegressionTest.java:38)
 
 [INFO] Running com.wust.dormitory.admin.WelcomeBrandDefaultsRegressionTest
-[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.142 s - in com.wust.dormitory.admin.WelcomeBrandDefaultsRegressionTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.146 s - in com.wust.dormitory.admin.WelcomeBrandDefaultsRegressionTest
 [INFO] 
 [INFO] Results:
 [INFO] 
@@ -107,13 +128,13 @@ expected: {"roomAutoCreateBuilding"=true}
 [INFO] Reactor Summary for Wust Dormitory Select Server 1.0.0-SNAPSHOT:
 [INFO] 
 [INFO] Wust Dormitory Select Server ....................... SUCCESS [  0.002 s]
-[INFO] model .............................................. SUCCESS [  9.024 s]
-[INFO] server ............................................. FAILURE [ 18.977 s]
+[INFO] model .............................................. SUCCESS [  8.405 s]
+[INFO] server ............................................. FAILURE [ 20.128 s]
 [INFO] ------------------------------------------------------------------------
 [INFO] BUILD FAILURE
 [INFO] ------------------------------------------------------------------------
-[INFO] Total time:  28.334 s
-[INFO] Finished at: 2026-08-23T10:34:52Z
+[INFO] Total time:  28.842 s
+[INFO] Finished at: 2026-08-23T10:36:46Z
 [INFO] ------------------------------------------------------------------------
 [ERROR] Failed to execute goal org.apache.maven.plugins:maven-surefire-plugin:3.0.0-M9:test (default-test) on project server: There are test failures.
 [ERROR] 
@@ -130,7 +151,33 @@ expected: {"roomAutoCreateBuilding"=true}
 [ERROR] After correcting the problems, you can resume the build with the command
 [ERROR]   mvn <args> -rf :server
 
+===== openapi_contract failure tail =====
+Traceback (most recent call last):
+  File "/home/runner/work/dor_demo/dor_demo/private-repo/scripts/ci/test_site_metadata_openapi_contract.py", line 34, in <module>
+    raise AssertionError(f"聚合 OpenAPI 缺少站点/学生目录契约：{token}")
+AssertionError: 聚合 OpenAPI 缺少站点/学生目录契约：/api/v1/public/site-assets/{slot}:
+
 ===== frontend_test failure tail =====
+        return
+      }
+      error.value = ''
+      if (status === 'PREVIEWED') {
+        const invalid = Number(task.invalidRows ?? 0)
+        message.value = invalid > 0
+          ? `预检完成，发现 ${invalid} 个错误行，请修正后重新上传。`
+          : '预检通过，可以确认正式导入。'
+      } else if (status === 'COMMITTED') {
+        message.value = `导入完成，共写入 ${Number(task.mutationCount ?? task.validRows ?? 0)} 项业务变更。`
+        emit('committed', task)
+      } else if (status === 'ROLLED_BACK') {
+        message.value = '导入任务已安全回滚。'
+      }
+    }
+    
+    async function commitTask() {
+      if (!selected.value?.taskId || !canCommit.value || loading.value) return
+      loading.value = true
+      error.value = ''
       try {
         const response = await api.post<ObjectSuccessResponse>(`/api/v1/admin/import-tasks/${selected.value.taskId}/commit`)
         const task = (response.data.data ?? {}) as DataObject
@@ -239,7 +286,7 @@ expected: {"roomAutoCreateBuilding"=true}
 # Subtest: student table hidden action menu cannot create vertical scroll blank space
 ok 88 - student table hidden action menu cannot create vertical scroll blank space
   ---
-  duration_ms: 0.254595
+  duration_ms: 0.262386
   type: 'test'
   ...
 1..88
@@ -250,7 +297,7 @@ ok 88 - student table hidden action menu cannot create vertical scroll blank spa
 # cancelled 0
 # skipped 0
 # todo 0
-# duration_ms 1152.160257
+# duration_ms 1114.151109
 
 ===== frontend_build failure tail =====
 
@@ -268,9 +315,9 @@ ok 88 - student table hidden action menu cannot create vertical scroll blank spa
 > openapi-typescript ../backend-java/model/src/main/resources/openapi-interface.yaml -o src/api/schema.d.ts && openapi-typescript ../backend-java/model/src/main/resources/admin/openapi-system-readiness.yaml -o src/api/systemReadinessSchema.d.ts
 
 ✨ openapi-typescript 7.13.0
-🚀 ../backend-java/model/src/main/resources/openapi-interface.yaml → src/api/schema.d.ts [376.4ms]
+🚀 ../backend-java/model/src/main/resources/openapi-interface.yaml → src/api/schema.d.ts [356.3ms]
 ✨ openapi-typescript 7.13.0
-🚀 ../backend-java/model/src/main/resources/admin/openapi-system-readiness.yaml → src/api/systemReadinessSchema.d.ts [33.1ms]
+🚀 ../backend-java/model/src/main/resources/admin/openapi-system-readiness.yaml → src/api/systemReadinessSchema.d.ts [31.1ms]
 src/account/DefaultProfileScopeSelector.vue(49,61): error TS2345: Argument of type 'ScopeType' is not assignable to parameter of type '"CAMPUS" | "BUILDING" | "FLOOR" | "ROOM" | "MAJOR"'.
   Type '"SCHOOL"' is not assignable to type '"CAMPUS" | "BUILDING" | "FLOOR" | "ROOM" | "MAJOR"'.
 src/components/admin/ImportWorkflowModal.vue(2,37): error TS6133: 'reactive' is declared but its value is never read.
