@@ -1,113 +1,142 @@
 private_ref=feat/app-download-ui-unification-20260823
-private_head=25ed6644f94d56d249dc1e1268585dc80ef09a20
+private_before=d5145511fd56bd2f67e17472e0360d7ac348c16e
+patch=0
 npm_ci=0
 frontend_test=1
-java_qr_test=1
+frontend_build=2
+java_test=0
+contracts=1
+deployment_check=0
+baseline_generate=0
+diff_check=0
+overall=1
 ===== frontend failure tail =====
-      selectedBedId.value = 0
-    }
-    
-    function pageItems(response: ObjectSuccessResponse): DataObject[] {
-      const data = (response.data ?? {}) as DataObject
-      return Array.isArray(data.items) ? data.items as DataObject[] : []
-    }
-    
-    async function loadStudentOptions() {
-      loadingOptions.value = true
-      error.value = ''
-      try {
-        const response = await api.get<ObjectSuccessResponse>('/api/v1/admin/students', {
-          params: { keyword: studentKeyword.value || undefined, page: 1, pageSize: 20 },
-        })
-        studentOptions.value = pageItems(response.data)
-      } catch (reason) {
-        error.value = reason instanceof Error ? reason.message : '学生选项加载失败'
-      } finally {
-        loadingOptions.value = false
-      }
-    }
-    
-    async function loadRoomOptions() {
-      loadingOptions.value = true
-      error.value = ''
-      try {
-        const response = await api.get<ObjectSuccessResponse>('/api/v1/admin/rooms/page', {
-          params: { page: 1, pageSize: 100 },
-        })
-        roomOptions.value = pageItems(response.data)
-      } catch (reason) {
-        error.value = reason instanceof Error ? reason.message : '寝室选项加载失败'
-      } finally {
-        loadingOptions.value = false
-      }
-    }
-    
-    async function loadBedOptions() {
-      if (!selectedRoomId.value) return
-      loadingOptions.value = true
-      error.value = ''
-      try {
-        const response = await api.get<ObjectSuccessResponse>(`/api/v1/admin/rooms/${selectedRoomId.value}/bed-layout`)
-        const data = (response.data.data ?? {}) as DataObject
-        bedOptions.value = Array.isArray(data.beds) ? data.beds as DataObject[] : []
-      } catch (reason) {
-        error.value = reason instanceof Error ? reason.message : '床位选项加载失败'
-      } finally {
-        loadingOptions.value = false
-      }
-    }
-    
-    function query() {
-      const id = Number(selectedId.value)
-      if (!Number.isInteger(id) || id <= 0) {
-        error.value = `请选择有效的${subjectName(subjectType.value)}。`
-        activeType.value = null
-        activeId.value = 0
-        return
-      }
-      error.value = ''
-      activeType.value = subjectType.value
-      activeId.value = id
-    }
-    
-    function subjectName(type: TimelineSubjectType) {
-      if (type === 'STUDENT') return '学生'
-      if (type === 'ROOM') return '寝室'
-      return '床位'
-    }
-    </script>
-    
-    <template>
-      <section class="panel object-history-workspace">
-        <div class="section-head"><div><span class="eyebrow">OBJECT TIMELINE</span><h3>学生 / 寝室 / 床位操作历史</h3><p>按业务对象查询统一审计时间线。只有当前岗位具有读取权限且位于 READ Scope 内的对象才能查看。</p></div></div>
-        <form class="history-query" @submit.prevent="query">
-          <label><span>对象类型</span><select v-model="subjectType" class="input"><option value="STUDENT">学生</option><option value="ROOM">寝室</option><option value="BED">床位</option></select></label>
-          <div class="object-selector-cascade">
-            <template v-if="subjectType === 'STUDENT'">
-              <label class="student-search-field"><span>学生</span><div class="selector-inline"><input v-model.trim="studentKeyword" class="input" placeholder="学号或姓名" @keyup.enter.prevent="loadStudentOptions" /><button class="button ghost" type="button" :disabled="loadingOptions" @click="loadStudentOptions">搜索</button></div></label>
-              <label><span>选择学生</span><select v-model.number="selectedStudentId" class="input"><option :value="0">请选择学生</option><option v-for="student in studentOptions" :key="String(student.id)" :value="Number(student.id)">{{ student.student_number }} · {{ student.student_name }}</option></select></label>
-            </template>
-            <template v-else>
-              <label><span>校区</span><select v-model="selectedCampusId" class="input" :disabled="loadingOptions"><option value="">校区</option><option v-for="campus in campusOptions" :key="campus.id" :value="campus.id">{{ campus.label }}</option></select></label>
-              <label><span>楼栋</span><select v-model="selectedBuildingId" class="input" :disabled="!selectedCampusId || loadingOptions"><option value="">楼栋</option><option v-for="building in buildingOptions" :key="building.id" :value="building.id">{{ building.label }}</option></select></label>
-              <label><span>楼层</span><select v-model="selectedFloorNumber" class="input" :disabled="!selectedBuildingId || loadingOptions"><option value="">楼层</option><option v-for="floor in floorOptions" :key="floor" :value="String(floor)">{{ floor }}层</option></select></label>
-              <label><span>寝室</span><select v-model.number="selectedRoomId" class="input" :disabled="!selectedFloorNumber || loadingOptions"><option :value="0">寝室</option><option v-for="room in roomCascadeOptions" :key="String(room.id)" :value="Number(room.id)">{{ room.room_number }}</option></select></label>
-              <label v-if="subjectType === 'BED'"><span>床位</span><select v-model.number="selectedBedId" class="input" :disabled="!selectedRoomId || loadingOptions"><option :value="0">床位</option><option v-for="bed in bedOptions" :key="String(bed.id)" :value="Number(bed.id)">{{ bed.bed_code }}</option></select></label>
-            </template>
-          </div>
-          <button class="button primary" type="submit">查询操作历史</button>
-        </form>
-        <p v-if="error" class="alert error">{{ error }}</p>
-        <div v-if="activeType && activeId" class="timeline-container"><ObjectAuditTimeline :subject-type="activeType" :subject-id="activeId" :title="`${subjectName(activeType)} #${activeId} 操作历史`" /></div>
-        <p v-else class="empty-state">选择对象类型并通过级联选择目标后才会加载历史记录；页面初始化不会预拉审计数据。</p>
-      </section>
-    </template>
-    
-    <style scoped>.object-history-workspace{display:grid;gap:16px}.history-query{display:grid;grid-template-columns:160px minmax(0,1fr) auto;gap:10px;align-items:end}.history-query label,.object-selector-cascade label{display:grid;gap:6px}.history-query label>span,.object-selector-cascade label>span{font-size:.75rem;font-weight:700;color:var(--text-muted)}.object-selector-cascade{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.student-search-field{grid-column:span 2}.selector-inline{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px}.timeline-container{padding-top:4px;border-top:1px solid var(--border)}@media(max-width:1100px){.history-query{grid-template-columns:1fr}.object-selector-cascade{grid-template-columns:repeat(2,minmax(0,1fr))}.history-query button{justify-self:start}}@media(max-width:720px){.object-selector-cascade{grid-template-columns:1fr}.student-search-field{grid-column:auto}.selector-inline{grid-template-columns:1fr}.history-query button{width:100%}}</style>
-    
-  operator: 'doesNotMatch'
+ok 70 - element properties use compact grouped controls
+  ---
+  duration_ms: 0.459079
+  type: 'test'
+  ...
+# Subtest: floor and room units are appended exactly once and can be hidden per element
+ok 71 - floor and room units are appended exactly once and can be hidden per element
+  ---
+  duration_ms: 0.766365
+  type: 'test'
+  ...
+# Subtest: template API preserves semantic Chinese suffixes while allowing explicit override
+ok 72 - template API preserves semantic Chinese suffixes while allowing explicit override
+  ---
+  duration_ms: 0.508973
+  type: 'test'
+  ...
+# Subtest: database migration makes custom print templates platform-controlled
+ok 73 - database migration makes custom print templates platform-controlled
+  ---
+  duration_ms: 0.642453
+  type: 'test'
+  ...
+# Subtest: QR code drag uses live element geometry instead of stale canonical preview coordinates
+ok 74 - QR code drag uses live element geometry instead of stale canonical preview coordinates
+  ---
+  duration_ms: 0.805087
+  type: 'test'
+  ...
+# Subtest: QR code canvas renders a cached single path instead of rebuilding hundreds of rect nodes while dragging
+ok 75 - QR code canvas renders a cached single path instead of rebuilding hundreds of rect nodes while dragging
+  ---
+  duration_ms: 0.473807
+  type: 'test'
+  ...
+# Subtest: QR code size controls keep square geometry when width or height changes
+ok 76 - QR code size controls keep square geometry when width or height changes
+  ---
+  duration_ms: 0.41677
+  type: 'test'
+  ...
+# Subtest: admin editor loads the exact same pinned static Regular and Bold Noto Sans SC resources as backend/mobile
+ok 77 - admin editor loads the exact same pinned static Regular and Bold Noto Sans SC resources as backend/mobile
+  ---
+  duration_ms: 1.963074
+  type: 'test'
+  ...
+# Subtest: font loader rejects SPA fallback or corrupted bytes before FontFace sees them
+ok 78 - font loader rejects SPA fallback or corrupted bytes before FontFace sees them
+  ---
+  duration_ms: 0.524222
+  type: 'test'
+  ...
+# Subtest: editor registers distinct 400 and 700 FontFace bytes instead of cloning a variable font
+ok 79 - editor registers distinct 400 and 700 FontFace bytes instead of cloning a variable font
+  ---
+  duration_ms: 0.71041
+  type: 'test'
+  ...
+# Subtest: canonical font loading and automatic preview are single-flight to avoid starving API requests
+ok 80 - canonical font loading and automatic preview are single-flight to avoid starving API requests
+  ---
+  duration_ms: 0.649225
+  type: 'test'
+  ...
+# Subtest: nginx never rewrites missing font files to index.html
+ok 81 - nginx never rewrites missing font files to index.html
+  ---
+  duration_ms: 0.653153
+  type: 'test'
+  ...
+# Subtest: residency list uses server pagination and renders only returned rows
+ok 82 - residency list uses server pagination and renders only returned rows
+  ---
+  duration_ms: 1.372169
+  type: 'test'
+  ...
+# Subtest: bed confirmation room list uses server pagination for its bounded room review list
+ok 83 - bed confirmation room list uses server pagination for its bounded room review list
+  ---
+  duration_ms: 0.282178
+  type: 'test'
+  ...
+# Subtest: default role provisioning supports no-access and hierarchical concrete scope selection
+ok 84 - default role provisioning supports no-access and hierarchical concrete scope selection
+  ---
+  duration_ms: 1.596027
+  type: 'test'
+  ...
+# Subtest: student welcome exposes a display switch and studentName token
+ok 85 - student welcome exposes a display switch and studentName token
+  ---
+  duration_ms: 0.290533
+  type: 'test'
+  ...
+# Subtest: platform site images are uploaded rather than edited as URLs
+ok 86 - platform site images are uploaded rather than edited as URLs
+  ---
+  duration_ms: 0.455913
+  type: 'test'
+  ...
+# Subtest: import upload attempts reuse a key only for transport retry and rotate it after success
+ok 87 - import upload attempts reuse a key only for transport retry and rotate it after success
+  ---
+  duration_ms: 0.478646
+  type: 'test'
+  ...
+# Subtest: student table hidden action menu cannot create vertical scroll blank space
+ok 88 - student table hidden action menu cannot create vertical scroll blank space
+  ---
+  duration_ms: 0.396261
+  type: 'test'
+  ...
+# Subtest: public app download page is memorable, mobile friendly and exposes direct-download QR
+not ok 89 - public app download page is memorable, mobile friendly and exposes direct-download QR
+  ---
+  duration_ms: 0.446535
+  type: 'test'
+  location: '/home/runner/work/dor_demo/dor_demo/private-repo/frontend/src/views/admin/requested-admin-fixes.spec.ts:63:1'
+  failureType: 'testCodeFailure'
+  error: "ENOENT: no such file or directory, open '/home/runner/work/dor_demo/dor_demo/private-repo/frontend/backend-java/server/src/main/java/com/wust/dormitory/mobile/MobileAppVersionController.java'"
+  code: 'ENOENT'
   stack: |-
-    TestContext.<anonymous> (file:///home/runner/work/dor_demo/dor_demo/private-repo/frontend/src/views/admin/requested-admin-fixes.spec.ts:113:10)
+    readFileSync (node:fs:440:20)
+    read (file:///home/runner/work/dor_demo/dor_demo/private-repo/frontend/src/views/admin/requested-admin-fixes.spec.ts:10:36)
+    TestContext.<anonymous> (file:///home/runner/work/dor_demo/dor_demo/private-repo/frontend/src/views/admin/requested-admin-fixes.spec.ts:67:22)
     Test.runInAsyncScope (node:async_hooks:214:14)
     Test.run (node:internal/test_runner/test:1047:25)
     Test.processPendingSubtests (node:internal/test_runner/test:744:18)
@@ -115,133 +144,131 @@ java_qr_test=1
     Test.run (node:internal/test_runner/test:1101:12)
     async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
   ...
+# Subtest: welcome token is the real student name and save action is in the card header
+not ok 90 - welcome token is the real student name and save action is in the card header
+  ---
+  duration_ms: 0.367157
+  type: 'test'
+  location: '/home/runner/work/dor_demo/dor_demo/private-repo/frontend/src/views/admin/requested-admin-fixes.spec.ts:78:1'
+  failureType: 'testCodeFailure'
+  error: "ENOENT: no such file or directory, open '/home/runner/work/dor_demo/dor_demo/private-repo/frontend/backend-java/server/src/main/java/com/wust/dormitory/auth/StudentWelcomeService.java'"
+  code: 'ENOENT'
+  stack: |-
+    readFileSync (node:fs:440:20)
+    read (file:///home/runner/work/dor_demo/dor_demo/private-repo/frontend/src/views/admin/requested-admin-fixes.spec.ts:10:36)
+    TestContext.<anonymous> (file:///home/runner/work/dor_demo/dor_demo/private-repo/frontend/src/views/admin/requested-admin-fixes.spec.ts:80:19)
+    Test.runInAsyncScope (node:async_hooks:214:14)
+    Test.run (node:internal/test_runner/test:1047:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:744:18)
+    Test.postRun (node:internal/test_runner/test:1173:19)
+    Test.run (node:internal/test_runner/test:1101:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: business boolean settings use the shared system switch language
+ok 91 - business boolean settings use the shared system switch language
+  ---
+  duration_ms: 0.99922
+  type: 'test'
+  ...
+# Subtest: all business file and image upload surfaces use one upload field component
+ok 92 - all business file and image upload surfaces use one upload field component
+  ---
+  duration_ms: 1.269787
+  type: 'test'
+  ...
+# Subtest: object operation history displays business names instead of database primary keys
+ok 93 - object operation history displays business names instead of database primary keys
+  ---
+  duration_ms: 0.785169
+  type: 'test'
+  ...
 1..93
 # tests 93
 # suites 0
-# pass 87
-# fail 6
+# pass 91
+# fail 2
 # cancelled 0
 # skipped 0
 # todo 0
-# duration_ms 1161.627224
-===== java failure tail =====
-[INFO] Processing operation getSystemReadiness
-[INFO] 'host' (OAS 2.0) or 'servers' (OAS 3.0) not defined in the spec. Default to [http://localhost] for server URL [http://localhost/]
-[INFO] 'host' (OAS 2.0) or 'servers' (OAS 3.0) not defined in the spec. Default to [http://localhost] for server URL [http://localhost/]
-[INFO] 'host' (OAS 2.0) or 'servers' (OAS 3.0) not defined in the spec. Default to [http://localhost] for server URL [http://localhost/]
-[INFO] writing file /home/runner/work/dor_demo/dor_demo/private-repo/backend-java/model/target/generated-sources/openapi-readiness/src/main/java/com/wust/dormitory/model/readiness/dto/ReadinessCheckResult.java
-[INFO] writing file /home/runner/work/dor_demo/dor_demo/private-repo/backend-java/model/target/generated-sources/openapi-readiness/src/main/java/com/wust/dormitory/model/readiness/dto/SystemReadinessReport.java
-[INFO] writing file /home/runner/work/dor_demo/dor_demo/private-repo/backend-java/model/target/generated-sources/openapi-readiness/src/main/java/com/wust/dormitory/model/readiness/dto/SystemReadinessSummary.java
-[INFO] 'host' (OAS 2.0) or 'servers' (OAS 3.0) not defined in the spec. Default to [http://localhost] for server URL [http://localhost/]
-[INFO] writing file /home/runner/work/dor_demo/dor_demo/private-repo/backend-java/model/target/generated-sources/openapi-readiness/src/main/java/com/wust/dormitory/model/readiness/api/SystemReadinessApi.java
-[INFO] Skipping generation of Webhooks.
-[INFO] 'host' (OAS 2.0) or 'servers' (OAS 3.0) not defined in the spec. Default to [http://localhost] for server URL [http://localhost/]
-[INFO] writing file /home/runner/work/dor_demo/dor_demo/private-repo/backend-java/model/target/generated-sources/openapi-readiness/pom.xml
-[INFO] writing file /home/runner/work/dor_demo/dor_demo/private-repo/backend-java/model/target/generated-sources/openapi-readiness/README.md
-[INFO] writing file /home/runner/work/dor_demo/dor_demo/private-repo/backend-java/model/target/generated-sources/openapi-readiness/src/main/java/com/wust/dormitory/model/readiness/api/ApiUtil.java
-[INFO] writing file /home/runner/work/dor_demo/dor_demo/private-repo/backend-java/model/target/generated-sources/openapi-readiness/.openapi-generator-ignore
-[INFO] writing file /home/runner/work/dor_demo/dor_demo/private-repo/backend-java/model/target/generated-sources/openapi-readiness/.openapi-generator/VERSION
-[INFO] writing file /home/runner/work/dor_demo/dor_demo/private-repo/backend-java/model/target/generated-sources/openapi-readiness/.openapi-generator/FILES
-################################################################################
-# Thanks for using OpenAPI Generator.                                          #
-# Please consider donation to help us maintain this project 🙏                 #
-# https://opencollective.com/openapi_generator/donate                          #
-################################################################################
-[INFO] 
-[INFO] --- build-helper:3.3.0:add-source (add-openapi-source) @ model ---
-[INFO] Source directory: /home/runner/work/dor_demo/dor_demo/private-repo/backend-java/model/target/generated-sources/openapi/src/main/java added.
-[INFO] Source directory: /home/runner/work/dor_demo/dor_demo/private-repo/backend-java/model/target/generated-sources/openapi-readiness/src/main/java added.
-[INFO] 
-[INFO] --- resources:3.4.0:resources (default-resources) @ model ---
-[INFO] Copying 54 resources from src/main/resources to target/classes
-[INFO] 
-[INFO] --- compiler:3.11.0:compile (default-compile) @ model ---
-[INFO] Changes detected - recompiling the module! :source
-[INFO] Compiling 180 source files with javac [debug target 21] to target/classes
-[INFO] 
-[INFO] --- resources:3.4.0:testResources (default-testResources) @ model ---
-[INFO] skip non existing resourceDirectory /home/runner/work/dor_demo/dor_demo/private-repo/backend-java/model/src/test/resources
-[INFO] 
-[INFO] --- compiler:3.11.0:testCompile (default-testCompile) @ model ---
-[INFO] No sources to compile
-[INFO] 
-[INFO] --- surefire:3.0.0-M9:test (default-test) @ model ---
-[INFO] No tests to run.
-[INFO] 
-[INFO] ---------------------< com.wust.dormitory:server >----------------------
-[INFO] Building server 1.0.0-SNAPSHOT                                     [3/3]
-[INFO]   from server/pom.xml
-[INFO] --------------------------------[ jar ]---------------------------------
-[INFO] 
-[INFO] --- build-helper:3.3.0:add-source (add-source) @ server ---
-[INFO] Source directory: /home/runner/work/dor_demo/dor_demo/private-repo/backend-java/server/target/generated-sources/mybatis-generator added.
-[INFO] 
-[INFO] --- resources:3.4.0:resources (default-resources) @ server ---
-[INFO] Copying 207 resources from src/main/resources to target/classes
-[INFO] 
-[INFO] --- compiler:3.11.0:compile (default-compile) @ server ---
-[INFO] Changes detected - recompiling the module! :dependency
-[INFO] Compiling 673 source files with javac [debug target 21] to target/classes
-[INFO] Annotation processing is enabled because one or more processors were found
-  on the class path. A future release of javac may disable annotation processing
-  unless at least one processor is specified by name (-processor), or a search
-  path is specified (--processor-path, --processor-module-path), or annotation
-  processing is enabled explicitly (-proc:only, -proc:full).
-  Use -Xlint:-options to suppress this message.
-  Use -proc:none to disable annotation processing.
-[INFO] /home/runner/work/dor_demo/dor_demo/private-repo/backend-java/server/src/main/java/com/wust/dormitory/common/error/GlobalExceptionHandler.java: Some input files use or override a deprecated API.
-[INFO] /home/runner/work/dor_demo/dor_demo/private-repo/backend-java/server/src/main/java/com/wust/dormitory/common/error/GlobalExceptionHandler.java: Recompile with -Xlint:deprecation for details.
-[INFO] /home/runner/work/dor_demo/dor_demo/private-repo/backend-java/server/src/main/java/com/wust/dormitory/realtime/RealtimeController.java: /home/runner/work/dor_demo/dor_demo/private-repo/backend-java/server/src/main/java/com/wust/dormitory/realtime/RealtimeController.java uses unchecked or unsafe operations.
-[INFO] /home/runner/work/dor_demo/dor_demo/private-repo/backend-java/server/src/main/java/com/wust/dormitory/realtime/RealtimeController.java: Recompile with -Xlint:unchecked for details.
-[INFO] 
-[INFO] --- resources:3.4.0:testResources (default-testResources) @ server ---
-[INFO] Copying 8 resources from src/test/resources to target/test-classes
-[INFO] 
-[INFO] --- compiler:3.11.0:testCompile (default-testCompile) @ server ---
-[INFO] Changes detected - recompiling the module! :dependency
-[INFO] Compiling 319 source files with javac [debug target 21] to target/test-classes
-[INFO] Annotation processing is enabled because one or more processors were found
-  on the class path. A future release of javac may disable annotation processing
-  unless at least one processor is specified by name (-processor), or a search
-  path is specified (--processor-path, --processor-module-path), or annotation
-  processing is enabled explicitly (-proc:only, -proc:full).
-  Use -Xlint:-options to suppress this message.
-  Use -proc:none to disable annotation processing.
-[INFO] /home/runner/work/dor_demo/dor_demo/private-repo/backend-java/server/src/test/java/com/wust/dormitory/common/error/GlobalExceptionHandlerUploadLimitTest.java: /home/runner/work/dor_demo/dor_demo/private-repo/backend-java/server/src/test/java/com/wust/dormitory/common/error/GlobalExceptionHandlerUploadLimitTest.java uses or overrides a deprecated API.
-[INFO] /home/runner/work/dor_demo/dor_demo/private-repo/backend-java/server/src/test/java/com/wust/dormitory/common/error/GlobalExceptionHandlerUploadLimitTest.java: Recompile with -Xlint:deprecation for details.
-[INFO] /home/runner/work/dor_demo/dor_demo/private-repo/backend-java/server/src/test/java/com/wust/dormitory/admin/RoomManagementQueryServiceTest.java: Some input files use unchecked or unsafe operations.
-[INFO] /home/runner/work/dor_demo/dor_demo/private-repo/backend-java/server/src/test/java/com/wust/dormitory/admin/RoomManagementQueryServiceTest.java: Recompile with -Xlint:unchecked for details.
-[INFO] -------------------------------------------------------------
-[ERROR] COMPILATION ERROR : 
-[INFO] -------------------------------------------------------------
-[ERROR] /home/runner/work/dor_demo/dor_demo/private-repo/backend-java/server/src/test/java/com/wust/dormitory/mobile/MobileAppVersionControllerTest.java:[35,34] cannot find symbol
-  symbol:   method getDownloadQr(org.springframework.mock.web.MockHttpServletRequest)
-  location: variable controller of type com.wust.dormitory.mobile.MobileAppVersionController
-[INFO] 1 error
-[INFO] -------------------------------------------------------------
-[INFO] ------------------------------------------------------------------------
-[INFO] Reactor Summary for Wust Dormitory Select Server 1.0.0-SNAPSHOT:
-[INFO] 
-[INFO] Wust Dormitory Select Server ....................... SUCCESS [  0.002 s]
-[INFO] model .............................................. SUCCESS [ 33.174 s]
-[INFO] server ............................................. FAILURE [ 28.313 s]
-[INFO] ------------------------------------------------------------------------
-[INFO] BUILD FAILURE
-[INFO] ------------------------------------------------------------------------
-[INFO] Total time:  01:08 min
-[INFO] Finished at: 2026-08-23T12:48:54Z
-[INFO] ------------------------------------------------------------------------
-[ERROR] Failed to execute goal org.apache.maven.plugins:maven-compiler-plugin:3.11.0:testCompile (default-testCompile) on project server: Compilation failure
-[ERROR] /home/runner/work/dor_demo/dor_demo/private-repo/backend-java/server/src/test/java/com/wust/dormitory/mobile/MobileAppVersionControllerTest.java:[35,34] cannot find symbol
-[ERROR]   symbol:   method getDownloadQr(org.springframework.mock.web.MockHttpServletRequest)
-[ERROR]   location: variable controller of type com.wust.dormitory.mobile.MobileAppVersionController
-[ERROR] -> [Help 1]
-[ERROR] 
-[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
-[ERROR] Re-run Maven using the -X switch to enable full debug logging.
-[ERROR] 
-[ERROR] For more information about the errors and possible solutions, please read the following articles:
-[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException
-[ERROR] 
-[ERROR] After correcting the problems, you can resume the build with the command
-[ERROR]   mvn <args> -rf :server
+# duration_ms 1353.357655
+===== build failure tail =====
+
+> wust-dormitory-select-frontend@1.0.0 build
+> npm run fonts:prepare && npm run generate:api && vue-tsc -b && vite build
+
+
+> wust-dormitory-select-frontend@1.0.0 fonts:prepare
+> node scripts/prepare-print-font.mjs
+
+[print-font] ready: /home/runner/work/dor_demo/dor_demo/private-repo/frontend/public/fonts/NotoSansSC-Regular.ttf (10596308 bytes, sha256=d4f5f0d3897f1ed286010dbecf8b63818e9fc2fbcfcd3ef34f59b4fc9575d992)
+[print-font] ready: /home/runner/work/dor_demo/dor_demo/private-repo/frontend/public/fonts/NotoSansSC-Bold.ttf (10585824 bytes, sha256=8ed50d467dedc57ee8e87f1ddcc3863a88b714470adcfdf757d339174e037c26)
+
+> wust-dormitory-select-frontend@1.0.0 generate:api
+> openapi-typescript ../backend-java/model/src/main/resources/openapi-interface.yaml -o src/api/schema.d.ts && openapi-typescript ../backend-java/model/src/main/resources/admin/openapi-system-readiness.yaml -o src/api/systemReadinessSchema.d.ts
+
+✨ openapi-typescript 7.13.0
+🚀 ../backend-java/model/src/main/resources/openapi-interface.yaml → src/api/schema.d.ts [460.7ms]
+✨ openapi-typescript 7.13.0
+🚀 ../backend-java/model/src/main/resources/admin/openapi-system-readiness.yaml → src/api/systemReadinessSchema.d.ts [35.6ms]
+src/views/admin/AdminDashboardView.vue(177,230): error TS2322: Type '{ token: string; label: string; example: string; }[]' is not assignable to type 'Record<string, string>'.
+  Index signature for type 'string' is missing in type '{ token: string; label: string; example: string; }[]'.
+src/views/admin/AdminDashboardView.vue(178,269): error TS2322: Type '{ token: string; label: string; example: string; }[]' is not assignable to type 'Record<string, string>'.
+  Index signature for type 'string' is missing in type '{ token: string; label: string; example: string; }[]'.
+src/views/admin/AdminDashboardView.vue(180,256): error TS2322: Type '{ token: string; label: string; example: string; }[]' is not assignable to type 'Record<string, string>'.
+  Index signature for type 'string' is missing in type '{ token: string; label: string; example: string; }[]'.
+src/views/admin/AdminMobilePrintTemplateView.vue(177,371): error TS2339: Property 'value' does not exist on type 'CreateComponentPublicInstanceWithMixins<ToResolvedProps<__VLS_Props, { change: (event: Event) => any; }>, { open: () => void; clear: () => void; }, {}, {}, {}, ComponentOptionsMixin, ... 19 more ..., { ...; }>'.
+src/views/admin/AdminMobilePrintTemplateView.vue(178,512): error TS2339: Property 'value' does not exist on type 'CreateComponentPublicInstanceWithMixins<ToResolvedProps<__VLS_Props, { change: (event: Event) => any; }>, { open: () => void; clear: () => void; }, {}, {}, {}, ComponentOptionsMixin, ... 19 more ..., { ...; }>'.
+src/views/admin/AdminMobilePrintTemplateView.vue(205,321): error TS2339: Property 'click' does not exist on type 'CreateComponentPublicInstanceWithMixins<ToResolvedProps<__VLS_Props, { change: (event: Event) => any; }>, { open: () => void; clear: () => void; }, {}, {}, {}, ComponentOptionsMixin, ... 19 more ..., { ...; }>'.
+src/views/admin/AdminMobilePrintTemplateView.vue(205,936): error TS2339: Property 'click' does not exist on type 'CreateComponentPublicInstanceWithMixins<ToResolvedProps<__VLS_Props, { change: (event: Event) => any; }>, { open: () => void; clear: () => void; }, {}, {}, {}, ComponentOptionsMixin, ... 19 more ..., { ...; }>'.
+===== contracts failure tail =====
+....
+----------------------------------------------------------------------
+Ran 4 tests in 0.002s
+
+OK
+.........
+----------------------------------------------------------------------
+Ran 9 tests in 0.003s
+
+OK
+.
+----------------------------------------------------------------------
+Ran 1 test in 0.000s
+
+OK
+......
+----------------------------------------------------------------------
+Ran 6 tests in 0.001s
+
+OK
+...
+----------------------------------------------------------------------
+Ran 3 tests in 0.001s
+
+OK
+......
+----------------------------------------------------------------------
+Ran 6 tests in 0.001s
+
+OK
+..
+----------------------------------------------------------------------
+Ran 2 tests in 0.001s
+
+OK
+..
+----------------------------------------------------------------------
+Ran 2 tests in 0.066s
+
+OK
+Runtime error and data correctness private migration contract passed
+Backend small-service convergence contract passed
+Student and team service convergence contract passed
+OpenAPI controller split D1 contract passed
+OpenAPI admin controller split D2 contract passed
+Final frontend modularization contract passed
+Traceback (most recent call last):
+  File "/home/runner/work/dor_demo/dor_demo/private-repo/scripts/ci/test_theme_building_notification_student_home.py", line 44, in <module>
+    assert "授权中心" in platform_site and "套餐设置" in platform_site
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError
