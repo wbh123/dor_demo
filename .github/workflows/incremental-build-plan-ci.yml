@@ -19,7 +19,7 @@ jobs:
   incremental-plan:
     name: Incremental build and restart plan
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
@@ -33,6 +33,9 @@ jobs:
         run: |
           bash -n scripts/ci/incremental_build_plan.sh
           bash -n scripts/ci/cleanup_build_worktree.sh
+          bash -n scripts/ci/pull_image_with_fallback.sh
+      - name: Validate mainland container image mirror tags and fallback
+        run: python3 scripts/ci/test_container_image_mirrors.py
       - name: Validate Nginx dynamic Docker DNS syntax
         run: python3 scripts/ci/test_proxy_dynamic_dns.py
       - name: Validate Java 21 backend runtime packages and privilege drop
