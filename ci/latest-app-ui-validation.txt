@@ -1,0 +1,291 @@
+private_before=c19d0232e116d6776abebda4ab095fc2bcb74ec3
+patch=0
+npm_ci=0
+frontend_test=1
+frontend_build=2
+java_test=0
+contracts=1
+diff_check=0
+overall=1
+===== frontend failure tail =====
+      '    }\n' +
+      '\n' +
+      '    static List<String> allowedRequestHeaders(boolean includeClientType) {\n' +
+      '        java.util.ArrayList<String> headers = new java.util.ArrayList<>(List.of(\n' +
+      '                "Authorization", "Content-Type", "X-Request-Id", "Last-Event-ID"));\n' +
+      '        for (String header : AUTH_CLIENT_CONTEXT_HEADERS) {\n' +
+      '            if (includeClientType || !"X-Client-Type".equals(header)) {\n' +
+      '                headers.add(header);\n' +
+      '            }\n' +
+      '        }\n' +
+      '        return List.copyOf(headers);\n' +
+      '    }\n' +
+      '\n' +
+      '    static List<String> parseOriginPatterns(String value) {\n' +
+      '        List<String> configured = Arrays.stream(String.valueOf(value).split(","))\n' +
+      '                .map(String::trim)\n' +
+      '                .filter(item -> !item.isEmpty())\n' +
+      '                .distinct()\n' +
+      '                .toList();\n' +
+      '        return configured.isEmpty() ? LOCAL_ORIGIN_PATTERNS : configured;\n' +
+      '    }\n' +
+      '}\n'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+  actual: |-
+    package com.wust.dormitory.security;
+    
+    import com.fasterxml.jackson.databind.ObjectMapper;
+    import com.wust.dormitory.common.response.ResponseFactory;
+    import jakarta.servlet.http.HttpServletResponse;
+    import org.springframework.beans.factory.annotation.Value;
+    import org.springframework.context.annotation.Bean;
+    import org.springframework.context.annotation.Configuration;
+    import org.springframework.http.MediaType;
+    import org.springframework.security.config.Customizer;
+    import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+    import org.springframework.security.config.http.SessionCreationPolicy;
+    import org.springframework.security.crypto.factory.PasswordEncoderFactories;
+    import org.springframework.security.crypto.password.PasswordEncoder;
+    import org.springframework.security.web.SecurityFilterChain;
+    import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+    import org.springframework.security.web.context.RequestAttributeSecurityContextRepository;
+    import org.springframework.security.web.context.SecurityContextRepository;
+    import org.springframework.web.cors.CorsConfiguration;
+    import org.springframework.web.cors.CorsConfigurationSource;
+    import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+    
+    import java.util.Arrays;
+    import java.util.List;
+    
+    @Configuration
+    public class SecurityConfig {
+        private static final List<String> LOCAL_ORIGIN_PATTERNS =
+                List.of("http://localhost:*", "http://127.0.0.1:*");
+    
+        static final List<String> AUTH_CLIENT_CONTEXT_HEADERS = List.of(
+                "X-Client-Type",
+                "X-Client-Instance-Id",
+                "X-App-Version",
+                "X-App-Build",
+                "X-Device-Form-Factor",
+                "X-Device-Manufacturer",
+                "X-Device-Model",
+                "X-OS-Name",
+                "X-OS-Version",
+                "X-Browser-Name",
+                "X-Browser-Version");
+    
+        @Bean
+        SecurityFilterChain securityFilterChain(
+                HttpSecurity http,
+                BearerTokenFilter tokenFilter,
+                AdminDomainIsolationFilter adminDomainIsolationFilter,
+                ObjectMapper objectMapper,
+                SecurityContextRepository securityContextRepository) throws Exception {
+            http.csrf(csrf -> csrf.disable())
+                    .cors(Customizer.withDefaults())
+                    .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                    .securityContext(securityContext -> securityContext.securityContextRepository(securityContextRepository))
+                    .authorizeHttpRequests(authorize -> authorize
+                            .requestMatchers(
+                                    "/api/v1/auth/login",
+                                    "/api/v1/auth/activate",
+                                    "/api/v1/platform/login",
+                                    "/api/v1/public/site-config",
+                                    "/api/v1/mobile/app-version",
+                                    "/actuator/health"
+                            ).permitAll()
+                            .requestMatchers("/api/v1/platform/**").hasRole("SYSTEM_ADMIN")
+                            .requestMatchers("/api/v1/account-admin/**", "/api/v1/admin/**").hasRole("ADMIN")
+                            .requestMatchers("/api/v1/student/**", "/api/v1/realtime/**").hasRole("STUDENT")
+                            .anyRequest().authenticated())
+                    .exceptionHandling(exceptions -> exceptions
+                            .authenticationEntryPoint((request, response, exception) -> {
+                                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                                response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+                                objectMapper.writeValue(response.getOutputStream(),
+                                        ResponseFactory.error("UNAUTHORIZED", "请先登录"));
+                            })
+                            .accessDeniedHandler((request, response, exception) -> {
+                                response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                                response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+                                objectMapper.writeValue(response.getOutputStream(),
+                                        ResponseFactory.error("FORBIDDEN", "无权执行该操作"));
+                            }))
+                    .addFilterBefore(tokenFilter, UsernamePasswordAuthenticationFilter.class)
+                    .addFilterAfter(adminDomainIsolationFilter, BearerTokenFilter.class);
+            return http.build();
+        }
+    
+        @Bean
+        SecurityContextRepository securityContextRepository() {
+            return new RequestAttributeSecurityContextRepository();
+        }
+    
+        @Bean
+        PasswordEncoder passwordEncoder() {
+            return PasswordEncoderFactories.createDelegatingPasswordEncoder();
+        }
+    
+        @Bean
+        CorsConfigurationSource corsConfigurationSource(
+                @Value("${WUST_DORMITORY_CORS_ALLOWED_ORIGIN_PATTERNS:}") String configuredOriginPatterns) {
+            CorsConfiguration configuration = new CorsConfiguration();
+            configuration.setAllowedOriginPatterns(parseOriginPatterns(configuredOriginPatterns));
+            configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
+            configuration.setAllowedHeaders(allowedRequestHeaders(true));
+            configuration.setExposedHeaders(List.of("X-Request-Id"));
+            configuration.setAllowCredentials(true);
+            UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+            source.registerCorsConfiguration("/**", configuration);
+            return source;
+        }
+    
+        static List<String> allowedRequestHeaders(boolean includeClientType) {
+            java.util.ArrayList<String> headers = new java.util.ArrayList<>(List.of(
+                    "Authorization", "Content-Type", "X-Request-Id", "Last-Event-ID"));
+            for (String header : AUTH_CLIENT_CONTEXT_HEADERS) {
+                if (includeClientType || !"X-Client-Type".equals(header)) {
+                    headers.add(header);
+                }
+            }
+            return List.copyOf(headers);
+        }
+    
+        static List<String> parseOriginPatterns(String value) {
+            List<String> configured = Arrays.stream(String.valueOf(value).split(","))
+                    .map(String::trim)
+                    .filter(item -> !item.isEmpty())
+                    .distinct()
+                    .toList();
+            return configured.isEmpty() ? LOCAL_ORIGIN_PATTERNS : configured;
+        }
+    }
+    
+  operator: 'match'
+  stack: |-
+    TestContext.<anonymous> (file:///home/runner/work/dor_demo/dor_demo/private-repo/frontend/src/views/admin/requested-admin-fixes.spec.ts:77:10)
+    Test.runInAsyncScope (node:async_hooks:214:14)
+    Test.run (node:internal/test_runner/test:1047:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:744:18)
+    Test.postRun (node:internal/test_runner/test:1173:19)
+    Test.run (node:internal/test_runner/test:1101:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: welcome token is the real student name and save action is in the card header
+ok 90 - welcome token is the real student name and save action is in the card header
+  ---
+  duration_ms: 0.476004
+  type: 'test'
+  ...
+# Subtest: business boolean settings use the shared system switch language
+ok 91 - business boolean settings use the shared system switch language
+  ---
+  duration_ms: 0.871298
+  type: 'test'
+  ...
+# Subtest: all business file and image upload surfaces use one upload field component
+ok 92 - all business file and image upload surfaces use one upload field component
+  ---
+  duration_ms: 1.200431
+  type: 'test'
+  ...
+# Subtest: object operation history displays business names instead of database primary keys
+ok 93 - object operation history displays business names instead of database primary keys
+  ---
+  duration_ms: 0.739029
+  type: 'test'
+  ...
+1..93
+# tests 93
+# suites 0
+# pass 92
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1137.343687
+===== build failure tail =====
+
+> wust-dormitory-select-frontend@1.0.0 build
+> npm run fonts:prepare && npm run generate:api && vue-tsc -b && vite build
+
+
+> wust-dormitory-select-frontend@1.0.0 fonts:prepare
+> node scripts/prepare-print-font.mjs
+
+[print-font] ready: /home/runner/work/dor_demo/dor_demo/private-repo/frontend/public/fonts/NotoSansSC-Regular.ttf (10596308 bytes, sha256=d4f5f0d3897f1ed286010dbecf8b63818e9fc2fbcfcd3ef34f59b4fc9575d992)
+[print-font] ready: /home/runner/work/dor_demo/dor_demo/private-repo/frontend/public/fonts/NotoSansSC-Bold.ttf (10585824 bytes, sha256=8ed50d467dedc57ee8e87f1ddcc3863a88b714470adcfdf757d339174e037c26)
+
+> wust-dormitory-select-frontend@1.0.0 generate:api
+> openapi-typescript ../backend-java/model/src/main/resources/openapi-interface.yaml -o src/api/schema.d.ts && openapi-typescript ../backend-java/model/src/main/resources/admin/openapi-system-readiness.yaml -o src/api/systemReadinessSchema.d.ts
+
+✨ openapi-typescript 7.13.0
+🚀 ../backend-java/model/src/main/resources/openapi-interface.yaml → src/api/schema.d.ts [343.2ms]
+✨ openapi-typescript 7.13.0
+🚀 ../backend-java/model/src/main/resources/admin/openapi-system-readiness.yaml → src/api/systemReadinessSchema.d.ts [31.2ms]
+src/views/admin/AdminDashboardView.vue(177,230): error TS2322: Type '{ token: string; label: string; example: string; }[]' is not assignable to type 'Record<string, string>'.
+  Index signature for type 'string' is missing in type '{ token: string; label: string; example: string; }[]'.
+src/views/admin/AdminDashboardView.vue(178,269): error TS2322: Type '{ token: string; label: string; example: string; }[]' is not assignable to type 'Record<string, string>'.
+  Index signature for type 'string' is missing in type '{ token: string; label: string; example: string; }[]'.
+src/views/admin/AdminDashboardView.vue(180,256): error TS2322: Type '{ token: string; label: string; example: string; }[]' is not assignable to type 'Record<string, string>'.
+  Index signature for type 'string' is missing in type '{ token: string; label: string; example: string; }[]'.
+src/views/admin/AdminMobilePrintTemplateView.vue(177,371): error TS2339: Property 'value' does not exist on type 'CreateComponentPublicInstanceWithMixins<ToResolvedProps<__VLS_Props, { change: (event: Event) => any; }>, { open: () => void; clear: () => void; }, {}, {}, {}, ComponentOptionsMixin, ... 19 more ..., { ...; }>'.
+src/views/admin/AdminMobilePrintTemplateView.vue(178,512): error TS2339: Property 'value' does not exist on type 'CreateComponentPublicInstanceWithMixins<ToResolvedProps<__VLS_Props, { change: (event: Event) => any; }>, { open: () => void; clear: () => void; }, {}, {}, {}, ComponentOptionsMixin, ... 19 more ..., { ...; }>'.
+src/views/admin/AdminMobilePrintTemplateView.vue(205,321): error TS2339: Property 'click' does not exist on type 'CreateComponentPublicInstanceWithMixins<ToResolvedProps<__VLS_Props, { change: (event: Event) => any; }>, { open: () => void; clear: () => void; }, {}, {}, {}, ComponentOptionsMixin, ... 19 more ..., { ...; }>'.
+src/views/admin/AdminMobilePrintTemplateView.vue(205,936): error TS2339: Property 'click' does not exist on type 'CreateComponentPublicInstanceWithMixins<ToResolvedProps<__VLS_Props, { change: (event: Event) => any; }>, { open: () => void; clear: () => void; }, {}, {}, {}, ComponentOptionsMixin, ... 19 more ..., { ...; }>'.
+===== contracts failure tail =====
+....
+----------------------------------------------------------------------
+Ran 4 tests in 0.002s
+
+OK
+.........
+----------------------------------------------------------------------
+Ran 9 tests in 0.003s
+
+OK
+.
+----------------------------------------------------------------------
+Ran 1 test in 0.000s
+
+OK
+......
+----------------------------------------------------------------------
+Ran 6 tests in 0.001s
+
+OK
+...
+----------------------------------------------------------------------
+Ran 3 tests in 0.001s
+
+OK
+......
+----------------------------------------------------------------------
+Ran 6 tests in 0.001s
+
+OK
+..
+----------------------------------------------------------------------
+Ran 2 tests in 0.001s
+
+OK
+..
+----------------------------------------------------------------------
+Ran 2 tests in 0.065s
+
+OK
+Runtime error and data correctness private migration contract passed
+Backend small-service convergence contract passed
+Student and team service convergence contract passed
+OpenAPI controller split D1 contract passed
+OpenAPI admin controller split D2 contract passed
+Final frontend modularization contract passed
+Traceback (most recent call last):
+  File "/home/runner/work/dor_demo/dor_demo/private-repo/scripts/ci/test_theme_building_notification_student_home.py", line 42, in <module>
+    assert "StudentThemeSettingUpdateRequest:" not in site_spec, "平台站点写契约不应重复维护主题授权状态"
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 平台站点写契约不应重复维护主题授权状态

@@ -1,0 +1,200 @@
+private_ref=feat/app-download-ui-unification-20260823
+private_before=7c957848dc04faf048d8a02063525efa163b317c
+modularity_baseline_sync=0
+patch=0
+contracts=1
+npm_ci=99
+frontend_test=99
+frontend_build=99
+java_test=99
+deployment_check=99
+baseline_generate=99
+diff_check=99
+overall=1
+===== contracts failure tail =====
+....
+----------------------------------------------------------------------
+Ran 4 tests in 0.002s
+
+OK
+.........
+----------------------------------------------------------------------
+Ran 9 tests in 0.003s
+
+OK
+.
+----------------------------------------------------------------------
+Ran 1 test in 0.000s
+
+OK
+......
+----------------------------------------------------------------------
+Ran 6 tests in 0.001s
+
+OK
+...
+----------------------------------------------------------------------
+Ran 3 tests in 0.001s
+
+OK
+......
+----------------------------------------------------------------------
+Ran 6 tests in 0.001s
+
+OK
+..
+----------------------------------------------------------------------
+Ran 2 tests in 0.001s
+
+OK
+..
+----------------------------------------------------------------------
+Ran 2 tests in 0.064s
+
+OK
+Runtime error and data correctness private migration contract passed
+Backend small-service convergence contract passed
+Student and team service convergence contract passed
+OpenAPI controller split D1 contract passed
+OpenAPI admin controller split D2 contract passed
+Final frontend modularization contract passed
+School theme entitlement, building scope, notification center and student-home regression contract passed
+School-wide theme, entitlement-backed branding, safe login HTML and natural login layout contract passed
+Remaining third-batch high-density dormitory and room-selection UI contract passed
+test_building_cards_are_extra_compact_and_high_density (__main__.StudentIdentityRandomReselectRegressionTest.test_building_cards_are_extra_compact_and_high_density) ... ok
+test_cancelled_bed_assignments_move_to_history_and_do_not_block_reselection (__main__.StudentIdentityRandomReselectRegressionTest.test_cancelled_bed_assignments_move_to_history_and_do_not_block_reselection) ... ok
+test_exchange_building_picker_has_no_search_input (__main__.StudentIdentityRandomReselectRegressionTest.test_exchange_building_picker_has_no_search_input) ... ok
+test_random_selection_is_one_visual_button_and_reads_nested_room_result (__main__.StudentIdentityRandomReselectRegressionTest.test_random_selection_is_one_visual_button_and_reads_nested_room_result) ... ok
+test_reselection_cancel_broadcasts_freed_bed_after_commit (__main__.StudentIdentityRandomReselectRegressionTest.test_reselection_cancel_broadcasts_freed_bed_after_commit) ... ok
+test_selection_match_score_reselect_entry_and_layout_do_not_regress (__main__.StudentIdentityRandomReselectRegressionTest.test_selection_match_score_reselect_entry_and_layout_do_not_regress) ... ok
+test_student_category_and_gender_are_immutable_after_creation (__main__.StudentIdentityRandomReselectRegressionTest.test_student_category_and_gender_are_immutable_after_creation) ... ok
+test_system_admin_theme_permission_is_entitlement_driven_not_a_duplicate_site_toggle (__main__.StudentIdentityRandomReselectRegressionTest.test_system_admin_theme_permission_is_entitlement_driven_not_a_duplicate_site_toggle) ... ok
+
+----------------------------------------------------------------------
+Ran 8 tests in 0.004s
+
+OK
+test_cancel_reselection_resets_redis_projection_and_refreshes_room_profile (__main__.StudentReselectionRuntimeResetContractTest.test_cancel_reselection_resets_redis_projection_and_refreshes_room_profile) ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.000s
+
+OK
+personal preference policy operation contract passed
+Room-change modes, exchange beds, roommate cards, theme authorization and admin-home contract passed
+后端分层门禁通过：检查 103 个 Controller，未发现 JDBC、Redis 或业务 Mapper 直连。
+Java 内嵌 SQL 门禁通过：当前 72 个指纹均来自固定基线 ccbd5a7d95b6，基线共 503 个指纹。
+SQL performance governance contract: OK
+Team category guard MyBatis contract: OK
+Batch creation MyBatis contract: OK
+Student welcome and system setting MyBatis contract: OK
+Student profile MyBatis contract: OK
+Assignment query/export pagination and MyBatis contract: OK
+Admin large-response pagination/lazy-loading contract: OK
+Authentication MyBatis contract: OK
+Platform authentication MyBatis contract: OK
+Platform audit MyBatis contract: OK
+Subscription and plan MyBatis persistence contracts: OK
+Student room recommendation Redis/MyBatis boundary contract: OK
+backend modularization boundaries: OK (37 large Java files, 5 aggregate controllers)
+admin service scope convergence contract: OK
+room layout componentization contract: OK
+admin allocation architecture contract: OK
+optimized allocation architecture contract: OK
+platform controller split contract: OK (4 plan + 5 subscription + 9 entitlement operations)
+admin governance controller split contract: OK (5 audit/export + 6 notification + 5 analytics + 4 report + 4 retention operations)
+spreadsheet support componentization: OK
+system setting normalization componentization: OK
+MyBatis-Plus foundation contract passed
+Admin room catalog MyBatis contract passed
+Admin major and building catalog MyBatis contract passed
+Admin student query MyBatis contract passed
+Student admin detailed MyBatis mapping/performance contract: OK
+Room occupancy snapshot MyBatis performance contract: OK
+Residency snapshot read-model contract: OK
+Reference data Redis cache contract: OK
+Reference data Redis cache V2 contract: OK
+Notification dispatch and template MyBatis contracts: OK
+bed confirmation MyBatis contract: OK
+room management MyBatis contract: OK
+import mutation MyBatis contract: OK
+residency service MyBatis contract: OK
+room change MyBatis contract: OK
+room exchange MyBatis and batching contract: OK
+Batch copy MyBatis componentization contract: OK
+verified team invitation MyBatis contract: OK
+entitlement admin MyBatis performance contract: OK
+batch and historical analytics MyBatis performance contract: OK
+matching scheme MyBatis and Redis cache contract: OK
+Student selection bootstrap contract: OK
+Room selection bootstrap contract: OK
+Bed selection hot-path contract: OK
+.......
+----------------------------------------------------------------------
+Ran 7 tests in 0.002s
+
+OK
+Selection candidate summary and vector performance contract: OK
+Selection entitlement cache and load-fixture contract: OK
+Selection load backend health probe/restart contract: OK
+Selection diagnostic timing contract: OK
+Selection bootstrap diagnostic timing contract: OK
+Selection Redis connection strategy contract: OK (shared default, pooled A/B preserved)
+Selection availability hot-read contract: OK (READY-prewarmed static/Hold snapshots + non-blocking stale followers)
+Selection availability version hot-read contract: OK
+Entitlement runtime cache non-blocking refresh contract: OK
+Selection server concurrency config contract: OK
+Auth token hot-read contract: OK
+SSE async security contract: OK (request SecurityContext restored; committed SSE response not rewritten)
+Selection catalog prewarm contract: OK (version lifecycle + distinct-segment prewarm + lazy fallback)
+Selection StudentContext hot-read contract: OK (prewarm + 500ms version probe + versioned catalog cache key)
+Selection active-team hot-read contract: OK (personal bulk snapshot + explicit team authoritative query)
+Selection load runtime diagnostics contract: OK (1000-user local default, 2000-user legacy preserved)
+Selection load low-disturbance and server concurrency contract: OK
+...........
+----------------------------------------------------------------------
+Ran 11 tests in 0.175s
+
+OK
+Selection SSE load fixture contract: OK (batch-wide per-student subscription)
+Selection Redis runtime contract: OK
+.............
+----------------------------------------------------------------------
+Ran 13 tests in 0.003s
+
+OK
+.......
+----------------------------------------------------------------------
+Ran 7 tests in 0.002s
+
+OK
+Selection Redis recovery/pubsub contract: OK
+test_admin_adjustment_mapper_exposes_active_batch_lock_instead_of_blocking_room (__main__.AdminSelectionRedisConcurrencyContractTest.test_admin_adjustment_mapper_exposes_active_batch_lock_instead_of_blocking_room) ... ok
+test_admin_adjustment_uses_same_redis_concurrency_domain_as_students (__main__.AdminSelectionRedisConcurrencyContractTest.test_admin_adjustment_uses_same_redis_concurrency_domain_as_students) ... ok
+test_admin_committed_mutation_skips_eager_prewarm_but_full_rebuild_keeps_it (__main__.AdminSelectionRedisConcurrencyContractTest.test_admin_committed_mutation_skips_eager_prewarm_but_full_rebuild_keeps_it) ... ok
+test_admin_committed_mutation_uses_diff_redis_replace_without_full_snapshot_delete (__main__.AdminSelectionRedisConcurrencyContractTest.test_admin_committed_mutation_uses_diff_redis_replace_without_full_snapshot_delete) ... ok
+
+----------------------------------------------------------------------
+Ran 4 tests in 0.001s
+
+OK
+Admin dashboard MyBatis contract passed
+Recent audit log MyBatis contract passed
+Admin batch catalog MyBatis contract passed
+Admin building and room OpenAPI/controller/service contract passed
+Effective room update OpenAPI/controller/service/frontend contract passed
+Site metadata, controlled site assets, student theme and admin student catalog OpenAPI contract passed
+School sidebar branding metadata and startup dependency contract passed
+System contract validation passed: 329 OpenAPI paths, 318 backend test classes
+phase2/phase3 operations contract: OK
+async import, recovery and anomaly workflow contracts are present
+allocation/governance/readiness regressions: OK
+country welcome, branding and room-exchange contract: OK
+waitlist core contract: OK
+V25 integrated workflow contracts passed
+Traceback (most recent call last):
+  File "/home/runner/work/dor_demo/dor_demo/private-repo/scripts/ci/test_admin_scope_questionnaire_team_ux.py", line 99, in <module>
+    require(spreadsheet, ('createSheet("字段枚举")', "字段名称", "允许填写内容", "系统规范值"), "Excel templates must include field-enumeration instructions")
+  File "/home/runner/work/dor_demo/dor_demo/private-repo/scripts/ci/test_admin_scope_questionnaire_team_ux.py", line 39, in require
+    raise AssertionError(f"{context}: {token}")
+AssertionError: Excel templates must include field-enumeration instructions: createSheet("字段枚举")

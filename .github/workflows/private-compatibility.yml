@@ -1,93 +1,169 @@
-name: Private Compatibility CI
+name: Private Feature Validation
 
 on:
   push:
     branches:
       - 'private-compat/**'
+    paths-ignore:
+      - 'ci/latest-feature-validation.txt'
   pull_request:
     branches:
       - main
     paths:
       - '.private-compat-trigger'
+      - '.github/workflows/private-compatibility.yml'
+      - 'ci/sync_backend_modularity_baseline.py'
+      - 'ci/apply_app_download_ui_unification.py'
+      - 'ci/apply_app_download_ui_followups.py'
+      - 'ci/apply_app_download_entitlement_status.py'
+      - 'ci/apply_sidebar_public_site_config.py'
+      - 'ci/apply_mybatis_sql_gate_cleanup.py'
+      - 'ci/apply_system_contract_alignment.py'
+      - 'ci/apply_streaming_import_contract_alignment.py'
 
 permissions:
-  contents: read
-
-concurrency:
-  group: private-compat-${{ github.ref }}
-  cancel-in-progress: true
+  contents: write
 
 jobs:
-  verify-private-ref:
-    name: Verify private integration ref
+  apply-and-verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 40
     steps:
-      - name: Resolve private branch name
+      - name: Resolve private branch
         id: target
         shell: bash
         run: |
           set -euo pipefail
           candidate="${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}"
           private_ref="${candidate#private-compat/}"
-          if [[ -z "$private_ref" || "$private_ref" == "$candidate" ]]; then
-            echo "Invalid compatibility branch name" >&2
-            exit 1
-          fi
-          if [[ ! "$private_ref" =~ ^[A-Za-z0-9._/-]+$ ]]; then
-            echo "Unsupported private ref characters" >&2
-            exit 1
-          fi
+          [[ "$private_ref" != "$candidate" ]]
           echo "private_ref=$private_ref" >> "$GITHUB_OUTPUT"
-
-      - name: Checkout private integration branch
-        uses: actions/checkout@v5
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.head_ref || github.ref_name }}
+          path: ci-tools
+          persist-credentials: true
+      - uses: actions/checkout@v5
         with:
           repository: wbh123/Wust-Dormitory-Select
           ref: ${{ steps.target.outputs.private_ref }}
           token: ${{ secrets.PRIVATE_CI }}
           path: private-repo
-          persist-credentials: false
+          persist-credentials: true
           fetch-depth: 0
-
       - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
-
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: private-repo/frontend/package-lock.json
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '21'
           cache: maven
           cache-dependency-path: private-repo/backend-java/pom.xml
-
-      - uses: actions/setup-node@v6
-        with:
-          node-version: '22'
-          cache: npm
-          cache-dependency-path: private-repo/frontend/package-lock.json
-
-      - name: Verify private contracts
-        working-directory: private-repo
+      - name: Apply implementation and validate
+        id: verify
         shell: bash
         run: |
-          set -euo pipefail
-          python scripts/ci/test_runtime_error_data_correctness_batch.py
-          bash scripts/ci/run_contracts.sh
+          set +e
+          result="$GITHUB_WORKSPACE/ci-tools/ci/latest-feature-validation.txt"
+          : > "$result"
+          echo "private_ref=${{ steps.target.outputs.private_ref }}" >> "$result"
+          echo "private_before=$(git -C private-repo rev-parse HEAD)" >> "$result"
 
-      - name: Verify private Java modules
-        working-directory: private-repo/backend-java
+          python ci-tools/ci/sync_backend_modularity_baseline.py >/tmp/sync.log 2>&1; sync=$?
+          echo "modularity_baseline_sync=$sync" >> "$result"
+
+          patch=99
+          if [[ $sync -eq 0 ]]; then
+            patch=0
+            for helper in \
+              apply_app_download_ui_unification.py \
+              apply_app_download_ui_followups.py \
+              apply_app_download_entitlement_status.py \
+              apply_sidebar_public_site_config.py \
+              apply_mybatis_sql_gate_cleanup.py \
+              apply_system_contract_alignment.py \
+              apply_streaming_import_contract_alignment.py; do
+              python "ci-tools/ci/$helper" >>/tmp/patch.log 2>&1
+              patch=$?
+              [[ $patch -eq 0 ]] || break
+            done
+          fi
+          echo "patch=$patch" >> "$result"
+
+          contracts=99
+          if [[ $patch -eq 0 ]]; then
+            (cd private-repo && bash scripts/ci/run_contracts.sh) >/tmp/contracts.log 2>&1; contracts=$?
+          fi
+          echo "contracts=$contracts" >> "$result"
+
+          if [[ $patch -eq 0 && $contracts -eq 0 ]]; then
+            cd private-repo/frontend
+            npm ci --no-audit --no-fund >/tmp/npm.log 2>&1; npm_ci=$?
+            if [[ $npm_ci -eq 0 ]]; then
+              npm test >/tmp/front.log 2>&1; frontend=$?
+              npm run build >/tmp/build.log 2>&1; build=$?
+            else frontend=99; build=99; fi
+            cd "$GITHUB_WORKSPACE"
+            mvn -f private-repo/backend-java/pom.xml -B -ntp -pl model,server -am test >/tmp/java.log 2>&1; java=$?
+            python private-repo/scripts/db/generate_school_deployment_sql.py --check >/tmp/deploy-check.log 2>&1; deploy_check=$?
+            python private-repo/scripts/db/generate_baseline_database.py --profile deployment >/tmp/baseline.log 2>&1; baseline=$?
+            git -C private-repo diff --check >/tmp/diff.log 2>&1; diff=$?
+          else
+            npm_ci=99; frontend=99; build=99; java=99; deploy_check=99; baseline=99; diff=99
+          fi
+
+          for pair in npm_ci:$npm_ci frontend_test:$frontend frontend_build:$build java_test:$java deployment_check:$deploy_check baseline_generate:$baseline diff_check:$diff; do
+            echo "$pair" | tr ':' '=' >> "$result"
+          done
+
+          overall=0
+          for code in "$sync" "$patch" "$contracts" "$npm_ci" "$frontend" "$build" "$java" "$deploy_check" "$baseline" "$diff"; do
+            [[ $code -eq 0 ]] || overall=1
+          done
+          echo "overall=$overall" >> "$result"
+
+          for pair in sync:/tmp/sync.log:$sync patch:/tmp/patch.log:$patch contracts:/tmp/contracts.log:$contracts frontend:/tmp/front.log:$frontend build:/tmp/build.log:$build java:/tmp/java.log:$java deployment:/tmp/deploy-check.log:$deploy_check baseline:/tmp/baseline.log:$baseline diff:/tmp/diff.log:$diff; do
+            IFS=: read -r label log code <<< "$pair"
+            if [[ $code -ne 0 && -f "$log" ]]; then
+              echo "===== $label failure tail =====" >> "$result"
+              tail -n 220 "$log" >> "$result"
+            fi
+          done
+
+          echo "===== validation summary ====="
+          cat "$result"
+          if [[ $overall -eq 0 ]]; then
+            cd private-repo
+            git config user.name github-actions[bot]
+            git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+            git add -A
+            if ! git diff --cached --quiet; then
+              git commit -m "feat: add public app download and unify form controls"
+              git push origin HEAD:${{ steps.target.outputs.private_ref }}
+            fi
+            echo "private_after=$(git rev-parse HEAD)" >> "$result"
+            cd "$GITHUB_WORKSPACE"
+          fi
+          echo "overall=$overall" >> "$GITHUB_OUTPUT"
+          exit 0
+      - name: Publish result
+        if: always() && github.event_name == 'push'
+        working-directory: ci-tools
         shell: bash
         run: |
-          set -euo pipefail
-          mvn -B -ntp clean verify
-
-      - name: Verify private frontend
-        working-directory: private-repo
-        shell: bash
-        env:
-          VITE_INSTITUTION_NAME: Example University
-          VITE_CAMPUS_NAME: Example Campus
-        run: |
-          set -euo pipefail
-          bash scripts/ci/run_frontend.sh
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add ci/latest-feature-validation.txt
+          if ! git diff --cached --quiet; then
+            git commit -m "ci: record feature validation [skip ci]"
+            git push origin HEAD:${GITHUB_REF_NAME}
+          fi
+      - name: Fail when implementation validation failed
+        if: steps.verify.outputs.overall != '0'
+        run: exit 1

@@ -1,0 +1,2 @@
+private_sha=3a977faf8f9c6aedd91421cb38913f882775789f
+reason=verify policy snapshot and upload attempt rotation red tests
