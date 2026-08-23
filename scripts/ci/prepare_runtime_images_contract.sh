@@ -4,12 +4,24 @@ set -euo pipefail
 env_file="${1:?usage: prepare_runtime_images_contract.sh <env-file>}"
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 pull_helper="${script_dir}/pull_image_with_fallback.sh"
+mysql_root_guard="${script_dir}/mysql_root_guard_contract.sh"
 skip_nginx="${WUST_DORMITORY_PREPARE_SKIP_NGINX:-0}"
 skip_java="${WUST_DORMITORY_PREPARE_SKIP_JAVA:-${skip_nginx}}"
+skip_mysql_guard="${WUST_DORMITORY_PREPARE_SKIP_MYSQL_GUARD:-0}"
 java_runtime_image="m.daocloud.io/docker.io/library/eclipse-temurin:21-jre-jammy"
 
 [[ -f "${env_file}" ]] || { echo "missing env file: ${env_file}" >&2; exit 1; }
 [[ -f "${pull_helper}" ]] || { echo "missing pull helper: ${pull_helper}" >&2; exit 1; }
+
+if [[ "${skip_mysql_guard}" != "1" && "$(basename "${env_file}")" != ".env.example" ]]; then
+  [[ -f "${mysql_root_guard}" ]] || { echo "missing MySQL root guard: ${mysql_root_guard}" >&2; exit 1; }
+  deployment_root="$(cd "$(dirname "${env_file}")" && pwd)"
+  mkdir -p "${deployment_root}/data/deploy" "${deployment_root}/data/mysql"
+  bash "${mysql_root_guard}" \
+    "${env_file}" \
+    "${deployment_root}/data/deploy/mysql-root-state.env" \
+    "${deployment_root}/data/mysql"
+fi
 
 read_env_value() {
   local key="$1" value
