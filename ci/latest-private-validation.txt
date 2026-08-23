@@ -1,16 +1,16 @@
 private_ref=fix/admin-scopes-branding-import-scroll-20260823
 private_before=8c6db78414609c5511b24b8f23d5cf05f25d64a4
-started_at=2026-08-23T10:56:34Z
-patch=1
+started_at=2026-08-23T10:58:15Z
+patch=0
 npm_ci=0
-deployment_generate=99
-baseline_generate=99
-api_generate=99
-java_test=99
-openapi_contract=1
+deployment_generate=0
+baseline_generate=0
+api_generate=0
+java_test=1
+openapi_contract=0
 deployment_test=0
-frontend_test=99
-frontend_build=99
+frontend_test=0
+frontend_build=0
 deployment_check=0
 db_tests=0
 diff_check=0
@@ -18,16 +18,184 @@ push=99
 private_after=8c6db78414609c5511b24b8f23d5cf05f25d64a4
 overall=1
 
-===== patch failure tail =====
-Traceback (most recent call last):
-  File "/home/runner/work/dor_demo/dor_demo/ci-tools/ci/apply_private_followups_v2.py", line 49, in <module>
-    replace_once(
-  File "/home/runner/work/dor_demo/dor_demo/ci-tools/ci/apply_private_followups_v2.py", line 24, in replace_once
-    raise RuntimeError(f'{path}: expected one marker, found {count}: {old[:120]!r}')
-RuntimeError: frontend/src/views/admin/AdminImportQualityView.vue: expected one marker, found 3: '    const task = (response.data.data ?? {}) as DataObject\n    selected.value = task\n    upsertTaskSummary(task)'
+===== java_test failure tail =====
+[INFO] Running com.wust.dormitory.residency.BatchCapacityMapperMySqlIntegrationTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 7.574 s - in com.wust.dormitory.residency.BatchCapacityMapperMySqlIntegrationTest
+[INFO] Running com.wust.dormitory.residency.ResidencyPolicyServiceTest
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.142 s - in com.wust.dormitory.residency.ResidencyPolicyServiceTest
+[INFO] Running com.wust.dormitory.residency.TeamCategoryGuardTest
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.071 s - in com.wust.dormitory.residency.TeamCategoryGuardTest
+[INFO] Running com.wust.dormitory.residency.AdminBedSwapServiceTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.14 s - in com.wust.dormitory.residency.AdminBedSwapServiceTest
+[INFO] Running com.wust.dormitory.residency.ResidencyServiceTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.002 s - in com.wust.dormitory.residency.ResidencyServiceTest
+[INFO] Running com.wust.dormitory.residency.BedSelectionEligibilityGuardTest
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.005 s - in com.wust.dormitory.residency.BedSelectionEligibilityGuardTest
+[INFO] Running com.wust.dormitory.residency.BatchCapacityServiceTest
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.069 s - in com.wust.dormitory.residency.BatchCapacityServiceTest
+[INFO] Running com.wust.dormitory.residency.CurrentResidencyQueryServiceTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.001 s - in com.wust.dormitory.residency.CurrentResidencyQueryServiceTest
+[INFO] Running com.wust.dormitory.residency.ResidencyMutationServiceTest
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.132 s - in com.wust.dormitory.residency.ResidencyMutationServiceTest
+[INFO] Running com.wust.dormitory.residency.BatchRoomLockServiceStudentConflictTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.064 s - in com.wust.dormitory.residency.BatchRoomLockServiceStudentConflictTest
+[INFO] Running com.wust.dormitory.residency.BedResidencySynchronizationServiceTest
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.072 s - in com.wust.dormitory.residency.BedResidencySynchronizationServiceTest
+[INFO] Running com.wust.dormitory.readiness.BatchReadinessCheckerTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.081 s - in com.wust.dormitory.readiness.BatchReadinessCheckerTest
+[INFO] Running com.wust.dormitory.readiness.AuthorizationReadinessCheckerTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.007 s - in com.wust.dormitory.readiness.AuthorizationReadinessCheckerTest
+[INFO] Running com.wust.dormitory.readiness.ResourceReadinessCheckerTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.008 s - in com.wust.dormitory.readiness.ResourceReadinessCheckerTest
+[INFO] Running com.wust.dormitory.readiness.LabelReadinessCheckerTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.074 s - in com.wust.dormitory.readiness.LabelReadinessCheckerTest
+[INFO] Running com.wust.dormitory.readiness.SystemReadinessServiceTest
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.005 s - in com.wust.dormitory.readiness.SystemReadinessServiceTest
+[INFO] Running com.wust.dormitory.readiness.SystemReadinessFreshMysql84FlywayIntegrationTest
+[ERROR] Tests run: 1, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 11.56 s <<< FAILURE! - in com.wust.dormitory.readiness.SystemReadinessFreshMysql84FlywayIntegrationTest
+[ERROR] com.wust.dormitory.readiness.SystemReadinessFreshMysql84FlywayIntegrationTest.officialFlywayMigrationsProduceSchemaCompatibleWithAllReadinessQueries  Time elapsed: 5.219 s  <<< FAILURE!
+org.opentest4j.AssertionFailedError: fresh database should finish at the normalized core schema version ==> expected: <67> but was: <69>
+	at org.junit.jupiter.api.AssertionFailureBuilder.build(AssertionFailureBuilder.java:158)
+	at org.junit.jupiter.api.AssertionFailureBuilder.buildAndThrow(AssertionFailureBuilder.java:139)
+	at org.junit.jupiter.api.AssertEquals.failNotEqual(AssertEquals.java:201)
+	at org.junit.jupiter.api.AssertEquals.assertEquals(AssertEquals.java:184)
+	at org.junit.jupiter.api.Assertions.assertEquals(Assertions.java:1199)
+	at com.wust.dormitory.readiness.SystemReadinessFreshMysql84FlywayIntegrationTest.officialFlywayMigrationsProduceSchemaCompatibleWithAllReadinessQueries(SystemReadinessFreshMysql84FlywayIntegrationTest.java:87)
 
-===== openapi_contract failure tail =====
-Traceback (most recent call last):
-  File "/home/runner/work/dor_demo/dor_demo/private-repo/scripts/ci/test_site_metadata_openapi_contract.py", line 34, in <module>
-    raise AssertionError(f"聚合 OpenAPI 缺少站点/学生目录契约：{token}")
-AssertionError: 聚合 OpenAPI 缺少站点/学生目录契约：/api/v1/public/site-assets/{slot}:
+[INFO] Running com.wust.dormitory.readiness.StudentReadinessCheckerTest
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.005 s - in com.wust.dormitory.readiness.StudentReadinessCheckerTest
+[INFO] Running com.wust.dormitory.readiness.ReadinessCheckerScenariosTest
+[INFO] Tests run: 12, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.353 s - in com.wust.dormitory.readiness.ReadinessCheckerScenariosTest
+[INFO] Running com.wust.dormitory.readiness.InfrastructureReadinessRedis74IntegrationTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.831 s - in com.wust.dormitory.readiness.InfrastructureReadinessRedis74IntegrationTest
+[INFO] Running com.wust.dormitory.readiness.ObjectStorageReadinessCheckerTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.003 s - in com.wust.dormitory.readiness.ObjectStorageReadinessCheckerTest
+[INFO] Running com.wust.dormitory.readiness.InfrastructureReadinessCheckerTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.003 s - in com.wust.dormitory.readiness.InfrastructureReadinessCheckerTest
+[INFO] Running com.wust.dormitory.report.ReportBuilderServiceTest
+[INFO] Tests run: 8, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.086 s - in com.wust.dormitory.report.ReportBuilderServiceTest
+[INFO] Running com.wust.dormitory.report.ReportBuilderPersistenceBoundaryTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.001 s - in com.wust.dormitory.report.ReportBuilderPersistenceBoundaryTest
+[INFO] Running com.wust.dormitory.storage.ObjectStoragePropertiesTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.002 s - in com.wust.dormitory.storage.ObjectStoragePropertiesTest
+[INFO] Running com.wust.dormitory.storage.MinioObjectStorageStartupCheckTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.122 s - in com.wust.dormitory.storage.MinioObjectStorageStartupCheckTest
+[INFO] Running com.wust.dormitory.storage.ObjectStorageKeyFactoryTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.003 s - in com.wust.dormitory.storage.ObjectStorageKeyFactoryTest
+[INFO] Running com.wust.dormitory.storage.MinioObjectStorageAdapterSpringWiringTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.185 s - in com.wust.dormitory.storage.MinioObjectStorageAdapterSpringWiringTest
+[INFO] Running com.wust.dormitory.mobile.MobileConfirmCheckinPerformanceTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.541 s - in com.wust.dormitory.mobile.MobileConfirmCheckinPerformanceTest
+[INFO] Running com.wust.dormitory.mobile.MobileStudentWorkbenchMapperMySqlIntegrationTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 6.699 s - in com.wust.dormitory.mobile.MobileStudentWorkbenchMapperMySqlIntegrationTest
+[INFO] Running com.wust.dormitory.mobile.MobileResidencyFilterContractTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.001 s - in com.wust.dormitory.mobile.MobileResidencyFilterContractTest
+[INFO] Running com.wust.dormitory.mobile.MobileAppReleaseDownloadControllerTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.007 s - in com.wust.dormitory.mobile.MobileAppReleaseDownloadControllerTest
+[INFO] Running com.wust.dormitory.mobile.MobileTaskRouteUnificationContractTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0 s - in com.wust.dormitory.mobile.MobileTaskRouteUnificationContractTest
+[INFO] Running com.wust.dormitory.mobile.MobileStudentCheckinReadPerformanceTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.002 s - in com.wust.dormitory.mobile.MobileStudentCheckinReadPerformanceTest
+[INFO] Running com.wust.dormitory.mobile.MobileDashboardPerformanceTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.073 s - in com.wust.dormitory.mobile.MobileDashboardPerformanceTest
+[INFO] Running com.wust.dormitory.mobile.MobileInspectionControllerTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.008 s - in com.wust.dormitory.mobile.MobileInspectionControllerTest
+[INFO] Running com.wust.dormitory.mobile.MobileBedConfirmationPaginationTest
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.08 s - in com.wust.dormitory.mobile.MobileBedConfirmationPaginationTest
+[INFO] Running com.wust.dormitory.mobile.MobileCheckinQueryServiceTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.002 s - in com.wust.dormitory.mobile.MobileCheckinQueryServiceTest
+[INFO] Running com.wust.dormitory.mobile.MobileRoomOptionsPerformanceTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.002 s - in com.wust.dormitory.mobile.MobileRoomOptionsPerformanceTest
+[INFO] Running com.wust.dormitory.mobile.MobileStudentWorkbenchScopeContractTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.001 s - in com.wust.dormitory.mobile.MobileStudentWorkbenchScopeContractTest
+[INFO] Running com.wust.dormitory.mobile.MobileTaskQueryServiceTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.075 s - in com.wust.dormitory.mobile.MobileTaskQueryServiceTest
+[INFO] Running com.wust.dormitory.mobile.MobileResidencyFacadeTest
+[INFO] Tests run: 7, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.011 s - in com.wust.dormitory.mobile.MobileResidencyFacadeTest
+[INFO] Running com.wust.dormitory.mobile.MobileBedConfirmationFacadeTest
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.011 s - in com.wust.dormitory.mobile.MobileBedConfirmationFacadeTest
+[INFO] Running com.wust.dormitory.mobile.MobileBedConfirmationViewMapperTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.001 s - in com.wust.dormitory.mobile.MobileBedConfirmationViewMapperTest
+[INFO] Running com.wust.dormitory.mobile.MobileDashboardMapperContractTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.001 s - in com.wust.dormitory.mobile.MobileDashboardMapperContractTest
+[INFO] Running com.wust.dormitory.mobile.MobileAppVersionControllerTest
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.003 s - in com.wust.dormitory.mobile.MobileAppVersionControllerTest
+[INFO] Running com.wust.dormitory.mobile.MobileBedConfirmationDormStaffTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.002 s - in com.wust.dormitory.mobile.MobileBedConfirmationDormStaffTest
+[INFO] Running com.wust.dormitory.mobile.MobileStudentCheckinAuthorizationPerformanceTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.001 s - in com.wust.dormitory.mobile.MobileStudentCheckinAuthorizationPerformanceTest
+[INFO] Running com.wust.dormitory.mobile.MobileWorkspaceP0PerformanceTest
+[INFO] Tests run: 7, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.082 s - in com.wust.dormitory.mobile.MobileWorkspaceP0PerformanceTest
+[INFO] Running com.wust.dormitory.mobile.MobileWorkbenchThreeLevelContractTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.005 s - in com.wust.dormitory.mobile.MobileWorkbenchThreeLevelContractTest
+[INFO] Running com.wust.dormitory.mobile.MobileWorkspaceP0MySqlIntegrationTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 7.586 s - in com.wust.dormitory.mobile.MobileWorkspaceP0MySqlIntegrationTest
+[INFO] Running com.wust.dormitory.mobile.MobileResidencyOnsiteAdjustmentServiceTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.005 s - in com.wust.dormitory.mobile.MobileResidencyOnsiteAdjustmentServiceTest
+[INFO] Running com.wust.dormitory.mobile.MobileSelectionBedVerificationPolicyTest
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.004 s - in com.wust.dormitory.mobile.MobileSelectionBedVerificationPolicyTest
+[INFO] Running com.wust.dormitory.mobile.MobileRoomSelectionBedAuditTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.004 s - in com.wust.dormitory.mobile.MobileRoomSelectionBedAuditTest
+[INFO] Running com.wust.dormitory.mobile.MobileBedConfirmationWorklistMapperContractTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.003 s - in com.wust.dormitory.mobile.MobileBedConfirmationWorklistMapperContractTest
+[INFO] Running com.wust.dormitory.mobile.MobileAuthServiceTest
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.007 s - in com.wust.dormitory.mobile.MobileAuthServiceTest
+[INFO] Running com.wust.dormitory.mobile.MobileWorkspaceControllerTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.131 s - in com.wust.dormitory.mobile.MobileWorkspaceControllerTest
+[INFO] Running com.wust.dormitory.mobile.MobileSelectionOnsiteCheckinServiceTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.004 s - in com.wust.dormitory.mobile.MobileSelectionOnsiteCheckinServiceTest
+[INFO] Running com.wust.dormitory.mobile.MobileAppReleaseServiceTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.004 s - in com.wust.dormitory.mobile.MobileAppReleaseServiceTest
+[INFO] Running com.wust.dormitory.mobile.MobileAppReleaseObjectStorageContractTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.073 s - in com.wust.dormitory.mobile.MobileAppReleaseObjectStorageContractTest
+[INFO] Running com.wust.dormitory.mobile.MobileWorkspaceFacadeTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.004 s - in com.wust.dormitory.mobile.MobileWorkspaceFacadeTest
+[INFO] 
+[INFO] Results:
+[INFO] 
+[ERROR] Failures: 
+[ERROR]   AccountAdminAccountServiceTest.dormStaffCreationRequiresInitialScope:86 
+Expecting actual throwable to be an instance of:
+  com.wust.dormitory.common.error.BusinessException
+but was:
+  java.lang.NullPointerException: Cannot invoke "java.lang.Number.longValue()" because the return value of "java.util.Map.get(Object)" is null
+	at com.wust.dormitory.accountadmin.AccountAdminAccountService.createBase(AccountAdminAccountService.java:69)
+	at com.wust.dormitory.accountadmin.AccountAdminAccountServiceTest.lambda$dormStaffCreationRequiresInitialScope$2(AccountAdminAccountServiceTest.java:85)
+	at org.assertj.core.api.ThrowableAssert.catchThrowable(ThrowableAssert.java:63)
+	...(82 remaining lines not displayed - this can be changed with Assertions.setMaxStackTraceElementsDisplayed)
+[ERROR]   AdminHomeSiteMetadataTest.fallsBackToCurrentDashboardCopyWhenAdminHomeIsNotConfigured:57 
+expected: "宿舍管理运行概览"
+ but was: "武汉科技大学"
+[ERROR]   SiteMetadataServiceTest.exposesConfiguredLoginHtmlThroughPublicConfig:96 
+expected: "/assets/new-login.png"
+ but was: ""
+[ERROR]   SystemReadinessFreshMysql84FlywayIntegrationTest.officialFlywayMigrationsProduceSchemaCompatibleWithAllReadinessQueries:87 fresh database should finish at the normalized core schema version ==> expected: <67> but was: <69>
+[INFO] 
+[ERROR] Tests run: 1016, Failures: 4, Errors: 0, Skipped: 0
+[INFO] 
+[INFO] ------------------------------------------------------------------------
+[INFO] Reactor Summary for Wust Dormitory Select Server 1.0.0-SNAPSHOT:
+[INFO] 
+[INFO] Wust Dormitory Select Server ....................... SUCCESS [  0.002 s]
+[INFO] model .............................................. SUCCESS [ 16.936 s]
+[INFO] server ............................................. FAILURE [03:27 min]
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD FAILURE
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  03:47 min
+[INFO] Finished at: 2026-08-23T11:02:13Z
+[INFO] ------------------------------------------------------------------------
+[ERROR] Failed to execute goal org.apache.maven.plugins:maven-surefire-plugin:3.0.0-M9:test (default-test) on project server: There are test failures.
+[ERROR] 
+[ERROR] Please refer to /home/runner/work/dor_demo/dor_demo/private-repo/backend-java/server/target/surefire-reports for the individual test results.
+[ERROR] Please refer to dump files (if any exist) [date].dump, [date]-jvmRun[N].dump and [date].dumpstream.
+[ERROR] -> [Help 1]
+[ERROR] 
+[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+[ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[ERROR] 
+[ERROR] For more information about the errors and possible solutions, please read the following articles:
+[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException
+[ERROR] 
+[ERROR] After correcting the problems, you can resume the build with the command
+[ERROR]   mvn <args> -rf :server
