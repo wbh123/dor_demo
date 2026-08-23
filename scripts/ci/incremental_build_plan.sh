@@ -18,20 +18,20 @@ while IFS= read -r path; do
   [[ -z "${path}" ]] && continue
 
   case "${path}" in
-    backend-java/pom.xml|backend-java/build-support/*|backend-java/*/pom.xml|backend-java/*/src/main/java/*|backend-java/*/src/main/resources/*)
+    backend-java/pom.xml|backend-java/build-support/*|backend-java/*/pom.xml|backend-java/*/src/main/java/*|backend-java/*/src/main/resources/*|scripts/deploy/build-backend.sh)
       BACKEND_COMPILE=1
       BACKEND_RUNTIME=1
       ;;
   esac
 
   case "${path}" in
-    backend-java/model/src/main/resources/*)
+    backend-java/model/src/main/resources/*|scripts/deploy/build-frontend.sh)
       FRONTEND_BUILD=1
       ;;
   esac
 
   case "${path}" in
-    backend-java/model/src/main/resources/mobile/*)
+    backend-java/model/src/main/resources/mobile/*|scripts/deploy/build-app.sh|scripts/deploy/prepare-gradle-distribution.sh)
       APP_BUILD=1
       ;;
   esac
@@ -46,6 +46,10 @@ while IFS= read -r path; do
     scripts/ops/*|backend-java/docs/sql/*|docker/backend/*|.dockerignore)
       BACKEND_RUNTIME=1
       ;;
+    docker/common/*)
+      BACKEND_RUNTIME=1
+      TOOLCHAIN_REBUILD=1
+      ;;
     docker/nginx/*)
       NGINX_RESTART=1
       ;;
@@ -58,7 +62,7 @@ while IFS= read -r path; do
     docker/minio/*)
       MINIO_RECREATE=1
       ;;
-    docker/toolchain/*|deploy/maven/*)
+    docker/toolchain/*|deploy/maven/*|scripts/deploy/toolchain.sh)
       TOOLCHAIN_REBUILD=1
       ;;
     docker/docker-compose.yml)
