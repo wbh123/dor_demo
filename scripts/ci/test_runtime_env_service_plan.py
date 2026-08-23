@@ -12,7 +12,12 @@ CONTRACT = ROOT / "scripts/ci/runtime_env_service_plan_contract.sh"
 BASE_ENV = """WUST_DORMITORY_TIMEZONE=Asia/Shanghai
 VITE_APP_TITLE=A
 WUST_DORMITORY_MYSQL_IMAGE=mysql:8.4
+WUST_DORMITORY_DB_NAME=wust_dormitory
+WUST_DORMITORY_DB_USER=wust_app
 WUST_DORMITORY_DB_PASSWORD=db-one
+WUST_DORMITORY_DB_ROOT_PASSWORD=root-one
+WUST_DORMITORY_BACKUP_DB_USER=wust_backup
+WUST_DORMITORY_BACKUP_DB_PASSWORD=backup-one
 WUST_DORMITORY_DB_PUBLISHED_PORT=3306
 WUST_DORMITORY_REDIS_IMAGE=redis:7.4-alpine
 WUST_DORMITORY_REDIS_PASSWORD=redis-one
@@ -26,11 +31,23 @@ WUST_DORMITORY_MINIO_ROOT_PASSWORD=root-pass
 WUST_DORMITORY_MINIO_BACKUP_BUCKET=wust-backups
 WUST_DORMITORY_OBJECT_STORAGE_ACCESS_KEY=app
 WUST_DORMITORY_OBJECT_STORAGE_SECRET_KEY=app-secret
+WUST_DORMITORY_BACKUP_STORAGE_ACCESS_KEY=backup
+WUST_DORMITORY_BACKUP_STORAGE_SECRET_KEY=backup-secret
 WUST_DORMITORY_BACKEND_PUBLISHED_PORT=8080
 WUST_DORMITORY_CORS_ALLOWED_ORIGIN_PATTERNS=http://localhost:*
 WUST_DORMITORY_NGINX_IMAGE=nginx:1.28-alpine
 WUST_DORMITORY_NGINX_PORT=80
 """
+
+HASH_KEYS = (
+    "MYSQL_SERVER_ENV_SHA256",
+    "MYSQL_ACCOUNT_ENV_SHA256",
+    "REDIS_RUNTIME_ENV_SHA256",
+    "MINIO_SERVER_ENV_SHA256",
+    "MINIO_INIT_ENV_SHA256",
+    "BACKEND_RUNTIME_ENV_SHA256",
+    "NGINX_RUNTIME_ENV_SHA256",
+)
 
 
 def parse(output: str) -> dict[str, str]:
@@ -45,23 +62,14 @@ def parse(output: str) -> dict[str, str]:
 class RuntimeEnvServicePlanTest(unittest.TestCase):
     def run_plan(self, env_file: Path, previous: dict[str, str] | None = None) -> dict[str, str]:
         previous = previous or {}
-        args = [
-            "bash",
-            str(CONTRACT),
-            str(env_file),
-            previous.get("MYSQL_RUNTIME_ENV_SHA256", ""),
-            previous.get("REDIS_RUNTIME_ENV_SHA256", ""),
-            previous.get("MINIO_RUNTIME_ENV_SHA256", ""),
-            previous.get("BACKEND_RUNTIME_ENV_SHA256", ""),
-            previous.get("NGINX_RUNTIME_ENV_SHA256", ""),
-        ]
+        args = ["bash", str(CONTRACT), str(env_file), *(previous.get(key, "") for key in HASH_KEYS)]
         result = subprocess.run(args, text=True, capture_output=True, check=False)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         return parse(result.stdout)
 
     def snapshot(self, env_file: Path) -> dict[str, str]:
         plan = self.run_plan(env_file)
-        return {key: value for key, value in plan.items() if key.endswith("_RUNTIME_ENV_SHA256")}
+        return {key: plan[key] for key in HASH_KEYS}
 
     def test_vite_only_change_restarts_no_runtime_service(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -70,21 +78,41 @@ class RuntimeEnvServicePlanTest(unittest.TestCase):
             previous = self.snapshot(env_file)
             env_file.write_text(BASE_ENV.replace("VITE_APP_TITLE=A", "VITE_APP_TITLE=B"), encoding="utf-8")
             plan = self.run_plan(env_file, previous)
-            for key in ("MYSQL_CONFIG_CHANGED", "REDIS_CONFIG_CHANGED", "MINIO_CONFIG_CHANGED", "BACKEND_CONFIG_CHANGED", "NGINX_CONFIG_CHANGED"):
+            for key in ("MYSQL_SERVER_CHANGED", "MYSQL_ACCOUNT_CHANGED", "REDIS_CONFIG_CHANGED", "MINIO_SERVER_CHANGED", "MINIO_INIT_CHANGED", "BACKEND_CONFIG_CHANGED", "NGINX_CONFIG_CHANGED"):
                 self.assertEqual(plan[key], "0", key)
 
-    def test_database_password_change_restarts_mysql_and_backend_only(self) -> None:
+    def test_database_password_rotation_runs_account_init_and_backend_without_mysql_restart(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             env_file = Path(temporary) / ".env"
             env_file.write_text(BASE_ENV, encoding="utf-8")
             previous = self.snapshot(env_file)
             env_file.write_text(BASE_ENV.replace("db-one", "db-two"), encoding="utf-8")
             plan = self.run_plan(env_file, previous)
-            self.assertEqual(plan["MYSQL_CONFIG_CHANGED"], "1")
+            self.assertEqual(plan["MYSQL_SERVER_CHANGED"], "0")
+            self.assertEqual(plan["MYSQL_ACCOUNT_CHANGED"], "1")
             self.assertEqual(plan["BACKEND_CONFIG_CHANGED"], "1")
-            self.assertEqual(plan["REDIS_CONFIG_CHANGED"], "0")
-            self.assertEqual(plan["MINIO_CONFIG_CHANGED"], "0")
-            self.assertEqual(plan["NGINX_CONFIG_CHANGED"], "0")
+
+    def test_backup_database_password_rotation_does_not_restart_mysql_or_backend(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            env_file = Path(temporary) / ".env"
+            env_file.write_text(BASE_ENV, encoding="utf-8")
+            previous = self.snapshot(env_file)
+            env_file.write_text(BASE_ENV.replace("backup-one", "backup-two"), encoding="utf-8")
+            plan = self.run_plan(env_file, previous)
+            self.assertEqual(plan["MYSQL_SERVER_CHANGED"], "0")
+            self.assertEqual(plan["MYSQL_ACCOUNT_CHANGED"], "1")
+            self.assertEqual(plan["BACKEND_CONFIG_CHANGED"], "1")
+
+    def test_mysql_root_change_restarts_server_and_reruns_account_init(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            env_file = Path(temporary) / ".env"
+            env_file.write_text(BASE_ENV, encoding="utf-8")
+            previous = self.snapshot(env_file)
+            env_file.write_text(BASE_ENV.replace("root-one", "root-two"), encoding="utf-8")
+            plan = self.run_plan(env_file, previous)
+            self.assertEqual(plan["MYSQL_SERVER_CHANGED"], "1")
+            self.assertEqual(plan["MYSQL_ACCOUNT_CHANGED"], "1")
+            self.assertEqual(plan["BACKEND_CONFIG_CHANGED"], "0")
 
     def test_redis_password_change_restarts_redis_and_backend_only(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -95,22 +123,41 @@ class RuntimeEnvServicePlanTest(unittest.TestCase):
             plan = self.run_plan(env_file, previous)
             self.assertEqual(plan["REDIS_CONFIG_CHANGED"], "1")
             self.assertEqual(plan["BACKEND_CONFIG_CHANGED"], "1")
-            self.assertEqual(plan["MYSQL_CONFIG_CHANGED"], "0")
-            self.assertEqual(plan["MINIO_CONFIG_CHANGED"], "0")
-            self.assertEqual(plan["NGINX_CONFIG_CHANGED"], "0")
+            self.assertEqual(plan["MYSQL_SERVER_CHANGED"], "0")
+            self.assertEqual(plan["MINIO_SERVER_CHANGED"], "0")
 
-    def test_minio_bucket_change_restarts_minio_init_and_backend_only(self) -> None:
+    def test_minio_bucket_change_reruns_init_and_backend_without_minio_restart(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             env_file = Path(temporary) / ".env"
             env_file.write_text(BASE_ENV, encoding="utf-8")
             previous = self.snapshot(env_file)
             env_file.write_text(BASE_ENV.replace("wust-backups", "wust-backups-v2"), encoding="utf-8")
             plan = self.run_plan(env_file, previous)
-            self.assertEqual(plan["MINIO_CONFIG_CHANGED"], "1")
+            self.assertEqual(plan["MINIO_SERVER_CHANGED"], "0")
+            self.assertEqual(plan["MINIO_INIT_CHANGED"], "1")
             self.assertEqual(plan["BACKEND_CONFIG_CHANGED"], "1")
-            self.assertEqual(plan["MYSQL_CONFIG_CHANGED"], "0")
-            self.assertEqual(plan["REDIS_CONFIG_CHANGED"], "0")
-            self.assertEqual(plan["NGINX_CONFIG_CHANGED"], "0")
+
+    def test_minio_business_secret_rotation_reruns_init_and_backend_without_server_restart(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            env_file = Path(temporary) / ".env"
+            env_file.write_text(BASE_ENV, encoding="utf-8")
+            previous = self.snapshot(env_file)
+            env_file.write_text(BASE_ENV.replace("app-secret", "app-secret-v2"), encoding="utf-8")
+            plan = self.run_plan(env_file, previous)
+            self.assertEqual(plan["MINIO_SERVER_CHANGED"], "0")
+            self.assertEqual(plan["MINIO_INIT_CHANGED"], "1")
+            self.assertEqual(plan["BACKEND_CONFIG_CHANGED"], "1")
+
+    def test_minio_root_change_restarts_server_and_reruns_init(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            env_file = Path(temporary) / ".env"
+            env_file.write_text(BASE_ENV, encoding="utf-8")
+            previous = self.snapshot(env_file)
+            env_file.write_text(BASE_ENV.replace("root-pass", "root-pass-v2"), encoding="utf-8")
+            plan = self.run_plan(env_file, previous)
+            self.assertEqual(plan["MINIO_SERVER_CHANGED"], "1")
+            self.assertEqual(plan["MINIO_INIT_CHANGED"], "1")
+            self.assertEqual(plan["BACKEND_CONFIG_CHANGED"], "0")
 
     def test_nginx_port_change_restarts_only_nginx(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -120,9 +167,8 @@ class RuntimeEnvServicePlanTest(unittest.TestCase):
             env_file.write_text(BASE_ENV.replace("WUST_DORMITORY_NGINX_PORT=80", "WUST_DORMITORY_NGINX_PORT=8088"), encoding="utf-8")
             plan = self.run_plan(env_file, previous)
             self.assertEqual(plan["NGINX_CONFIG_CHANGED"], "1")
-            self.assertEqual(plan["MYSQL_CONFIG_CHANGED"], "0")
-            self.assertEqual(plan["REDIS_CONFIG_CHANGED"], "0")
-            self.assertEqual(plan["MINIO_CONFIG_CHANGED"], "0")
+            self.assertEqual(plan["MYSQL_SERVER_CHANGED"], "0")
+            self.assertEqual(plan["MINIO_SERVER_CHANGED"], "0")
             self.assertEqual(plan["BACKEND_CONFIG_CHANGED"], "0")
 
     def test_backend_only_config_change_restarts_only_backend(self) -> None:
@@ -133,9 +179,11 @@ class RuntimeEnvServicePlanTest(unittest.TestCase):
             env_file.write_text(BASE_ENV.replace("http://localhost:*", "https://example.edu"), encoding="utf-8")
             plan = self.run_plan(env_file, previous)
             self.assertEqual(plan["BACKEND_CONFIG_CHANGED"], "1")
-            self.assertEqual(plan["MYSQL_CONFIG_CHANGED"], "0")
+            self.assertEqual(plan["MYSQL_SERVER_CHANGED"], "0")
+            self.assertEqual(plan["MYSQL_ACCOUNT_CHANGED"], "0")
             self.assertEqual(plan["REDIS_CONFIG_CHANGED"], "0")
-            self.assertEqual(plan["MINIO_CONFIG_CHANGED"], "0")
+            self.assertEqual(plan["MINIO_SERVER_CHANGED"], "0")
+            self.assertEqual(plan["MINIO_INIT_CHANGED"], "0")
             self.assertEqual(plan["NGINX_CONFIG_CHANGED"], "0")
 
     def test_shell_syntax(self) -> None:
