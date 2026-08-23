@@ -49,7 +49,7 @@ Ran 2 tests in 0.001s
 OK
 ..
 ----------------------------------------------------------------------
-Ran 2 tests in 0.068s
+Ran 2 tests in 0.065s
 
 OK
 Runtime error and data correctness private migration contract passed
@@ -77,7 +77,7 @@ OK
 test_cancel_reselection_resets_redis_projection_and_refreshes_room_profile (__main__.StudentReselectionRuntimeResetContractTest.test_cancel_reselection_resets_redis_projection_and_refreshes_room_profile) ... ok
 
 ----------------------------------------------------------------------
-Ran 1 test in 0.001s
+Ran 1 test in 0.000s
 
 OK
 personal preference policy operation contract passed
@@ -153,7 +153,7 @@ Selection load runtime diagnostics contract: OK (1000-user local default, 2000-u
 Selection load low-disturbance and server concurrency contract: OK
 ...........
 ----------------------------------------------------------------------
-Ran 11 tests in 0.061s
+Ran 11 tests in 0.054s
 
 OK
 Selection SSE load fixture contract: OK (batch-wide per-student subscription)
