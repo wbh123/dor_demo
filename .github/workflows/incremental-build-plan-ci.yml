@@ -19,7 +19,7 @@ jobs:
   incremental-plan:
     name: Incremental build and restart plan
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
@@ -41,3 +41,5 @@ jobs:
         run: python3 scripts/ci/test_cross_container_mysqldump.py
       - name: Validate Android SDK mainland mirror endpoints
         run: python3 scripts/ci/test_android_sdk_mirror.py
+      - name: Prove sdkmanager installs through mainland mirror with Google blocked
+        run: python3 scripts/ci/test_android_sdkmanager_mainland_mirror.py
