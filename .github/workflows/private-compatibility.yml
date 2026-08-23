@@ -90,6 +90,10 @@ jobs:
 
           python ci-tools/ci/apply_private_followups_v2.py > /tmp/patch.log 2>&1
           patch=$?
+          if [[ $patch -eq 0 ]]; then
+            python ci-tools/ci/apply_latest_migration_test.py >> /tmp/patch.log 2>&1
+            patch=$?
+          fi
           echo "patch=$patch" >> "$result"
 
           cd private-repo/frontend
