@@ -74,6 +74,21 @@ patch(
     '''        assertThat(login.get("imageUrl")).isEqualTo("");''',
 )
 
-print('semantic regression tests aligned with requested behavior')
+# Remove accidentally tracked interpreter caches and prevent future test/generator
+# runs from re-adding Python bytecode at any nesting depth.
+cache_dir = ROOT / 'scripts/db/baseline/__pycache__'
+if cache_dir.exists():
+    for artifact in cache_dir.glob('*.pyc'):
+        artifact.unlink()
+    try:
+        cache_dir.rmdir()
+    except OSError:
+        pass
 
-# Exact-head revalidation trigger for private commit a5d7dddd1d7882a4520b14233580ad1d935496bb.
+gitignore = ROOT / '.gitignore'
+gitignore_text = gitignore.read_text(encoding='utf-8')
+ignore_block = '\n# Python interpreter caches\n**/__pycache__/\n*.py[cod]\n'
+if '**/__pycache__/' not in gitignore_text or '*.py[cod]' not in gitignore_text:
+    gitignore.write_text(gitignore_text.rstrip() + ignore_block, encoding='utf-8')
+
+print('semantic regression tests aligned; generated Python bytecode cleaned')
