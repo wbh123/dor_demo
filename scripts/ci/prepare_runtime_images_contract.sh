@@ -13,7 +13,10 @@ java_runtime_image="m.daocloud.io/docker.io/library/eclipse-temurin:21-jre-jammy
 [[ -f "${env_file}" ]] || { echo "missing env file: ${env_file}" >&2; exit 1; }
 [[ -f "${pull_helper}" ]] || { echo "missing pull helper: ${pull_helper}" >&2; exit 1; }
 
-if [[ "${skip_mysql_guard}" != "1" && "$(basename "${env_file}")" != ".env.example" ]]; then
+# The production deploy validates the full .env before this preflight. This public contract also
+# supports minimal image-only fixtures, so the guard runs only when the fixture includes the root key.
+if [[ "${skip_mysql_guard}" != "1" && "$(basename "${env_file}")" != ".env.example" ]] \
+   && grep -q '^[[:space:]]*WUST_DORMITORY_DB_ROOT_PASSWORD=' "${env_file}"; then
   [[ -f "${mysql_root_guard}" ]] || { echo "missing MySQL root guard: ${mysql_root_guard}" >&2; exit 1; }
   deployment_root="$(cd "$(dirname "${env_file}")" && pwd)"
   mkdir -p "${deployment_root}/data/deploy" "${deployment_root}/data/mysql"
