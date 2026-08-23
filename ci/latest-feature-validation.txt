@@ -1,0 +1,165 @@
+private_ref=feat/app-download-ui-unification-20260823
+private_head=30b0e905c4880347600f6daca225b292203b8823
+npm_ci=0
+frontend_test=1
+===== frontend_test failure tail =====
+      .filter((value) => Number.isFinite(value)))]
+      .sort((left, right) => left - right))
+    const roomCascadeOptions = computed(() => roomOptions.value.filter((room) => (
+      (!selectedCampusId.value || String(room.campus_id) === selectedCampusId.value)
+      && (!selectedBuildingId.value || String(room.building_id) === selectedBuildingId.value)
+      && (!selectedFloorNumber.value || String(room.floor_number) === selectedFloorNumber.value)
+    )))
+    const selectedId = computed(() => {
+      if (subjectType.value === 'STUDENT') return selectedStudentId.value
+      if (subjectType.value === 'ROOM') return selectedRoomId.value
+      return selectedBedId.value
+    })
+    
+    watch(subjectType, async () => {
+      error.value = ''
+      activeType.value = null
+      activeId.value = 0
+      if (subjectType.value === 'STUDENT' && studentOptions.value.length === 0) await loadStudentOptions()
+      if ((subjectType.value === 'ROOM' || subjectType.value === 'BED') && roomOptions.value.length === 0) await loadRoomOptions()
+    })
+    
+    watch(selectedCampusId, () => { selectedBuildingId.value = ''; selectedFloorNumber.value = ''; selectedRoomId.value = 0; resetBeds() })
+    watch(selectedBuildingId, () => { selectedFloorNumber.value = ''; selectedRoomId.value = 0; resetBeds() })
+    watch(selectedFloorNumber, () => { selectedRoomId.value = 0; resetBeds() })
+    watch(selectedRoomId, async (roomId) => {
+      resetBeds()
+      if (subjectType.value === 'BED' && roomId) await loadBedOptions()
+    })
+    
+    function uniqueOptions(rows: DataObject[], idKey: string, labelKey: string) {
+      const seen = new Map<string, string>()
+      for (const row of rows) {
+        const id = String(row[idKey] ?? '')
+        if (id && !seen.has(id)) seen.set(id, String(row[labelKey] ?? id))
+      }
+      return [...seen.entries()].map(([id, label]) => ({ id, label }))
+    }
+    
+    function resetBeds() {
+      bedOptions.value = []
+      selectedBedId.value = 0
+    }
+    
+    function pageItems(response: ObjectSuccessResponse): DataObject[] {
+      const data = (response.data ?? {}) as DataObject
+      return Array.isArray(data.items) ? data.items as DataObject[] : []
+    }
+    
+    async function loadStudentOptions() {
+      loadingOptions.value = true
+      error.value = ''
+      try {
+        const response = await api.get<ObjectSuccessResponse>('/api/v1/admin/students', {
+          params: { keyword: studentKeyword.value || undefined, page: 1, pageSize: 20 },
+        })
+        studentOptions.value = pageItems(response.data)
+      } catch (reason) {
+        error.value = reason instanceof Error ? reason.message : '学生选项加载失败'
+      } finally {
+        loadingOptions.value = false
+      }
+    }
+    
+    async function loadRoomOptions() {
+      loadingOptions.value = true
+      error.value = ''
+      try {
+        const response = await api.get<ObjectSuccessResponse>('/api/v1/admin/rooms/page', {
+          params: { page: 1, pageSize: 100 },
+        })
+        roomOptions.value = pageItems(response.data)
+      } catch (reason) {
+        error.value = reason instanceof Error ? reason.message : '寝室选项加载失败'
+      } finally {
+        loadingOptions.value = false
+      }
+    }
+    
+    async function loadBedOptions() {
+      if (!selectedRoomId.value) return
+      loadingOptions.value = true
+      error.value = ''
+      try {
+        const response = await api.get<ObjectSuccessResponse>(`/api/v1/admin/rooms/${selectedRoomId.value}/bed-layout`)
+        const data = (response.data.data ?? {}) as DataObject
+        bedOptions.value = Array.isArray(data.beds) ? data.beds as DataObject[] : []
+      } catch (reason) {
+        error.value = reason instanceof Error ? reason.message : '床位选项加载失败'
+      } finally {
+        loadingOptions.value = false
+      }
+    }
+    
+    function query() {
+      const id = Number(selectedId.value)
+      if (!Number.isInteger(id) || id <= 0) {
+        error.value = `请选择有效的${subjectName(subjectType.value)}。`
+        activeType.value = null
+        activeId.value = 0
+        return
+      }
+      error.value = ''
+      activeType.value = subjectType.value
+      activeId.value = id
+    }
+    
+    function subjectName(type: TimelineSubjectType) {
+      if (type === 'STUDENT') return '学生'
+      if (type === 'ROOM') return '寝室'
+      return '床位'
+    }
+    </script>
+    
+    <template>
+      <section class="panel object-history-workspace">
+        <div class="section-head"><div><span class="eyebrow">OBJECT TIMELINE</span><h3>学生 / 寝室 / 床位操作历史</h3><p>按业务对象查询统一审计时间线。只有当前岗位具有读取权限且位于 READ Scope 内的对象才能查看。</p></div></div>
+        <form class="history-query" @submit.prevent="query">
+          <label><span>对象类型</span><select v-model="subjectType" class="input"><option value="STUDENT">学生</option><option value="ROOM">寝室</option><option value="BED">床位</option></select></label>
+          <div class="object-selector-cascade">
+            <template v-if="subjectType === 'STUDENT'">
+              <label class="student-search-field"><span>学生</span><div class="selector-inline"><input v-model.trim="studentKeyword" class="input" placeholder="学号或姓名" @keyup.enter.prevent="loadStudentOptions" /><button class="button ghost" type="button" :disabled="loadingOptions" @click="loadStudentOptions">搜索</button></div></label>
+              <label><span>选择学生</span><select v-model.number="selectedStudentId" class="input"><option :value="0">请选择学生</option><option v-for="student in studentOptions" :key="String(student.id)" :value="Number(student.id)">{{ student.student_number }} · {{ student.student_name }}</option></select></label>
+            </template>
+            <template v-else>
+              <label><span>校区</span><select v-model="selectedCampusId" class="input" :disabled="loadingOptions"><option value="">校区</option><option v-for="campus in campusOptions" :key="campus.id" :value="campus.id">{{ campus.label }}</option></select></label>
+              <label><span>楼栋</span><select v-model="selectedBuildingId" class="input" :disabled="!selectedCampusId || loadingOptions"><option value="">楼栋</option><option v-for="building in buildingOptions" :key="building.id" :value="building.id">{{ building.label }}</option></select></label>
+              <label><span>楼层</span><select v-model="selectedFloorNumber" class="input" :disabled="!selectedBuildingId || loadingOptions"><option value="">楼层</option><option v-for="floor in floorOptions" :key="floor" :value="String(floor)">{{ floor }}层</option></select></label>
+              <label><span>寝室</span><select v-model.number="selectedRoomId" class="input" :disabled="!selectedFloorNumber || loadingOptions"><option :value="0">寝室</option><option v-for="room in roomCascadeOptions" :key="String(room.id)" :value="Number(room.id)">{{ room.room_number }}</option></select></label>
+              <label v-if="subjectType === 'BED'"><span>床位</span><select v-model.number="selectedBedId" class="input" :disabled="!selectedRoomId || loadingOptions"><option :value="0">床位</option><option v-for="bed in bedOptions" :key="String(bed.id)" :value="Number(bed.id)">{{ bed.bed_code }}</option></select></label>
+            </template>
+          </div>
+          <button class="button primary" type="submit">查询操作历史</button>
+        </form>
+        <p v-if="error" class="alert error">{{ error }}</p>
+        <div v-if="activeType && activeId" class="timeline-container"><ObjectAuditTimeline :subject-type="activeType" :subject-id="activeId" :title="`${subjectName(activeType)} #${activeId} 操作历史`" /></div>
+        <p v-else class="empty-state">选择对象类型并通过级联选择目标后才会加载历史记录；页面初始化不会预拉审计数据。</p>
+      </section>
+    </template>
+    
+    <style scoped>.object-history-workspace{display:grid;gap:16px}.history-query{display:grid;grid-template-columns:160px minmax(0,1fr) auto;gap:10px;align-items:end}.history-query label,.object-selector-cascade label{display:grid;gap:6px}.history-query label>span,.object-selector-cascade label>span{font-size:.75rem;font-weight:700;color:var(--text-muted)}.object-selector-cascade{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.student-search-field{grid-column:span 2}.selector-inline{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px}.timeline-container{padding-top:4px;border-top:1px solid var(--border)}@media(max-width:1100px){.history-query{grid-template-columns:1fr}.object-selector-cascade{grid-template-columns:repeat(2,minmax(0,1fr))}.history-query button{justify-self:start}}@media(max-width:720px){.object-selector-cascade{grid-template-columns:1fr}.student-search-field{grid-column:auto}.selector-inline{grid-template-columns:1fr}.history-query button{width:100%}}</style>
+    
+  operator: 'doesNotMatch'
+  stack: |-
+    TestContext.<anonymous> (file:///home/runner/work/dor_demo/dor_demo/private-repo/frontend/src/views/admin/requested-admin-fixes.spec.ts:112:10)
+    Test.runInAsyncScope (node:async_hooks:214:14)
+    Test.run (node:internal/test_runner/test:1047:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:744:18)
+    Test.postRun (node:internal/test_runner/test:1173:19)
+    Test.run (node:internal/test_runner/test:1101:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+1..93
+# tests 93
+# suites 0
+# pass 88
+# fail 5
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1218.62495
