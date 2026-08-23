@@ -61,6 +61,15 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('ci-tools/ci/apply_admin_requested_fixes.py')
+          text = p.read_text(encoding='utf-8')
+          start = text.index("# 4. Import attempts:")
+          tail = text.index("p = 'frontend/src/components/admin/ImportWorkflowModal.vue'", start)
+          fixed = '''# 4. Import attempts: generated per-click key, explicit keys retain transport retry semantics.\np = 'backend-java/server/src/main/java/com/wust/dormitory/importworkflow/ImportWorkflowService.java'\nreplace(p, \'\'\'    private String normalizeIdempotencyKey(String supplied, String type, String digest) {\n        String trimmed = supplied == null ? "" : supplied.trim();\n        if (!trimmed.isBlank()) return trimmed;\n        if ("ROOM".equals(type)) {\n            String policy = importPolicyService.roomAutoCreateBuildingEnabled() ? "AUTO_BUILDING_ON" : "AUTO_BUILDING_OFF";\n            return type + ':' + digest + ':' + policy;\n        }\n        return type + ':' + digest;\n    }\'\'\',\n\'\'\'    private String normalizeIdempotencyKey(String supplied, String type, String digest) {\n        String trimmed = supplied == null ? "" : supplied.trim();\n        if (!trimmed.isBlank()) return trimmed;\n        return "attempt:" + type + ':' + UUID.randomUUID();\n    }\'\'\')\n\n'''
+          p.write_text(text[:start] + fixed + text[tail:], encoding='utf-8')
+          PY
           python ci-tools/ci/apply_admin_requested_fixes.py
           cd private-repo
           if ! git diff --quiet; then
