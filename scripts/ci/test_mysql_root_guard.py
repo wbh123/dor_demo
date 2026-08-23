@@ -50,46 +50,51 @@ exit 1
         env["CONTAINER_PASSWORD"] = container_password
         return env, log
 
-    def run_guard(self, *, previous_hash: str, new_password: str, data_nonempty: bool, container_exists: bool, accepts_new_password: bool) -> subprocess.CompletedProcess[str]:
+    def run_guard(self, *, previous_hash: str, new_password: str, data_nonempty: bool, container_exists: bool, accepts_new_password: bool) -> tuple[subprocess.CompletedProcess[str], str]:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             env_file = root / ".env"
             env_file.write_text(f"WUST_DORMITORY_DB_ROOT_PASSWORD={new_password}\n", encoding="utf-8")
             state_file = root / "state.env"
-            state_file.write_text(f"MYSQL_ROOT_PASSWORD_SHA256={previous_hash}\n", encoding="utf-8")
+            if previous_hash:
+                state_file.write_text(f"MYSQL_ROOT_PASSWORD_SHA256={previous_hash}\n", encoding="utf-8")
             data_dir = root / "mysql-data"
             data_dir.mkdir()
             if data_nonempty:
                 (data_dir / "ibdata1").write_text("x", encoding="utf-8")
             env, _ = self.make_fake_docker(root, container_exists=container_exists, accepts_new_password=accepts_new_password)
-            return subprocess.run(
+            result = subprocess.run(
                 ["bash", str(GUARD), str(env_file), str(state_file), str(data_dir)],
                 text=True,
                 capture_output=True,
                 check=False,
                 env=env,
             )
+            state = state_file.read_text(encoding="utf-8") if state_file.exists() else ""
+            return result, state
 
     def test_unchanged_root_hash_is_allowed_without_docker_probe(self) -> None:
         password = "same-root"
-        result = self.run_guard(previous_hash=sha256(password), new_password=password, data_nonempty=True, container_exists=False, accepts_new_password=False)
+        result, _ = self.run_guard(previous_hash=sha256(password), new_password=password, data_nonempty=True, container_exists=False, accepts_new_password=False)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn(f"CURRENT_MYSQL_ROOT_PASSWORD_SHA256={sha256(password)}", result.stdout)
 
     def test_changed_root_with_existing_data_and_missing_container_is_blocked(self) -> None:
-        result = self.run_guard(previous_hash=sha256("old-root"), new_password="new-root", data_nonempty=True, container_exists=False, accepts_new_password=False)
+        result, _ = self.run_guard(previous_hash=sha256("old-root"), new_password="new-root", data_nonempty=True, container_exists=False, accepts_new_password=False)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("MySQL root", result.stderr)
 
     def test_changed_root_is_allowed_only_when_running_database_accepts_new_password(self) -> None:
-        denied = self.run_guard(previous_hash=sha256("old-root"), new_password="new-root", data_nonempty=True, container_exists=True, accepts_new_password=False)
+        denied, _ = self.run_guard(previous_hash=sha256("old-root"), new_password="new-root", data_nonempty=True, container_exists=True, accepts_new_password=False)
         self.assertNotEqual(denied.returncode, 0)
-        allowed = self.run_guard(previous_hash=sha256("old-root"), new_password="new-root", data_nonempty=True, container_exists=True, accepts_new_password=True)
+        allowed, state = self.run_guard(previous_hash=sha256("old-root"), new_password="new-root", data_nonempty=True, container_exists=True, accepts_new_password=True)
         self.assertEqual(allowed.returncode, 0, allowed.stdout + allowed.stderr)
+        self.assertIn(f"MYSQL_ROOT_PASSWORD_SHA256={sha256('new-root')}", state)
 
-    def test_fresh_empty_data_allows_new_root_password(self) -> None:
-        result = self.run_guard(previous_hash="", new_password="new-root", data_nonempty=False, container_exists=False, accepts_new_password=False)
+    def test_fresh_empty_data_allows_and_persists_initial_password_hash(self) -> None:
+        result, state = self.run_guard(previous_hash="", new_password="new-root", data_nonempty=False, container_exists=False, accepts_new_password=False)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn(f"MYSQL_ROOT_PASSWORD_SHA256={sha256('new-root')}", state)
 
     def test_shell_syntax(self) -> None:
         result = subprocess.run(["bash", "-n", str(GUARD)], text=True, capture_output=True, check=False)
