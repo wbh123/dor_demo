@@ -34,8 +34,11 @@ jobs:
           bash -n scripts/ci/incremental_build_plan.sh
           bash -n scripts/ci/cleanup_build_worktree.sh
           bash -n scripts/ci/pull_image_with_fallback.sh
+          bash -n scripts/ci/prepare_runtime_images_contract.sh
       - name: Validate mainland container image mirror tags and fallback
         run: python3 scripts/ci/test_container_image_mirrors.py
+      - name: Validate source and release runtime image preflight modes
+        run: python3 scripts/ci/test_runtime_image_preflight.py
       - name: Validate Nginx dynamic Docker DNS syntax
         run: python3 scripts/ci/test_proxy_dynamic_dns.py
       - name: Validate Java 21 backend runtime packages and privilege drop
