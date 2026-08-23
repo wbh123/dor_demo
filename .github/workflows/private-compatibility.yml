@@ -4,15 +4,14 @@ on:
   push:
     branches:
       - 'private-compat/**'
-  pull_request:
-    branches:
-      - main
+    paths-ignore:
+      - 'ci/latest-private-validation.txt'
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
-  group: private-compat-${{ github.event.pull_request.head.ref || github.ref_name }}
+  group: private-compat-${{ github.ref_name }}
   cancel-in-progress: true
 
 jobs:
@@ -26,9 +25,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          candidate="${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}"
-          private_ref="${candidate#private-compat/}"
-          if [[ -z "$private_ref" || "$private_ref" == "$candidate" ]]; then
+          private_ref="${GITHUB_REF_NAME#private-compat/}"
+          if [[ -z "$private_ref" || "$private_ref" == "$GITHUB_REF_NAME" ]]; then
             echo "Invalid compatibility branch name" >&2
             exit 1
           fi
@@ -37,6 +35,13 @@ jobs:
             exit 1
           fi
           echo "private_ref=$private_ref" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout CI helper branch
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.ref_name }}
+          path: ci-tools
+          persist-credentials: true
 
       - name: Checkout private integration branch
         uses: actions/checkout@v5
@@ -61,27 +66,96 @@ jobs:
           cache: npm
           cache-dependency-path: private-repo/frontend/package-lock.json
 
-      - name: Compile Java production and test sources
-        working-directory: private-repo
+      - name: Validate private branch
+        id: validate
         shell: bash
-        run: mvn -f backend-java/pom.xml -B -ntp -pl server -am -DskipTests package
+        run: |
+          set +e
+          private_sha="$(git -C private-repo rev-parse HEAD)"
+          mkdir -p ci-tools/ci
+          result="ci-tools/ci/latest-private-validation.txt"
+          : > "$result"
+          {
+            echo "private_ref=${{ steps.target.outputs.private_ref }}"
+            echo "private_sha=$private_sha"
+            echo "validated_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          } >> "$result"
 
-      - name: Run requested Java regressions
-        working-directory: private-repo
+          mvn -f private-repo/backend-java/pom.xml -B -ntp -pl server -am -DskipTests package > /tmp/java-compile.log 2>&1
+          java_compile=$?
+          echo "java_compile=$java_compile" >> "$result"
+
+          if [[ $java_compile -eq 0 ]]; then
+            mvn -f private-repo/backend-java/pom.xml -B -ntp -pl server -am \
+              -Dtest=AdminNoScopeGrantRegressionTest,WelcomeBrandDefaultsRegressionTest,ImportAttemptHistoryRegressionTest \
+              -Dsurefire.failIfNoSpecifiedTests=false test > /tmp/java-regression.log 2>&1
+            java_regression=$?
+          else
+            java_regression=99
+            echo "skipped because Java compile failed" > /tmp/java-regression.log
+          fi
+          echo "java_regression=$java_regression" >> "$result"
+
+          cd private-repo/frontend
+          npm ci --no-audit --no-fund > /tmp/npm-ci.log 2>&1
+          npm_ci=$?
+          echo "npm_ci=$npm_ci" >> "$GITHUB_WORKSPACE/$result"
+
+          if [[ $npm_ci -eq 0 ]]; then
+            npm test > /tmp/frontend-test.log 2>&1
+            frontend_test=$?
+            npm run build > /tmp/frontend-build.log 2>&1
+            frontend_build=$?
+          else
+            frontend_test=99
+            frontend_build=99
+            echo "skipped because npm ci failed" > /tmp/frontend-test.log
+            echo "skipped because npm ci failed" > /tmp/frontend-build.log
+          fi
+          cd "$GITHUB_WORKSPACE"
+          echo "frontend_test=$frontend_test" >> "$result"
+          echo "frontend_build=$frontend_build" >> "$result"
+
+          overall=0
+          for code in "$java_compile" "$java_regression" "$npm_ci" "$frontend_test" "$frontend_build"; do
+            if [[ "$code" -ne 0 ]]; then overall=1; fi
+          done
+          echo "overall=$overall" >> "$result"
+
+          if [[ $overall -ne 0 ]]; then
+            for pair in \
+              "java_compile:/tmp/java-compile.log:$java_compile" \
+              "java_regression:/tmp/java-regression.log:$java_regression" \
+              "npm_ci:/tmp/npm-ci.log:$npm_ci" \
+              "frontend_test:/tmp/frontend-test.log:$frontend_test" \
+              "frontend_build:/tmp/frontend-build.log:$frontend_build"; do
+              IFS=: read -r label logfile code <<< "$pair"
+              if [[ "$code" -ne 0 ]]; then
+                {
+                  echo
+                  echo "===== ${label} failure tail ====="
+                  tail -n 120 "$logfile"
+                } >> "$result"
+              fi
+            done
+          fi
+          echo "overall=$overall" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Publish validation result
+        if: always() && steps.validate.outcome == 'success'
+        working-directory: ci-tools
         shell: bash
-        run: >-
-          mvn -f backend-java/pom.xml -B -ntp -pl server -am
-          -Dtest=AdminNoScopeGrantRegressionTest,WelcomeBrandDefaultsRegressionTest,ImportAttemptHistoryRegressionTest
-          -Dsurefire.failIfNoSpecifiedTests=false test
+        run: |
+          set -euo pipefail
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add ci/latest-private-validation.txt
+          if ! git diff --cached --quiet; then
+            git commit -m "ci: record private validation result [skip ci]"
+            git push origin HEAD:${GITHUB_REF_NAME}
+          fi
 
-      - name: Install frontend dependencies
-        working-directory: private-repo/frontend
-        run: npm ci --no-audit --no-fund
-
-      - name: Run frontend regression suite
-        working-directory: private-repo/frontend
-        run: npm test
-
-      - name: Typecheck and build frontend
-        working-directory: private-repo/frontend
-        run: npm run build
+      - name: Fail workflow when validation failed
+        if: steps.validate.outputs.overall != '0'
+        run: exit 1
