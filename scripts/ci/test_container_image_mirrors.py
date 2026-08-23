@@ -38,6 +38,29 @@ def inspect_manifest(image: str) -> tuple[str, int, str]:
         return image, 124, f"timeout after 60s: {exc}"
 
 
+def fake_docker(root: Path, *, mirror_fails: bool) -> tuple[dict[str, str], Path]:
+    bin_dir = root / "bin"
+    bin_dir.mkdir()
+    log = root / "docker.log"
+    fake = bin_dir / "docker"
+    fake.write_text(
+        """#!/usr/bin/env bash
+set -euo pipefail
+printf '%s\n' "$*" >> "${DOCKER_LOG}"
+if [[ "$1 $2" == "image inspect" ]]; then exit 1; fi
+if [[ "$1" == "pull" && "$2" == m.daocloud.io/* && "${MIRROR_FAILS:-0}" == "1" ]]; then exit 1; fi
+exit 0
+""",
+        encoding="utf-8",
+    )
+    fake.chmod(fake.stat().st_mode | stat.S_IXUSR)
+    env = os.environ.copy()
+    env["PATH"] = f"{bin_dir}:{env['PATH']}"
+    env["DOCKER_LOG"] = str(log)
+    env["MIRROR_FAILS"] = "1" if mirror_fails else "0"
+    return env, log
+
+
 class ContainerMirrorTest(unittest.TestCase):
     def test_all_required_mirror_tags_have_manifests(self) -> None:
         failures: list[str] = []
@@ -52,24 +75,7 @@ class ContainerMirrorTest(unittest.TestCase):
     def test_fallback_pulls_official_and_tags_preferred_name(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            bin_dir = root / "bin"
-            bin_dir.mkdir()
-            log = root / "docker.log"
-            fake = bin_dir / "docker"
-            fake.write_text(
-                """#!/usr/bin/env bash
-set -euo pipefail
-printf '%s\\n' \"$*\" >> \"${DOCKER_LOG}\"
-if [[ \"$1 $2\" == \"image inspect\" ]]; then exit 1; fi
-if [[ \"$1\" == \"pull\" && \"$2\" == m.daocloud.io/* ]]; then exit 1; fi
-exit 0
-""",
-                encoding="utf-8",
-            )
-            fake.chmod(fake.stat().st_mode | stat.S_IXUSR)
-            env = os.environ.copy()
-            env["PATH"] = f"{bin_dir}:{env['PATH']}"
-            env["DOCKER_LOG"] = str(log)
+            env, log = fake_docker(root, mirror_fails=True)
             mirror = "m.daocloud.io/docker.io/library/mysql:8.4"
             official = "docker.io/library/mysql:8.4"
             result = subprocess.run(
@@ -84,6 +90,25 @@ exit 0
             self.assertIn(f"pull {mirror}", calls)
             self.assertIn(f"pull {official}", calls)
             self.assertIn(f"tag {official} {mirror}", calls)
+
+    def test_legacy_docker_hub_name_prefers_mainland_mirror_without_env_change(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            env, log = fake_docker(root, mirror_fails=False)
+            legacy = "mysql:8.4"
+            mirror = "m.daocloud.io/docker.io/library/mysql:8.4"
+            result = subprocess.run(
+                ["bash", str(PULL), legacy],
+                text=True,
+                capture_output=True,
+                check=False,
+                env=env,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            calls = log.read_text(encoding="utf-8").splitlines()
+            self.assertIn(f"pull {mirror}", calls)
+            self.assertIn(f"tag {mirror} {legacy}", calls)
+            self.assertFalse(any(call == f"pull {legacy}" for call in calls))
 
 
 if __name__ == "__main__":
