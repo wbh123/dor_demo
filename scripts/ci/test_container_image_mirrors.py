@@ -6,6 +6,7 @@ import stat
 import subprocess
 import tempfile
 import unittest
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -23,18 +24,30 @@ IMAGES = (
 )
 
 
+def inspect_manifest(image: str) -> tuple[str, int, str]:
+    try:
+        result = subprocess.run(
+            ["docker", "manifest", "inspect", image],
+            text=True,
+            capture_output=True,
+            check=False,
+            timeout=60,
+        )
+        return image, result.returncode, result.stdout + result.stderr
+    except subprocess.TimeoutExpired as exc:
+        return image, 124, f"timeout after 60s: {exc}"
+
+
 class ContainerMirrorTest(unittest.TestCase):
     def test_all_required_mirror_tags_have_manifests(self) -> None:
-        for image in IMAGES:
-            with self.subTest(image=image):
-                result = subprocess.run(
-                    ["docker", "manifest", "inspect", image],
-                    text=True,
-                    capture_output=True,
-                    check=False,
-                    timeout=90,
-                )
-                self.assertEqual(result.returncode, 0, f"{image}\n{result.stdout}\n{result.stderr}")
+        failures: list[str] = []
+        with ThreadPoolExecutor(max_workers=len(IMAGES)) as executor:
+            futures = [executor.submit(inspect_manifest, image) for image in IMAGES]
+            for future in as_completed(futures):
+                image, code, output = future.result()
+                if code != 0:
+                    failures.append(f"{image}: exit={code}\n{output}")
+        self.assertFalse(failures, "\n\n".join(failures))
 
     def test_fallback_pulls_official_and_tags_preferred_name(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
