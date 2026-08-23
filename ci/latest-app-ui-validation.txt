@@ -12,139 +12,139 @@ overall=1
 # Subtest: visual editor converts font points to millimeters with the same physical formula as Android print
 ok 67 - visual editor converts font points to millimeters with the same physical formula as Android print
   ---
-  duration_ms: 0.69781
+  duration_ms: 0.883632
   type: 'test'
   ...
 # Subtest: visual editor is isolated in a full-screen overlay and preserves canvas width
 ok 68 - visual editor is isolated in a full-screen overlay and preserves canvas width
   ---
-  duration_ms: 1.406067
+  duration_ms: 4.814991
   type: 'test'
   ...
 # Subtest: revision history stays on management page instead of element properties
 ok 69 - revision history stays on management page instead of element properties
   ---
-  duration_ms: 0.574768
+  duration_ms: 0.62575
   type: 'test'
   ...
 # Subtest: element properties use compact grouped controls
 ok 70 - element properties use compact grouped controls
   ---
-  duration_ms: 0.358755
+  duration_ms: 0.400168
   type: 'test'
   ...
 # Subtest: floor and room units are appended exactly once and can be hidden per element
 ok 71 - floor and room units are appended exactly once and can be hidden per element
   ---
-  duration_ms: 0.687064
+  duration_ms: 0.794726
   type: 'test'
   ...
 # Subtest: template API preserves semantic Chinese suffixes while allowing explicit override
 ok 72 - template API preserves semantic Chinese suffixes while allowing explicit override
   ---
-  duration_ms: 0.431093
+  duration_ms: 0.463647
   type: 'test'
   ...
 # Subtest: database migration makes custom print templates platform-controlled
 ok 73 - database migration makes custom print templates platform-controlled
   ---
-  duration_ms: 0.587035
+  duration_ms: 0.582209
   type: 'test'
   ...
 # Subtest: QR code drag uses live element geometry instead of stale canonical preview coordinates
 ok 74 - QR code drag uses live element geometry instead of stale canonical preview coordinates
   ---
-  duration_ms: 0.707455
+  duration_ms: 0.776683
   type: 'test'
   ...
 # Subtest: QR code canvas renders a cached single path instead of rebuilding hundreds of rect nodes while dragging
 ok 75 - QR code canvas renders a cached single path instead of rebuilding hundreds of rect nodes while dragging
   ---
-  duration_ms: 0.434969
+  duration_ms: 0.514752
   type: 'test'
   ...
 # Subtest: QR code size controls keep square geometry when width or height changes
 ok 76 - QR code size controls keep square geometry when width or height changes
   ---
-  duration_ms: 0.34144
+  duration_ms: 0.394036
   type: 'test'
   ...
 # Subtest: admin editor loads the exact same pinned static Regular and Bold Noto Sans SC resources as backend/mobile
 ok 77 - admin editor loads the exact same pinned static Regular and Bold Noto Sans SC resources as backend/mobile
   ---
-  duration_ms: 1.586075
+  duration_ms: 1.803622
   type: 'test'
   ...
 # Subtest: font loader rejects SPA fallback or corrupted bytes before FontFace sees them
 ok 78 - font loader rejects SPA fallback or corrupted bytes before FontFace sees them
   ---
-  duration_ms: 0.423552
+  duration_ms: 0.466332
   type: 'test'
   ...
 # Subtest: editor registers distinct 400 and 700 FontFace bytes instead of cloning a variable font
 ok 79 - editor registers distinct 400 and 700 FontFace bytes instead of cloning a variable font
   ---
-  duration_ms: 0.601216
+  duration_ms: 0.590544
   type: 'test'
   ...
 # Subtest: canonical font loading and automatic preview are single-flight to avoid starving API requests
 ok 80 - canonical font loading and automatic preview are single-flight to avoid starving API requests
   ---
-  duration_ms: 0.52301
+  duration_ms: 0.600012
   type: 'test'
   ...
 # Subtest: nginx never rewrites missing font files to index.html
 ok 81 - nginx never rewrites missing font files to index.html
   ---
-  duration_ms: 0.559674
+  duration_ms: 0.531082
   type: 'test'
   ...
 # Subtest: residency list uses server pagination and renders only returned rows
 ok 82 - residency list uses server pagination and renders only returned rows
   ---
-  duration_ms: 1.199439
+  duration_ms: 6.546581
   type: 'test'
   ...
 # Subtest: bed confirmation room list uses server pagination for its bounded room review list
 ok 83 - bed confirmation room list uses server pagination for its bounded room review list
   ---
-  duration_ms: 0.22775
+  duration_ms: 0.271347
   type: 'test'
   ...
 # Subtest: default role provisioning supports no-access and hierarchical concrete scope selection
 ok 84 - default role provisioning supports no-access and hierarchical concrete scope selection
   ---
-  duration_ms: 1.583511
+  duration_ms: 1.585474
   type: 'test'
   ...
 # Subtest: student welcome exposes a display switch and studentName token
 ok 85 - student welcome exposes a display switch and studentName token
   ---
-  duration_ms: 0.27472
+  duration_ms: 0.313426
   type: 'test'
   ...
 # Subtest: platform site images are uploaded rather than edited as URLs
 ok 86 - platform site images are uploaded rather than edited as URLs
   ---
-  duration_ms: 0.448248
+  duration_ms: 0.423231
   type: 'test'
   ...
 # Subtest: import upload attempts reuse a key only for transport retry and rotate it after success
 ok 87 - import upload attempts reuse a key only for transport retry and rotate it after success
   ---
-  duration_ms: 0.452194
+  duration_ms: 0.478736
   type: 'test'
   ...
 # Subtest: student table hidden action menu cannot create vertical scroll blank space
 ok 88 - student table hidden action menu cannot create vertical scroll blank space
   ---
-  duration_ms: 1.116515
+  duration_ms: 0.323615
   type: 'test'
   ...
 # Subtest: public app download page is memorable, mobile friendly and exposes direct-download QR
 not ok 89 - public app download page is memorable, mobile friendly and exposes direct-download QR
   ---
-  duration_ms: 0.438274
+  duration_ms: 1.2673
   type: 'test'
   location: '/home/runner/work/dor_demo/dor_demo/private-repo/frontend/src/views/admin/requested-admin-fixes.spec.ts:63:1'
   failureType: 'testCodeFailure'
@@ -164,7 +164,7 @@ not ok 89 - public app download page is memorable, mobile friendly and exposes d
 # Subtest: welcome token is the real student name and save action is in the card header
 not ok 90 - welcome token is the real student name and save action is in the card header
   ---
-  duration_ms: 0.305255
+  duration_ms: 0.370583
   type: 'test'
   location: '/home/runner/work/dor_demo/dor_demo/private-repo/frontend/src/views/admin/requested-admin-fixes.spec.ts:78:1'
   failureType: 'testCodeFailure'
@@ -184,19 +184,19 @@ not ok 90 - welcome token is the real student name and save action is in the car
 # Subtest: business boolean settings use the shared system switch language
 ok 91 - business boolean settings use the shared system switch language
   ---
-  duration_ms: 0.794315
+  duration_ms: 0.904011
   type: 'test'
   ...
 # Subtest: all business file and image upload surfaces use one upload field component
 ok 92 - all business file and image upload surfaces use one upload field component
   ---
-  duration_ms: 1.115694
+  duration_ms: 0.821245
   type: 'test'
   ...
 # Subtest: object operation history displays business names instead of database primary keys
 ok 93 - object operation history displays business names instead of database primary keys
   ---
-  duration_ms: 0.700064
+  duration_ms: 0.490267
   type: 'test'
   ...
 1..93
@@ -207,7 +207,7 @@ ok 93 - object operation history displays business names instead of database pri
 # cancelled 0
 # skipped 0
 # todo 0
-# duration_ms 1134.91999
+# duration_ms 1212.107185
 ===== build failure tail =====
 
 > wust-dormitory-select-frontend@1.0.0 build
@@ -224,9 +224,9 @@ ok 93 - object operation history displays business names instead of database pri
 > openapi-typescript ../backend-java/model/src/main/resources/openapi-interface.yaml -o src/api/schema.d.ts && openapi-typescript ../backend-java/model/src/main/resources/admin/openapi-system-readiness.yaml -o src/api/systemReadinessSchema.d.ts
 
 ✨ openapi-typescript 7.13.0
-🚀 ../backend-java/model/src/main/resources/openapi-interface.yaml → src/api/schema.d.ts [351.2ms]
+🚀 ../backend-java/model/src/main/resources/openapi-interface.yaml → src/api/schema.d.ts [377ms]
 ✨ openapi-typescript 7.13.0
-🚀 ../backend-java/model/src/main/resources/admin/openapi-system-readiness.yaml → src/api/systemReadinessSchema.d.ts [36.4ms]
+🚀 ../backend-java/model/src/main/resources/admin/openapi-system-readiness.yaml → src/api/systemReadinessSchema.d.ts [33.6ms]
 src/views/admin/AdminDashboardView.vue(177,230): error TS2322: Type '{ token: string; label: string; example: string; }[]' is not assignable to type 'Record<string, string>'.
   Index signature for type 'string' is missing in type '{ token: string; label: string; example: string; }[]'.
 src/views/admin/AdminDashboardView.vue(178,269): error TS2322: Type '{ token: string; label: string; example: string; }[]' is not assignable to type 'Record<string, string>'.
@@ -265,7 +265,7 @@ Ran 3 tests in 0.001s
 OK
 ......
 ----------------------------------------------------------------------
-Ran 6 tests in 0.001s
+Ran 6 tests in 0.002s
 
 OK
 ..
@@ -275,7 +275,7 @@ Ran 2 tests in 0.001s
 OK
 ..
 ----------------------------------------------------------------------
-Ran 2 tests in 0.066s
+Ran 2 tests in 0.067s
 
 OK
 Runtime error and data correctness private migration contract passed
