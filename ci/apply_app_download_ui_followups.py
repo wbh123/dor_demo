@@ -85,4 +85,11 @@ replace_required(
     '是否允许学校管理员修改学校主题，由授权中心或套餐设置决定。',
 )
 
+# The public app metadata and QR image must both remain reachable without authentication.
+replace_required(
+    'backend-java/server/src/main/java/com/wust/dormitory/security/SecurityConfig.java',
+    '"/api/v1/mobile/app-version",',
+    '"/api/v1/mobile/app-version/**",',
+)
+
 print('app download UI followups applied')
