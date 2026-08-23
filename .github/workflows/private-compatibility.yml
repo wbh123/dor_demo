@@ -10,29 +10,19 @@ on:
 permissions:
   contents: write
 
-concurrency:
-  group: private-feature-${{ github.ref_name }}
-  cancel-in-progress: true
-
 jobs:
-  frontend-red:
+  feature-red:
     runs-on: ubuntu-latest
     steps:
       - name: Resolve private branch
         id: target
-        shell: bash
-        run: |
-          set -euo pipefail
-          private_ref="${GITHUB_REF_NAME#private-compat/}"
-          echo "private_ref=$private_ref" >> "$GITHUB_OUTPUT"
-      - name: Checkout helper branch
-        uses: actions/checkout@v5
+        run: echo "private_ref=${GITHUB_REF_NAME#private-compat/}" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v5
         with:
           ref: ${{ github.ref_name }}
           path: ci-tools
           persist-credentials: true
-      - name: Checkout private branch
-        uses: actions/checkout@v5
+      - uses: actions/checkout@v5
         with:
           repository: wbh123/Wust-Dormitory-Select
           ref: ${{ steps.target.outputs.private_ref }}
@@ -44,42 +34,41 @@ jobs:
           node-version: '22'
           cache: npm
           cache-dependency-path: private-repo/frontend/package-lock.json
-      - name: Run private frontend tests
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: private-repo/backend-java/pom.xml
+      - name: Run feature tests
         id: test
         shell: bash
         run: |
           set +e
           cd private-repo/frontend
-          npm ci --no-audit --no-fund > /tmp/npm-ci.log 2>&1
-          npm_ci=$?
-          if [[ $npm_ci -eq 0 ]]; then npm test > /tmp/frontend-test.log 2>&1; frontend_test=$?; else frontend_test=99; fi
+          npm ci --no-audit --no-fund >/tmp/npm.log 2>&1; npm_ci=$?
+          if [[ $npm_ci -eq 0 ]]; then npm test >/tmp/front.log 2>&1; frontend=$?; else frontend=99; fi
           cd "$GITHUB_WORKSPACE"
+          mvn -f private-repo/backend-java/pom.xml -B -ntp -pl server -am -Dtest=MobileAppVersionControllerTest -Dsurefire.failIfNoSpecifiedTests=false test >/tmp/java.log 2>&1; java=$?
           result="ci-tools/ci/latest-feature-validation.txt"
           {
             echo "private_ref=${{ steps.target.outputs.private_ref }}"
             echo "private_head=$(git -C private-repo rev-parse HEAD)"
             echo "npm_ci=$npm_ci"
-            echo "frontend_test=$frontend_test"
-            if [[ $frontend_test -ne 0 && -f /tmp/frontend-test.log ]]; then
-              echo "===== frontend_test failure tail ====="
-              tail -n 160 /tmp/frontend-test.log
-            fi
+            echo "frontend_test=$frontend"
+            echo "java_qr_test=$java"
+            for pair in frontend:/tmp/front.log:$frontend java:/tmp/java.log:$java; do IFS=: read -r label log code <<< "$pair"; if [[ $code -ne 0 ]]; then echo "===== $label failure tail ====="; tail -n 120 "$log"; fi; done
           } > "$result"
-          echo "frontend_test=$frontend_test" >> "$GITHUB_OUTPUT"
+          echo "failed=$(( frontend != 0 || java != 0 ))" >> "$GITHUB_OUTPUT"
           exit 0
-      - name: Publish feature validation result
+      - name: Publish result
         if: always()
         working-directory: ci-tools
-        shell: bash
         run: |
-          set -euo pipefail
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           git add ci/latest-feature-validation.txt
-          if ! git diff --cached --quiet; then
-            git commit -m "ci: record feature validation [skip ci]"
-            git push origin HEAD:${GITHUB_REF_NAME}
-          fi
-      - name: Fail on frontend test failure
-        if: steps.test.outputs.frontend_test != '0'
+          if ! git diff --cached --quiet; then git commit -m "ci: record feature validation [skip ci]" && git push origin HEAD:${GITHUB_REF_NAME}; fi
+      - name: Fail on expected red
+        if: steps.test.outputs.failed != '0'
         run: exit 1
