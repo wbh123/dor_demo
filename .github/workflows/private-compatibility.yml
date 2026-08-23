@@ -19,6 +19,7 @@ on:
       - 'ci/apply_sidebar_public_site_config.py'
       - 'ci/apply_mybatis_sql_gate_cleanup.py'
       - 'ci/apply_system_contract_alignment.py'
+      - 'ci/apply_streaming_import_contract_alignment.py'
 
 permissions:
   contents: write
@@ -86,7 +87,8 @@ jobs:
               apply_app_download_entitlement_status.py \
               apply_sidebar_public_site_config.py \
               apply_mybatis_sql_gate_cleanup.py \
-              apply_system_contract_alignment.py; do
+              apply_system_contract_alignment.py \
+              apply_streaming_import_contract_alignment.py; do
               python "ci-tools/ci/$helper" >>/tmp/patch.log 2>&1
               patch=$?
               [[ $patch -eq 0 ]] || break
