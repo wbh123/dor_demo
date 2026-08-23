@@ -49,7 +49,7 @@ Ran 2 tests in 0.001s
 OK
 ..
 ----------------------------------------------------------------------
-Ran 2 tests in 0.064s
+Ran 2 tests in 0.068s
 
 OK
 Runtime error and data correctness private migration contract passed
@@ -77,7 +77,7 @@ OK
 test_cancel_reselection_resets_redis_projection_and_refreshes_room_profile (__main__.StudentReselectionRuntimeResetContractTest.test_cancel_reselection_resets_redis_projection_and_refreshes_room_profile) ... ok
 
 ----------------------------------------------------------------------
-Ran 1 test in 0.000s
+Ran 1 test in 0.001s
 
 OK
 personal preference policy operation contract passed
@@ -153,7 +153,7 @@ Selection load runtime diagnostics contract: OK (1000-user local default, 2000-u
 Selection load low-disturbance and server concurrency contract: OK
 ...........
 ----------------------------------------------------------------------
-Ran 11 tests in 0.051s
+Ran 11 tests in 0.061s
 
 OK
 Selection SSE load fixture contract: OK (batch-wide per-student subscription)
@@ -187,9 +187,14 @@ Site metadata, controlled site assets, student theme and admin student catalog O
 School sidebar branding metadata and startup dependency contract passed
 System contract validation passed: 329 OpenAPI paths, 318 backend test classes
 phase2/phase3 operations contract: OK
+async import, recovery and anomaly workflow contracts are present
+allocation/governance/readiness regressions: OK
+country welcome, branding and room-exchange contract: OK
+waitlist core contract: OK
+V25 integrated workflow contracts passed
 Traceback (most recent call last):
-  File "/home/runner/work/dor_demo/dor_demo/private-repo/scripts/ci/test_import_recovery_anomaly_workflows.py", line 58, in <module>
-    require(import_worker, token, f"background import worker missing behavior: {token}")
-  File "/home/runner/work/dor_demo/dor_demo/private-repo/scripts/ci/test_import_recovery_anomaly_workflows.py", line 15, in require
-    raise AssertionError(message)
-AssertionError: background import worker missing behavior: SpreadsheetSupport.read
+  File "/home/runner/work/dor_demo/dor_demo/private-repo/scripts/ci/test_admin_scope_questionnaire_team_ux.py", line 49, in <module>
+    require(admin_data, ("PhoneDialCodeSelect", "TransientNotice", "student-category-switch-top", "/api/v1/admin/students/${student.id}/direct-assignment", "'/api/v1/admin/residencies'", "master-data-card-body"), "administrator student page is missing required layout or placement behavior")
+  File "/home/runner/work/dor_demo/dor_demo/private-repo/scripts/ci/test_admin_scope_questionnaire_team_ux.py", line 39, in require
+    raise AssertionError(f"{context}: {token}")
+AssertionError: administrator student page is missing required layout or placement behavior: /api/v1/admin/students/${student.id}/direct-assignment
